@@ -13,6 +13,17 @@ It runs with **zero external services** — no API keys, no Postgres, no browser
 intake → policy check → proof-gap → drafting → engage → negotiate → resolved
 ```
 
+## Run in 30 seconds
+
+```bash
+git clone https://github.com/sumanthbolle/Summaverick.git
+cd Summaverick/summaverick        # the project lives in the summaverick/ subfolder
+pip install -r requirements.txt
+bash scripts/demo.sh              # watch a case resolve itself in the terminal
+```
+
+That's it — no API keys, no database, no browser needed. Requires **Python 3.11+**.
+
 ## Quick start
 
 ```bash
