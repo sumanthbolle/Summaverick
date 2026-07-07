@@ -22,7 +22,10 @@ pip install -r requirements.txt
 bash scripts/demo.sh              # watch a case resolve itself in the terminal
 ```
 
-That's it — no API keys, no database, no browser needed. Requires **Python 3.11+**.
+That's it — no API keys, no database, no browser needed.
+
+**Python:** 3.11+ recommended. On macOS's built-in Python 3.9 use `pip3`/`python3`;
+`requirements.txt` pulls in `eval_type_backport` so it still runs on 3.9.
 
 ## Quick start
 
