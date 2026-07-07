@@ -22,6 +22,8 @@ CID=$(curl -s -X POST "localhost:$PORT/demo/run?scenario=$SCENARIO" \
        | python3 -c "import sys,json; print(json.load(sys.stdin)['case_id'])")
 echo "▶ case id: $CID — streaming live events:"
 echo "--------------------------------------------------------"
-timeout 15 curl -s -N "localhost:$PORT/case/$CID/stream" || true
+# --max-time caps the stream (portable; macOS has no GNU `timeout`). The SSE
+# stream also ends itself with a `done` event once the case resolves.
+curl --max-time 20 -s -N "localhost:$PORT/case/$CID/stream" || true
 echo "--------------------------------------------------------"
 echo "▶ done."
