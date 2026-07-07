@@ -37,6 +37,8 @@
     .banner { margin-top:16px; padding:14px; border-radius:10px; text-align:center;
               font-size:16px; font-weight:600; display:none; }
     .banner.show { display:block; background:rgba(35,134,54,.15); border:1px solid var(--agent); }
+    .banner.error { background:rgba(248,81,73,.15); border-color:#f85149; font-weight:500; }
+    #status { font-size:12px; color:var(--muted); }
   </style>
 </head>
 <body>
@@ -54,6 +56,7 @@
         </select>
       </label>
       <button id="start">▶ Start Demo (Swiggy missing item)</button>
+      <span id="status">checking backend…</span>
     </div>
 
     <div class="timeline" id="timeline"></div>
@@ -104,8 +107,18 @@
       reached = new Set(["Intake","Policy","Drafting"]);
       renderTimeline("Engaging");
 
-      const res = await fetch(`${backend}/demo/run?scenario=${scenario}`, { method: "POST" });
-      const { case_id } = await res.json();
+      let case_id;
+      try {
+        const res = await fetch(`${backend}/demo/run?scenario=${scenario}`, { method: "POST" });
+        ({ case_id } = await res.json());
+      } catch (err) {
+        banner.textContent = `⚠️ Can't reach the backend at ${backend}. ` +
+          `Start it first:  python3 -m uvicorn backend.main:app --port 8099`;
+        banner.className = "banner show error";
+        btn.disabled = false;
+        return;
+      }
+      addMsg("system", `— case ${case_id} created —`);
 
       const es = new EventSource(`${backend}/case/${case_id}/stream`);
       es.addEventListener("agent_sent", e => addMsg("agent", JSON.parse(e.data).message));
@@ -129,6 +142,23 @@
     });
 
     renderTimeline("");
+
+    // Ping the backend on load so the user knows whether it's up.
+    async function checkBackend() {
+      const backend = document.getElementById("backend").value.replace(/\/$/, "");
+      const status = document.getElementById("status");
+      try {
+        const r = await fetch(`${backend}/health`);
+        const j = await r.json();
+        status.textContent = `backend up ✓ (NIM ${j.nim_online ? "online" : "offline"})`;
+        status.style.color = "#3fb950";
+      } catch {
+        status.textContent = "backend not reachable — start it: python3 -m uvicorn backend.main:app --port 8099";
+        status.style.color = "#f85149";
+      }
+    }
+    document.getElementById("backend").addEventListener("change", checkBackend);
+    checkBackend();
   </script>
 </body>
 </html>
