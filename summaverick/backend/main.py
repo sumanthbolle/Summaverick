@@ -22,7 +22,9 @@ from typing import Any
 
 from fastapi import Body, FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
 from .agents import orchestrator
 from .memory.db import AutonomyLevel, CaseStatus, store
@@ -40,6 +42,12 @@ app.add_middleware(
 async def health() -> dict[str, Any]:
     from .llm.nim_client import client as nim
     return {"status": "ok", "nim_online": nim.online}
+
+
+@app.get("/")
+async def index() -> FileResponse:
+    """Serve the demo UI same-origin (avoids file:// + CORS issues)."""
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
 # --------------------------------------------------------------------- #

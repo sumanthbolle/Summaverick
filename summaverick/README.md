@@ -37,9 +37,9 @@ pip install -r requirements.txt
 bash scripts/demo.sh            # cooperative bot
 bash scripts/demo.sh stubborn   # bot denies first → agent escalates tone
 
-# Or run the API + open the live UI:
+# Or run the API + live UI, then open http://localhost:8099/ and press “Start Demo”:
 python -m uvicorn backend.main:app --port 8099
-#   then open frontend/index.html in a browser and press “Start Demo”
+#   the UI is served same-origin at / (no CORS/file:// issues)
 
 # Tests:
 pytest -q

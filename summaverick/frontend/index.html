@@ -67,6 +67,13 @@
   </main>
 
   <script>
+    // When served by the backend (http://localhost:8099/), use that origin so
+    // everything is same-origin. When opened via file://, fall back to :8099.
+    (function () {
+      const f = document.getElementById("backend");
+      f.value = location.protocol.startsWith("http") ? location.origin : "http://localhost:8099";
+    })();
+
     const STAGES = ["Intake","Policy","Drafting","Engaging","Escalating","Resolved"];
     const chat = document.getElementById("chat");
     const banner = document.getElementById("banner");
