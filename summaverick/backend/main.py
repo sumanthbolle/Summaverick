@@ -2,11 +2,13 @@
 
 Endpoints:
   GET  /health
-  POST /case/create               intake -> policy -> proof_gap -> draft
-  GET  /case/{id}                  full case + policy/proof info
+  POST /case/create               intake -> proof_gap -> draft
+  GET  /case/{id}                  full case (404 if unknown)
   GET  /cases                      list cases
+  POST /case/{id}/proof            add evidence, re-check gaps, draft
   POST /case/{id}/approve          approve draft and start engaging (async)
-  POST /case/{id}/engage           alias for approve (explicit engage)
+  POST /case/{id}/engage           alias for approve
+  POST /case/{id}/accept           accept a paused refund offer
   GET  /case/{id}/stream           SSE live event stream
   POST /simulate/bot/start         start a mock-bot session (external demos)
   POST /simulate/bot/reply         mock-bot reply (external demos)
@@ -20,7 +22,7 @@ import os
 import tempfile
 from typing import Any
 
-from fastapi import Body, FastAPI, File, Form, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 
@@ -65,6 +67,9 @@ async def create_case(
     supplied_proof: str | None = Form(None),  # comma-separated
     screenshot: UploadFile | None = File(None),
 ) -> dict[str, Any]:
+    if autonomy_level not in {a.value for a in AutonomyLevel}:
+        raise HTTPException(422, f"invalid autonomy_level: {autonomy_level}")
+
     screenshot_path = None
     if screenshot is not None:
         suffix = os.path.splitext(screenshot.filename or "")[1] or ".png"
@@ -73,17 +78,21 @@ async def create_case(
             fh.write(await screenshot.read())
 
     proof = [p.strip() for p in supplied_proof.split(",")] if supplied_proof else []
-    case = await orchestrator.process_intake(
-        user_id=user_id,
-        platform=platform.lower(),
-        text=text,
-        screenshot_path=screenshot_path,
-        supplied_proof=proof,
-        autonomy_level=autonomy_level,
-        desired_outcome=desired_outcome,
-        threshold=threshold,
-        scenario=scenario,
-    )
+    try:
+        case = await orchestrator.process_intake(
+            user_id=user_id,
+            platform=platform.lower(),
+            text=text,
+            screenshot_path=screenshot_path,
+            supplied_proof=proof,
+            autonomy_level=autonomy_level,
+            desired_outcome=desired_outcome,
+            threshold=threshold,
+            scenario=scenario,
+        )
+    finally:
+        if screenshot_path and os.path.exists(screenshot_path):
+            os.unlink(screenshot_path)  # don't leak the uploaded file on disk
 
     # Auto modes proceed to engagement in the background.
     if case["status"] != CaseStatus.awaiting_proof.value and \
@@ -95,7 +104,9 @@ async def create_case(
 @app.get("/case/{case_id}")
 async def get_case(case_id: str) -> dict[str, Any]:
     case = store.get_case(case_id)
-    return case or {"error": "not found"}
+    if not case:
+        raise HTTPException(404, "case not found")
+    return case
 
 
 @app.get("/cases")
@@ -103,15 +114,38 @@ async def list_cases(user_id: str | None = None) -> list[dict[str, Any]]:
     return store.list_cases(user_id)
 
 
+@app.post("/case/{case_id}/proof")
+async def add_proof(case_id: str, supplied_proof: str = Form("")) -> dict[str, Any]:
+    """User confirms/attaches evidence; re-checks gaps and drafts if satisfied."""
+    if not store.get_case(case_id):
+        raise HTTPException(404, "case not found")
+    proof = [p.strip() for p in supplied_proof.split(",") if p.strip()]
+    case = await orchestrator.add_proof(case_id, proof)
+    if case["status"] != CaseStatus.awaiting_proof.value and \
+            case.get("autonomy_level") != AutonomyLevel.suggest.value:
+        asyncio.create_task(orchestrator.engage(case_id))
+    return case
+
+
 @app.post("/case/{case_id}/approve")
 async def approve_case(case_id: str) -> dict[str, Any]:
     case = store.get_case(case_id)
     if not case:
-        return {"error": "not found"}
+        raise HTTPException(404, "case not found")
     if not case.get("draft"):
-        return {"error": "no draft to approve"}
+        raise HTTPException(409, "case has no draft to approve")
+    if case["status"] != CaseStatus.awaiting_approval.value:
+        raise HTTPException(409, f"case is {case['status']}, cannot approve")
     asyncio.create_task(orchestrator.engage(case_id))
-    return {"case_id": case_id, "status": "engaging"}
+    return {"case_id": case_id, "status": CaseStatus.engaging.value}
+
+
+@app.post("/case/{case_id}/accept")
+async def accept_case(case_id: str) -> dict[str, Any]:
+    """Accept a paused refund offer (suggest / auto_send / below-threshold)."""
+    if not store.get_case(case_id):
+        raise HTTPException(404, "case not found")
+    return await orchestrator.accept_offer(case_id)
 
 
 # alias
@@ -121,15 +155,28 @@ app.add_api_route("/case/{case_id}/engage", approve_case, methods=["POST"])
 @app.get("/case/{case_id}/stream")
 async def stream_case(case_id: str) -> StreamingResponse:
     async def gen():
-        # Replay a snapshot first so late subscribers see current state.
         case = store.get_case(case_id)
-        if case:
-            yield _sse("snapshot", {"status": case["status"], "transcript": case["transcript"]})
-        async for evt in events.subscribe(case_id):
-            yield _sse(evt["event"], evt["data"])
+        if not case:
+            yield _sse("error", {"detail": "not found"})
+            yield _sse("done", {})
+            return
+        if events.has(case_id):
+            # Live or recently finished — stream buffered history + live events.
+            async for evt in events.subscribe(case_id):
+                yield _sse(evt["event"], evt["data"])
+        else:
+            # Not tracked by the hub (never engaged / long finished): static replay.
+            yield _sse("snapshot", {
+                "status": case["status"], "transcript": case["transcript"],
+                "refund_amount": case.get("refund_amount"),
+            })
         yield _sse("done", {})
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def _sse(event: str, data: dict[str, Any]) -> str:

@@ -44,6 +44,21 @@ def test_guardrails_redaction_and_block():
     assert check_outbound("Order ORD12345678901 issue").allowed is True
 
 
+def test_guardrail_keeps_numeric_order_id():
+    # A numeric order/ref id must NOT be scrubbed as a phone number.
+    assert "9812345678" in redact("Order ID: 9812345678, item missing")
+    assert check_outbound("Order ID: 9812345678, item missing").allowed is True
+    # But a bare phone number with no order hint is still PII.
+    assert "[PHONE_REDACTED]" in redact("reach me on 9812345678")
+    assert check_outbound("reach me on 9812345678").allowed is False
+
+
+def test_intake_handles_amountless_and_junk_text():
+    # Must not raise on comma-only "amount".
+    out = intake_agent.run(text="refund rs. , please", platform="swiggy")
+    assert "amount" not in out["entities"]
+
+
 @pytest.mark.asyncio
 async def test_intake_stops_for_proof_gap():
     case = await orchestrator.process_intake(

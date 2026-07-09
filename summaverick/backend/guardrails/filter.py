@@ -5,8 +5,10 @@ A rule-based stand-in for NeMo Guardrails. Its jobs:
   * block a message from being *sent* if it leaks PII the user has not
     explicitly approved for that case.
 
-This is deliberately conservative: we would rather over-redact a log line than
-leak a phone number into telemetry.
+Order / reference / transaction numbers are needed for the complaint, so a
+numeric run immediately preceded by an "order"/"ref"/"txn"/"booking" hint is
+NOT treated as a phone or card number. This keeps us from silently stripping
+the order ID out of an outbound complaint.
 """
 from __future__ import annotations
 
@@ -20,8 +22,14 @@ _PATTERNS = {
     "card": re.compile(r"(?<!\d)(?:\d[ -]?){13,16}(?!\d)"),
 }
 
-# Order/reference ids are needed for the complaint, so we never treat them as PII.
-_ALLOWED_HINTS = ("order", "ref", "txn", "booking")
+# Patterns whose matches may legitimately be identifiers, not PII.
+_HINT_EXEMPT = ("phone", "card")
+_ALLOWED_HINTS = ("order", "ref", "txn", "transaction", "booking", "invoice")
+
+
+def _preceded_by_hint(text: str, start: int) -> bool:
+    window = text[max(0, start - 24):start].lower()
+    return any(h in window for h in _ALLOWED_HINTS)
 
 
 def redact(text: str) -> str:
@@ -32,8 +40,12 @@ def redact(text: str) -> str:
     # UPI before email so the @handle form is caught first.
     out = _PATTERNS["upi"].sub("[UPI_REDACTED]", out)
     out = _PATTERNS["email"].sub("[EMAIL_REDACTED]", out)
-    out = _PATTERNS["phone"].sub("[PHONE_REDACTED]", out)
-    out = _PATTERNS["card"].sub("[CARD_REDACTED]", out)
+    for name in _HINT_EXEMPT:
+        placeholder = f"[{name.upper()}_REDACTED]"
+        out = _PATTERNS[name].sub(
+            lambda m: m.group(0) if _preceded_by_hint(m.string, m.start()) else placeholder,
+            out,
+        )
     return out
 
 
@@ -48,13 +60,9 @@ def check_outbound(text: str, approved_pii: bool = False) -> GuardResult:
     """Decide whether ``text`` is safe to send to a support channel."""
     findings: list[str] = []
     for name, pat in _PATTERNS.items():
-        if name == "card":
-            # Skip matches that are clearly order/reference numbers.
-            for m in pat.finditer(text):
-                window = text[max(0, m.start() - 24):m.start()].lower()
-                if not any(h in window for h in _ALLOWED_HINTS):
-                    findings.append(name)
-                    break
+        if name in _HINT_EXEMPT:
+            if any(not _preceded_by_hint(text, m.start()) for m in pat.finditer(text)):
+                findings.append(name)
         elif pat.search(text):
             findings.append(name)
 

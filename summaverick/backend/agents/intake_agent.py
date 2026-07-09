@@ -39,9 +39,13 @@ def _extract_entities(text: str) -> dict[str, Any]:
     m = re.search(r"(?:order|ref(?:erence)?|booking)\s*(?:id|no\.?|number|#)?\s*[:#]?\s*([A-Z0-9]{5,})", text, re.I)
     if m:
         entities["order_id"] = m.group(1)
-    m = re.search(r"(?:₹|rs\.?|inr)\s*([\d,]+(?:\.\d{1,2})?)", text, re.I)
+    # Require at least one digit so a run of commas/spaces can't reach float().
+    m = re.search(r"(?:₹|rs\.?|inr)\s*([\d,]*\d[\d,]*(?:\.\d{1,2})?)", text, re.I)
     if m:
-        entities["amount"] = float(m.group(1).replace(",", ""))
+        try:
+            entities["amount"] = float(m.group(1).replace(",", ""))
+        except ValueError:
+            pass
     m = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})\b", text)
     if m:
         entities["date"] = m.group(1)

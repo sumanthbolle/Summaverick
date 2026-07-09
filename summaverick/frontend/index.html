@@ -3,169 +3,408 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Summaverick — Live Case</title>
+  <title>Summaverick — Autonomous Customer Advocacy</title>
   <style>
-    :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --agent:#238636;
-            --bot:#1f6feb; --text:#e6edf3; --muted:#8b949e; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-           background:var(--bg); color:var(--text); }
-    header { padding:16px 20px; border-bottom:1px solid var(--border);
-             display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-    h1 { font-size:18px; margin:0; }
-    .sub { color:var(--muted); font-size:13px; }
-    main { max-width:820px; margin:0 auto; padding:20px; }
-    .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
-    button { background:var(--agent); color:#fff; border:0; border-radius:6px;
-             padding:9px 14px; font-size:14px; cursor:pointer; }
-    button.secondary { background:#21262d; border:1px solid var(--border); }
+    :root {
+      --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#30363d;
+      --agent:#238636; --agent2:#2ea043; --bot:#30363d; --text:#e6edf3;
+      --muted:#8b949e; --accent:#1f6feb; --danger:#f85149; --gold:#e3b341;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+           background:var(--bg); color:var(--text); line-height:1.45; }
+    header { padding:14px 22px; border-bottom:1px solid var(--border); display:flex;
+             align-items:center; gap:12px; position:sticky; top:0; background:var(--bg); z-index:5; }
+    header h1 { font-size:17px; margin:0; letter-spacing:.2px; }
+    .sub { color:var(--muted); font-size:12.5px; }
+    #status { margin-left:auto; font-size:12px; }
+    .wrap { max-width:1080px; margin:0 auto; padding:20px; display:grid;
+            grid-template-columns:340px 1fr; gap:20px; align-items:start; }
+    @media (max-width:820px){ .wrap{ grid-template-columns:1fr; } }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }
+    .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted);
+               margin:0 0 12px; }
+    label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+    input, select, textarea { width:100%; background:var(--panel2); color:var(--text);
+             border:1px solid var(--border); border-radius:8px; padding:9px 10px; font-size:13.5px;
+             font-family:inherit; }
+    textarea { resize:vertical; min-height:76px; }
+    .row { display:flex; gap:10px; } .row > * { flex:1; }
+    button { background:var(--agent); color:#fff; border:0; border-radius:8px; padding:10px 14px;
+             font-size:13.5px; font-weight:600; cursor:pointer; transition:background .15s; }
+    button:hover:not(:disabled){ background:var(--agent2); }
+    button.secondary { background:var(--panel2); border:1px solid var(--border); color:var(--text); font-weight:500; }
+    button.secondary:hover:not(:disabled){ background:#252c3a; }
     button:disabled { opacity:.5; cursor:not-allowed; }
-    select, input { background:var(--panel); color:var(--text); border:1px solid var(--border);
-             border-radius:6px; padding:8px; font-size:13px; }
-    .timeline { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
-    .stage { padding:6px 10px; border:1px solid var(--border); border-radius:999px;
-             font-size:12px; color:var(--muted); }
-    .stage.active { border-color:var(--agent); color:var(--text); }
+    .full { width:100%; margin-top:14px; }
+    .hint { font-size:11.5px; color:var(--muted); margin-top:6px; }
+
+    .timeline { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+    .stage { padding:5px 11px; border:1px solid var(--border); border-radius:999px; font-size:11.5px;
+             color:var(--muted); white-space:nowrap; }
+    .stage.active { border-color:var(--accent); color:#cdd9ff; }
     .stage.done { background:var(--agent); border-color:var(--agent); color:#fff; }
-    .chat { border:1px solid var(--border); border-radius:10px; background:var(--panel);
-            padding:14px; min-height:280px; display:flex; flex-direction:column; gap:10px; }
-    .msg { max-width:80%; padding:10px 12px; border-radius:12px; font-size:14px; white-space:pre-wrap; }
-    .msg.agent { align-self:flex-end; background:var(--agent); }
-    .msg.bot { align-self:flex-start; background:#21262d; border:1px solid var(--border); }
-    .who { font-size:11px; color:var(--muted); margin-bottom:3px; }
-    .system { align-self:center; color:var(--muted); font-size:12px; font-style:italic; }
-    .banner { margin-top:16px; padding:14px; border-radius:10px; text-align:center;
-              font-size:16px; font-weight:600; display:none; }
-    .banner.show { display:block; background:rgba(35,134,54,.15); border:1px solid var(--agent); }
-    .banner.error { background:rgba(248,81,73,.15); border-color:#f85149; font-weight:500; }
-    #status { font-size:12px; color:var(--muted); }
+
+    .chat { display:flex; flex-direction:column; gap:9px; min-height:220px; max-height:52vh;
+            overflow-y:auto; padding:4px 2px; }
+    .msg { max-width:82%; padding:9px 12px; border-radius:13px; font-size:13.5px; white-space:pre-wrap;
+           word-break:break-word; }
+    .msg.agent { align-self:flex-end; background:var(--agent); border-bottom-right-radius:4px; }
+    .msg.bot { align-self:flex-start; background:var(--panel2); border:1px solid var(--border);
+               border-bottom-left-radius:4px; }
+    .who { font-size:10.5px; opacity:.85; margin-bottom:2px; }
+    .system { align-self:center; color:var(--muted); font-size:11.5px; font-style:italic; }
+    .empty { color:var(--muted); font-size:13px; text-align:center; padding:40px 10px; }
+
+    .banner { margin-top:14px; padding:13px 15px; border-radius:10px; display:none; }
+    .banner.show { display:block; }
+    .banner.ok { background:rgba(35,134,54,.16); border:1px solid var(--agent); }
+    .banner.err { background:rgba(248,81,73,.14); border:1px solid var(--danger); }
+    .banner.warn { background:rgba(227,179,65,.14); border:1px solid var(--gold); }
+    .banner .big { font-size:16px; font-weight:700; }
+
+    .draft { background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:11px;
+             font-size:13px; white-space:pre-wrap; margin-top:10px; }
+    .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px;
+            border:1px solid var(--border); color:var(--muted); }
+    .pill.st-resolved { background:rgba(35,134,54,.2); border-color:var(--agent); color:#7ee787; }
+    .pill.st-engaging, .pill.st-processing { background:rgba(31,111,235,.18); border-color:var(--accent); color:#79c0ff; }
+    .pill.st-escalated, .pill.st-awaiting_acceptance, .pill.st-awaiting_approval, .pill.st-awaiting_proof
+          { background:rgba(227,179,65,.16); border-color:var(--gold); color:#f2cc60; }
+    .pill.st-failed { background:rgba(248,81,73,.16); border-color:var(--danger); color:#ff7b72; }
+
+    .hist { display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; }
+    .hist-item { border:1px solid var(--border); border-radius:8px; padding:9px 11px; cursor:pointer;
+                 background:var(--panel2); }
+    .hist-item:hover { border-color:var(--accent); }
+    .hist-item .t { font-size:13px; } .hist-item .m { font-size:11px; color:var(--muted); margin-top:3px; }
+    .prooflist label { display:flex; align-items:center; gap:8px; color:var(--text); font-size:13px; margin:8px 0; }
+    .prooflist input { width:auto; }
+    .actions { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+    .actions button { flex:0 0 auto; }
   </style>
 </head>
 <body>
   <header>
     <h1>🛡️ Summaverick</h1>
-    <span class="sub">Autonomous customer-advocacy agent — live case view (demo mode)</span>
+    <span class="sub">Autonomous customer-advocacy agent</span>
+    <span id="status" class="sub">checking backend…</span>
   </header>
-  <main>
-    <div class="controls">
-      <label class="sub">Backend <input id="backend" value="http://localhost:8099" size="24" /></label>
-      <label class="sub">Bot
-        <select id="scenario">
-          <option value="cooperative">cooperative</option>
-          <option value="stubborn">stubborn (forces escalation)</option>
+
+  <div class="wrap">
+    <!-- LEFT: create + history -->
+    <div style="display:flex; flex-direction:column; gap:20px;">
+      <div class="card">
+        <h2>New case</h2>
+        <label for="platform">Platform</label>
+        <select id="platform">
+          <option value="swiggy">Swiggy</option>
+          <option value="zomato">Zomato</option>
+          <option value="amazon">Amazon</option>
+          <option value="flipkart">Flipkart</option>
+          <option value="netflix">Netflix</option>
         </select>
-      </label>
-      <button id="start">▶ Start Demo (Swiggy missing item)</button>
-      <span id="status">checking backend…</span>
+
+        <label for="text">Describe the issue</label>
+        <textarea id="text" placeholder="e.g. Swiggy order #SWG12345 — paneer roll missing, ₹229 paid"></textarea>
+
+        <label for="outcome">Desired outcome</label>
+        <input id="outcome" value="a full refund" />
+
+        <div class="row">
+          <div>
+            <label for="autonomy">Autonomy</label>
+            <select id="autonomy">
+              <option value="suggest">Suggest — I approve the draft</option>
+              <option value="auto_send">Auto-send — engage for me</option>
+              <option value="full_auto" selected>Full auto — accept refunds</option>
+            </select>
+          </div>
+          <div>
+            <label for="threshold">Auto-accept if ≥ (₹)</label>
+            <input id="threshold" type="number" placeholder="any" min="0" />
+          </div>
+        </div>
+
+        <label for="scenario">Simulated support behavior <span class="sub">(mock bot)</span></label>
+        <select id="scenario">
+          <option value="cooperative">Cooperative</option>
+          <option value="stubborn">Stubborn (forces escalation)</option>
+        </select>
+
+        <button id="create" class="full">Submit case →</button>
+        <button id="demo" class="secondary full" style="margin-top:8px;">▶ Run canned demo</button>
+        <div class="hint">Runs against a built-in mock support bot — no real accounts are touched.</div>
+      </div>
+
+      <div class="card">
+        <h2>Case history</h2>
+        <div id="hist" class="hist"><div class="empty">No cases yet.</div></div>
+      </div>
     </div>
 
-    <div class="timeline" id="timeline"></div>
-    <div class="chat" id="chat">
-      <div class="system">Press “Start Demo” to watch Summaverick resolve a case autonomously.</div>
+    <!-- RIGHT: active case -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <h2 style="margin:0;">Case</h2>
+        <span id="caseid" class="sub"></span>
+        <span id="casepill" class="pill" style="margin-left:auto; display:none;"></span>
+      </div>
+      <div class="timeline" id="timeline"></div>
+      <div id="draftbox"></div>
+      <div class="chat" id="chat"><div class="empty">Submit a case or run the demo to begin.</div></div>
+      <div class="banner" id="banner"></div>
+      <div class="actions" id="actions"></div>
     </div>
-    <div class="banner" id="banner"></div>
-  </main>
+  </div>
 
   <script>
-    // When served by the backend (http://localhost:8099/), use that origin so
-    // everything is same-origin. When opened via file://, fall back to :8099.
-    (function () {
-      const f = document.getElementById("backend");
-      f.value = location.protocol.startsWith("http") ? location.origin : "http://localhost:8099";
-    })();
-
+  (function () {
+    const $ = id => document.getElementById(id);
+    const backend = () => location.protocol.startsWith("http") ? location.origin : "http://localhost:8099";
     const STAGES = ["Intake","Policy","Drafting","Engaging","Escalating","Resolved"];
-    const chat = document.getElementById("chat");
-    const banner = document.getElementById("banner");
-    const timelineEl = document.getElementById("timeline");
+
+    let es = null;                 // current EventSource
+    let current = null;            // current case id
     let reached = new Set();
 
-    function renderTimeline(active) {
-      timelineEl.innerHTML = "";
+    // ---- rendering helpers -------------------------------------------------
+    function timeline(active) {
+      $("timeline").innerHTML = "";
       STAGES.forEach(s => {
         const d = document.createElement("div");
         d.className = "stage" + (reached.has(s) ? " done" : "") + (s === active ? " active" : "");
         d.textContent = s;
-        timelineEl.appendChild(d);
+        $("timeline").appendChild(d);
       });
     }
+    function clearChat() { $("chat").innerHTML = ""; }
     function addMsg(who, text) {
-      if (chat.querySelector(".system")) chat.innerHTML = "";
-      const wrap = document.createElement("div");
-      wrap.className = "msg " + (who === "agent" ? "agent" : who === "bot" ? "bot" : "system");
-      if (who === "system") { wrap.textContent = text; }
+      const empty = $("chat").querySelector(".empty");
+      if (empty) empty.remove();
+      const el = document.createElement("div");
+      el.className = "msg " + (who === "agent" ? "agent" : who === "bot" ? "bot" : "system");
+      if (who === "system") el.textContent = text;
       else {
-        const label = document.createElement("div");
-        label.className = "who";
-        label.textContent = who === "agent" ? "Summaverick" : "Support bot";
-        const body = document.createElement("div");
-        body.textContent = text;
-        wrap.appendChild(label); wrap.appendChild(body);
+        const w = document.createElement("div"); w.className = "who";
+        w.textContent = who === "agent" ? "Summaverick" : "Support";
+        const b = document.createElement("div"); b.textContent = text;
+        el.append(w, b);
       }
-      chat.appendChild(wrap);
-      chat.scrollTop = chat.scrollHeight;
+      $("chat").append(el);
+      $("chat").scrollTop = $("chat").scrollHeight;
+    }
+    function banner(kind, html) {
+      const b = $("banner"); b.className = "banner show " + kind; b.innerHTML = html;
+    }
+    function hideBanner() { $("banner").className = "banner"; }
+    function setPill(status) {
+      const p = $("casepill"); p.style.display = "inline-block";
+      p.className = "pill st-" + status; p.textContent = status.replace(/_/g, " ");
+    }
+    function setActions(buttons) {
+      const a = $("actions"); a.innerHTML = "";
+      buttons.forEach(([label, cls, fn]) => {
+        const btn = document.createElement("button"); btn.textContent = label;
+        if (cls) btn.className = cls; btn.onclick = fn; a.append(btn);
+      });
+    }
+    const money = n => (n == null ? "" : "₹" + Number(n).toLocaleString("en-IN"));
+
+    // ---- API ---------------------------------------------------------------
+    async function api(path, opts) {
+      const r = await fetch(backend() + path, opts);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+      return r.json();
     }
 
-    document.getElementById("start").addEventListener("click", async () => {
-      const backend = document.getElementById("backend").value.replace(/\/$/, "");
-      const scenario = document.getElementById("scenario").value;
-      const btn = document.getElementById("start");
-      btn.disabled = true; chat.innerHTML = ""; banner.className = "banner";
-      reached = new Set(["Intake","Policy","Drafting"]);
-      renderTimeline("Engaging");
+    // ---- case flow ---------------------------------------------------------
+    function resetView(id) {
+      current = id; reached = new Set(); es && es.close(); es = null;
+      hideBanner(); $("draftbox").innerHTML = ""; setActions([]);
+      $("caseid").textContent = id ? "#" + id : ""; $("casepill").style.display = "none";
+      clearChat(); timeline("");
+    }
 
-      let case_id;
+    async function createCase() {
+      const fd = new FormData();
+      fd.append("platform", $("platform").value);
+      fd.append("text", $("text").value.trim());
+      fd.append("desired_outcome", $("outcome").value.trim() || "a full refund");
+      fd.append("autonomy_level", $("autonomy").value);
+      fd.append("scenario", $("scenario").value);
+      if ($("threshold").value) fd.append("threshold", $("threshold").value);
+      if (!$("text").value.trim()) { banner("err", "Please describe the issue first."); return; }
+
+      $("create").disabled = true;
       try {
-        const res = await fetch(`${backend}/demo/run?scenario=${scenario}`, { method: "POST" });
-        ({ case_id } = await res.json());
-      } catch (err) {
-        banner.textContent = `⚠️ Can't reach the backend at ${backend}. ` +
-          `Start it first:  python3 -m uvicorn backend.main:app --port 8099`;
-        banner.className = "banner show error";
-        btn.disabled = false;
-        return;
-      }
-      addMsg("system", `— case ${case_id} created —`);
+        const c = await api("/case/create", { method: "POST", body: fd });
+        resetView(c.id);
+        reached = new Set(["Intake","Policy"]);
+        renderCaseState(c);
+        refreshHistory();
+      } catch (e) {
+        banner("err", "Could not create case: " + e.message);
+      } finally { $("create").disabled = false; }
+    }
 
-      const es = new EventSource(`${backend}/case/${case_id}/stream`);
+    // Decide what to show based on the case's returned status.
+    function renderCaseState(c) {
+      setPill(c.status);
+      if (c.status === "awaiting_proof") {
+        reached = new Set(["Intake","Policy"]); timeline("Drafting");
+        renderProofGaps(c);
+      } else if (c.status === "awaiting_approval") {
+        reached = new Set(["Intake","Policy","Drafting"]); timeline("Drafting");
+        if (c.autonomy_level === "suggest") renderDraftApproval(c);
+        else openStream(c.id);   // auto modes already engaging in background
+      } else {
+        openStream(c.id);
+      }
+    }
+
+    function renderProofGaps(c) {
+      timeline("Drafting");
+      const box = $("draftbox");
+      box.innerHTML = "<div class='hint'>A bit more evidence is needed before we can file this:</div>";
+      const list = document.createElement("div"); list.className = "prooflist";
+      (c.proof_gaps || []).forEach((g, i) => {
+        const l = document.createElement("label");
+        l.innerHTML = `<input type="checkbox" data-i="${i}"> ${g}`;
+        list.append(l);
+      });
+      box.append(list);
+      banner("warn", "This case is paused until the missing evidence is confirmed.");
+      setActions([["I've attached this evidence", "", async () => {
+        // We can't actually upload arbitrary proof here; mark the required items supplied.
+        const req = c.required_proof || [];
+        await api(`/case/${c.id}/proof`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "supplied_proof=" + encodeURIComponent(req.join(",")),
+        }).then(nc => { resetView(nc.id); reached = new Set(["Intake","Policy"]); renderCaseState(nc); refreshHistory(); });
+      }]]);
+    }
+
+    function renderDraftApproval(c) {
+      timeline("Drafting");
+      $("draftbox").innerHTML = "<div class='hint'>Draft complaint — review before we send it:</div>" +
+        `<div class="draft">${escapeHtml(c.draft || "")}</div>`;
+      banner("warn", "Waiting for your approval to engage support.");
+      setActions([
+        ["✓ Approve & engage", "", async () => {
+          setActions([]); hideBanner(); $("draftbox").innerHTML = "";
+          await api(`/case/${c.id}/approve`, { method: "POST" });
+          openStream(c.id);
+        }],
+        ["Cancel", "secondary", () => { resetView(null); $("chat").innerHTML = "<div class='empty'>Cancelled.</div>"; }],
+      ]);
+    }
+
+    function openStream(id) {
+      current = id;
+      reached = new Set(["Intake","Policy","Drafting"]); timeline("Engaging");
+      setPill("engaging"); $("draftbox").innerHTML = ""; setActions([]);
+      es && es.close();
+      es = new EventSource(`${backend()}/case/${id}/stream`);
+      // Static replay for a case the live hub no longer tracks.
+      es.addEventListener("snapshot", e => {
+        const d = JSON.parse(e.data); clearChat();
+        (d.transcript || []).forEach(t => addMsg(t.role, t.text));
+        if (d.status === "resolved") onResolved(d.refund_amount); else setPill(d.status);
+      });
+      es.addEventListener("channel_opened", () => addMsg("system", "— connected to support —"));
       es.addEventListener("agent_sent", e => addMsg("agent", JSON.parse(e.data).message));
       es.addEventListener("bot_replied", e => addMsg("bot", JSON.parse(e.data).message));
-      es.addEventListener("channel_opened", () => addMsg("system", "— connected to support channel —"));
       es.addEventListener("escalating", e => {
-        reached.add("Engaging"); renderTimeline("Escalating");
-        const d = JSON.parse(e.data);
-        addMsg("system", `— escalating (tone: ${d.tone || "firm"}) —`);
+        reached.add("Engaging"); timeline("Escalating"); setPill("escalated");
+        addMsg("system", `— escalating (tone: ${JSON.parse(e.data).tone || "firmer"}) —`);
       });
-      es.addEventListener("resolved", e => {
-        ["Engaging","Escalating","Resolved"].forEach(s => reached.add(s));
-        renderTimeline("Resolved");
+      es.addEventListener("offer", e => {
         const amt = JSON.parse(e.data).refund_amount;
-        banner.textContent = `🎉 Resolved — ₹${amt} refunded, zero user intervention`;
-        banner.className = "banner show";
+        setPill("awaiting_acceptance");
+        banner("warn", `Support offered a refund of <b>${money(amt)}</b>. Accept it?`);
+        setActions([["✓ Accept " + money(amt), "", async () => {
+          const c = await api(`/case/${id}/accept`, { method: "POST" });
+          onResolved(c.refund_amount); refreshHistory();
+        }], ["Decline", "secondary", () => { hideBanner(); setActions([]); }]]);
       });
-      es.addEventListener("needs_human", () => addMsg("system", "— handed off to a human representative —"));
-      es.addEventListener("done", () => { es.close(); btn.disabled = false; });
-      es.onerror = () => { es.close(); btn.disabled = false; };
-    });
+      es.addEventListener("resolved", e => onResolved(JSON.parse(e.data).refund_amount));
+      es.addEventListener("needs_human", () => {
+        setPill("escalated");
+        banner("warn", "Handed off to a human representative — we'll follow up.");
+      });
+      es.addEventListener("done", () => { es && es.close(); es = null; refreshHistory(); });
+      es.onerror = () => { es && es.close(); es = null; };
+    }
 
-    renderTimeline("");
+    function onResolved(amt) {
+      ["Engaging","Escalating","Resolved"].forEach(s => reached.add(s));
+      timeline("Resolved"); setPill("resolved"); setActions([]);
+      banner("ok", `<div class="big">🎉 Resolved — ${money(amt)} refunded</div>`);
+      es && es.close(); es = null;
+    }
 
-    // Ping the backend on load so the user knows whether it's up.
-    async function checkBackend() {
-      const backend = document.getElementById("backend").value.replace(/\/$/, "");
-      const status = document.getElementById("status");
+    // View a past case statically (no live stream).
+    async function viewCase(id) {
+      const c = await api(`/case/${id}`);
+      resetView(id); setPill(c.status);
+      const done = ["Intake","Policy","Drafting"];
+      if (["engaging","escalated","resolved","awaiting_acceptance"].includes(c.status)) done.push("Engaging");
+      if (c.status === "escalated") done.push("Escalating");
+      if (c.status === "resolved") done.push("Resolved");
+      reached = new Set(done); timeline(c.status === "resolved" ? "Resolved" : "");
+      clearChat();
+      (c.transcript || []).forEach(t => addMsg(t.role, t.text));
+      if (!c.transcript || !c.transcript.length) $("chat").innerHTML = "<div class='empty'>No conversation yet.</div>";
+      if (c.status === "resolved") banner("ok", `<div class="big">🎉 Resolved — ${money(c.refund_amount)} refunded</div>`);
+      else if (c.status === "awaiting_approval" && c.draft) renderDraftApproval(c);
+    }
+
+    async function refreshHistory() {
+      let cases = [];
+      try { cases = await api("/cases"); } catch { return; }
+      const h = $("hist");
+      if (!cases.length) { h.innerHTML = "<div class='empty'>No cases yet.</div>"; return; }
+      h.innerHTML = "";
+      cases.slice(0, 30).forEach(c => {
+        const d = document.createElement("div"); d.className = "hist-item"; d.onclick = () => viewCase(c.id);
+        d.innerHTML = `<div class="t">${c.platform} · ${(c.issue_type||"issue").replace(/_/g," ")}
+          <span class="pill st-${c.status}" style="float:right">${c.status.replace(/_/g," ")}</span></div>
+          <div class="m">#${c.id}${c.refund_amount ? " · " + money(c.refund_amount) : ""}</div>`;
+        h.append(d);
+      });
+    }
+
+    async function runDemo() {
+      $("demo").disabled = true;
       try {
-        const r = await fetch(`${backend}/health`);
-        const j = await r.json();
-        status.textContent = `backend up ✓ (NIM ${j.nim_online ? "online" : "offline"})`;
-        status.style.color = "#3fb950";
+        const { case_id } = await api(`/demo/run?scenario=${$("scenario").value}`, { method: "POST" });
+        resetView(case_id); openStream(case_id); refreshHistory();
+      } catch (e) { banner("err", "Demo failed: " + e.message); }
+      finally { $("demo").disabled = false; }
+    }
+
+    function escapeHtml(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+    async function checkBackend() {
+      const s = $("status");
+      try {
+        const j = await api("/health");
+        s.textContent = `backend up ✓ · NIM ${j.nim_online ? "online" : "offline"}`;
+        s.style.color = "#3fb950";
       } catch {
-        status.textContent = "backend not reachable — start it: python3 -m uvicorn backend.main:app --port 8099";
-        status.style.color = "#f85149";
+        s.textContent = "backend offline — run: uvicorn backend.main:app --port 8099";
+        s.style.color = "#f85149";
       }
     }
-    document.getElementById("backend").addEventListener("change", checkBackend);
+
+    $("create").onclick = createCase;
+    $("demo").onclick = runDemo;
+    timeline("");
     checkBackend();
+    refreshHistory();
+  })();
   </script>
 </body>
 </html>

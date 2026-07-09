@@ -66,10 +66,25 @@ and everything still works.
 | Memory | `backend/memory/db.py` | SQLite case store (Postgres+pgvector is the prod target) |
 | Frontend | `frontend/index.html` | Live chat + timeline via Server-Sent Events |
 
+### Using the app
+Open `http://localhost:8099/` and either **submit your own case** (platform,
+issue description, autonomy level, optional refund threshold) or hit **Run
+canned demo**. Watch the negotiation stream live, approve the draft or accept a
+refund offer when prompted, and browse past cases in the history panel.
+
 ### Autonomy levels
-- `suggest` — produce a draft and stop; user calls `POST /case/{id}/approve` to engage.
-- `auto_send` — auto-approve the draft, then engage.
-- `full_auto` — also auto-accept refund offers at/above the user's threshold.
+The refund decision is the key human-in-the-loop control; only `full_auto` ever
+accepts on its own:
+
+- `suggest` — draft, then wait for `POST /case/{id}/approve`; a refund offer is
+  paused for the user to accept.
+- `auto_send` — draft auto-approved and engaged; a refund offer is still paused
+  for the user to accept.
+- `full_auto` — engages and auto-accepts an offer that meets the user's minimum
+  threshold; a lowball below the threshold is paused for the user.
+
+A paused offer sets the case to `awaiting_acceptance`; the user resolves it with
+`POST /case/{id}/accept`.
 
 ### Online (NIM) mode
 Set `NIM_API_KEY` (see `.env.example`) and the same code paths call the
@@ -78,10 +93,12 @@ else changes. Without a key, a deterministic heuristic engine stands in so the
 project is always runnable and testable.
 
 ## Key endpoints
-- `POST /case/create` — multipart: `platform`, `text`, optional `screenshot`, `autonomy_level`, …
-- `GET /case/{id}` / `GET /cases`
+- `POST /case/create` — multipart: `platform`, `text`, optional `screenshot`, `autonomy_level`, `threshold`, …
+- `GET /case/{id}` (404 if unknown) · `GET /cases`
+- `POST /case/{id}/proof` — add evidence, re-check gaps, draft
 - `POST /case/{id}/approve` — approve draft, start live negotiation
-- `GET /case/{id}/stream` — SSE: `agent_sent`, `bot_replied`, `escalating`, `resolved`, …
+- `POST /case/{id}/accept` — accept a paused refund offer
+- `GET /case/{id}/stream` — SSE: `agent_sent`, `bot_replied`, `escalating`, `offer`, `resolved`, …
 - `POST /demo/run?scenario=cooperative|stubborn` — one-click full-auto demo case
 - `POST /simulate/bot/start` · `POST /simulate/bot/reply` — poke the mock bot directly
 

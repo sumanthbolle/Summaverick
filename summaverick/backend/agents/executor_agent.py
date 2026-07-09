@@ -60,14 +60,16 @@ class NegotiationLoop:
         return resp
 
     def _classify(self, resp: dict[str, Any]) -> str:
-        # Trust the channel's own intent hint if present (mock bot provides it),
-        # otherwise fall back to the light model / heuristics.
-        if resp.get("intent") in BOT_INTENTS:
-            return resp["intent"]
+        # Track every reply so loop detection works even when the channel
+        # supplies its own intent hint (the mock bot always does).
         text = resp.get("text", "")
         self._recent_bot.append(text)
-        if len(self._recent_bot) >= LOOP_THRESHOLD and len(set(self._recent_bot[-LOOP_THRESHOLD:])) == 1:
+        if (text and len(self._recent_bot) >= LOOP_THRESHOLD
+                and len(set(self._recent_bot[-LOOP_THRESHOLD:])) == 1):
             return "loop"
+        # Trust the channel's own intent hint if present, else classify.
+        if resp.get("intent") in BOT_INTENTS:
+            return resp["intent"]
         return client.classify(text, BOT_INTENTS, model=LIGHT_MODEL)
 
     def _escalate_tone(self) -> None:
@@ -105,21 +107,18 @@ class NegotiationLoop:
             return "I want to speak to a human representative, please."
         if intent == "transfer_human":
             return await self._regenerate("a clear, human-friendly summary and a refund")
-        if intent == "offer_refund":
-            amt = resp.get("refund_amount")
-            if self._accept_offer(amt):
-                tracker_agent.record_resolution(self.case_id, "refund_accepted", amt)
-                await events.publish(self.case_id, "resolved", {"refund_amount": amt})
-                return None
-            await events.publish(self.case_id, "awaiting_approval", {"refund_amount": amt})
-            return None
-        if intent == "close":
-            return None
+        # offer_refund and close are terminal — handled directly in run().
         # greeting / unknown -> keep momentum
         return None
 
-    def _accept_offer(self, amount: float | None) -> bool:
-        """full_auto accepts offers at/above threshold (or any if unset)."""
+    def _should_auto_accept(self, amount: float | None) -> bool:
+        """Only full_auto accepts on the agent's own authority.
+
+        suggest / auto_send always pause a refund offer for the user. full_auto
+        accepts an offer that meets the user's minimum threshold; a lowball below
+        the threshold is paused for the user. Unset threshold = accept anything
+        (the user opted into full autonomy).
+        """
         if self.autonomy != "full_auto":
             return False
         if self.threshold is None or amount is None:
@@ -143,27 +142,34 @@ class NegotiationLoop:
                 store.append_transcript(self.case_id, "bot", text, intent=intent)
                 await events.publish(self.case_id, "bot_replied", {"message": text, "intent": intent})
 
-            if resp.get("resolved"):
+            # --- terminal intents --------------------------------------- #
+            if intent == "offer_refund":
                 amt = resp.get("refund_amount")
-                if self._accept_offer(amt) or intent == "close":
+                if self._should_auto_accept(amt):
                     tracker_agent.record_resolution(self.case_id, "refund_accepted", amt)
                     await events.publish(self.case_id, "resolved", {"refund_amount": amt})
                     return "resolved"
+                # Not ours to accept — pause and hand the decision to the user.
+                store.update(self.case_id, status=CaseStatus.awaiting_acceptance.value,
+                             refund_amount=amt)
+                await events.publish(self.case_id, "offer", {"refund_amount": amt})
+                return CaseStatus.awaiting_acceptance.value
+            if intent == "close":
+                break  # bot closed without an acceptable offer
 
+            # --- non-terminal: decide the next message ------------------ #
             next_msg = await self._act(intent, resp)
-            if intent in ("offer_refund", "close") and store.get_case(self.case_id)["status"] == "resolved":
-                return "resolved"
-            if next_msg is None and intent in ("close",):
-                break
             if next_msg:
                 await self._send(next_msg)
             else:
                 # Nothing to say (e.g. processing) — brief wait, then poll again.
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.1)
 
-        # Loop exhausted without a clean resolution.
+        # Loop ended without an accepted refund → hand off to a human.
         current = store.get_case(self.case_id)
-        if current and current["status"] not in (CaseStatus.resolved.value,):
+        if current and current["status"] not in (
+            CaseStatus.resolved.value, CaseStatus.awaiting_acceptance.value
+        ):
             store.update(self.case_id, status=CaseStatus.escalated.value)
             await events.publish(self.case_id, "needs_human", {})
         return current["status"] if current else "failed"

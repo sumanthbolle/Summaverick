@@ -39,7 +39,9 @@ def run(
     if entities.get("order_id"):
         ctx_lines.append(f"order_id: {entities['order_id']}")
     if entities.get("amount"):
-        ctx_lines.append(f"amount: {entities['amount']}")
+        amt = entities["amount"]
+        amt_str = f"{int(amt)}" if float(amt).is_integer() else f"{amt}"
+        ctx_lines.append(f"amount: ₹{amt_str}")
     if policy_notes:
         ctx_lines.append(f"policy_notes: {policy_notes}")
 

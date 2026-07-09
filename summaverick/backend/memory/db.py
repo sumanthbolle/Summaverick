@@ -27,6 +27,7 @@ class CaseStatus(str, Enum):
     awaiting_approval = "awaiting_approval"
     engaging = "engaging"
     escalated = "escalated"
+    awaiting_acceptance = "awaiting_acceptance"   # refund offered, awaiting user OK
     resolved = "resolved"
     failed = "failed"
 
@@ -130,12 +131,19 @@ class Store:
         return self.get_case(case_id)
 
     def append_transcript(self, case_id: str, role: str, text: str, intent: str | None = None) -> None:
-        case = self.get_case(case_id)
-        if not case:
-            return
-        transcript = case["transcript"]
-        transcript.append({"role": role, "text": text, "intent": intent, "ts": time.time()})
-        self.update(case_id, transcript=transcript)
+        # Atomic read-modify-write under a single lock so concurrent appends
+        # (e.g. if a store call is ever moved to a thread) can't lose entries.
+        with self._lock:
+            row = self._conn.execute("SELECT transcript FROM cases WHERE id=?", (case_id,)).fetchone()
+            if row is None:
+                return
+            transcript = json.loads(row["transcript"]) if row["transcript"] else []
+            transcript.append({"role": role, "text": text, "intent": intent, "ts": time.time()})
+            self._conn.execute(
+                "UPDATE cases SET transcript=?, updated_at=? WHERE id=?",
+                (json.dumps(transcript), time.time(), case_id),
+            )
+            self._conn.commit()
 
 
 store = Store()
