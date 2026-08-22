@@ -1,0 +1,396 @@
+{
+  "scripting": {
+    "name": "Scripting & Code",
+    "icon": "💻",
+    "desc": "Write real ServiceNow scripts. GlideRecord, Business Rules, Client Scripts, GlideAjax, debugging scenarios, and code optimization.",
+    "featured": true,
+    "color": "blue",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick Challenge",
+        "desc": "10 random questions, 90s each",
+        "count": 10,
+        "timer": 90
+      },
+      {
+        "id": "code-only",
+        "name": "Code Only",
+        "desc": "Only scripting & scenario questions",
+        "count": "code",
+        "timer": 0
+      },
+      {
+        "id": "hard-mode",
+        "name": "Hard Mode",
+        "desc": "Hard questions only, 60s timer",
+        "count": "hard",
+        "timer": 60
+      }
+    ]
+  },
+  "architecture": {
+    "name": "Architecture & Design",
+    "icon": "🏗️",
+    "desc": "System design, CMDB, multi-scope apps, domain separation, performance, and platform architecture patterns.",
+    "featured": false,
+    "color": "default",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick 10",
+        "desc": "10 random questions",
+        "count": 10,
+        "timer": 0
+      },
+      {
+        "id": "hard-mode",
+        "name": "Hard Mode",
+        "desc": "Hard questions only",
+        "count": "hard",
+        "timer": 0
+      }
+    ]
+  },
+  "csa": {
+    "name": "CSA Certification",
+    "icon": "🎯",
+    "desc": "Full-length ServiceNow Certified System Administrator exam prep. 898 questions covering all exam domains, organized by topic.",
+    "featured": true,
+    "color": "green",
+    "topics": [
+      {
+        "id": "platform-overview",
+        "name": "Platform Overview & Navigation",
+        "icon": "🧭"
+      },
+      {
+        "id": "user-admin",
+        "name": "User Administration & Security",
+        "icon": "🔐"
+      },
+      {
+        "id": "tables-schema",
+        "name": "Database & Tables",
+        "icon": "🗄️"
+      },
+      {
+        "id": "ui-config",
+        "name": "UI Configuration",
+        "icon": "🎨"
+      },
+      {
+        "id": "itsm",
+        "name": "IT Service Management",
+        "icon": "🔧"
+      },
+      {
+        "id": "service-catalog",
+        "name": "Service Catalog & Requests",
+        "icon": "🛒"
+      },
+      {
+        "id": "knowledge-mgmt",
+        "name": "Knowledge Management",
+        "icon": "📖"
+      },
+      {
+        "id": "self-service",
+        "name": "Self-Service & Service Portal",
+        "icon": "🌐"
+      },
+      {
+        "id": "workflow-automation",
+        "name": "Workflow & Flow Designer",
+        "icon": "⚡"
+      },
+      {
+        "id": "reporting",
+        "name": "Reporting & Dashboards",
+        "icon": "📊"
+      },
+      {
+        "id": "import-integration",
+        "name": "Import & Integration",
+        "icon": "🔄"
+      },
+      {
+        "id": "cmdb",
+        "name": "CMDB & Asset Management",
+        "icon": "🖥️"
+      },
+      {
+        "id": "update-sets",
+        "name": "Update Sets & Development",
+        "icon": "📦"
+      },
+      {
+        "id": "scripting",
+        "name": "Scripting & APIs",
+        "icon": "💻"
+      }
+    ],
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "Browse all questions by topic — no timer",
+        "count": "all",
+        "timer": 0,
+        "topicBased": true
+      },
+      {
+        "id": "quick",
+        "name": "Quick 15",
+        "desc": "15 random questions, ~15 min",
+        "count": 15,
+        "timer": 60
+      },
+      {
+        "id": "half",
+        "name": "Half Exam",
+        "desc": "30 questions, ~30 min",
+        "count": 30,
+        "timer": 60
+      },
+      {
+        "id": "exam",
+        "name": "Full Simulation",
+        "desc": "60 questions, 90 min — real exam conditions",
+        "count": 60,
+        "timer": 90
+      },
+      {
+        "id": "snowsets-pack",
+        "name": "SnowSets 43-Page Pack",
+        "desc": "Scraped CSA question set from SnowSets (strictly this source set only)",
+        "count": "all",
+        "timer": 75,
+        "sourceSet": "snowsets_csa"
+      },
+      {
+        "id": "snaf-pack",
+        "name": "SNAF Study Checklist",
+        "desc": "Knowledge-item quiz built from the ServiceNow CSA Study Items Checklist (SNAF course)",
+        "count": "all",
+        "timer": 0,
+        "sourceSet": "snaf_checklist"
+      }
+    ]
+  },
+  "modules": {
+    "name": "Modules & ITSM",
+    "icon": "📦",
+    "desc": "ITSM, ITOM, Service Catalog, Change Management, Problem Management, and module architecture.",
+    "featured": false,
+    "color": "default",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick 10",
+        "desc": "10 random questions",
+        "count": 10,
+        "timer": 0
+      },
+      {
+        "id": "hard-mode",
+        "name": "Hard Mode",
+        "desc": "Hard questions only",
+        "count": "hard",
+        "timer": 0
+      }
+    ]
+  },
+  "fundamentals": {
+    "name": "Platform Fundamentals",
+    "icon": "📚",
+    "desc": "Tables, ACLs, execution order, UI Policies, Business Rules, data model, and core platform concepts.",
+    "featured": false,
+    "color": "default",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick 10",
+        "desc": "10 random questions",
+        "count": 10,
+        "timer": 0
+      },
+      {
+        "id": "hard-mode",
+        "name": "Hard Mode",
+        "desc": "Hard questions only",
+        "count": "hard",
+        "timer": 0
+      }
+    ]
+  },
+  "csm": {
+    "name": "CIS-CSM Certification",
+    "icon": "🎯",
+    "desc": "Full-length Customer Service Management certification prep. Case management, CSM data model, portals, entitlements, and proactive service.",
+    "featured": true,
+    "color": "green",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick 25",
+        "desc": "25 random questions, ~22 min",
+        "count": 25,
+        "timer": 54
+      },
+      {
+        "id": "half",
+        "name": "Half Exam",
+        "desc": "30 questions, ~30 min",
+        "count": 30,
+        "timer": 60
+      },
+      {
+        "id": "exam",
+        "name": "Full Simulation",
+        "desc": "60 questions, ~90 min",
+        "count": 60,
+        "timer": 90
+      }
+    ]
+  },
+  "grc": {
+    "name": "CIS-RC GRC",
+    "icon": "🛡️",
+    "desc": "Risk & Compliance certification covering GRC frameworks, policy management, risk assessment, and controls.",
+    "featured": false,
+    "color": "default",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick 25",
+        "desc": "25 random questions",
+        "count": 25,
+        "timer": 90
+      },
+      {
+        "id": "exam",
+        "name": "Full Simulation",
+        "desc": "60 questions, ~90 min",
+        "count": 60,
+        "timer": 90
+      }
+    ]
+  },
+  "cis_df": {
+    "name": "CIS-Data Foundations",
+    "icon": "🧱",
+    "desc": "Practice questions based on CIS Data Foundations dump material: CMDB Data Manager, CSDM Data Foundations, CI Class Manager, and Unified Map.",
+    "featured": true,
+    "color": "green",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick 15",
+        "desc": "15 random questions",
+        "count": 15,
+        "timer": 60
+      },
+      {
+        "id": "half",
+        "name": "Half Exam",
+        "desc": "30 questions, ~30 min",
+        "count": 30,
+        "timer": 60
+      },
+      {
+        "id": "exam",
+        "name": "Full Simulation",
+        "desc": "50 questions, ~75 min",
+        "count": 50,
+        "timer": 90
+      }
+    ]
+  },
+  "csa_dumps_live": {
+    "name": "CSA Dumps Live Test",
+    "icon": "🧪",
+    "desc": "Live test generated from uploaded CSA dump material. Includes timed practice and full simulation modes.",
+    "featured": true,
+    "color": "green",
+    "modes": [
+      {
+        "id": "practice",
+        "name": "Practice Mode",
+        "desc": "All extracted questions, no timer",
+        "count": "all",
+        "timer": 0
+      },
+      {
+        "id": "quick",
+        "name": "Quick 20",
+        "desc": "20 random questions, 60s each",
+        "count": 20,
+        "timer": 60
+      },
+      {
+        "id": "half",
+        "name": "Half Test 40",
+        "desc": "40 random questions, 75s each",
+        "count": 40,
+        "timer": 75
+      },
+      {
+        "id": "exam",
+        "name": "Full Live Test",
+        "desc": "60 random questions, 90s each",
+        "count": 60,
+        "timer": 90
+      }
+    ]
+  }
+}
