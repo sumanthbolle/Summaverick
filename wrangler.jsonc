@@ -1,0 +1,44 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "summaverick",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-12",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "summaverick.com", "custom_domain": true },
+    { "pattern": "www.summaverick.com", "custom_domain": true }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "summaverick",
+      // Replace after `wrangler d1 create summaverick --location apac`.
+      // Any string works for --local; the real UUID is required for --remote.
+      "database_id": "REPLACE_WITH_D1_UUID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    // Replace id after `wrangler kv namespace create CONFIG`.
+    { "binding": "CONFIG", "id": "REPLACE_WITH_KV_ID" }
+  ],
+  "r2_buckets": [
+    { "binding": "BODIES", "bucket_name": "summaverick-content" }
+  ],
+  "triggers": {
+    // 01:00 SGT nightly D1 export -> R2 backups/. 02:00 SGT UPSC retention sweep.
+    "crons": ["0 17 * * *", "0 18 * * *"]
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "PUBLIC_ORIGIN": "https://summaverick.com",
+    "MAGIC_LINK_FROM": "login@summaverick.com"
+  }
+}

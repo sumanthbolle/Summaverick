@@ -1,0 +1,37 @@
+{
+  "name": "summaverick",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Learning + tools platform on Cloudflare Workers + D1 + R2 + KV (summaverick.com)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate:local": "wrangler d1 migrations apply summaverick --local",
+    "migrate:remote": "wrangler d1 migrations apply summaverick --remote",
+    "seed:quiz:local": "node scripts/seed-quiz.ts --local",
+    "seed:quiz:remote": "node scripts/seed-quiz.ts --remote",
+    "seed:content:local": "node scripts/seed-content.ts --local",
+    "seed:content:remote": "node scripts/seed-content.ts --remote",
+    "verify": "node scripts/verify.ts"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^13.1.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5",
+    "wrangler": "^4.20.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "workerd", "@cloudflare/workerd-linux-64"]
+  }
+}

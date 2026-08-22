@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quiz — summaverick</title>
+    <meta
+      name="description"
+      content="ServiceNow quizzes — CSA, Scripting, Architecture, Modules, CSM, GRC, CIS-Discovery. Answers are graded server-side and never shipped to the browser."
+    />
+    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/quiz.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">summaverick</a>
+      <nav><a href="/quiz.html">Quiz</a> <a href="#" id="historyLink">History</a></nav>
+    </header>
+
+    <main class="wrap" id="app">
+      <section id="view-categories" hidden>
+        <h1>ServiceNow Quiz</h1>
+        <p class="tag">Pick a category, then a mode. Answers are graded on the
+          server — nothing is scrapeable from this page.</p>
+        <div id="categoryGrid" class="grid"></div>
+      </section>
+
+      <section id="view-modes" hidden>
+        <button class="back" data-go="categories">&larr; Categories</button>
+        <h2 id="modeCatName"></h2>
+        <div id="modeList" class="modes"></div>
+      </section>
+
+      <section id="view-quiz" hidden>
+        <div class="quiz-head">
+          <span id="progress" class="progress"></span>
+          <span id="timer" class="timer"></span>
+        </div>
+        <div id="questionCard" class="card"></div>
+        <div class="actions">
+          <button id="submitBtn" class="primary" disabled>Submit</button>
+          <button id="nextBtn" class="primary" hidden>Next</button>
+          <button id="finishBtn" class="ghost" hidden>Finish</button>
+        </div>
+        <div id="feedback" class="feedback" hidden></div>
+      </section>
+
+      <section id="view-results" hidden>
+        <h2>Results</h2>
+        <div id="scoreBox" class="scorebox"></div>
+        <div id="reviewList" class="review"></div>
+        <button class="primary" data-go="categories">New quiz</button>
+      </section>
+
+      <section id="view-history" hidden>
+        <button class="back" data-go="categories">&larr; Back</button>
+        <h2>Your attempts</h2>
+        <div id="historyList" class="review"></div>
+      </section>
+
+      <div id="loading" class="loading">Loading…</div>
+      <div id="error" class="error" hidden></div>
+    </main>
+
+    <script src="/assets/quiz.js" type="module"></script>
+  </body>
+</html>

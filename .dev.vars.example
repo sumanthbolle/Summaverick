@@ -1,0 +1,25 @@
+# Copy to .dev.vars for local dev (never commit .dev.vars).
+# In production these are set via: wrangler secret put <NAME>
+
+# Perplexity (trending / servicenow / research LLM calls)
+PERPLEXITY_API_KEY=""
+
+# Bearer token the UPSC GitHub Actions workflows use to POST to /api/upsc/*
+UPSC_PUBLISH_TOKEN=""
+
+# HMAC key for signing/verifying opaque session material & magic-link tokens
+SESSION_SECRET=""
+
+# Amadeus (SkyFare / flights)
+AMADEUS_CLIENT_ID=""
+AMADEUS_CLIENT_SECRET=""
+
+# Resend (magic-link email delivery)
+RESEND_API_KEY=""
+
+# Public origin used to build WebAuthn rpID / magic-link callback URLs.
+# Local dev: http://localhost:8787   Production: https://summaverick.com
+PUBLIC_ORIGIN="http://localhost:8787"
+
+# Email address magic links are sent from (must be a verified Resend sender)
+MAGIC_LINK_FROM="login@summaverick.com"
