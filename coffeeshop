@@ -1,0 +1,15 @@
+#include<stdio.h>
+int main()
+{
+int X,P,i,flag=1;
+scanf("%d%d",&X,&P);
+for(i=0;flag!=0;i++)
+{
+  X=X-(X*(P/100));
+  count++;
+  if(X==0)
+  flag==0;
+  }
+  printf("%d",count);
+  return 0;
+  }

@@ -1,0 +1,37 @@
+platform: swiggy
+display_name: Swiggy
+category: food_delivery
+support_url: https://www.swiggy.com/support
+selectors:
+  chat_launcher: "button[data-cy='help-chat']"
+  chat_input: "textarea#chat-input"
+  send_button: "button[data-cy='send']"
+  bot_message: "div.chat-bubble--bot"
+
+policy:
+  refund_window_hours: 24
+  eligible_reasons:
+    - missing_item
+    - wrong_order
+    - food_quality
+    - not_delivered
+    - spillage
+  ineligible_reasons:
+    - changed_mind
+    - late_delivery_within_sla
+  max_auto_refund: 500
+  notes: >
+    Swiggy issues refunds to the original payment method or Swiggy Money.
+    Missing-item claims usually resolve within one support interaction.
+
+required_proof:
+  missing_item:
+    - order_confirmation
+  wrong_order:
+    - order_confirmation
+    - photo_of_wrong_item
+  food_quality:
+    - order_confirmation
+    - photo_of_food
+  not_delivered:
+    - order_confirmation

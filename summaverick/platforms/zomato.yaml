@@ -1,0 +1,36 @@
+platform: zomato
+display_name: Zomato
+category: food_delivery
+support_url: https://www.zomato.com/support
+# Selectors are illustrative only; real automation must respect the platform's
+# Terms of Service and use authorised, authenticated sessions.
+selectors:
+  chat_launcher: "button[data-testid='support-chat-launcher']"
+  chat_input: "textarea[name='chat-message']"
+  send_button: "button[aria-label='Send']"
+  bot_message: "div[data-role='bot-message']"
+
+policy:
+  refund_window_hours: 24
+  eligible_reasons:
+    - missing_item
+    - wrong_order
+    - food_quality
+    - not_delivered
+  ineligible_reasons:
+    - changed_mind
+    - late_delivery_within_sla
+  max_auto_refund: 500          # INR the agent may accept without user prompt
+  notes: >
+    Refunds for missing/incorrect items are typically issued to the source
+    payment method or as Zomato credits within 24-48 hours.
+
+required_proof:
+  missing_item:
+    - order_confirmation
+    - photo_of_received_items
+  wrong_order:
+    - order_confirmation
+    - photo_of_wrong_item
+  not_delivered:
+    - order_confirmation

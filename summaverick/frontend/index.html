@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Summaverick — Live Case</title>
+  <style>
+    :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --agent:#238636;
+            --bot:#1f6feb; --text:#e6edf3; --muted:#8b949e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+           background:var(--bg); color:var(--text); }
+    header { padding:16px 20px; border-bottom:1px solid var(--border);
+             display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    h1 { font-size:18px; margin:0; }
+    .sub { color:var(--muted); font-size:13px; }
+    main { max-width:820px; margin:0 auto; padding:20px; }
+    .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+    button { background:var(--agent); color:#fff; border:0; border-radius:6px;
+             padding:9px 14px; font-size:14px; cursor:pointer; }
+    button.secondary { background:#21262d; border:1px solid var(--border); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    select, input { background:var(--panel); color:var(--text); border:1px solid var(--border);
+             border-radius:6px; padding:8px; font-size:13px; }
+    .timeline { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+    .stage { padding:6px 10px; border:1px solid var(--border); border-radius:999px;
+             font-size:12px; color:var(--muted); }
+    .stage.active { border-color:var(--agent); color:var(--text); }
+    .stage.done { background:var(--agent); border-color:var(--agent); color:#fff; }
+    .chat { border:1px solid var(--border); border-radius:10px; background:var(--panel);
+            padding:14px; min-height:280px; display:flex; flex-direction:column; gap:10px; }
+    .msg { max-width:80%; padding:10px 12px; border-radius:12px; font-size:14px; white-space:pre-wrap; }
+    .msg.agent { align-self:flex-end; background:var(--agent); }
+    .msg.bot { align-self:flex-start; background:#21262d; border:1px solid var(--border); }
+    .who { font-size:11px; color:var(--muted); margin-bottom:3px; }
+    .system { align-self:center; color:var(--muted); font-size:12px; font-style:italic; }
+    .banner { margin-top:16px; padding:14px; border-radius:10px; text-align:center;
+              font-size:16px; font-weight:600; display:none; }
+    .banner.show { display:block; background:rgba(35,134,54,.15); border:1px solid var(--agent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🛡️ Summaverick</h1>
+    <span class="sub">Autonomous customer-advocacy agent — live case view (demo mode)</span>
+  </header>
+  <main>
+    <div class="controls">
+      <label class="sub">Backend <input id="backend" value="http://localhost:8099" size="24" /></label>
+      <label class="sub">Bot
+        <select id="scenario">
+          <option value="cooperative">cooperative</option>
+          <option value="stubborn">stubborn (forces escalation)</option>
+        </select>
+      </label>
+      <button id="start">▶ Start Demo (Swiggy missing item)</button>
+    </div>
+
+    <div class="timeline" id="timeline"></div>
+    <div class="chat" id="chat">
+      <div class="system">Press “Start Demo” to watch Summaverick resolve a case autonomously.</div>
+    </div>
+    <div class="banner" id="banner"></div>
+  </main>
+
+  <script>
+    const STAGES = ["Intake","Policy","Drafting","Engaging","Escalating","Resolved"];
+    const chat = document.getElementById("chat");
+    const banner = document.getElementById("banner");
+    const timelineEl = document.getElementById("timeline");
+    let reached = new Set();
+
+    function renderTimeline(active) {
+      timelineEl.innerHTML = "";
+      STAGES.forEach(s => {
+        const d = document.createElement("div");
+        d.className = "stage" + (reached.has(s) ? " done" : "") + (s === active ? " active" : "");
+        d.textContent = s;
+        timelineEl.appendChild(d);
+      });
+    }
+    function addMsg(who, text) {
+      if (chat.querySelector(".system")) chat.innerHTML = "";
+      const wrap = document.createElement("div");
+      wrap.className = "msg " + (who === "agent" ? "agent" : who === "bot" ? "bot" : "system");
+      if (who === "system") { wrap.textContent = text; }
+      else {
+        const label = document.createElement("div");
+        label.className = "who";
+        label.textContent = who === "agent" ? "Summaverick" : "Support bot";
+        const body = document.createElement("div");
+        body.textContent = text;
+        wrap.appendChild(label); wrap.appendChild(body);
+      }
+      chat.appendChild(wrap);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    document.getElementById("start").addEventListener("click", async () => {
+      const backend = document.getElementById("backend").value.replace(/\/$/, "");
+      const scenario = document.getElementById("scenario").value;
+      const btn = document.getElementById("start");
+      btn.disabled = true; chat.innerHTML = ""; banner.className = "banner";
+      reached = new Set(["Intake","Policy","Drafting"]);
+      renderTimeline("Engaging");
+
+      const res = await fetch(`${backend}/demo/run?scenario=${scenario}`, { method: "POST" });
+      const { case_id } = await res.json();
+
+      const es = new EventSource(`${backend}/case/${case_id}/stream`);
+      es.addEventListener("agent_sent", e => addMsg("agent", JSON.parse(e.data).message));
+      es.addEventListener("bot_replied", e => addMsg("bot", JSON.parse(e.data).message));
+      es.addEventListener("channel_opened", () => addMsg("system", "— connected to support channel —"));
+      es.addEventListener("escalating", e => {
+        reached.add("Engaging"); renderTimeline("Escalating");
+        const d = JSON.parse(e.data);
+        addMsg("system", `— escalating (tone: ${d.tone || "firm"}) —`);
+      });
+      es.addEventListener("resolved", e => {
+        ["Engaging","Escalating","Resolved"].forEach(s => reached.add(s));
+        renderTimeline("Resolved");
+        const amt = JSON.parse(e.data).refund_amount;
+        banner.textContent = `🎉 Resolved — ₹${amt} refunded, zero user intervention`;
+        banner.className = "banner show";
+      });
+      es.addEventListener("needs_human", () => addMsg("system", "— handed off to a human representative —"));
+      es.addEventListener("done", () => { es.close(); btn.disabled = false; });
+      es.onerror = () => { es.close(); btn.disabled = false; };
+    });
+
+    renderTimeline("");
+  </script>
+</body>
+</html>
