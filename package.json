@@ -19,7 +19,7 @@
     "seed:quiz:remote": "node scripts/seed-quiz.ts --remote",
     "seed:content:local": "node scripts/seed-content.ts --local",
     "seed:content:remote": "node scripts/seed-content.ts --remote",
-    "verify": "node scripts/verify.ts"
+    "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.1.1"

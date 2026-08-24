@@ -129,12 +129,38 @@ Set **both** of these on the repo
 
 | Name | Where | Value |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | **Secret** | API token from [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens). Use **Edit Cloudflare Workers**, and also grant **D1 Edit**, **Workers KV Storage Edit**, **Workers R2 Storage Edit**. |
-| `CLOUDFLARE_ACCOUNT_ID` | **Variable** (or secret) | Account ID from the Cloudflare dashboard Workers overview (right sidebar). |
+| `CLOUDFLARE_API_TOKEN` | **Secret** | Custom API token from [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens). Start from **Edit Cloudflare Workers**, then **also** add **Account → D1 → Edit**, **Workers KV Storage → Edit**, and **Workers R2 Storage → Edit**. The Workers template alone is not enough for D1. |
+| `CLOUDFLARE_ACCOUNT_ID` | **Variable** (or secret) | **Account ID** from the Cloudflare dashboard **Workers** overview (right sidebar). Do **not** paste the **Zone ID** from the `summaverick.com` domain overview — both are 32 hex characters and they are not interchangeable. |
 
 Push to `master` (or re-run the failed `deploy` workflow). The workflow runs
-typecheck → tests → `d1 migrations apply --remote` → `wrangler deploy` →
-`scripts/verify.ts https://summaverick.com`.
+typecheck → tests → credential probe → `d1 migrations apply --remote` (non-blocking)
+→ `wrangler deploy` → `scripts/verify.mjs --core https://summaverick.com`.
+
+### Cloudflare error 7403
+
+```
+The given account is not valid or is not authorized to access this service [code: 7403]
+```
+
+on `wrangler d1 migrations apply` means the token can talk to Cloudflare but
+**cannot use D1**. Usual causes, in order:
+
+1. The GitHub secret was created from **Edit Cloudflare Workers** and is missing
+   **Account → D1 → Edit**. Edit the existing token (or create a new one), add
+   D1 Edit, update the secret if you created a new token, re-run **deploy**.
+2. `CLOUDFLARE_ACCOUNT_ID` is the **Zone ID** for `summaverick.com`. Replace it
+   with the Account ID from the Workers overview.
+3. `wrangler.jsonc` `database_id` belongs to a different Cloudflare account.
+   Recreate with `pnpm exec wrangler d1 create summaverick --location apac`.
+
+Until D1 works, the Worker still deploys. Quiz/library APIs stay empty (503);
+the product pages and `/advocate` do not need D1. After D1 Edit is granted and
+migrations apply, seed production:
+
+```
+pnpm run seed:quiz:remote
+pnpm run seed:content:remote
+```
 
 ---
 
