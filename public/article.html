@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Article — summaverick</title>
+    <meta name="description" content="summaverick library" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page narrow">
+      <p><a class="btn ghost back" href="/learn" id="backLink">Library</a></p>
+      <div id="error" class="error" hidden></div>
+      <p class="loading" id="loading">Loading…</p>
+      <article id="article" hidden>
+        <p class="eyebrow" id="kicker"></p>
+        <h1 id="title"></h1>
+        <p class="muted" id="meta"></p>
+        <div class="prose" id="body"></div>
+      </article>
+    </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script src="/assets/article.js" type="module"></script>
+  </body>
+</html>

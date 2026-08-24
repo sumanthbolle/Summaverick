@@ -39,7 +39,8 @@ src/
   lib/             session, webauthn, crypto, ratelimit, cors(=same-origin), json, backup, retention
 migrations/        0001_init, 0002_content, 0003_upsc, 0004_metals
 scripts/           seed-quiz, seed-content, export-backup, verify (+ _util)
-public/            static assets served by the Worker
+public/            static assets served by the Worker (full site UI)
+
 tests/             vitest unit tests
 ```
 
@@ -60,6 +61,25 @@ pnpm run typecheck && pnpm run test
 
 > On networks with an outbound proxy, run wrangler with `NO_PROXY=localhost,127.0.0.1`
 > so its internal loopback fetches aren't intercepted.
+
+## Site
+
+Pretty URLs (also served as `*.html`):
+
+| Path | Product |
+|---|---|
+| `/` | Home |
+| `/quiz` | ServiceNow quiz |
+| `/learn` · `/interviews` · `/article/:slug` | Library |
+| `/research` | ServiceNow research agent |
+| `/flights` | SkyFare |
+| `/metals` | Gold & silver |
+| `/upsc` | Evidence-gated UPSC feed |
+| `/advocate` | Customer-advocacy live demo (Worker SSE) |
+| `/signin` | Passkeys + magic link |
+| `/search` | Full-text search |
+
+The Python advocacy MVP in `summaverick/` still runs offline (`bash scripts/demo.sh`). The live site streams the same loop from `POST/GET /api/advocate/demo`.
 
 ## First-time cloud setup
 

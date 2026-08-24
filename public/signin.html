@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Sign in — summaverick</title>
+    <meta name="description" content="Sign in with a passkey or an email magic link. No passwords." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page narrow">
+      <p class="eyebrow">Account</p>
+      <h1>Sign in</h1>
+      <p class="tag">Passkeys first. Email magic link as a fallback. Nothing password-shaped is stored.</p>
+      <div id="signed" class="card" hidden>
+        <h2>You’re signed in</h2>
+        <p id="who"></p>
+        <button class="btn" id="logout" type="button">Sign out</button>
+      </div>
+      <form id="authForm" class="card form-grid" style="margin-top: 16px">
+        <label class="lbl">Email
+          <input class="field" id="email" type="email" autocomplete="username webauthn" required placeholder="you@example.com" />
+        </label>
+        <div class="row" style="justify-content: flex-start">
+          <button class="btn primary" id="passkey" type="button">Use a passkey</button>
+          <button class="btn" id="magic" type="submit">Email a link</button>
+        </div>
+      </form>
+      <div id="error" class="error" hidden></div>
+      <div id="notice" class="empty" hidden></div>
+    </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script src="/assets/signin.js" type="module"></script>
+  </body>
+</html>

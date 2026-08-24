@@ -14,7 +14,24 @@ import { toolsRoutes } from "./routes/tools";
 import { upscRoutes } from "./routes/upsc";
 import { adminRoutes } from "./routes/admin";
 import { researchRoutes } from "./routes/research";
+import { advocateRoutes } from "./routes/advocate";
 import { runScheduled } from "./scheduled";
+
+/** Pretty paths → static HTML files in /public. */
+const PAGES: Record<string, string> = {
+  "/": "/index.html",
+  "/quiz": "/quiz.html",
+  "/research": "/research.html",
+  "/learn": "/learn.html",
+  "/interviews": "/interviews.html",
+  "/search": "/search.html",
+  "/flights": "/flights.html",
+  "/metals": "/metals.html",
+  "/upsc": "/upsc.html",
+  "/advocate": "/advocate.html",
+  "/signin": "/signin.html",
+  "/tools": "/tools.html",
+};
 
 function route(method: string, pattern: string, handler: Handler): RouteDef {
   return { method, pattern, handler };
@@ -30,6 +47,7 @@ const ROUTES: RouteDef[] = [
   ...upscRoutes(route),
   ...adminRoutes(route),
   ...researchRoutes(route),
+  ...advocateRoutes(route),
 ];
 
 /** Match a path against a pattern, capturing :params. */
@@ -75,7 +93,16 @@ export default {
       url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin/");
 
     if (!isApi) {
-      // Static assets (HTML, css, js, images). Worker owns everything else.
+      const path = url.pathname.replace(/\/+$/, "") || "/";
+      if (path.startsWith("/article/") && path.length > "/article/".length) {
+        const assetUrl = new URL("/article.html", url.origin);
+        return env.ASSETS.fetch(new Request(assetUrl, req));
+      }
+      const asset = PAGES[path];
+      if (asset) {
+        const assetUrl = new URL(asset, url.origin);
+        return env.ASSETS.fetch(new Request(assetUrl, req));
+      }
       return env.ASSETS.fetch(req);
     }
 

@@ -29,10 +29,7 @@
     // Replace id after `wrangler kv namespace create CONFIG`.
     {
       "binding": "KV",
-      "id": "648c1f767e62415b93070adc8aafe177",
-      
-      // Optional: preview_id used when running `wrangler dev` for local dev
-      "preview_id": "<ID_OF_PREVIEW_KV_NAMESPACE_FOR_LOCAL_DEVELOPMENT>"
+      "id": "648c1f767e62415b93070adc8aafe177"
     }
   ],
   "r2_buckets": [

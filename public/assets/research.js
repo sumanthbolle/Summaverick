@@ -1,6 +1,9 @@
 // summaverick research client. POSTs to /api/research and renders the answer
 // plus the full pipeline trace. All rendering uses textContent / DOM nodes (no
 // innerHTML with server strings) so untrusted evidence text can never inject.
+import { mountChrome } from "/assets/app.js";
+mountChrome({ active: "tools" });
+
 const $ = (id) => document.getElementById(id);
 
 async function api(path, opts = {}) {
@@ -35,9 +38,9 @@ function pct(n) {
 }
 
 function section(title, ...body) {
-  const s = el("section", { class: "trace" });
+  const s = el("section", { class: "section" });
   s.append(el("h2", { text: title }));
-  const panel = el("div", { class: "panel" });
+  const panel = el("div", { class: "card" });
   for (const b of body) if (b) panel.append(b);
   s.append(panel);
   return s;
