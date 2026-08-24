@@ -21,7 +21,7 @@
       "database_name": "summaverick",
       // Replace after `wrangler d1 create summaverick --location apac`.
       // Any string works for --local; the real UUID is required for --remote.
-      "database_id": "REPLACE_WITH_D1_UUID",
+      "database_id": "e60dc612-a809-418b-b2af-46eb39b5d11f",
       "migrations_dir": "migrations"
     }
   ],
