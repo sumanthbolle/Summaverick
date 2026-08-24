@@ -81,6 +81,8 @@ function icon(name) {
   };
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "18");
+  svg.setAttribute("height", "18");
   svg.setAttribute("fill", "none");
   svg.setAttribute("stroke", "currentColor");
   svg.setAttribute("stroke-width", "1.8");
@@ -148,7 +150,6 @@ export function mountChrome({ active } = {}) {
     const searchM = el("a", { class: "icon-btn nav-search-m", href: "/search" });
     searchM.append(icon("search"));
     searchM.setAttribute("aria-label", "Search");
-    searchM.style.display = "";
     const account = el("a", { class: "icon-btn", href: "/signin", attrs: { id: "nav-account", "aria-label": "Sign in" } });
     account.append(icon("account"));
     end.append(search, searchM, account);
