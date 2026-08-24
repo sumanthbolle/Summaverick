@@ -107,6 +107,7 @@
 *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; min-height: 100%; }
+html { overflow-x: clip; }
 body {
   font: var(--body);
   font-family: var(--font);
@@ -283,6 +284,7 @@ a:hover { text-decoration: underline; }
   text-align: center;
   padding: 56px 16px 40px;
   position: relative;
+  overflow: hidden;
 }
 .hero::before {
   content: "";
