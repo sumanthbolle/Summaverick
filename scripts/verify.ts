@@ -67,6 +67,19 @@ const checks: Check[] = [
       assert(res.status === 200, `home status ${res.status}`);
       const text = await res.text();
       assert(text.includes("<html"), "home not HTML");
+      assert(/summaverick/i.test(text), "home missing brand");
+    },
+  },
+  {
+    name: "advocate demo metadata",
+    run: async () => {
+      const { status, body } = await getJson("/api/advocate");
+      assert(status === 200, `advocate status ${status}`);
+      assert(body?.ok === true, "advocate ok !== true");
+      assert(
+        Array.isArray(body?.scenarios) && body.scenarios.includes("cooperative"),
+        "advocate scenarios missing"
+      );
     },
   },
 ];

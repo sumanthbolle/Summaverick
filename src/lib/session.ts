@@ -37,11 +37,41 @@ function parseCookies(header: string | null): Record<string, string> {
  * it mints a fresh anonymous session. Returns the SessionInfo plus the Set-Cookie
  * headers that must be attached to the response when `isNew` is true.
  */
+function ephemeral(
+  cookies: Record<string, string>
+): { info: SessionInfo; setCookies: string[] } {
+  const now = nowMs();
+  return {
+    info: {
+      sessionId: cookies[SESSION_COOKIE] ?? newId("sess"),
+      deviceId: cookies[DEVICE_COOKIE] ?? newId("dev"),
+      userId: null,
+      isNew: false,
+      expiresAt: now + SESSION_TTL_MS,
+    },
+    setCookies: [],
+  };
+}
+
 export async function resolveSession(
   req: Request,
   env: Env
 ): Promise<{ info: SessionInfo; setCookies: string[] }> {
   const cookies = parseCookies(req.headers.get("cookie"));
+  try {
+    return await resolveSessionInner(req, env, cookies);
+  } catch (err) {
+    // D1 may not be migrated yet; never take the whole API down with it.
+    console.error("session resolve failed", err);
+    return ephemeral(cookies);
+  }
+}
+
+async function resolveSessionInner(
+  req: Request,
+  env: Env,
+  cookies: Record<string, string>
+): Promise<{ info: SessionInfo; setCookies: string[] }> {
   const now = nowMs();
   const uaHash = await fingerprint(
     req.headers.get("user-agent") ?? "unknown",

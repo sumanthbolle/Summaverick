@@ -243,7 +243,10 @@ export function authRoutes(route: RouteMaker): RouteDef[] {
         user = await getUserById(ctx.env.DB, id);
       }
       if (user) await completeLogin(ctx.env, ctx.session, user.id);
-      return new Response(null, { status: 302, headers: { location: "/" } });
+      return new Response(null, {
+        status: 302,
+        headers: { location: "/?signedin=1" },
+      });
     }),
 
     // ---- session ----

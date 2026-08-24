@@ -53,17 +53,32 @@ export function contentRoutes(route: RouteMaker): RouteDef[] {
         0,
         parseInt(ctx.url.searchParams.get("page") ?? "0", 10) || 0
       );
-      const rows = await listContent(ctx.env.DB, {
-        kind,
-        category,
-        limit: PAGE_SIZE,
-        offset: page * PAGE_SIZE,
-      });
-      return ok({
-        page,
-        pageSize: PAGE_SIZE,
-        items: rows.map(meta),
-      });
+      try {
+        const rows = await listContent(ctx.env.DB, {
+          kind,
+          category,
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
+        });
+        return ok({
+          page,
+          pageSize: PAGE_SIZE,
+          items: rows.map(meta),
+        });
+      } catch (err) {
+        console.error("content feed", err);
+        return json(
+          {
+            ok: false,
+            error: "unavailable",
+            message: "Library is still being set up.",
+            page,
+            pageSize: PAGE_SIZE,
+            items: [],
+          },
+          { status: 503 }
+        );
+      }
     }),
 
     route("GET", "/api/search", async (_req, ctx) => {

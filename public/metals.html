@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Metals — summaverick</title>
+    <meta name="description" content="Live gold and silver spot prices." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page">
+      <p class="eyebrow">Markets</p>
+      <h1>Gold &amp; silver</h1>
+      <p class="tag">Spot per troy ounce. History blends live quotes with daily closes.</p>
+      <label class="lbl" style="max-width: 220px; margin: 16px 0">
+        Display currency
+        <select class="field" id="currency">
+          <option>USD</option><option>INR</option><option>EUR</option><option>GBP</option>
+          <option>SGD</option><option>AUD</option><option>JPY</option><option>AED</option>
+        </select>
+      </label>
+      <div id="error" class="error" hidden></div>
+      <div id="loading" class="loading">Loading prices…</div>
+      <div class="grid cols-2" id="cards"></div>
+      <p class="muted" id="src" style="margin-top: 20px"></p>
+    </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script src="/assets/metals.js" type="module"></script>
+  </body>
+</html>

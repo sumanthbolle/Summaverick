@@ -2,6 +2,9 @@
 // server ships stems + options only, grades every response, and reveals the
 // correct answer per-question after it is answered. localStorage holds ONLY the
 // in-progress attempt id (a pointer); all real state lives in D1.
+import { mountChrome } from "/assets/app.js";
+mountChrome({ active: "quiz" });
+
 const $ = (id) => document.getElementById(id);
 const ATTEMPT_KEY = "sv_attempt";
 
@@ -41,11 +44,13 @@ async function loadCategories() {
   grid.innerHTML = "";
   for (const c of categories) {
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "cat";
     b.innerHTML =
       `<div class="icon">${c.icon || "📘"}</div>` +
       `<div class="name">${esc(c.name)}</div>` +
-      `<div class="meta">${c.count} questions</div>`;
+      `<div class="meta">${c.count} questions</div>` +
+      (c.description ? `<div class="meta">${esc(c.description)}</div>` : "");
     b.onclick = () => loadModes(c);
     grid.appendChild(b);
   }
@@ -58,6 +63,7 @@ function loadModes(cat) {
   list.innerHTML = "";
   for (const m of cat.modes || []) {
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "mode";
     b.innerHTML =
       `<span><span class="name">${esc(m.name || m.id)}</span>` +
@@ -120,6 +126,7 @@ function renderQuestion() {
   card.innerHTML = `<p class="stem">${esc(q.stem)}</p>`;
   q.options.forEach((opt, i) => {
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "opt";
     b.textContent = opt;
     b.onclick = () => {

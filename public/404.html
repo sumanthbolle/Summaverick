@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Not found — summaverick</title>
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page narrow">
+      <p class="eyebrow">404</p>
+      <h1>This page isn’t here.</h1>
+      <p class="tag">Try the home page, the quiz, or search the library.</p>
+      <div class="row" style="justify-content: flex-start">
+        <a class="btn primary" href="/">Home</a>
+        <a class="btn" href="/search">Search</a>
+      </div>
+    </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script type="module">
+      import { mountChrome } from "/assets/app.js";
+      mountChrome();
+    </script>
+  </body>
+</html>

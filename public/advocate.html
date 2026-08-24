@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Advocate — summaverick</title>
+    <meta
+      name="description"
+      content="Autonomous customer-advocacy agent. Watch a Swiggy missing-item case negotiate itself to a refund."
+    />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page narrow">
+      <p class="eyebrow">Autonomous agent</p>
+      <h1>Customer advocacy</h1>
+      <p class="tag">
+        Intake, policy check, draft, then a live negotiation against a mock
+        support bot. No logins to real platforms. PII stays out of outbound messages.
+      </p>
+      <div class="row" style="justify-content: flex-start; margin: 16px 0 8px">
+        <label class="lbl">Bot
+          <select class="field" id="scenario">
+            <option value="cooperative">Cooperative</option>
+            <option value="stubborn">Stubborn (forces escalation)</option>
+          </select>
+        </label>
+        <button class="btn primary" id="start" type="button">Start demo</button>
+      </div>
+      <div class="timeline" id="timeline" role="list" aria-label="Case stages"></div>
+      <div class="chat" id="chat" aria-live="polite">
+        <div class="msg system">Press Start demo to watch Summaverick resolve a Swiggy missing-item case.</div>
+      </div>
+      <div class="banner" id="banner" role="status"></div>
+      <p class="muted" style="margin-top: 24px">
+        The full Python MVP (offline heuristics, optional NIM) lives in this repo’s
+        <code>summaverick/</code> folder. This page streams the same loop from the Worker.
+      </p>
+    </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script src="/assets/advocate.js" type="module"></script>
+  </body>
+</html>

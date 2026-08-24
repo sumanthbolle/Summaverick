@@ -58,19 +58,32 @@ export function quizRoutes(route: RouteMaker): RouteDef[] {
   return [
     // ---- categories with LIVE counts ----
     route("GET", "/api/quiz/categories", async (_req, ctx) => {
-      const rows = await listCategoriesWithCounts(ctx.env.DB);
-      return ok({
-        categories: rows.map((c) => ({
-          id: c.id,
-          name: c.name,
-          icon: c.icon,
-          description: c.description,
-          featured: c.featured === 1,
-          color: c.color,
-          count: c.count,
-          modes: safeModes(c.modes_json),
-        })),
-      });
+      try {
+        const rows = await listCategoriesWithCounts(ctx.env.DB);
+        return ok({
+          categories: rows.map((c) => ({
+            id: c.id,
+            name: c.name,
+            icon: c.icon,
+            description: c.description,
+            featured: c.featured === 1,
+            color: c.color,
+            count: c.count,
+            modes: safeModes(c.modes_json),
+          })),
+        });
+      } catch (err) {
+        console.error("quiz categories", err);
+        return json(
+          {
+            ok: false,
+            error: "unavailable",
+            message: "Quiz catalog is still being set up.",
+            categories: [],
+          },
+          { status: 503 }
+        );
+      }
     }),
 
     // ---- start an attempt ----

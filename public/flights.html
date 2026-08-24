@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SkyFare — summaverick</title>
+    <meta name="description" content="Search flights and get booking advice." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page">
+      <p class="eyebrow">SkyFare</p>
+      <h1>Flights</h1>
+      <p class="tag">Search real inventory when Amadeus is configured. Otherwise the AI fallback still returns structured options.</p>
+      <form id="searchForm" class="card form-grid cols-2" style="margin: 20px 0">
+        <label class="lbl">Origin
+          <input class="field" id="origin" name="origin" required placeholder="SIN or Singapore" autocomplete="off" />
+        </label>
+        <label class="lbl">Destination
+          <input class="field" id="destination" name="destination" required placeholder="NRT or Tokyo" autocomplete="off" />
+        </label>
+        <label class="lbl">Departure
+          <input class="field" id="departureDate" name="departureDate" type="date" required />
+        </label>
+        <label class="lbl">Return (optional)
+          <input class="field" id="returnDate" name="returnDate" type="date" />
+        </label>
+        <label class="lbl">Cabin
+          <select class="field" id="cabinClass">
+            <option value="economy">Economy</option>
+            <option value="premium_economy">Premium economy</option>
+            <option value="business">Business</option>
+            <option value="first">First</option>
+          </select>
+        </label>
+        <label class="lbl">Priority
+          <select class="field" id="priorityMode">
+            <option value="best_balance">Best balance</option>
+            <option value="cheapest">Cheapest</option>
+            <option value="fastest">Fastest</option>
+          </select>
+        </label>
+        <div class="row" style="grid-column: 1 / -1; justify-content: flex-start">
+          <button class="btn primary" type="submit">Search flights</button>
+        </div>
+      </form>
+      <div id="error" class="error" hidden></div>
+      <div id="loading" class="loading" hidden>Searching… this can take up to a minute.</div>
+      <div id="results"></div>
+    </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script src="/assets/flights.js" type="module"></script>
+  </body>
+</html>

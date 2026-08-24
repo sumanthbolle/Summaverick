@@ -242,21 +242,36 @@ export function upscRoutes(route: RouteMaker): RouteDef[] {
     // ---- public feed of published notes ----
     route("GET", "/api/upsc/feed", async (_req, ctx) => {
       const scope = ctx.url.searchParams.get("scope") ?? "daily";
-      const notes = await listPublishedNotes(ctx.env.DB, 200);
-      return json({
-        ok: true,
-        scope,
-        count: notes.length,
-        notes: notes.map((n) => ({
-          id: n.id,
-          paper: n.paper,
-          anchor: n.anchor,
-          band: n.band,
-          score: n.score,
-          publishedAt: n.published_at,
-          payload: safeParse(n.payload_json),
-        })),
-      });
+      try {
+        const notes = await listPublishedNotes(ctx.env.DB, 200);
+        return json({
+          ok: true,
+          scope,
+          count: notes.length,
+          notes: notes.map((n) => ({
+            id: n.id,
+            paper: n.paper,
+            anchor: n.anchor,
+            band: n.band,
+            score: n.score,
+            publishedAt: n.published_at,
+            payload: safeParse(n.payload_json),
+          })),
+        });
+      } catch (err) {
+        console.error("upsc feed", err);
+        return json(
+          {
+            ok: false,
+            error: "unavailable",
+            message: "UPSC feed is still being set up.",
+            scope,
+            count: 0,
+            notes: [],
+          },
+          { status: 503 }
+        );
+      }
     }),
 
     // ---- lightweight publish-health summary ----

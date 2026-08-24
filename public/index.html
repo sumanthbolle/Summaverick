@@ -2,24 +2,65 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>summaverick</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>summaverick — learn, research, resolve</title>
     <meta
       name="description"
-      content="Learning + tools: quiz, blog, interviews, tutorials, UPSC, SkyFare, metals, research."
+      content="ServiceNow quizzes and research, interviews, SkyFare flights, metals, UPSC notes, and an autonomous customer-advocacy agent."
     />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/app.css" />
   </head>
   <body>
-    <main class="wrap">
-      <h1>summaverick</h1>
-      <p class="tag">Learning &amp; tools platform — coming online.</p>
-      <ul class="links">
-        <li><a href="/quiz.html">Quiz</a></li>
-        <li><a href="/research.html">ServiceNow Research</a></li>
-        <li><a href="/api/health">API health</a></li>
-      </ul>
-      <p class="foot">Cloudflare Workers · D1 · R2 · KV</p>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main">
+      <section class="hero">
+        <p class="eyebrow">Learning + tools</p>
+        <h1>Learn. Research. Resolve.</h1>
+        <p class="lede">
+          ServiceNow quizzes graded on the server, evidence-backed research,
+          interviews, SkyFare, metals, UPSC notes — and an agent that
+          negotiates refunds for you.
+        </p>
+        <div class="row">
+          <a class="btn primary" href="/quiz">Take a quiz</a>
+          <a class="btn" href="/advocate">Watch a live case</a>
+        </div>
+      </section>
+
+      <div class="page" style="padding-top: 0">
+        <section aria-labelledby="products-h">
+          <div class="section-head">
+            <h2 id="products-h">The platform</h2>
+          </div>
+          <div class="grid auto" id="productGrid"></div>
+        </section>
+
+        <section class="section" aria-labelledby="learn-h">
+          <div class="section-head">
+            <h2 id="learn-h">From the library</h2>
+            <a href="/learn">See all</a>
+          </div>
+          <div class="grid cols-2" id="postGrid">
+            <p class="loading" id="postsLoading">Loading essays…</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="pulse-h">
+          <div class="section-head">
+            <h2 id="pulse-h">Pulse</h2>
+          </div>
+          <div class="grid cols-2" id="pulseGrid">
+            <p class="muted" id="pulseStatus">Headlines load when the live feed is configured.</p>
+          </div>
+        </section>
+      </div>
     </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script src="/assets/home.js" type="module"></script>
   </body>
 </html>

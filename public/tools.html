@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Tools — summaverick</title>
+    <meta name="description" content="Research agent, SkyFare flights, metals, UPSC notes, and the advocacy demo." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page">
+      <p class="eyebrow">Tools</p>
+      <h1>Workspaces</h1>
+      <p class="tag">Five products, one origin. Each one is a real tool — not a landing page.</p>
+      <div class="grid auto" id="toolGrid"></div>
+    </main>
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
+    <script type="module">
+      import { mountChrome, el, $ } from "/assets/app.js";
+      mountChrome({ active: "tools" });
+      const tools = [
+        { href: "/research", kicker: "ServiceNow", title: "Research agent", body: "Ask a platform question. Watch classification, retrieval layers, and claim verification." },
+        { href: "/flights", kicker: "SkyFare", title: "Flight search", body: "Origin, destination, dates. Inventory first, language second." },
+        { href: "/metals", kicker: "Spot", title: "Gold & silver", body: "Live ounce prices with a 30-day sparkline." },
+        { href: "/upsc", kicker: "Notes", title: "UPSC feed", body: "Published only when every fact is backed by an official summary." },
+        { href: "/advocate", kicker: "Agent", title: "Customer advocacy", body: "A full-auto Swiggy missing-item case against a mock support bot." },
+        { href: "/signin", kicker: "Account", title: "Passkeys", body: "WebAuthn first, magic link as fallback. No passwords stored." },
+      ];
+      for (const t of tools) {
+        const a = el("a", { class: "tile", href: t.href });
+        a.append(el("div", { class: "kicker", text: t.kicker }), el("h3", { text: t.title }), el("p", { text: t.body }));
+        $("toolGrid").append(a);
+      }
+    </script>
+  </body>
+</html>

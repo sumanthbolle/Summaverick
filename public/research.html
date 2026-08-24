@@ -2,23 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Research — summaverick</title>
     <meta
       name="description"
-      content="ServiceNow research agent — a 3-layer retrieval pipeline (SDK explain, product docs, read-only instance) with security hardening, evidence gates, per-claim verification and a live, visible reasoning trace."
+      content="ServiceNow research agent — a 3-layer retrieval pipeline with security hardening, evidence gates, per-claim verification and a live reasoning trace."
     />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/app.css" />
-    <link rel="stylesheet" href="/assets/research.css" />
   </head>
   <body>
-    <header class="topbar">
-      <a class="brand" href="/">summaverick</a>
-      <nav><a href="/quiz.html">Quiz</a> <a href="/research.html">Research</a></nav>
-    </header>
-
-    <main class="wrap">
-      <h1>ServiceNow Research Agent</h1>
+    <a class="skip" href="#main">Skip to content</a>
+    <header id="site-header"></header>
+    <main id="main" class="page">
+      <p class="eyebrow">Evidence-gated</p>
+      <h1>ServiceNow research</h1>
       <p class="tag">
         Ask a ServiceNow question. The answer is assembled from a three-layer
         retrieval pipeline, and every hop — classification, layers hit, evidence
@@ -26,12 +26,15 @@
       </p>
 
       <form id="askForm" class="ask" autocomplete="off">
-        <textarea
-          id="query"
-          placeholder="e.g. How do I define a BusinessRule with the ServiceNow Fluent SDK?"
-          required
-        ></textarea>
-        <button id="askBtn" type="submit">Research</button>
+        <label class="lbl" style="flex: 1 1 420px" for="query">Question
+          <textarea
+            id="query"
+            class="field"
+            placeholder="e.g. How do I define a BusinessRule with the ServiceNow Fluent SDK?"
+            required
+          ></textarea>
+        </label>
+        <button id="askBtn" class="btn primary" type="submit">Research</button>
       </form>
       <p class="examples">
         Try:
@@ -44,17 +47,18 @@
       <div id="error" class="error" hidden></div>
 
       <div id="result" hidden>
-        <div id="answer" class="answer"></div>
+        <div id="answer" class="card" style="white-space: pre-wrap; margin: 18px 0"></div>
         <div id="trace"></div>
       </div>
 
-      <p class="foot">
+      <p class="muted" style="margin-top: 40px">
         Read-only pipeline. Retrieved content is treated as untrusted evidence;
         mutating SDK commands, credential/HR tables, and unapproved deletions are
         blocked by policy. Live instance access is disabled by default.
       </p>
     </main>
-
+    <nav id="tabbar"></nav>
+    <footer id="site-footer"></footer>
     <script src="/assets/research.js" type="module"></script>
   </body>
 </html>
