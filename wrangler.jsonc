@@ -44,4 +44,6 @@
     "PUBLIC_ORIGIN": "https://summaverick.com",
     "MAGIC_LINK_FROM": "login@summaverick.com"
   }
+  // Account ID is supplied in CI as CLOUDFLARE_ACCOUNT_ID (do not hard-code a
+  // token here). Optional: set "account_id" once you copy it from the dashboard.
 }

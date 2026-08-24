@@ -123,10 +123,18 @@ is non-zero and **zero bytes are added to git** in the old repo.
 
 ## 9. CI/CD (T11)
 
-Add a repo secret `CLOUDFLARE_API_TOKEN` (Workers Scripts:Edit, D1:Edit,
-Workers R2 Storage:Edit, Workers KV:Edit). Push to `main` → `.github/workflows/deploy.yml`
-runs typecheck → tests → `d1 migrations apply --remote` → `wrangler deploy` →
-`scripts/verify.ts https://summaverick.com`. A failing smoke check fails the deploy.
+Wrangler in GitHub Actions is non-interactive. It will not run `wrangler login`.
+Set **both** of these on the repo
+([Settings → Secrets and variables → Actions](https://github.com/sumanthbolle/Summaverick/settings/secrets/actions)):
+
+| Name | Where | Value |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | **Secret** | API token from [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens). Use **Edit Cloudflare Workers**, and also grant **D1 Edit**, **Workers KV Storage Edit**, **Workers R2 Storage Edit**. |
+| `CLOUDFLARE_ACCOUNT_ID` | **Variable** (or secret) | Account ID from the Cloudflare dashboard Workers overview (right sidebar). |
+
+Push to `master` (or re-run the failed `deploy` workflow). The workflow runs
+typecheck → tests → `d1 migrations apply --remote` → `wrangler deploy` →
+`scripts/verify.ts https://summaverick.com`.
 
 ---
 
