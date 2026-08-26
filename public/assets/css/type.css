@@ -1,0 +1,81 @@
+/*
+ * type.css — the typeface and the type system.
+ *
+ * Geist (variable) for text and UI; Geist Mono (variable) for traces, code and
+ * data — the mono is the site's working voice, since the product is a machine
+ * showing its work. Files are vendored under /assets/fonts (latin subset).
+ */
+
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/assets/fonts/geist-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Geist Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/assets/fonts/geist-mono-latin.woff2") format("woff2");
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  line-height: var(--leading-normal);
+  color: var(--c-text);
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  color: var(--c-text);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.display {
+  font-size: var(--step-5);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  font-weight: 560;
+}
+
+h1, .h1 { font-size: var(--step-4); }
+h2, .h2 { font-size: var(--step-3); }
+h3, .h3 { font-size: var(--step-2); letter-spacing: var(--tracking-snug); }
+h4, .h4 { font-size: var(--step-1); letter-spacing: var(--tracking-snug); line-height: var(--leading-snug); }
+
+p { text-wrap: pretty; }
+
+.lead {
+  font-size: var(--step-1);
+  line-height: var(--leading-snug);
+  color: var(--c-text-dim);
+  letter-spacing: var(--tracking-snug);
+  font-weight: 400;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--c-text-mute);
+  font-weight: 500;
+}
+
+.mono { font-family: var(--font-mono); }
+
+small, .small { font-size: var(--step--1); }
+
+.text-dim  { color: var(--c-text-dim); }
+.text-mute { color: var(--c-text-mute); }
+.text-ok   { color: var(--c-ok); }
+.text-bad  { color: var(--c-bad); }

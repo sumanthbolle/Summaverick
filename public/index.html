@@ -1,66 +1,252 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>summaverick — learn, research, resolve</title>
-    <meta
-      name="description"
-      content="ServiceNow quizzes and research, interviews, SkyFare flights, metals, UPSC notes, and an autonomous customer-advocacy agent."
-    />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f5f7" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
-    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/app.css" />
-  </head>
-  <body>
-    <a class="skip" href="#main">Skip to content</a>
-    <header id="site-header"></header>
-    <main id="main">
-      <section class="hero">
-        <p class="eyebrow">Learning + tools</p>
-        <h1>Learn. Research. Resolve.</h1>
-        <p class="lede">
-          ServiceNow quizzes graded on the server, evidence-backed research,
-          interviews, SkyFare, metals, UPSC notes — and an agent that
-          negotiates refunds for you.
-        </p>
-        <div class="row">
-          <a class="btn primary" href="/quiz">Take a quiz</a>
-          <a class="btn" href="/advocate">Watch a live case</a>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Summaverick — retrieval that cites its sources</title>
+  <meta name="description" content="I build agentic retrieval systems that hold up in production. The Summaverick Research Agent answers ServiceNow questions from version-matched sources, with a trace you can watch and evals you can check." />
+
+  <link rel="icon" href="/assets/favicon.svg" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+
+  <!-- Set the theme before first paint so there is no flash. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("sv-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <!-- ===================== Nav ===================== -->
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/">
+      <span class="mark" aria-hidden="true"></span>
+      Summaverick
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#agent">The agent</a>
+      <a href="#work">Work</a>
+      <a href="#engage">Engagements</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch colour theme">
+        <span aria-hidden="true">◐</span>
+      </button>
+      <a class="btn btn-primary" href="#contact">Start a conversation</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ===================== Scene 1 — Hero ===================== -->
+    <section class="scene hero scene-hero" id="hero" data-scene="hero">
+      <div class="stage">
+        <div class="hero-bg" aria-hidden="true"></div>
+        <div class="hero-grid" data-hero-grid aria-hidden="true"></div>
+        <div class="stage-inner hero-inner">
+          <p class="eyebrow reveal" data-hero-eyebrow>Summaverick · agentic retrieval</p>
+          <h1 class="display reveal" data-hero-title>
+            Retrieval that cites its sources and survives production.
+          </h1>
+          <p class="lead reveal" data-hero-lead>
+            I build research agents for ServiceNow teams. This one answers from
+            version-matched sources, shows its working as it runs, and publishes
+            the evals it passes and the two it doesn't.
+          </p>
+          <div class="hero-cta reveal" data-hero-cta>
+            <a class="btn btn-primary btn-lg" href="#agent">Watch it run</a>
+            <a class="btn btn-ghost btn-lg" href="#work">See the work</a>
+          </div>
         </div>
-      </section>
-
-      <div class="page" style="padding-top: 0">
-        <section aria-labelledby="products-h">
-          <div class="section-head">
-            <h2 id="products-h">The platform</h2>
-          </div>
-          <div class="grid auto" id="productGrid"></div>
-        </section>
-
-        <section class="section" aria-labelledby="learn-h">
-          <div class="section-head">
-            <h2 id="learn-h">From the library</h2>
-            <a href="/learn">See all</a>
-          </div>
-          <div class="grid cols-2" id="postGrid">
-            <p class="loading" id="postsLoading">Loading essays…</p>
-          </div>
-        </section>
-
-        <section class="section" aria-labelledby="pulse-h">
-          <div class="section-head">
-            <h2 id="pulse-h">Pulse</h2>
-          </div>
-          <div class="grid cols-2" id="pulseGrid">
-            <p class="muted" id="pulseStatus">Headlines load when the live feed is configured.</p>
-          </div>
-        </section>
+        <div class="hero-scrollcue" data-hero-cue>
+          <span>scroll</span>
+          <span class="rail"></span>
+        </div>
       </div>
-    </main>
-    <nav id="tabbar"></nav>
-    <footer id="site-footer"></footer>
-    <script src="/assets/home.js" type="module"></script>
-  </body>
+    </section>
+
+    <!-- ===================== Scene 2 — The gap ===================== -->
+    <section class="scene scene-tall" id="scene-gap" data-scene="gap">
+      <div class="stage">
+        <div class="stage-inner">
+          <div class="scene-kicker">
+            <span class="idx">02</span>
+            <span class="eyebrow">the gap</span>
+          </div>
+          <h2 class="scene-title">Confident and wrong is the default.</h2>
+          <p class="scene-sub" data-gap-q></p>
+          <div class="answers" data-gap-answers></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Scene 3 — Three layers ===================== -->
+    <section class="scene scene-tall" id="scene-layers" data-scene="layers">
+      <div class="stage">
+        <div class="stage-inner">
+          <div class="scene-kicker">
+            <span class="idx">03</span>
+            <span class="eyebrow">retrieval</span>
+          </div>
+          <h2 class="scene-title">Layered, and version-aware.</h2>
+          <p class="scene-sub">
+            The classifier reads the query, then retrieval descends the layers it
+            needs. Live instance query is the third layer and it stays off until a
+            client turns it on.
+          </p>
+          <div class="layers" data-layers></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Scene 4 — The firewall ===================== -->
+    <section class="scene scene-tall" id="scene-firewall" data-scene="firewall">
+      <div class="stage">
+        <div class="stage-inner">
+          <div class="scene-kicker">
+            <span class="idx">04</span>
+            <span class="eyebrow">safety</span>
+          </div>
+          <h2 class="scene-title">Injection stops before the model sees it.</h2>
+          <p class="scene-sub">
+            Retrieved documents are untrusted input. A poisoned instruction hidden
+            in one is caught, stripped, and logged — the clean evidence continues.
+          </p>
+          <div class="firewall" data-firewall></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Scene 5 — The receipts ===================== -->
+    <section class="scene scene-tall" id="scene-receipts" data-scene="receipts">
+      <div class="stage">
+        <div class="stage-inner">
+          <div class="scene-kicker">
+            <span class="idx">05</span>
+            <span class="eyebrow">the receipts</span>
+          </div>
+          <h2 class="scene-title">Every claim carries a citation. The evals are public.</h2>
+          <div class="receipts">
+            <div class="claims-col" data-receipts-claims></div>
+            <div class="scoreboard" data-scoreboard></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Live agent ===================== -->
+    <section class="section" id="agent">
+      <div class="container">
+        <div class="section-head stack">
+          <span class="eyebrow">the agent</span>
+          <h2 class="h1">Watch it work.</h2>
+          <p class="lead">
+            Ask a ServiceNow question. The trace renders stage by stage —
+            classification, the layers consulted, dedup, the injection check, and
+            the verified answer with its sources. An injection attempt is blocked
+            in view, not swept under.
+          </p>
+        </div>
+        <div class="agent-shell">
+          <form class="agent-top" data-agent-form>
+            <input class="agent-input" data-agent-input type="text"
+              value="how do I sign a scoped app build with the SDK?"
+              aria-label="Ask the research agent" maxlength="280" />
+            <button class="btn btn-primary" type="submit" data-agent-run>Run</button>
+          </form>
+          <div class="trace" data-agent-trace></div>
+          <p class="trace-note">
+            Preview plays a captured trace client-side. The live endpoint
+            (streamed over SSE, rate-limited, injection-gated) lands with T8.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== Work ===================== -->
+    <section class="section" id="work">
+      <div class="container">
+        <div class="section-head stack">
+          <span class="eyebrow">work</span>
+          <h2 class="h1">Selected work.</h2>
+          <p class="lead">Client names are withheld by default. The numbers are not.</p>
+        </div>
+        <div class="cards" data-work></div>
+      </div>
+    </section>
+
+    <!-- ===================== Engagements ===================== -->
+    <section class="section" id="engage">
+      <div class="container">
+        <div class="section-head stack">
+          <span class="eyebrow">engagements</span>
+          <h2 class="h1">How working together looks.</h2>
+          <p class="lead">
+            Three shapes. Each says what it is, how long it takes, and what you
+            hold at the end — so you can tell whether it fits before we talk.
+          </p>
+        </div>
+        <div class="cards" data-engage></div>
+      </div>
+    </section>
+
+    <!-- ===================== Contact ===================== -->
+    <section class="section" id="contact">
+      <div class="container">
+        <div class="section-head stack">
+          <span class="eyebrow">contact</span>
+          <h2 class="h1">Start a conversation.</h2>
+          <p class="lead">
+            Tell me what you're trying to build. I read every message myself.
+          </p>
+        </div>
+        <form class="card stack" data-lead-form style="max-width: 640px;">
+          <div class="grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="field"><label for="lead-name">Name</label><input id="lead-name" name="name" type="text" autocomplete="name" /></div>
+            <div class="field"><label for="lead-email">Email</label><input id="lead-email" name="email" type="email" autocomplete="email" required /></div>
+          </div>
+          <div class="field">
+            <label for="lead-intent">What's this about?</label>
+            <select id="lead-intent" name="intent">
+              <option value="product">The research agent</option>
+              <option value="consulting">A consulting engagement</option>
+              <option value="other">Something else</option>
+            </select>
+          </div>
+          <div class="field"><label for="lead-message">Message</label><textarea id="lead-message" name="message" placeholder="A sentence or two on the problem."></textarea></div>
+          <div class="field hp" aria-hidden="true"><label for="lead-company-url">Company URL</label><input id="lead-company-url" name="company_url" type="text" tabindex="-1" autocomplete="off" /></div>
+          <div><button class="btn btn-primary btn-lg" type="submit">Send</button></div>
+          <p class="small text-mute" data-lead-status role="status"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== Footer ===================== -->
+  <footer class="footer">
+    <div class="container footer-grid">
+      <div class="stack">
+        <span class="nav-brand"><span class="mark" aria-hidden="true"></span> Summaverick</span>
+        <p class="small text-mute">Agentic retrieval, built to hold up in production.</p>
+      </div>
+      <div class="small">
+        <p class="text-mute">© <span data-year></span> Summaverick · summaverick.com</p>
+        <p><a href="#agent">The agent</a> · <a href="#work">Work</a> · <a href="#contact">Contact</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Vendored animation libraries (self-contained; no CDN). -->
+  <script src="/assets/vendor/gsap.min.js"></script>
+  <script src="/assets/vendor/ScrollTrigger.min.js"></script>
+  <script src="/assets/vendor/lenis.min.js"></script>
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
 </html>

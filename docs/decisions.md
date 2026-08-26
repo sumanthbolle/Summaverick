@@ -2,6 +2,27 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-08-26 — Scroll narrative: Option A (vanilla + GSAP), libraries vendored
+
+**Decision.** The five-scene scroll narrative (T10) is built Option A from the
+handover §1.2: a static page with GSAP ScrollTrigger, no build framework. Smooth
+scrolling uses **Lenis** (MIT) rather than GSAP ScrollSmoother, which is a Club
+GSAP plugin and not free to redistribute — Lenis is the world-class,
+self-hostable equivalent. All three libraries (GSAP, ScrollTrigger, Lenis) are
+**vendored** under `public/assets/vendor/`, and the typeface (Geist + Geist Mono,
+OFL) under `public/assets/fonts/`. Nothing loads from a CDN, keeping the site
+self-contained per the Cloudflare-decoupling decision below.
+
+Pinning uses CSS `position: sticky` on each scene's stage (not ScrollTrigger's
+`pin`), which sidesteps the `position: fixed` / `overflow` pin bug the handover
+warns about; `overflow: clip` is used throughout regardless. Every scene is
+scrub-linked, so scroll-up reverses scroll-down for free, and every scene renders
+its final readable state under `prefers-reduced-motion` with no timeline built.
+
+Fixtures for scenes 2–4 and the scoreboard are representative of the agent's real
+output shape but are marked `provisional` and must be regenerated from live
+`research_runs` once T8/T9 land (they are not rendered as verified metrics).
+
 ## 2026-08-26 — Defer the Cloudflare dependency; keep everything runnable from the repo
 
 **Decision.** For now, nothing on the push/PR path depends on a Cloudflare

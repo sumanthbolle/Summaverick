@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Learning + tools platform on Cloudflare Workers + D1 + R2 + KV (summaverick.com)",
+  "description": "Summaverick — product + consulting site for agentic retrieval (summaverick.com)",
   "engines": {
     "node": ">=20"
   },
@@ -26,12 +26,20 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250620.0",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "gsap": "3.12.5",
+    "lenis": "1.1.14",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5",
     "wrangler": "^4.20.0"
   },
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "workerd", "@cloudflare/workerd-linux-64"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "@cloudflare/workerd-linux-64"
+    ]
   }
 }
