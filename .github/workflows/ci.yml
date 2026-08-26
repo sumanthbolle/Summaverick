@@ -8,9 +8,10 @@ name: ci
 # Deploying to Cloudflare is deliberately kept out of the push/PR path — see
 # deploy.yml (manual only) and docs/decisions.md.
 
+# Build/test on pull requests (and on demand). Pushes to master are covered by
+# deploy.yml, which runs the same typecheck + tests before deploying, so this
+# does not also run there — avoids duplicate runs on the same commit.
 on:
-  push:
-    branches: [main, master]
   pull_request:
   workflow_dispatch:
 

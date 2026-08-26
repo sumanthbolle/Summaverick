@@ -127,11 +127,13 @@ a:hover { color: var(--c-accent-press); }
   display: inline-flex; align-items: center; gap: var(--space-2);
   font-weight: 600; letter-spacing: var(--tracking-snug); color: var(--c-text);
 }
-.nav-brand .mark {
-  width: 26px; height: 26px; border-radius: 7px;
-  background: linear-gradient(135deg, var(--c-accent), var(--c-layer-2));
-  box-shadow: var(--shadow-1);
+/* Branded wordmark logo (dark artwork) sits in a rounded tile so it reads as
+   intentional on the light theme too. */
+.brand-logo {
+  height: 38px; width: auto; display: block;
+  border-radius: 9px;
 }
+.footer-logo { height: 52px; width: auto; border-radius: 10px; display: block; }
 .nav-links { display: flex; align-items: center; gap: var(--space-5); }
 .nav-links a { color: var(--c-text-dim); font-size: var(--step--1); }
 .nav-links a:hover { color: var(--c-text); }
@@ -154,8 +156,8 @@ a:hover { color: var(--c-accent-press); }
   position: relative;
   overflow: clip;
 }
-.scene-tall { height: 300vh; }        /* scroll budget per scene */
-.scene-hero { height: 175vh; }        /* hero only fades out — needs less */
+.scene-tall { height: 185vh; }        /* scroll budget per scene — tuned for pace */
+.scene-hero { height: 120vh; }        /* hero only fades out — needs less */
 .stage {
   position: sticky;
   top: 0;
@@ -395,6 +397,36 @@ a:hover { color: var(--c-accent-press); }
 .a-badge[data-ok="true"] { background: var(--c-ok-soft); color: var(--c-ok); border-color: transparent; }
 .a-badge[data-ok="false"] { background: var(--c-bad-soft); color: var(--c-bad); border-color: transparent; }
 
+/* ---- Ask Summaverick page --------------------------------------------- */
+.ask-wrap { padding-block: calc(var(--space-9) + 48px) var(--space-9); min-height: 70vh; }
+.ask-inner { max-width: 52rem; }
+.ask-inner h1 { margin-top: var(--space-3); }
+.ask-inner .lead { margin-top: var(--space-4); }
+.composer {
+  display: flex; gap: var(--space-3); align-items: flex-end;
+  margin-top: var(--space-6);
+  padding: var(--space-3);
+  border: 1px solid var(--c-line-strong); border-radius: var(--radius-xl);
+  background: var(--c-surface); box-shadow: var(--shadow-2);
+}
+.composer-input {
+  flex: 1; font: inherit; font-size: var(--step-0); resize: none;
+  border: 0; background: transparent; color: var(--c-text);
+  padding: 0.6em 0.6em; max-height: 160px; line-height: 1.4;
+}
+.composer-input:focus { outline: none; }
+.composer .btn { flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.chip {
+  font: inherit; font-size: var(--step--1); cursor: pointer;
+  padding: 0.5em 0.9em; border-radius: var(--radius-pill);
+  border: 1px solid var(--c-line-strong); background: var(--c-surface); color: var(--c-text-dim);
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.chip:hover { color: var(--c-text); border-color: var(--c-accent); }
+.ask-results { margin-top: var(--space-6); }
+.ask-results .trace { min-height: 0; }
+
 /* ---- Forms ------------------------------------------------------------ */
 .field { display: grid; gap: var(--space-2); }
 .field label { font-size: var(--step--1); color: var(--c-text-dim); }
@@ -427,7 +459,7 @@ a:hover { color: var(--c-accent-press); }
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  .scene-tall { height: auto; }
+  .scene-tall, .scene-hero { height: auto; }
   .stage { position: static; height: auto; padding-block: var(--space-9); }
   .trace-step { opacity: 1; transform: none; }
   .hero-scrollcue { display: none; }

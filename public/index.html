@@ -6,7 +6,15 @@
   <title>Summaverick — retrieval that cites its sources</title>
   <meta name="description" content="I build agentic retrieval systems that hold up in production. The Summaverick Research Agent answers ServiceNow questions from version-matched sources, with a trace you can watch and evals you can check." />
 
-  <link rel="icon" href="/assets/favicon.svg" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Summaverick — retrieval that cites its sources" />
+  <meta property="og:description" content="Agentic retrieval for ServiceNow, built to hold up in production. Watch the agent work and check the evals." />
+  <meta property="og:image" content="/assets/img/summaverick-logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="/assets/img/summaverick-logo.png" />
   <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/assets/css/tokens.css" />
@@ -26,15 +34,14 @@
 <body>
   <!-- ===================== Nav ===================== -->
   <header class="nav" id="nav">
-    <a class="nav-brand" href="/">
-      <span class="mark" aria-hidden="true"></span>
-      Summaverick
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img class="brand-logo" src="/assets/img/summaverick-mark.webp" alt="Summaverick" width="68" height="38" />
     </a>
     <nav class="nav-links" aria-label="Primary">
       <a href="#agent">The agent</a>
       <a href="#practice">What I build</a>
       <a href="#work">Work</a>
-      <a href="#engage">Engagements</a>
+      <a href="/ask">Ask</a>
       <a href="#contact">Contact</a>
     </nav>
     <div class="nav-actions">
@@ -57,10 +64,10 @@
             Retrieval that cites its sources and survives production.
           </h1>
           <p class="lead reveal" data-hero-lead>
-            I build ServiceNow apps, AI systems, and agents that hold up in
-            production. This is one of them — a research agent that answers from
-            version-matched sources, shows its working as it runs, and publishes
-            the evals it passes and the two it doesn't.
+            I build ServiceNow apps, AI systems, and agents for production use.
+            The one on this page is a research agent: it answers ServiceNow
+            questions from version-matched docs, shows each step as it runs, and
+            lists the eval cases it passes and the ones it fails.
           </p>
           <div class="hero-cta reveal" data-hero-cta>
             <a class="btn btn-primary btn-lg" href="#agent">Watch it run</a>
@@ -150,10 +157,11 @@
           <span class="eyebrow">the agent</span>
           <h2 class="h1">Watch it work.</h2>
           <p class="lead">
-            Ask a ServiceNow question. The trace renders stage by stage —
-            classification, the layers consulted, dedup, the injection check, and
-            the verified answer with its sources. An injection attempt is blocked
-            in view, not swept under.
+            Ask a ServiceNow question. The trace shows each stage as it runs —
+            how the query was classified, which layers were consulted, the dedup
+            and injection checks, and the verified answer with its sources. If a
+            question trips the injection detector, it's rejected before the model
+            and you see that happen.
           </p>
         </div>
         <div class="agent-shell">
@@ -181,9 +189,9 @@
           <span class="eyebrow">what I build</span>
           <h2 class="h1">Four kinds of work.</h2>
           <p class="lead">
-            ServiceNow store apps, AI transformation, custom agents, and the
-            products that come out of doing all three. Same rule across them:
-            cite the source, show the working, name the constraint.
+            ServiceNow store apps, AI transformation work, custom agents, and a
+            few products built out of all three. Each one shows its sources, and
+            I'm clear about where it stops.
           </p>
         </div>
         <div class="cards" data-pillars></div>
@@ -196,7 +204,7 @@
         <div class="section-head stack">
           <span class="eyebrow">work</span>
           <h2 class="h1">Selected work.</h2>
-          <p class="lead">Client names are withheld by default. The numbers are not.</p>
+          <p class="lead">I don't name clients without permission. The metrics are real.</p>
         </div>
         <div class="cards" data-work></div>
       </div>
@@ -209,8 +217,9 @@
           <span class="eyebrow">engagements</span>
           <h2 class="h1">How working together looks.</h2>
           <p class="lead">
-            Three shapes. Each says what it is, how long it takes, and what you
-            hold at the end — so you can tell whether it fits before we talk.
+            Three ways to work together. Each one lists what it is, how long it
+            takes, and what you have at the end, so you can tell whether it fits
+            before we talk.
           </p>
         </div>
         <div class="cards" data-engage></div>
@@ -253,7 +262,7 @@
   <footer class="footer">
     <div class="container footer-grid">
       <div class="stack">
-        <span class="nav-brand"><span class="mark" aria-hidden="true"></span> Summaverick</span>
+        <img class="footer-logo" src="/assets/img/summaverick-mark.webp" alt="Summaverick" width="93" height="52" />
         <p class="small text-mute">Agentic retrieval, built to hold up in production.</p>
       </div>
       <div class="small">

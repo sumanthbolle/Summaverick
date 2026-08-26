@@ -5,6 +5,7 @@
  */
 
 import { el, $, $$, prefersReducedMotion } from "./lib/dom.js";
+import { streamResearch } from "./lib/agent-stream.js";
 import { WORK, ENGAGEMENTS, PILLARS, AGENT_TRACE, INJECTION_MARKERS } from "./data/consulting.js";
 
 function workCard(w) {
@@ -119,46 +120,14 @@ function initAgentPreview() {
 
   const setBusy = (busy) => { if (runBtn) { runBtn.disabled = busy; runBtn.textContent = busy ? "Running…" : "Run"; } };
 
-  function handleEvent(type, data) {
-    if (type === "stage") addStep(data.label, data.detail, data.kind);
-    else if (type === "blocked") addStep("blocked", data.reason, "block");
-    else if (type === "answer") addAnswer(data);
-    else if (type === "error") addStep("error", data.message || "the run failed", "block");
-  }
-
-  async function streamLive(query) {
-    const res = await fetch("/api/research/stream", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query }),
+  const streamLive = (query) =>
+    streamResearch(query, {
+      stage: (d) => addStep(d.label, d.detail, d.kind),
+      blocked: (d) => addStep("blocked", d.reason, "block"),
+      answer: (d) => addAnswer(d),
+      error: (d) => addStep("error", d.message || "the run failed", "block"),
+      rateLimited: (msg) => addStep("rate limited", msg, "block"),
     });
-    if (!res.ok || !res.body) {
-      let msg = `HTTP ${res.status}`;
-      try { const j = await res.json(); msg = j.message || msg; } catch (e) {}
-      if (res.status === 429) { addStep("rate limited", msg, "block"); return true; }
-      throw new Error(msg); // 4xx/5xx without a stream → try fallback
-    }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let idx;
-      while ((idx = buf.indexOf("\n\n")) >= 0) {
-        const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
-        let type = "message", payload = "";
-        for (const line of frame.split("\n")) {
-          if (line.startsWith("event:")) type = line.slice(6).trim();
-          else if (line.startsWith("data:")) payload += line.slice(5).trim();
-        }
-        if (!payload) continue;
-        try { handleEvent(type, JSON.parse(payload)); } catch (e) {}
-      }
-    }
-    return true;
-  }
 
   /* Canned fallback for static hosting. */
   function playCanned(query) {
