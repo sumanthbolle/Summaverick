@@ -1,18 +1,21 @@
 name: deploy
 
-# MANUAL ONLY. This workflow is not on the push/PR path, so the day-to-day
-# repo does not depend on Cloudflare at all — see docs/decisions.md.
-#
-# Run it from the Actions tab ("Run workflow") once these repo secrets exist:
-#   - CLOUDFLARE_API_TOKEN   (Workers + D1 Edit)
-#   - CLOUDFLARE_ACCOUNT_ID
+# Deploys the Worker to Cloudflare on every push to master, and on demand from
+# the Actions tab. Requires these repo secrets (Settings → Secrets and
+# variables → Actions):
+#   - CLOUDFLARE_API_TOKEN   (Workers + D1 + KV + R2 Edit)
+#   - CLOUDFLARE_ACCOUNT_ID  (the Account ID from Workers overview, NOT a Zone ID)
 #   - PERPLEXITY_API_KEY     (optional — pushed onto the Worker so the live
 #                             agent returns model answers; omit and it serves
 #                             the evidence-backed draft)
-# and wrangler.jsonc points at real D1/KV/R2 resources. Until then, leave it
-# alone; ci.yml keeps the build honest without any account.
+# and wrangler.jsonc must point at real D1/KV/R2 resources with summaverick.com
+# added to that Cloudflare account. Until the secrets are set, the deploy job
+# fails fast at the credential check; the separate ci.yml build/test stays
+# green regardless. See docs/decisions.md.
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 concurrency:

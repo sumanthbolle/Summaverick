@@ -2,6 +2,28 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-08-26 — Re-enable auto-deploy on merge to master
+
+**Decision.** Reverses the "defer Cloudflare" gate below now that the site is
+meant to go live. `deploy.yml` runs on every push to `master` (and still on
+manual dispatch); `ci.yml` now runs on pull requests only, so a master commit
+isn't tested twice.
+
+**Why.** A merge was expected to appear on summaverick.com and didn't. Two
+causes: (1) deploy was manual-only, so merges never deployed; (2) more
+fundamentally, the Cloudflare deploy had never once succeeded — every run
+failed in <1s at the credential preflight because `CLOUDFLARE_API_TOKEN` /
+`CLOUDFLARE_ACCOUNT_ID` are not set as repo secrets, so `wrangler deploy` never
+ran and the Worker was never published.
+
+**Prerequisite (human, one-time).** Auto-deploy only produces a live site once
+these repo secrets exist: `CLOUDFLARE_API_TOKEN` (Workers + D1 + KV + R2 Edit),
+`CLOUDFLARE_ACCOUNT_ID` (Account ID, not a Zone ID), optional
+`PERPLEXITY_API_KEY`; and the D1/KV/R2 resources exist with summaverick.com on
+that account (RUNBOOK §1). Until then the deploy job fails fast at the
+credential check while `ci.yml` stays green — the failure is the signal that
+setup is incomplete, not a code regression.
+
 ## 2026-08-26 — Live agent (T8): single streaming endpoint, no Durable Object
 
 **Decision.** The live agent streams over a single SSE connection
