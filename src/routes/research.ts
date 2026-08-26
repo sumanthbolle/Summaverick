@@ -192,6 +192,10 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
             citations: t.evidence.slice(0, 6).map((e) => ({ title: e.title, url: e.url ?? null, sourceType: e.sourceType })),
             verification: t.verification,
             llmUsed: t.llm.used,
+            llmModel: t.llm.model,
+            // Why the model was not used (missing key, or an upstream/egress
+            // failure), so a fallback to the draft is explainable in the UI.
+            llmError: t.llm.error ?? null,
             // Compact summary only — the full case list is large and the public
             // scoreboard (T9) reads eval_results from D1, not this payload.
             evalScores: {

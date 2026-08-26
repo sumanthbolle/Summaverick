@@ -35,14 +35,47 @@ returns a row.
 
 ## 2. Secrets
 
+Secrets are **per-Worker** and are **not** inherited from any other repo. A
+`PERPLEXITY_API_KEY` stored as a GitHub Actions secret in
+`sumanthbolle.github.io` (or set on the old `wandering-haze-b394` Worker) does
+**not** reach this Worker — the `summaverick` Worker only sees a key you give
+*it*, in one of the three ways below.
+
+The research agent needs only `PERPLEXITY_API_KEY`. Without it the live agent
+still runs — it returns the deterministic, evidence-backed draft and the trace
+shows `model answer` vs `evidence-backed draft` accordingly. The other secrets
+belong to legacy routes.
+
+**Local dev (`wrangler dev`).** Put it in `.dev.vars` (gitignored — never
+committed). Copy `.dev.vars.example` to `.dev.vars` and fill the value:
+
+```bash
+cp .dev.vars.example .dev.vars   # then edit PERPLEXITY_API_KEY="pplx-..."
+pnpm dev
+```
+
+**Deployed Worker.** Set it once on the Worker; it persists across deploys:
+
 ```bash
 npx wrangler secret put PERPLEXITY_API_KEY
-npx wrangler secret put UPSC_PUBLISH_TOKEN
 npx wrangler secret put SESSION_SECRET          # any long random string
+# legacy routes only:
+npx wrangler secret put UPSC_PUBLISH_TOKEN
 npx wrangler secret put AMADEUS_CLIENT_ID
 npx wrangler secret put AMADEUS_CLIENT_SECRET
 npx wrangler secret put RESEND_API_KEY
 ```
+
+**CI (this repo, when Cloudflare deploy is re-enabled).** Add
+`PERPLEXITY_API_KEY` under this repo's
+[Settings → Secrets and variables → Actions](https://github.com/sumanthbolle/Summaverick/settings/secrets/actions),
+then have the deploy job push it with `wrangler secret put` (or set it once by
+hand as above). A secret in a different repo is not visible here.
+
+> Note: the sandboxed dev environment blocks egress to `api.perplexity.ai`, so
+> the model call fails there and the agent falls back to the draft even with a
+> key set — the UI names the reason. On a real network the key produces
+> `model answer`.
 
 `ALLOWED_ORIGIN` is intentionally **not** used (same origin).
 

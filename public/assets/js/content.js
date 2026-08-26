@@ -99,14 +99,20 @@ function initAgentPreview() {
   const addAnswer = (a) => {
     const verOk = a.verification ? a.verification.ok : null;
     const head = el("div", { class: "a-head" }, [
-      el("span", { class: "a-badge", text: a.llmUsed ? "model answer" : "evidence-backed draft" }),
+      el("span", { class: "a-badge", text: a.llmUsed ? `model answer${a.llmModel ? " · " + a.llmModel : ""}` : "evidence-backed draft" }),
       a.verification ? el("span", { class: "a-badge", "data-ok": String(verOk), text: `${a.verification.citationCount} citation(s) · ${verOk ? "verified" : "unverified"}` }) : null,
     ]);
+    // When the model wasn't used, say why — helps diagnose a fallback once a key
+    // is wired (missing key vs. an upstream/egress error).
+    const note = !a.llmUsed
+      ? el("div", { class: "small text-mute", style: "margin-top:var(--space-2)",
+          text: a.llmError ? `model unavailable (${a.llmError}) — retrieval + verification ran; showing the evidence-backed draft` : "no model key configured — showing the evidence-backed draft" })
+      : null;
     const cites = (a.citations || []).length
       ? el("div", { class: "a-cites" }, a.citations.map((c) =>
           el("span", { class: "cite", html: "&#8250; " + (c.sourceType ? c.sourceType + " · " : "") + c.title })))
       : null;
-    const block = el("div", { class: "trace-answer" }, [head, el("div", { class: "a-text", text: a.text }), cites]);
+    const block = el("div", { class: "trace-answer" }, [head, el("div", { class: "a-text", text: a.text }), note, cites]);
     traceEl.append(block);
     requestAnimationFrame(() => setTimeout(() => block.classList.add("show"), 30));
   };
