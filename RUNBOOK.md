@@ -66,11 +66,12 @@ npx wrangler secret put AMADEUS_CLIENT_SECRET
 npx wrangler secret put RESEND_API_KEY
 ```
 
-**CI (this repo, when Cloudflare deploy is re-enabled).** Add
-`PERPLEXITY_API_KEY` under this repo's
-[Settings → Secrets and variables → Actions](https://github.com/sumanthbolle/Summaverick/settings/secrets/actions),
-then have the deploy job push it with `wrangler secret put` (or set it once by
-hand as above). A secret in a different repo is not visible here.
+**CI (this repo).** Add `PERPLEXITY_API_KEY` under this repo's
+[Settings → Secrets and variables → Actions](https://github.com/sumanthbolle/Summaverick/settings/secrets/actions).
+The manual **deploy** workflow (`.github/workflows/deploy.yml`) then pushes it
+onto the Worker for you with `wrangler secret put` right after `wrangler
+deploy` — piped via stdin, never printed, and skipped with a notice when the
+secret is absent. A secret in a different repo is not visible here.
 
 > Note: the sandboxed dev environment blocks egress to `api.perplexity.ai`, so
 > the model call fails there and the agent falls back to the draft even with a

@@ -6,6 +6,9 @@ name: deploy
 # Run it from the Actions tab ("Run workflow") once these repo secrets exist:
 #   - CLOUDFLARE_API_TOKEN   (Workers + D1 Edit)
 #   - CLOUDFLARE_ACCOUNT_ID
+#   - PERPLEXITY_API_KEY     (optional — pushed onto the Worker so the live
+#                             agent returns model answers; omit and it serves
+#                             the evidence-backed draft)
 # and wrangler.jsonc points at real D1/KV/R2 resources. Until then, leave it
 # alone; ci.yml keeps the build honest without any account.
 
@@ -24,6 +27,9 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN || vars.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
+      # Job-level so the guard `if: env.PERPLEXITY_API_KEY != ''` can read it.
+      # GitHub masks it in logs; the step below never prints it.
+      PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
       CI: true
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +65,19 @@ jobs:
 
       - name: Deploy Worker
         run: pnpm exec wrangler deploy
+
+      # Push the research-agent LLM key onto the Worker AFTER deploy (the Worker
+      # must exist first). Runs only when the repo secret is set; the value is
+      # piped via stdin and never printed. Worker secrets persist across
+      # deploys, so this is an idempotent re-set on later runs. Setting a secret
+      # rolls a new Worker version, so the key is live immediately.
+      - name: Set PERPLEXITY_API_KEY on the Worker
+        if: env.PERPLEXITY_API_KEY != ''
+        run: printf '%s' "$PERPLEXITY_API_KEY" | pnpm exec wrangler secret put PERPLEXITY_API_KEY
+
+      - name: PERPLEXITY_API_KEY note
+        if: env.PERPLEXITY_API_KEY == ''
+        run: echo "::notice::PERPLEXITY_API_KEY repo secret not set — the live agent will serve the evidence-backed draft. Add it under Settings → Secrets and variables → Actions to enable model answers."
 
       - name: Smoke checks (Worker + pages)
         run: node scripts/verify.mjs --core https://summaverick.com
