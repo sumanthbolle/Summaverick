@@ -1,9 +1,15 @@
 name: deploy
 
+# MANUAL ONLY. This workflow is not on the push/PR path, so the day-to-day
+# repo does not depend on Cloudflare at all — see docs/decisions.md.
+#
+# Run it from the Actions tab ("Run workflow") once these repo secrets exist:
+#   - CLOUDFLARE_API_TOKEN   (Workers + D1 Edit)
+#   - CLOUDFLARE_ACCOUNT_ID
+# and wrangler.jsonc points at real D1/KV/R2 resources. Until then, leave it
+# alone; ci.yml keeps the build honest without any account.
+
 on:
-  push:
-    branches: [main, master]
-  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -11,42 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      # Do not set `version` here. package.json already pins
-      # "packageManager": "pnpm@10.33.0"; setting both makes pnpm/action-setup
-      # fail with "Multiple versions of pnpm specified".
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Unit tests
-        run: pnpm run test
-
   deploy:
-    if: github.event_name != 'pull_request'
-    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
-      # Wrangler CI auth: token is required; account id is required unless
-      # wrangler.jsonc has account_id. Read secrets first, then Actions vars
-      # (in case the values were added under Variables instead of Secrets).
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN || vars.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
       CI: true
@@ -63,16 +38,20 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # Probes the Cloudflare API so a D1-only 7403 (token missing
-      # Account → D1 → Edit, or a Zone ID pasted as Account ID) is explained
-      # instead of a generic wrangler error. Exits 1 only when Worker deploy
-      # cannot succeed.
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        run: pnpm run test
+
+      # Explains a D1-only 7403 (token missing Account -> D1 -> Edit, or a Zone
+      # ID pasted as Account ID) instead of a generic wrangler error.
       - name: Check Cloudflare credentials
         run: node scripts/check-cloudflare-auth.mjs
 
       # The "Edit Cloudflare Workers" token template does not include D1, so
-      # this step often fails with Cloudflare 7403. Do not block wrangler
-      # deploy on that — static pages and /api/advocate do not need D1.
+      # this often fails with Cloudflare 7403. Do not block the deploy on it;
+      # static pages and non-D1 routes do not need it.
       - name: Apply D1 migrations (remote)
         id: d1
         continue-on-error: true
@@ -92,4 +71,4 @@ jobs:
       - name: D1 migrations note
         if: steps.d1.outcome == 'failure'
         run: |
-          echo "::warning::Remote D1 migrations failed (often Cloudflare 7403: API token missing Account → D1 → Edit). The Worker was still deployed. Edit the token at https://dash.cloudflare.com/profile/api-tokens, add D1 Edit, then re-run this workflow."
+          echo "::warning::Remote D1 migrations failed (often Cloudflare 7403: API token missing Account -> D1 -> Edit). The Worker was still deployed. Edit the token at https://dash.cloudflare.com/profile/api-tokens, add D1 Edit, then re-run this workflow."
