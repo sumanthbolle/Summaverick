@@ -363,9 +363,37 @@ a:hover { color: var(--c-accent-press); }
   background: var(--c-ok-soft); color: var(--c-ok); font-size: 11px; margin-top: 2px;
 }
 .trace-step[data-kind="block"] .tick { background: var(--c-bad-soft); color: var(--c-bad); }
+.trace-step[data-kind="active"] .tick { background: var(--c-accent-soft); color: var(--c-accent); }
+.trace-step[data-kind="muted"] { opacity: 0.6; }
+.trace-step[data-kind="muted"] .tick { background: var(--c-bg-elev); color: var(--c-text-mute); }
 .trace-step .k { color: var(--c-text); font-weight: 500; }
 .trace-step .v { color: var(--c-text-dim); }
 .trace-note { color: var(--c-text-mute); font-size: var(--step--1); padding: 0 var(--space-4) var(--space-4); }
+
+/* Final answer block streamed after the trace. */
+.trace-answer {
+  margin: var(--space-2) var(--space-4) var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--c-line); border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.trace-answer.show { opacity: 1; transform: none; }
+.trace-answer .a-head {
+  display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center;
+  margin-bottom: var(--space-3);
+}
+.trace-answer .a-text { white-space: pre-wrap; }
+.trace-answer .a-cites { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.a-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 0.72em; padding: 2px 8px;
+  border-radius: var(--radius-pill); border: 1px solid var(--c-line);
+  color: var(--c-text-dim);
+}
+.a-badge[data-ok="true"] { background: var(--c-ok-soft); color: var(--c-ok); border-color: transparent; }
+.a-badge[data-ok="false"] { background: var(--c-bad-soft); color: var(--c-bad); border-color: transparent; }
 
 /* ---- Forms ------------------------------------------------------------ */
 .field { display: grid; gap: var(--space-2); }

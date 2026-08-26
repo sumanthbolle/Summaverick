@@ -138,6 +138,9 @@ export async function runResearchPipeline(options: {
   configOverride?: ServiceNowDomainConfig;
   fetchImpl?: typeof fetch;
   perplexityModel?: string;
+  /** Optional sink that receives internal stage events as they fire, so an SSE
+   *  endpoint can stream the trace live. Absent = the default in-memory sink. */
+  traceSink?: import("./core/types").TraceSink;
 }): Promise<ResearchPipelineResult> {
   const query = options.query.trim();
   const config =
@@ -145,7 +148,7 @@ export async function runResearchPipeline(options: {
   const fetchImpl = options.fetchImpl ?? timeoutFetch(8000);
   const evalScores = getEvalScores();
 
-  const pack = new ServiceNowDomainPack(config, { fetchImpl });
+  const pack = new ServiceNowDomainPack(config, { fetchImpl, trace: options.traceSink });
   const result = await pack.research(
     query,
     createResearchContext({ allowLiveInstance: options.allowLiveInstance ?? false })

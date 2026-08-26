@@ -5,7 +5,7 @@
  */
 
 import { el, $, $$, prefersReducedMotion } from "./lib/dom.js";
-import { WORK, ENGAGEMENTS, AGENT_TRACE, INJECTION_MARKERS } from "./data/consulting.js";
+import { WORK, ENGAGEMENTS, PILLARS, AGENT_TRACE, INJECTION_MARKERS } from "./data/consulting.js";
 
 function workCard(w) {
   return el("article", { class: "card stack" }, [
@@ -30,7 +30,16 @@ function engageCard(e) {
   ]);
 }
 
+function pillarCard(p, i) {
+  return el("article", { class: "card stack" }, [
+    el("span", { class: "eyebrow", text: String(i + 1).padStart(2, "0") + " · " + p.label }),
+    el("p", { text: p.text }),
+  ]);
+}
+
 function renderStatic() {
+  const pillars = $("[data-pillars]");
+  if (pillars) pillars.replaceChildren(...PILLARS.map(pillarCard));
   const work = $("[data-work]");
   if (work) work.replaceChildren(...WORK.map(workCard));
   const engage = $("[data-engage]");
@@ -61,38 +70,112 @@ function initReveal() {
   targets.forEach((t) => io.observe(t));
 }
 
-/* Agent preview: plays a captured trace step-by-step. A query that trips an
- * injection marker plays the blocked trace instead — the firewall, live. */
+/* Agent preview. Streams the real trace from POST /api/research/stream, stage
+ * by stage. If the endpoint is unreachable (e.g. the page is served statically,
+ * without the Worker), it falls back to a captured trace so the demo still
+ * runs. A query that trips the injection detector is blocked server-side and the
+ * block is shown here — the firewall, live. */
 function initAgentPreview() {
   const form = $("[data-agent-form]");
   const input = $("[data-agent-input]");
   const traceEl = $("[data-agent-trace]");
+  const runBtn = $("[data-agent-run]");
   if (!form || !traceEl) return;
 
-  let timers = [];
-  const clear = () => { timers.forEach(clearTimeout); timers = []; traceEl.replaceChildren(); };
+  let stepIndex = 0;
+  const tick = (kind) => (kind === "block" ? "✕" : kind === "active" ? "○" : kind === "muted" ? "·" : "✓");
 
-  const looksLikeInjection = (q) => {
-    const s = q.toLowerCase();
-    return INJECTION_MARKERS.some((m) => s.includes(m));
+  const clear = () => { stepIndex = 0; traceEl.replaceChildren(); };
+  const addStep = (label, detail, kind) => {
+    const row = el("div", { class: "trace-step", dataset: { kind: kind || "ok" } }, [
+      el("span", { class: "tick", text: tick(kind) }),
+      el("div", {}, [el("span", { class: "k", text: label }), " ", el("span", { class: "v", text: detail || "" })]),
+    ]);
+    traceEl.append(row);
+    const i = stepIndex++;
+    requestAnimationFrame(() => setTimeout(() => row.classList.add("show"), 20 + Math.min(i, 6) * 40));
+    return row;
+  };
+  const addAnswer = (a) => {
+    const verOk = a.verification ? a.verification.ok : null;
+    const head = el("div", { class: "a-head" }, [
+      el("span", { class: "a-badge", text: a.llmUsed ? "model answer" : "evidence-backed draft" }),
+      a.verification ? el("span", { class: "a-badge", "data-ok": String(verOk), text: `${a.verification.citationCount} citation(s) · ${verOk ? "verified" : "unverified"}` }) : null,
+    ]);
+    const cites = (a.citations || []).length
+      ? el("div", { class: "a-cites" }, a.citations.map((c) =>
+          el("span", { class: "cite", html: "&#8250; " + (c.sourceType ? c.sourceType + " · " : "") + c.title })))
+      : null;
+    const block = el("div", { class: "trace-answer" }, [head, el("div", { class: "a-text", text: a.text }), cites]);
+    traceEl.append(block);
+    requestAnimationFrame(() => setTimeout(() => block.classList.add("show"), 30));
   };
 
-  const play = (steps) => {
-    clear();
-    steps.forEach((step, i) => {
-      const row = el("div", { class: "trace-step", dataset: { kind: step.kind } }, [
-        el("span", { class: "tick", text: step.kind === "block" ? "✕" : "✓" }),
-        el("div", {}, [el("span", { class: "k", text: step.k }), " ", el("span", { class: "v", text: step.v })]),
-      ]);
-      traceEl.append(row);
-      timers.push(setTimeout(() => row.classList.add("show"), 90 + i * 260));
+  const setBusy = (busy) => { if (runBtn) { runBtn.disabled = busy; runBtn.textContent = busy ? "Running…" : "Run"; } };
+
+  function handleEvent(type, data) {
+    if (type === "stage") addStep(data.label, data.detail, data.kind);
+    else if (type === "blocked") addStep("blocked", data.reason, "block");
+    else if (type === "answer") addAnswer(data);
+    else if (type === "error") addStep("error", data.message || "the run failed", "block");
+  }
+
+  async function streamLive(query) {
+    const res = await fetch("/api/research/stream", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query }),
     });
-  };
+    if (!res.ok || !res.body) {
+      let msg = `HTTP ${res.status}`;
+      try { const j = await res.json(); msg = j.message || msg; } catch (e) {}
+      if (res.status === 429) { addStep("rate limited", msg, "block"); return true; }
+      throw new Error(msg); // 4xx/5xx without a stream → try fallback
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        let type = "message", payload = "";
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) type = line.slice(6).trim();
+          else if (line.startsWith("data:")) payload += line.slice(5).trim();
+        }
+        if (!payload) continue;
+        try { handleEvent(type, JSON.parse(payload)); } catch (e) {}
+      }
+    }
+    return true;
+  }
 
-  form.addEventListener("submit", (e) => {
+  /* Canned fallback for static hosting. */
+  function playCanned(query) {
+    const s = (query || "").toLowerCase();
+    const blocked = INJECTION_MARKERS.some((m) => s.includes(m));
+    const steps = blocked ? AGENT_TRACE.blocked : AGENT_TRACE.ok;
+    steps.forEach((step, i) => setTimeout(() => addStep(step.k, step.v, step.kind), 90 + i * 240));
+  }
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const q = (input.value || "").trim();
-    play(looksLikeInjection(q) ? AGENT_TRACE.blocked : AGENT_TRACE.ok);
+    if (!q) return;
+    clear();
+    setBusy(true);
+    try {
+      await streamLive(q);
+    } catch (err) {
+      addStep("preview", "live endpoint unavailable — playing a captured trace", "muted");
+      playCanned(q);
+    } finally {
+      setBusy(false);
+    }
   });
 }
 

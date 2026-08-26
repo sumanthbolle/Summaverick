@@ -2,6 +2,38 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-08-26 — Live agent (T8): single streaming endpoint, no Durable Object
+
+**Decision.** The live agent streams over a single SSE connection
+(`POST /api/research/stream`) rather than the handover's three-route +
+Durable Object design. No DO means it runs entirely in local `wrangler dev`
+(Miniflare) with no Cloudflare account — consistent with the Cloudflare
+deferral below. The DO can be added later, when a run needs to be resumed or
+watched by more than one client; nothing here blocks that.
+
+**Routes.** `POST /api/research/stream` (SSE: accepted → classify → expand →
+injection gate → retrieve → per-layer → dedup → verify → answer → done),
+`POST /api/research` (non-streaming `{answer, trace}`), and
+`GET /api/research/:id` (a completed run, from D1 + the trace in R2).
+
+**Safety + limits, as the handover requires.**
+- Rate limited per client (IP, falling back to device): 6/min burst and 50/day,
+  returning a clean 429 with `retry-after`.
+- The query is scanned for prompt injection **before any model call**; a hit is
+  streamed as a visible `blocked` event and the run stops. Query capped at 500.
+- Instance query stays off by default; `permitWriteOperations` stays false.
+
+**Degrades offline.** With no `PERPLEXITY_API_KEY` the pipeline returns its
+deterministic evidence-backed draft (the retrieval/verification trace is
+unchanged), so the demo works with no key. The front-end streams the live
+trace and falls back to a captured trace only when the Worker isn't present
+(e.g. static hosting).
+
+**Fixed along the way.** The KV binding in `wrangler.jsonc` was `KV`, but the
+Worker reads `env.CONFIG` everywhere — renamed the binding to `CONFIG` so the
+rate limiter (and all KV use) works at runtime. Added migration
+`0005_research.sql` (`research_runs`, `eval_results`).
+
 ## 2026-08-26 — Scroll narrative: Option A (vanilla + GSAP), libraries vendored
 
 **Decision.** The five-scene scroll narrative (T10) is built Option A from the

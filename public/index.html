@@ -32,6 +32,7 @@
     </a>
     <nav class="nav-links" aria-label="Primary">
       <a href="#agent">The agent</a>
+      <a href="#practice">What I build</a>
       <a href="#work">Work</a>
       <a href="#engage">Engagements</a>
       <a href="#contact">Contact</a>
@@ -56,7 +57,8 @@
             Retrieval that cites its sources and survives production.
           </h1>
           <p class="lead reveal" data-hero-lead>
-            I build research agents for ServiceNow teams. This one answers from
+            I build ServiceNow apps, AI systems, and agents that hold up in
+            production. This is one of them — a research agent that answers from
             version-matched sources, shows its working as it runs, and publishes
             the evals it passes and the two it doesn't.
           </p>
@@ -157,16 +159,34 @@
         <div class="agent-shell">
           <form class="agent-top" data-agent-form>
             <input class="agent-input" data-agent-input type="text"
-              value="how do I sign a scoped app build with the SDK?"
-              aria-label="Ask the research agent" maxlength="280" />
+              value="How do I use GlideRecord to query the incident table?"
+              aria-label="Ask the research agent" maxlength="500" />
             <button class="btn btn-primary" type="submit" data-agent-run>Run</button>
           </form>
           <div class="trace" data-agent-trace></div>
           <p class="trace-note">
-            Preview plays a captured trace client-side. The live endpoint
-            (streamed over SSE, rate-limited, injection-gated) lands with T8.
+            The trace streams live over SSE from the agent — rate-limited, and a
+            query that trips the injection detector is blocked before the model.
+            Try one to see it. (Served statically without the Worker, it falls
+            back to a captured trace.)
           </p>
         </div>
+      </div>
+    </section>
+
+    <!-- ===================== What I build ===================== -->
+    <section class="section" id="practice">
+      <div class="container">
+        <div class="section-head stack">
+          <span class="eyebrow">what I build</span>
+          <h2 class="h1">Four kinds of work.</h2>
+          <p class="lead">
+            ServiceNow store apps, AI transformation, custom agents, and the
+            products that come out of doing all three. Same rule across them:
+            cite the source, show the working, name the constraint.
+          </p>
+        </div>
+        <div class="cards" data-pillars></div>
       </div>
     </section>
 

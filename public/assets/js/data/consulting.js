@@ -43,6 +43,25 @@ export const WORK = [
   },
 ];
 
+export const PILLARS = [
+  {
+    label: "ServiceNow store apps",
+    text: "Scoped apps built with the Fluent SDK and taken through certification onto the ServiceNow Store. Version-matched to the release you actually run, not the latest one.",
+  },
+  {
+    label: "AI transformation",
+    text: "GenAI adopted where it earns its place. I read the real work first, wire the guardrails in from day one, and say plainly which parts aren't worth automating yet.",
+  },
+  {
+    label: "Custom agents",
+    text: "Agentic systems with a narrow tool surface, a verifier between steps, and the safety gates on by default — the research agent on this page is one of them.",
+  },
+  {
+    label: "Products",
+    text: "The practice, productized. The Summaverick Research Agent is the first, live here; more follow the same rule — cite the source, show the working, publish the evals.",
+  },
+];
+
 export const ENGAGEMENTS = [
   {
     name: "Diagnostic",
@@ -67,14 +86,13 @@ export const ENGAGEMENTS = [
 /* Captured trace the /agent preview replays. Regenerate from a real run in T8. */
 export const AGENT_TRACE = {
   ok: [
-    { k: "classify", v: "intent → sdk.build+auth", kind: "ok" },
-    { k: "expand", v: "+3 query variants", kind: "ok" },
-    { k: "layer 1 · SDK explain", v: "6 candidates (version-matched)", kind: "ok" },
-    { k: "layer 2 · product docs", v: "4 candidates", kind: "ok" },
-    { k: "layer 3 · instance query", v: "skipped — off by default", kind: "ok" },
-    { k: "dedup", v: "7 unique of 10", kind: "ok" },
+    { k: "classify", v: "intent → platform_development · confidence 0.8", kind: "ok" },
+    { k: "expand", v: "+2 query variants", kind: "ok" },
     { k: "injection check", v: "clean", kind: "ok" },
-    { k: "verify", v: "2 / 2 claims sourced", kind: "ok" },
+    { k: "Layer 2 · product docs", v: "4 candidate(s) · answered here", kind: "ok" },
+    { k: "Layer 3 · live instance", v: "off by default — skipped", kind: "muted" },
+    { k: "dedup + rank", v: "4 ranked of 4 candidate(s)", kind: "ok" },
+    { k: "verify", v: "6 citation(s) · 0 unsupported claim(s)", kind: "ok" },
     { k: "answer", v: "returned with citations", kind: "ok" },
   ],
   blocked: [

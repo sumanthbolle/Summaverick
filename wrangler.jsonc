@@ -26,9 +26,11 @@
     }
   ],
   "kv_namespaces": [
-    // Replace id after `wrangler kv namespace create CONFIG`.
+    // Binding name must be CONFIG — the Worker reads env.CONFIG everywhere.
+    // Replace id after `wrangler kv namespace create CONFIG` (any string works
+    // for --local; the real id is only needed for --remote).
     {
-      "binding": "KV",
+      "binding": "CONFIG",
       "id": "648c1f767e62415b93070adc8aafe177"
     }
   ],
