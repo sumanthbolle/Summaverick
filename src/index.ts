@@ -20,6 +20,8 @@ import { runScheduled } from "./scheduled";
 /** Pretty paths → static HTML files in /public. */
 const PAGES: Record<string, string> = {
   "/": "/index.html",
+  "/ask": "/ask.html",
+  "/ask-summaverick": "/ask.html",
   "/quiz": "/quiz.html",
   "/research": "/research.html",
   "/learn": "/learn.html",

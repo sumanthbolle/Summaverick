@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ask Summaverick — a ServiceNow research agent</title>
+  <meta name="description" content="Ask a ServiceNow question and watch the answer build — classification, the retrieval layers it consults, the checks it runs, and the answer with its sources." />
+
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("sv-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img class="brand-logo" src="/assets/img/summaverick-mark.webp" alt="Summaverick" width="68" height="38" />
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="/#agent">The agent</a>
+      <a href="/#practice">What I build</a>
+      <a href="/#work">Work</a>
+      <a href="/ask" aria-current="page">Ask</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch colour theme">
+        <span aria-hidden="true">◐</span>
+      </button>
+      <a class="btn btn-primary" href="/#contact">Start a conversation</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="ask-wrap">
+      <div class="container ask-inner">
+        <span class="eyebrow">ask summaverick</span>
+        <h1 class="h1">Ask a ServiceNow question.</h1>
+        <p class="lead">
+          Type a question and watch the answer build — how it's classified, which
+          retrieval layers it consults, the checks it runs, and the answer with
+          its sources. Same agent as the home page, on its own page.
+        </p>
+
+        <form class="composer" data-ask-form>
+          <textarea class="composer-input" data-ask-input rows="2"
+            placeholder="e.g. How do I use GlideRecord to query the incident table?"
+            aria-label="Ask Summaverick" maxlength="500"></textarea>
+          <button class="btn btn-primary btn-lg" type="submit" data-ask-run>Ask</button>
+        </form>
+
+        <div class="chips" data-ask-chips></div>
+
+        <div class="agent-shell ask-results" data-ask-results hidden>
+          <div class="trace" data-ask-trace></div>
+        </div>
+
+        <p class="small text-mute" style="margin-top: var(--space-6)">
+          Scoped to ServiceNow — Fluent SDK, product docs, and (off by default)
+          read-only instance metadata. Rate-limited, and a question that trips
+          the injection detector is rejected before the model. Without a model
+          key set it returns the evidence-backed draft.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-grid">
+      <div class="stack">
+        <img class="footer-logo" src="/assets/img/summaverick-mark.webp" alt="Summaverick" width="93" height="52" />
+        <p class="small text-mute">Agentic retrieval, built to hold up in production.</p>
+      </div>
+      <div class="small">
+        <p class="text-mute">© <span data-year></span> Summaverick · summaverick.com</p>
+        <p><a href="/#agent">The agent</a> · <a href="/#work">Work</a> · <a href="/#contact">Contact</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="/assets/js/ask.js"></script>
+</body>
+</html>

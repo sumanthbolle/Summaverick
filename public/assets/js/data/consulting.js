@@ -46,19 +46,19 @@ export const WORK = [
 export const PILLARS = [
   {
     label: "ServiceNow store apps",
-    text: "Scoped apps built with the Fluent SDK and taken through certification onto the ServiceNow Store. Version-matched to the release you actually run, not the latest one.",
+    text: "Scoped apps built with the Fluent SDK and taken through certification onto the ServiceNow Store, matched to the release you're actually on rather than the newest one.",
   },
   {
     label: "AI transformation",
-    text: "GenAI adopted where it earns its place. I read the real work first, wire the guardrails in from day one, and say plainly which parts aren't worth automating yet.",
+    text: "Putting GenAI where it pays off. I look at the real work first, build the guardrails in early, and tell you which parts aren't worth automating yet.",
   },
   {
     label: "Custom agents",
-    text: "Agentic systems with a narrow tool surface, a verifier between steps, and the safety gates on by default — the research agent on this page is one of them.",
+    text: "Agents with a narrow tool surface, a verifier between steps, and the safety gates on by default. The research agent on this page is one of them.",
   },
   {
     label: "Products",
-    text: "The practice, productized. The Summaverick Research Agent is the first, live here; more follow the same rule — cite the source, show the working, publish the evals.",
+    text: "Some of this work turns into products. The Summaverick Research Agent is the first, running here; each one shows its sources and its own test scores.",
   },
 ];
 
