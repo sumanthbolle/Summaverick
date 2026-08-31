@@ -1,14 +1,18 @@
 /*
- * boot.js — company homepage. Chrome, below-fold interactions, agent preview.
- * The old GSAP scroll-scene narrative is gone; this page is ordinary HTML.
+ * boot.js — company homepage. Chrome, the Apple-style scroll experience,
+ * below-fold interactions, and the agent preview.
  */
 
 import { initChrome } from "./chrome.js";
 import { initContent } from "./content.js";
+import { initScrollExperience } from "./lib/scroll-experience.js";
 
 function boot() {
   initChrome();
-  initContent();
+  // The scroll experience owns reveals when it engages; otherwise fall back to
+  // the plain IntersectionObserver reveal in content.js.
+  const rich = initScrollExperience();
+  initContent({ reveal: !rich });
 }
 
 if (document.readyState === "loading") {

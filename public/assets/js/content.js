@@ -171,8 +171,10 @@ function initLeadForm() {
   });
 }
 
-export function initContent() {
-  initReveal();
+export function initContent(opts = {}) {
+  // The scroll experience runs its own richer reveals; only fall back to the
+  // plain IntersectionObserver reveal when it didn't engage.
+  if (opts.reveal !== false) initReveal();
   initAgentPreview();
   initLeadForm();
 }
