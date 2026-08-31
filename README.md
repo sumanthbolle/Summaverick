@@ -3,7 +3,9 @@
 Learning + tools platform for **summaverick.com** — quiz, blog, interviews,
 tutorials, UPSC, SkyFare (flights), metals, and ServiceNow research — built as a
 single Cloudflare **Worker with Static Assets**, backed by **D1** (relational),
-**R2** (long bodies / archives), and **KV** (hot config).
+**R2** (long bodies / archives), and **KV** (hot config). The public homepage is
+the company site: Store apps, implementations, AI systems, product collaboration,
+and fine-tuning.
 
 One origin serves both the HTML and the API, so there is **no CORS** and no
 `ALLOWED_ORIGIN` secret. Correct quiz answers are graded server-side and never
@@ -68,7 +70,8 @@ Pretty URLs (also served as `*.html`):
 
 | Path | Product |
 |---|---|
-| `/` | Home |
+| `/` | Company home — Store apps, implementations, AI, product work, fine-tuning |
+| `/ask` | Research agent (full page) |
 | `/quiz` | ServiceNow quiz |
 | `/learn` · `/interviews` · `/article/:slug` | Library |
 | `/research` | ServiceNow research agent |

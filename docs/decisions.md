@@ -2,6 +2,23 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-08-31 — Company homepage, not a scroll-scene personal site
+
+**Decision.** Replace the five-scene GSAP/Lenis homepage with a conventional
+company site. Copy, information architecture, and chrome live in HTML. The
+research agent remains a product on `/` (preview) and `/ask`, not the identity
+of the firm.
+
+**Why.** The scroll narrative read as generated marketing HTML: numbered scenes,
+first-person "I build", pill CTAs, empty `data-*` shells hydrated from JS.
+Enterprise buyers looking for Store certification, an implementation kickstart,
+AI work, a product collaboration, or fine-tuning could not find those offers.
+
+**What shipped.** Five capability sections matching those offers; engagement
+shapes; selected work in company voice; a four-column footer; a mobile nav;
+contact intents that match the work. GSAP/Lenis are no longer loaded on `/`.
+Scene modules remain in the repo unused.
+
 ## 2026-08-26 — Re-enable auto-deploy on merge to master
 
 **Decision.** Reverses the "defer Cloudflare" gate below now that the site is

@@ -193,7 +193,7 @@ export function mountChrome({ active } = {}) {
       nav,
       el("p", {
         class: "copy",
-        text: "Learning, research, and advocacy tools. Answers are graded on the server. Same-origin, no CORS.",
+        text: "Summaverick — ServiceNow products, AI systems, and learning tools.",
       })
     );
   }

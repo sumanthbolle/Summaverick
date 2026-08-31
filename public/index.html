@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Summaverick — retrieval that cites its sources</title>
-  <meta name="description" content="I build agentic retrieval systems that hold up in production. The Summaverick Research Agent answers ServiceNow questions from version-matched sources, with a trace you can watch and evals you can check." />
+  <title>Summaverick — ServiceNow products and AI systems</title>
+  <meta name="description" content="Summaverick builds ServiceNow Store apps, stands up implementations with AI from the first sprint, and trains models that stay inside your stack. Development, publishing, certification, fine-tuning." />
 
   <link rel="icon" href="/assets/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
-  <meta property="og:title" content="Summaverick — retrieval that cites its sources" />
-  <meta property="og:description" content="Agentic retrieval for ServiceNow, built to hold up in production. Watch the agent work and check the evals." />
+  <meta property="og:title" content="Summaverick — ServiceNow products and AI systems" />
+  <meta property="og:description" content="Store apps, AI-led implementations, product collaboration, and fine-tuning. Built for production, not a slide deck." />
   <meta property="og:image" content="/assets/img/summaverick-logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="/assets/img/summaverick-logo.png" />
@@ -21,7 +21,6 @@
   <link rel="stylesheet" href="/assets/css/type.css" />
   <link rel="stylesheet" href="/assets/css/site.css" />
 
-  <!-- Set the theme before first paint so there is no flash. -->
   <script>
     (function () {
       try {
@@ -32,136 +31,293 @@
   </script>
 </head>
 <body>
-  <!-- ===================== Nav ===================== -->
+  <a class="skip" href="#main">Skip to content</a>
+
   <header class="nav" id="nav">
     <a class="nav-brand" href="/" aria-label="Summaverick — home">
       <img class="brand-logo" src="/assets/img/summaverick-mark.webp" alt="Summaverick" width="68" height="38" />
     </a>
-    <nav class="nav-links" aria-label="Primary">
-      <a href="#agent">The agent</a>
-      <a href="#practice">What I build</a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="#capabilities">Capabilities</a>
       <a href="#work">Work</a>
-      <a href="/ask">Ask</a>
+      <a href="#platform">Platform</a>
+      <a href="/learn">Insights</a>
       <a href="#contact">Contact</a>
     </nav>
     <div class="nav-actions">
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch colour theme">
         <span aria-hidden="true">◐</span>
       </button>
-      <a class="btn btn-primary" href="#contact">Start a conversation</a>
+      <a class="btn btn-primary" href="#contact">Talk with us</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span>
+        <span class="visually-hidden">Menu</span>
+      </button>
     </div>
   </header>
 
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="#capabilities">Capabilities</a>
+      <a href="#store-apps">Store apps</a>
+      <a href="#implementation">Implementation</a>
+      <a href="#ai-implementation">AI systems</a>
+      <a href="#product-build">Product collaboration</a>
+      <a href="#fine-tuning">Fine-tuning</a>
+      <a href="#work">Work</a>
+      <a href="#platform">Platform</a>
+      <a href="/learn">Insights</a>
+      <a href="/ask">Research agent</a>
+      <a href="#contact">Contact</a>
+      <a href="#contact">Talk with us</a>
+    </nav>
+  </div>
+
   <main id="main">
-    <!-- ===================== Scene 1 — Hero ===================== -->
-    <section class="scene hero scene-hero" id="hero" data-scene="hero">
-      <div class="stage">
-        <div class="hero-bg" aria-hidden="true"></div>
-        <div class="hero-grid" data-hero-grid aria-hidden="true"></div>
-        <div class="stage-inner hero-inner">
-          <p class="eyebrow reveal" data-hero-eyebrow>Summaverick · agentic retrieval</p>
-          <h1 class="display reveal" data-hero-title>
-            Retrieval that cites its sources and survives production.
-          </h1>
-          <p class="lead reveal" data-hero-lead>
-            I build ServiceNow apps, AI systems, and agents for production use.
-            The one on this page is a research agent: it answers ServiceNow
-            questions from version-matched docs, shows each step as it runs, and
-            lists the eval cases it passes and the ones it fails.
-          </p>
-          <div class="hero-cta reveal" data-hero-cta>
-            <a class="btn btn-primary btn-lg" href="#agent">Watch it run</a>
-            <a class="btn btn-ghost btn-lg" href="#work">See the work</a>
-          </div>
-        </div>
-        <div class="hero-scrollcue" data-hero-cue>
-          <span>scroll</span>
-          <span class="rail"></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Scene 2 — The gap ===================== -->
-    <section class="scene scene-tall" id="scene-gap" data-scene="gap">
-      <div class="stage">
-        <div class="stage-inner">
-          <div class="scene-kicker">
-            <span class="idx">02</span>
-            <span class="eyebrow">the gap</span>
-          </div>
-          <h2 class="scene-title">Confident and wrong is the default.</h2>
-          <p class="scene-sub" data-gap-q></p>
-          <div class="answers" data-gap-answers></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Scene 3 — Three layers ===================== -->
-    <section class="scene scene-tall" id="scene-layers" data-scene="layers">
-      <div class="stage">
-        <div class="stage-inner">
-          <div class="scene-kicker">
-            <span class="idx">03</span>
-            <span class="eyebrow">retrieval</span>
-          </div>
-          <h2 class="scene-title">Layered, and version-aware.</h2>
-          <p class="scene-sub">
-            The classifier reads the query, then retrieval descends the layers it
-            needs. Live instance query is the third layer and it stays off until a
-            client turns it on.
-          </p>
-          <div class="layers" data-layers></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Scene 4 — The firewall ===================== -->
-    <section class="scene scene-tall" id="scene-firewall" data-scene="firewall">
-      <div class="stage">
-        <div class="stage-inner">
-          <div class="scene-kicker">
-            <span class="idx">04</span>
-            <span class="eyebrow">safety</span>
-          </div>
-          <h2 class="scene-title">Injection stops before the model sees it.</h2>
-          <p class="scene-sub">
-            Retrieved documents are untrusted input. A poisoned instruction hidden
-            in one is caught, stripped, and logged — the clean evidence continues.
-          </p>
-          <div class="firewall" data-firewall></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Scene 5 — The receipts ===================== -->
-    <section class="scene scene-tall" id="scene-receipts" data-scene="receipts">
-      <div class="stage">
-        <div class="stage-inner">
-          <div class="scene-kicker">
-            <span class="idx">05</span>
-            <span class="eyebrow">the receipts</span>
-          </div>
-          <h2 class="scene-title">Every claim carries a citation. The evals are public.</h2>
-          <div class="receipts">
-            <div class="claims-col" data-receipts-claims></div>
-            <div class="scoreboard" data-scoreboard></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== Live agent ===================== -->
-    <section class="section" id="agent">
-      <div class="container">
-        <div class="section-head stack">
-          <span class="eyebrow">the agent</span>
-          <h2 class="h1">Watch it work.</h2>
+    <section class="masthead" id="top">
+      <div class="container mast-grid">
+        <div class="mast-copy">
+          <p class="kicker">ServiceNow · AI systems · product engineering</p>
+          <h1 class="display">ServiceNow products and AI systems, built to ship.</h1>
           <p class="lead">
-            Ask a ServiceNow question. The trace shows each stage as it runs —
-            how the query was classified, which layers were consulted, the dedup
-            and injection checks, and the verified answer with its sources. If a
-            question trips the injection detector, it's rejected before the model
-            and you see that happen.
+            Summaverick is a product and engineering firm. We take Store apps from
+            scoped design through certification. We stand up implementations with
+            AI in the first sprint. We train and wire models that stay inside
+            your stack.
+          </p>
+          <div class="mast-cta">
+            <a class="btn btn-primary btn-lg" href="#contact">Discuss a project</a>
+            <a class="btn btn-ghost btn-lg" href="#platform">See the research agent</a>
+          </div>
+        </div>
+        <aside class="mast-panel" aria-label="Where to start">
+          <p class="mast-panel-label">Where to start</p>
+          <ol class="start-list">
+            <li><a href="#store-apps">Need a Store app developed, published, certified — quickly?</a></li>
+            <li><a href="#implementation">Want to kickstart a ServiceNow implementation with AI?</a></li>
+            <li><a href="#ai-implementation">Looking for a smarter AI implementation?</a></li>
+            <li><a href="#product-build">Want to build a product on or around ServiceNow?</a></li>
+            <li><a href="#fine-tuning">Need fine-tuning, or better AI in the stack you already run?</a></li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <div class="trust-strip" aria-label="Practice areas">
+      <div class="container trust-row">
+        <span>Store certification</span>
+        <span>Fluent SDK</span>
+        <span>Now Assist</span>
+        <span>Custom agents</span>
+        <span>Fine-tuning</span>
+      </div>
+    </div>
+
+    <section class="section" id="capabilities">
+      <div class="container">
+        <div class="section-head">
+          <p class="kicker">Capabilities</p>
+          <h2>Five kinds of work. Each one has a deliverable, not a workshop.</h2>
+          <p class="lede">
+            If you already know which of these you need, skip to it. If you do
+            not, send the problem — we will tell you which of these it is, and
+            which it is not.
+          </p>
+        </div>
+
+        <article class="capability" id="store-apps">
+          <p class="kicker">Store apps</p>
+          <h3>Develop, publish, and certify — on a timeline that holds.</h3>
+          <div class="capability-body">
+            <p>
+              Scoped ServiceNow applications, built on the Fluent SDK and taken
+              through Store publishing and certification. Matched to the release
+              you actually run, not the newest one on a slide. If certification
+              is the bottleneck, that is the work we start with.
+            </p>
+            <ul class="outcomes">
+              <li>Certifiable scoped app and Store listing package</li>
+              <li>Release matrix for the instances in production</li>
+              <li>Publishing and certification support through Store approval</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="capability" id="implementation">
+          <p class="kicker">Implementation</p>
+          <h3>Kickstart a ServiceNow programme with AI in the first sprint.</h3>
+          <div class="capability-body">
+            <p>
+              Most implementations bolt AI on in a later phase. We put Now Assist
+              and the custom work next to process design, so the first go-live
+              already has the skills and the guardrails. A diagnostic first, then
+              a sprint that produces a running slice — not a deck.
+            </p>
+            <ul class="outcomes">
+              <li>Process and ticket-mix diagnostic</li>
+              <li>Now Assist skill plan: what to turn on, what to leave off</li>
+              <li>A working first slice on the instance you will live on</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="capability" id="ai-implementation">
+          <p class="kicker">AI systems</p>
+          <h3>A smarter AI implementation — on the platform you already have.</h3>
+          <div class="capability-body">
+            <p>
+              Licensed Now Assist that nobody uses. Agents that sound confident
+              and cite nothing. We read the actual work, turn on the skills that
+              pay off, and build custom agents only where the platform will not.
+              Guardrails and evals are part of the build, not a later phase.
+            </p>
+            <ul class="outcomes">
+              <li>Skill and agent map against real ticket volume</li>
+              <li>Custom agents with a narrow tool surface and a verifier</li>
+              <li>Injection checks, citations, and an eval suite you can rerun</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="capability" id="product-build">
+          <p class="kicker">Product collaboration</p>
+          <h3>Build a product on ServiceNow — or one that does a similar job.</h3>
+          <div class="capability-body">
+            <p>
+              Joint product work: a Store app, a companion system, or a platform
+              that covers the same operational ground in a different stack. We
+              build with you, not a body-shop bench. Intellectual property and
+              the operating model are agreed before the first commit.
+            </p>
+            <ul class="outcomes">
+              <li>Shared product brief and ownership model</li>
+              <li>Working software on a release cadence you can keep</li>
+              <li>A team that can extend it after the engagement</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="capability" id="fine-tuning">
+          <p class="kicker">Fine-tuning</p>
+          <h3>Fine-tune at a cost that makes sense, or improve the AI you already run.</h3>
+          <div class="capability-body">
+            <p>
+              Domain fine-tuning and evaluation against your data, or better
+              retrieval and tooling around the models already in the environment.
+              The goal is a model you own, wired into the workflows that matter,
+              without a blank-check GPU bill.
+            </p>
+            <ul class="outcomes">
+              <li>Fine-tune or retrieval plan with a cost envelope</li>
+              <li>Eval set from real tasks, not a public benchmark</li>
+              <li>Wiring into ServiceNow or the surrounding ecosystem</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="engage">
+      <div class="container">
+        <div class="section-head">
+          <p class="kicker">Engagements</p>
+          <h2>How the work is scoped.</h2>
+          <p class="lede">
+            Five shapes. Pick the one that matches the problem, or we will
+            recommend one after a short diagnostic.
+          </p>
+        </div>
+        <div class="engage-grid">
+          <article class="engage-card">
+            <h3>Diagnostic</h3>
+            <p class="engage-meta">1–2 weeks</p>
+            <p>We read the instance, the ticket mix, or the agent setup, and say where it breaks.</p>
+            <p class="engage-out">Written findings, ranked, with the first fix named.</p>
+          </article>
+          <article class="engage-card">
+            <h3>Store sprint</h3>
+            <p class="engage-meta">Certification-ready</p>
+            <p>Scoped app through publishing and Store certification, on the release you run.</p>
+            <p class="engage-out">Listing package and a path through Store approval.</p>
+          </article>
+          <article class="engage-card">
+            <h3>Implementation kickstart</h3>
+            <p class="engage-meta">First running slice</p>
+            <p>Process design with Now Assist and custom work in the same sprint as go-live prep.</p>
+            <p class="engage-out">A slice on the live instance, skills on, guardrails in.</p>
+          </article>
+          <article class="engage-card">
+            <h3>Build</h3>
+            <p class="engage-meta">6–12 weeks</p>
+            <p>Retrieval, agents, or a product — evals and safety gates from day one.</p>
+            <p class="engage-out">A running system and a team that can extend it.</p>
+          </article>
+          <article class="engage-card">
+            <h3>Product partnership</h3>
+            <p class="engage-meta">Ongoing</p>
+            <p>Embedded on a shared product: Store app, companion system, or adjacent platform.</p>
+            <p class="engage-out">Release cadence, IP terms, and operating model agreed up front.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="work">
+      <div class="container">
+        <div class="section-head">
+          <p class="kicker">Selected work</p>
+          <h2>What this looks like in practice.</h2>
+          <p class="lede">
+            Client names are withheld. These are representative engagements —
+            the constraints are the point.
+          </p>
+        </div>
+        <div class="work-grid">
+          <article class="work-card">
+            <p class="kicker">Enterprise software vendor</p>
+            <h3>GenAI platform on Bedrock, with a local fallback</h3>
+            <p>Teams needed generative features without sending customer data to a single hosted model.</p>
+            <p class="text-dim">A retrieval and generation layer over Bedrock, with an Ollama path for workloads that had to stay on-prem. One interface; two backends chosen per data sensitivity.</p>
+            <p class="constraint">Constraint held: routing is the client’s per workload. Model choice is config, not code.</p>
+            <p class="stack-tags"><span>Bedrock</span><span>Ollama</span><span>TypeScript</span></p>
+          </article>
+          <article class="work-card">
+            <p class="kicker">Warranty operations</p>
+            <h3>Multi-agent warranty automation</h3>
+            <p>Claims triage was manual, and the rules changed often enough that a single prompt kept drifting.</p>
+            <p class="text-dim">Specialised agents for intake, policy lookup, and adjudication — each with a narrow tool surface and a verifier between them.</p>
+            <p class="constraint">Constraint held: no agent approves a payout. Adjudication proposes; a person commits.</p>
+            <p class="stack-tags"><span>Agents</span><span>Tool routing</span><span>Verifier</span></p>
+          </article>
+          <article class="work-card">
+            <p class="kicker">ServiceNow customer</p>
+            <h3>Now Assist adoption</h3>
+            <p>Now Assist was licensed and barely used. Nobody could say which skills were worth turning on.</p>
+            <p class="text-dim">Ticket mix read against the shipped skills, a short list of where the payoff was real, and a rollout in that order.</p>
+            <p class="constraint">Constraint held: two skills stayed off — the data to justify them was not there yet.</p>
+            <p class="stack-tags"><span>Now Assist</span><span>Skill Kit</span></p>
+          </article>
+          <article class="work-card">
+            <p class="kicker">Telecom operator</p>
+            <h3>AIOps for network operations</h3>
+            <p>Alert volume buried the signal. On-call was drowning in duplicates.</p>
+            <p class="text-dim">Correlation and dedup ahead of the pager, with retrieval over runbooks so an alert arrives with its likely cause and the last fix attached.</p>
+            <p class="constraint">Constraint held: remediation is suggested, never executed. The runbook link is the product.</p>
+            <p class="stack-tags"><span>Correlation</span><span>Retrieval</span><span>Runbooks</span></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="platform">
+      <div class="container">
+        <div class="section-head">
+          <p class="kicker">Platform</p>
+          <h2>The research agent is how we build agents: citations, a firewall, and public evals.</h2>
+          <p class="lede">
+            Ask a ServiceNow question. The trace shows classification, which
+            layers were consulted, the injection check, and the answer with its
+            sources. It is a product of the practice — not the whole firm.
           </p>
         </div>
         <div class="agent-shell">
@@ -171,111 +327,110 @@
               aria-label="Ask the research agent" maxlength="500" />
             <button class="btn btn-primary" type="submit" data-agent-run>Run</button>
           </form>
-          <div class="trace" data-agent-trace></div>
+          <div class="trace" data-agent-trace>
+            <p class="trace-empty">Run a question to see classification, retrieval layers, and verification.</p>
+          </div>
           <p class="trace-note">
-            The trace streams live over SSE from the agent — rate-limited, and a
-            query that trips the injection detector is blocked before the model.
-            Try one to see it. (Served statically without the Worker, it falls
-            back to a captured trace.)
+            Live over SSE from the agent — rate-limited. A query that trips the
+            injection detector is blocked before the model.
+            <a href="/ask">Open the full agent</a>
+            · <a href="/quiz">ServiceNow quiz</a>
+            · <a href="/learn">Library</a>
           </p>
         </div>
       </div>
     </section>
 
-    <!-- ===================== What I build ===================== -->
-    <section class="section" id="practice">
-      <div class="container">
-        <div class="section-head stack">
-          <span class="eyebrow">what I build</span>
-          <h2 class="h1">Four kinds of work.</h2>
-          <p class="lead">
-            ServiceNow store apps, AI transformation work, custom agents, and a
-            few products built out of all three. Each one shows its sources, and
-            I'm clear about where it stops.
-          </p>
-        </div>
-        <div class="cards" data-pillars></div>
-      </div>
-    </section>
-
-    <!-- ===================== Work ===================== -->
-    <section class="section" id="work">
-      <div class="container">
-        <div class="section-head stack">
-          <span class="eyebrow">work</span>
-          <h2 class="h1">Selected work.</h2>
-          <p class="lead">I don't name clients without permission. The metrics are real.</p>
-        </div>
-        <div class="cards" data-work></div>
-      </div>
-    </section>
-
-    <!-- ===================== Engagements ===================== -->
-    <section class="section" id="engage">
-      <div class="container">
-        <div class="section-head stack">
-          <span class="eyebrow">engagements</span>
-          <h2 class="h1">How working together looks.</h2>
-          <p class="lead">
-            Three ways to work together. Each one lists what it is, how long it
-            takes, and what you have at the end, so you can tell whether it fits
-            before we talk.
-          </p>
-        </div>
-        <div class="cards" data-engage></div>
-      </div>
-    </section>
-
-    <!-- ===================== Contact ===================== -->
     <section class="section" id="contact">
-      <div class="container">
-        <div class="section-head stack">
-          <span class="eyebrow">contact</span>
-          <h2 class="h1">Start a conversation.</h2>
-          <p class="lead">
-            Tell me what you're trying to build. I read every message myself.
+      <div class="container contact-grid">
+        <div class="section-head">
+          <p class="kicker">Contact</p>
+          <h2>Tell us what you need.</h2>
+          <p class="lede">
+            Store app, implementation, AI system, product collaboration, or
+            fine-tuning. We read every message. If it is not a fit, we will say so.
           </p>
         </div>
-        <form class="card stack" data-lead-form style="max-width: 640px;">
-          <div class="grid" style="grid-template-columns: 1fr 1fr;">
-            <div class="field"><label for="lead-name">Name</label><input id="lead-name" name="name" type="text" autocomplete="name" /></div>
-            <div class="field"><label for="lead-email">Email</label><input id="lead-email" name="email" type="email" autocomplete="email" required /></div>
+        <form class="contact-form" data-lead-form>
+          <div class="form-grid">
+            <div class="field">
+              <label for="lead-name">Name</label>
+              <input id="lead-name" name="name" type="text" autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="lead-email">Work email</label>
+              <input id="lead-email" name="email" type="email" autocomplete="email" required />
+            </div>
           </div>
           <div class="field">
-            <label for="lead-intent">What's this about?</label>
+            <label for="lead-org">Organisation</label>
+            <input id="lead-org" name="organisation" type="text" autocomplete="organization" />
+          </div>
+          <div class="field">
+            <label for="lead-intent">What is this about?</label>
             <select id="lead-intent" name="intent">
-              <option value="product">The research agent</option>
-              <option value="consulting">A consulting engagement</option>
+              <option value="store">Store app — develop, publish, certify</option>
+              <option value="implement">ServiceNow implementation with AI</option>
+              <option value="ai">Smarter AI implementation</option>
+              <option value="product">Product collaboration</option>
+              <option value="finetune">Fine-tuning / in-ecosystem AI</option>
               <option value="other">Something else</option>
             </select>
           </div>
-          <div class="field"><label for="lead-message">Message</label><textarea id="lead-message" name="message" placeholder="A sentence or two on the problem."></textarea></div>
-          <div class="field hp" aria-hidden="true"><label for="lead-company-url">Company URL</label><input id="lead-company-url" name="company_url" type="text" tabindex="-1" autocomplete="off" /></div>
-          <div><button class="btn btn-primary btn-lg" type="submit">Send</button></div>
+          <div class="field">
+            <label for="lead-message">The problem in a few sentences</label>
+            <textarea id="lead-message" name="message" placeholder="What you are trying to ship, and what is in the way."></textarea>
+          </div>
+          <div class="field hp" aria-hidden="true">
+            <label for="lead-company-url">Company URL</label>
+            <input id="lead-company-url" name="company_url" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <div>
+            <button class="btn btn-primary btn-lg" type="submit">Send</button>
+          </div>
           <p class="small text-mute" data-lead-status role="status"></p>
         </form>
       </div>
     </section>
   </main>
 
-  <!-- ===================== Footer ===================== -->
   <footer class="footer">
-    <div class="container footer-grid">
-      <div class="stack">
+    <div class="container footer-cols">
+      <div class="footer-brand">
         <img class="footer-logo" src="/assets/img/summaverick-mark.webp" alt="Summaverick" width="93" height="52" />
-        <p class="small text-mute">Agentic retrieval, built to hold up in production.</p>
+        <p>ServiceNow products and AI systems, built to ship.</p>
       </div>
-      <div class="small">
-        <p class="text-mute">© <span data-year></span> Summaverick · summaverick.com</p>
-        <p><a href="#agent">The agent</a> · <a href="#work">Work</a> · <a href="#contact">Contact</a></p>
+      <div>
+        <p class="footer-head">Capabilities</p>
+        <ul>
+          <li><a href="#store-apps">Store apps</a></li>
+          <li><a href="#implementation">Implementation</a></li>
+          <li><a href="#ai-implementation">AI systems</a></li>
+          <li><a href="#product-build">Product collaboration</a></li>
+          <li><a href="#fine-tuning">Fine-tuning</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-head">Platform</p>
+        <ul>
+          <li><a href="/ask">Research agent</a></li>
+          <li><a href="/quiz">Quiz</a></li>
+          <li><a href="/learn">Library</a></li>
+          <li><a href="/tools">Tools</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-head">Company</p>
+        <ul>
+          <li><a href="#work">Work</a></li>
+          <li><a href="#contact">Contact</a></li>
+          <li><a href="/signin">Sign in</a></li>
+        </ul>
+        <p class="small text-mute footer-copy">© <span data-year></span> Summaverick · summaverick.com</p>
       </div>
     </div>
   </footer>
 
-  <!-- Vendored animation libraries (self-contained; no CDN). -->
-  <script src="/assets/vendor/gsap.min.js"></script>
-  <script src="/assets/vendor/ScrollTrigger.min.js"></script>
-  <script src="/assets/vendor/lenis.min.js"></script>
   <script type="module" src="/assets/js/boot.js"></script>
 </body>
 </html>

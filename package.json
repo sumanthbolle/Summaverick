@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Summaverick — product + consulting site for agentic retrieval (summaverick.com)",
+  "description": "Summaverick — ServiceNow products, AI systems, and the summaverick.com platform",
   "engines": {
     "node": ">=20"
   },

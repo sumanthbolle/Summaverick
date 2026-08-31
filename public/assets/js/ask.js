@@ -6,6 +6,7 @@
 
 import { el, $ } from "./lib/dom.js";
 import { streamResearch } from "./lib/agent-stream.js";
+import { initChrome } from "./chrome.js";
 
 const CHIPS = [
   "How do I use GlideRecord to query the incident table?",
@@ -13,25 +14,6 @@ const CHIPS = [
   "What is the CMDB and how do CI relationships work?",
   "How do ACLs evaluate on a table?",
 ];
-
-function initChrome() {
-  const nav = $("#nav");
-  const onScroll = () => nav?.setAttribute("data-scrolled", String(window.scrollY > 8));
-  onScroll();
-  window.addEventListener("scroll", onScroll, { passive: true });
-
-  $("#theme-toggle")?.addEventListener("click", () => {
-    const root = document.documentElement;
-    const cur = root.getAttribute("data-theme") ||
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    const next = cur === "dark" ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try { localStorage.setItem("sv-theme", next); } catch (e) {}
-  });
-
-  const yr = $("[data-year]");
-  if (yr) yr.textContent = String(new Date().getFullYear());
-}
 
 function initAsk() {
   const form = $("[data-ask-form]");
