@@ -26,7 +26,7 @@ html.lenis, html.lenis body { height: auto; }
 img, svg { display: block; max-width: 100%; }
 
 a { color: var(--c-accent); text-decoration: none; }
-a:hover { color: var(--c-accent-press); }
+a:hover { color: var(--c-accent-press); text-decoration: underline; }
 
 ::selection { background: var(--c-accent-soft); color: var(--c-text); }
 
@@ -222,7 +222,7 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
 }
 .scene-kicker .idx {
   font-family: var(--font-mono); font-size: var(--step--1);
-  color: var(--c-accent); letter-spacing: 0.04em;
+  color: var(--c-text-dim); letter-spacing: 0.04em;
 }
 .scene-title { font-size: var(--step-3); max-width: 22ch; }
 .scene-sub { color: var(--c-text-dim); max-width: 52ch; margin-top: var(--space-3); }
@@ -502,7 +502,7 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
   margin: 0 0 var(--space-3);
   font-size: var(--step--1);
   font-weight: 500;
-  color: var(--c-accent);
+  color: var(--c-text-dim);
   letter-spacing: 0.01em;
 }
 .lede {
@@ -568,7 +568,7 @@ body[data-nav-open] { overflow: hidden; }
   line-height: var(--leading-normal);
   color: var(--c-on-ink-dim);
 }
-.mast-copy .kicker { color: var(--c-ink-accent); }
+.mast-copy .kicker { color: var(--c-on-ink-mute); }
 .mast-cta {
   display: flex; flex-wrap: wrap; gap: var(--space-3);
   margin-top: var(--space-6);
@@ -579,6 +579,19 @@ body[data-nav-open] { overflow: hidden; }
   background: transparent;
 }
 .masthead .btn-ghost:hover { border-color: var(--c-on-ink); color: var(--c-on-ink); }
+/* On the always-ink masthead and nav the mono-ink primary would vanish —
+   flip it to white-on-ink so the CTA stays legible in both themes. */
+.masthead .btn-primary,
+.nav[data-over-ink] .btn-primary {
+  --btn-bg: var(--c-on-ink);
+  --btn-fg: var(--c-ink);
+  border-color: transparent;
+}
+.masthead .btn-primary:hover,
+.nav[data-over-ink] .btn-primary:hover {
+  --btn-bg: #ffffff;
+  color: var(--c-ink);
+}
 .mast-panel {
   border: 1px solid var(--c-ink-line);
   background: var(--c-ink-2);
@@ -809,16 +822,16 @@ body[data-nav-open] { overflow: hidden; }
 }
 .mast-aurora__blob--a {
   top: -12%; left: -6%;
-  background: radial-gradient(circle at 50% 50%, rgba(47, 92, 255, 0.55), transparent 70%);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.22), transparent 70%);
 }
 .mast-aurora__blob--b {
   top: 8%; right: -8%;
-  background: radial-gradient(circle at 50% 50%, rgba(122, 77, 255, 0.5), transparent 70%);
+  background: radial-gradient(circle at 50% 50%, rgba(200, 202, 214, 0.18), transparent 70%);
 }
 .mast-aurora__blob--c {
   bottom: -22%; left: 32%;
   width: 38vw; height: 38vw;
-  background: radial-gradient(circle at 50% 50%, rgba(138, 162, 255, 0.4), transparent 70%);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.14), transparent 70%);
   opacity: 0.4;
 }
 .mast-aurora__grid {
