@@ -747,6 +747,163 @@ body[data-nav-open] { overflow: hidden; }
   .engage-grid { grid-template-columns: 1fr; }
 }
 
+/* ======================================================================== *
+ * Scroll experience — Apple-style smooth scroll, tide parallax, reveals.
+ * All of this is progressive: it only engages once scroll-experience.js sets
+ * .sv-anim (before paint) and .sv-ready (once the motion libs are live). If a
+ * vendor script fails or motion is reduced, .sv-anim is dropped and every
+ * rule below collapses back to the plain, fully-visible page.
+ * ======================================================================== */
+
+/* Pre-hide reveal targets before first paint so they can rise in. Kept in sync
+ * with REVEAL_SELECTOR in scroll-experience.js. */
+.sv-anim .section-head,
+.sv-anim .capability,
+.sv-anim .work-card,
+.sv-anim .engage-card,
+.sv-anim .agent-shell,
+.sv-anim .contact-form { opacity: 0; }
+.sv-anim .trust-row span { opacity: 0; }
+/* The masthead intro is a JS timeline; hide its pieces until it plays. */
+.sv-anim .mast-copy > *,
+.sv-anim .mast-panel { opacity: 0; }
+.reveal, [data-reveal] { will-change: transform, opacity; }
+
+/* ---- Top progress bar ------------------------------------------------- */
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 120;
+  height: 2px;
+  pointer-events: none;
+  background: transparent;
+}
+.scroll-progress span {
+  display: block;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--c-accent), var(--c-layer-2));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c-accent) 60%, transparent);
+}
+
+/* ---- Masthead "tide" atmosphere --------------------------------------- */
+.masthead { position: relative; overflow: clip; isolation: isolate; }
+.masthead .mast-grid { position: relative; z-index: 1; }
+.mast-aurora {
+  position: absolute;
+  inset: -20% -10% -10% -10%;
+  z-index: 0;
+  pointer-events: none;
+}
+.mast-aurora__blob {
+  position: absolute;
+  width: 46vw;
+  height: 46vw;
+  max-width: 640px;
+  max-height: 640px;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.mast-aurora__blob--a {
+  top: -12%; left: -6%;
+  background: radial-gradient(circle at 50% 50%, rgba(47, 92, 255, 0.55), transparent 70%);
+}
+.mast-aurora__blob--b {
+  top: 8%; right: -8%;
+  background: radial-gradient(circle at 50% 50%, rgba(122, 77, 255, 0.5), transparent 70%);
+}
+.mast-aurora__blob--c {
+  bottom: -22%; left: 32%;
+  width: 38vw; height: 38vw;
+  background: radial-gradient(circle at 50% 50%, rgba(138, 162, 255, 0.4), transparent 70%);
+  opacity: 0.4;
+}
+.mast-aurora__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--c-ink-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--c-ink-line) 1px, transparent 1px);
+  background-size: 68px 68px;
+  mask-image: radial-gradient(80% 70% at 50% 20%, #000 30%, transparent 78%);
+  -webkit-mask-image: radial-gradient(80% 70% at 50% 20%, #000 30%, transparent 78%);
+  opacity: 0.6;
+  will-change: transform;
+}
+/* A soft breathing drift so the tide is alive even before you scroll. */
+@keyframes mast-tide {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(2%, -3%, 0) scale(1.06); }
+}
+.mast-aurora__blob--a { animation: mast-tide 16s var(--ease-in-out) infinite; }
+.mast-aurora__blob--b { animation: mast-tide 20s var(--ease-in-out) infinite reverse; }
+.mast-aurora__blob--c { animation: mast-tide 24s var(--ease-in-out) infinite; }
+
+/* ---- Right-edge section pager (scrollspy) ----------------------------- */
+.section-pager {
+  position: fixed;
+  right: clamp(10px, 1.4vw, 22px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 110;
+  display: grid;
+  gap: var(--space-3);
+}
+.section-pager__dot {
+  position: relative;
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+.section-pager__dot::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 1px solid var(--c-line-strong);
+  background: color-mix(in srgb, var(--c-text) 20%, transparent);
+  transition: transform var(--dur-base) var(--ease-out),
+              background var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
+}
+.section-pager__dot:hover::after { background: var(--c-text-dim); }
+.section-pager__dot.is-active::after {
+  inset: 0;
+  background: var(--c-accent);
+  border-color: transparent;
+  transform: scale(1);
+}
+.section-pager__label {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translate(6px, -50%);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--c-text-dim);
+  background: color-mix(in srgb, var(--c-bg) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--c-line);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.section-pager__dot:hover .section-pager__label,
+.section-pager__dot.is-active .section-pager__label {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+@media (max-width: 1180px) { .section-pager { display: none; } }
+
 /* ---- Reduced motion --------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   * , *::before, *::after {
@@ -759,4 +916,16 @@ body[data-nav-open] { overflow: hidden; }
   .stage { position: static; height: auto; padding-block: var(--space-9); }
   .trace-step { opacity: 1; transform: none; }
   .hero-scrollcue { display: none; }
+  /* Motion layer never hides content when motion is reduced. */
+  .sv-anim .section-head,
+  .sv-anim .capability,
+  .sv-anim .work-card,
+  .sv-anim .engage-card,
+  .sv-anim .agent-shell,
+  .sv-anim .contact-form,
+  .sv-anim .trust-row span,
+  .sv-anim .mast-copy > *,
+  .sv-anim .mast-panel { opacity: 1; }
+  .mast-aurora { display: none; }
+  .scroll-progress, .section-pager { display: none; }
 }

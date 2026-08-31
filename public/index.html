@@ -23,9 +23,23 @@
 
   <script>
     (function () {
+      var root = document.documentElement;
       try {
         var t = localStorage.getItem("sv-theme");
-        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        if (t === "light" || t === "dark") root.setAttribute("data-theme", t);
+      } catch (e) {}
+      // Pre-hide scroll-reveal targets before first paint so they can rise in,
+      // but only when motion is welcome. Safety net below un-hides them if the
+      // scroll layer never signals ready (e.g. a vendor script failed to load).
+      try {
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          root.classList.add("sv-anim");
+          window.addEventListener("load", function () {
+            setTimeout(function () {
+              if (!root.classList.contains("sv-ready")) root.classList.remove("sv-anim");
+            }, 120);
+          });
+        }
       } catch (e) {}
     })();
   </script>
@@ -75,6 +89,12 @@
 
   <main id="main">
     <section class="masthead" id="top">
+      <div class="mast-aurora" aria-hidden="true">
+        <span class="mast-aurora__blob mast-aurora__blob--a"></span>
+        <span class="mast-aurora__blob mast-aurora__blob--b"></span>
+        <span class="mast-aurora__blob mast-aurora__blob--c"></span>
+        <span class="mast-aurora__grid"></span>
+      </div>
       <div class="container mast-grid">
         <div class="mast-copy">
           <p class="kicker">ServiceNow · AI systems · product engineering</p>
@@ -431,6 +451,10 @@
     </div>
   </footer>
 
+  <!-- Motion layer (classic scripts run before the deferred module below). -->
+  <script src="/assets/vendor/gsap.min.js"></script>
+  <script src="/assets/vendor/ScrollTrigger.min.js"></script>
+  <script src="/assets/vendor/lenis.min.js"></script>
   <script type="module" src="/assets/js/boot.js"></script>
 </body>
 </html>
