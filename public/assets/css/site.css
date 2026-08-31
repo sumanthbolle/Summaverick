@@ -118,11 +118,11 @@ a:hover { color: var(--c-accent-press); }
   background: color-mix(in srgb, var(--c-bg) 94%, transparent);
   backdrop-filter: saturate(140%) blur(12px);
   -webkit-backdrop-filter: saturate(140%) blur(12px);
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid var(--c-line);
   transition: border-color var(--dur-base) var(--ease-out),
               background var(--dur-base) var(--ease-out);
 }
-.nav[data-scrolled="true"] { border-bottom-color: var(--c-line); }
+.nav[data-scrolled="true"] { background: color-mix(in srgb, var(--c-bg) 96%, transparent); }
 .nav-brand {
   display: inline-flex; align-items: center; gap: var(--space-2);
   font-weight: 600; letter-spacing: var(--tracking-snug); color: var(--c-text);
@@ -169,6 +169,25 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
 @media (max-width: 860px) {
   .nav-links { display: none; }
   .nav-toggle { display: grid; }
+}
+
+/* Ink nav while the masthead is in view (homepage only). */
+.nav[data-over-ink] {
+  background: color-mix(in srgb, var(--c-ink) 88%, transparent);
+  border-bottom-color: var(--c-ink-line);
+}
+.nav[data-over-ink] .nav-links a { color: var(--c-on-ink-dim); }
+.nav[data-over-ink] .nav-links a:hover { color: var(--c-on-ink); }
+.nav[data-over-ink] .theme-toggle,
+.nav[data-over-ink] .nav-toggle {
+  background: var(--c-ink-2);
+  border-color: var(--c-ink-line);
+  color: var(--c-on-ink);
+}
+.nav[data-over-ink] .nav-toggle-bars,
+.nav[data-over-ink] .nav-toggle-bars::before,
+.nav[data-over-ink] .nav-toggle-bars::after {
+  background: var(--c-on-ink);
 }
 
 /* ---- Scroll scenes ---------------------------------------------------- */
@@ -510,70 +529,93 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
 }
 .nav-panel a:hover { color: var(--c-accent); }
 body[data-nav-open] { overflow: hidden; }
+.nav[data-over-ink] ~ .nav-panel {
+  background: var(--c-ink);
+  border-top-color: var(--c-ink-line);
+}
+.nav[data-over-ink] ~ .nav-panel a {
+  color: var(--c-on-ink);
+  border-bottom-color: var(--c-ink-line);
+}
+.nav[data-over-ink] ~ .nav-panel a:hover { color: var(--c-ink-accent); }
 
 /* ---- Masthead --------------------------------------------------------- */
 .masthead {
-  padding: calc(var(--space-10) + 28px) 0 var(--space-8);
+  padding: calc(var(--space-10) + 28px) 0 0;
+  background: var(--c-ink);
+  color: var(--c-on-ink);
 }
 .mast-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.8fr);
   gap: var(--space-8);
   align-items: start;
+  padding-bottom: var(--space-8);
 }
+.mast-copy { text-align: left; }
 .mast-copy .display {
   margin: 0;
   max-width: 16ch;
   font-size: clamp(2.15rem, 1.55rem + 2.2vw, 3.45rem);
   letter-spacing: -0.028em;
   line-height: 1.05;
+  color: var(--c-on-ink);
 }
 .mast-copy .lead {
   margin: var(--space-5) 0 0;
   max-width: 46ch;
   font-size: var(--step-0);
   line-height: var(--leading-normal);
+  color: var(--c-on-ink-dim);
 }
+.mast-copy .kicker { color: var(--c-ink-accent); }
 .mast-cta {
   display: flex; flex-wrap: wrap; gap: var(--space-3);
   margin-top: var(--space-6);
 }
+.masthead .btn-ghost {
+  color: var(--c-on-ink);
+  border-color: var(--c-ink-line);
+  background: transparent;
+}
+.masthead .btn-ghost:hover { border-color: var(--c-on-ink); color: var(--c-on-ink); }
 .mast-panel {
-  border: 1px solid var(--c-line);
-  background: var(--c-surface);
+  border: 1px solid var(--c-ink-line);
+  background: var(--c-ink-2);
   padding: var(--space-5);
 }
 .mast-panel-label {
   margin: 0 0 var(--space-4);
   font-size: var(--step--1);
   font-weight: 500;
-  color: var(--c-text-mute);
+  color: var(--c-on-ink-mute);
 }
 .start-list {
   list-style: none; margin: 0; padding: 0;
 }
-.start-list li + li { border-top: 1px solid var(--c-line); }
+.start-list li + li { border-top: 1px solid var(--c-ink-line); }
 .start-list a {
   display: block;
   padding: 0.85em 0;
-  color: var(--c-text);
+  color: var(--c-on-ink);
   font-size: var(--step--1);
   line-height: 1.4;
 }
-.start-list a:hover { color: var(--c-accent); }
+.start-list a:hover { color: var(--c-ink-accent); }
 .start-list a::after {
   content: " →";
-  color: var(--c-text-mute);
+  color: var(--c-on-ink-mute);
 }
 
 .trust-strip {
-  border-block: 1px solid var(--c-line);
-  padding-block: var(--space-4);
+  background: var(--c-ink);
+  border-top: 1px solid var(--c-ink-line);
+  padding-block: var(--space-5);
 }
 .trust-row {
   display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6);
   font-size: var(--step--1);
-  color: var(--c-text-mute);
+  color: var(--c-on-ink-mute);
   letter-spacing: 0.01em;
 }
 
@@ -581,6 +623,7 @@ body[data-nav-open] { overflow: hidden; }
 .capability {
   padding-block: var(--space-7);
   border-top: 1px solid var(--c-line);
+  scroll-margin-top: 80px;
 }
 .capability:first-of-type { border-top: 1px solid var(--c-line); }
 .capability h3 {
@@ -611,7 +654,7 @@ body[data-nav-open] { overflow: hidden; }
   background: var(--c-accent);
 }
 
-.section-alt { background: var(--c-bg-elev); }
+#work, #platform, #contact, #engage, #capabilities { scroll-margin-top: 80px; }
 
 /* ---- Engagements / work ---------------------------------------------- */
 .engage-grid {
@@ -670,24 +713,18 @@ body[data-nav-open] { overflow: hidden; }
 
 /* ---- Footer ----------------------------------------------------------- */
 .footer {
-  border-top: 1px solid var(--c-line);
+  border-top: 0;
+  background: var(--c-ink);
   padding-block: var(--space-8) var(--space-7);
-  color: var(--c-text-mute);
+  color: var(--c-on-ink-mute);
 }
-.footer a { color: var(--c-text-dim); }
-.footer a:hover { color: var(--c-text); }
-.footer-grid { display: flex; justify-content: space-between; gap: var(--space-6); flex-wrap: wrap; }
-.footer-cols {
-  display: grid;
-  grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
-  gap: var(--space-7);
-}
-.footer-brand p { margin: var(--space-4) 0 0; max-width: 28ch; }
+.footer a { color: var(--c-on-ink-dim); }
+.footer a:hover { color: var(--c-on-ink); }
 .footer-head {
   margin: 0 0 var(--space-3);
   font-size: var(--step--1);
   font-weight: 500;
-  color: var(--c-text);
+  color: var(--c-on-ink);
 }
 .footer ul { list-style: none; margin: 0; padding: 0; }
 .footer li + li { margin-top: 0.4em; }

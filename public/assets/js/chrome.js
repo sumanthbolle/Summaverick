@@ -7,8 +7,15 @@ import { $ } from "./lib/dom.js";
 
 export function initChrome() {
   const nav = $("#nav");
-  const onScroll = () =>
-    nav?.setAttribute("data-scrolled", String(window.scrollY > 8));
+  const mast = document.querySelector(".masthead");
+  const onScroll = () => {
+    const y = window.scrollY;
+    nav?.setAttribute("data-scrolled", String(y > 8));
+    if (nav && mast) {
+      nav.toggleAttribute("data-over-ink", y < Math.max(mast.offsetHeight - 56, 0));
+    }
+  };
+  if (nav && mast) nav.toggleAttribute("data-over-ink", true);
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
 
