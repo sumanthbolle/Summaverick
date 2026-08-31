@@ -27,6 +27,15 @@
   --c-accent-soft:   rgba(47, 92, 255, 0.10);
   --c-on-accent:     #ffffff;
 
+  /* Company masthead / footer — always ink, independent of theme. */
+  --c-ink:           #0b1020;
+  --c-ink-2:         #141b2e;
+  --c-on-ink:        #f3f4f8;
+  --c-on-ink-dim:    #c3c7d4;
+  --c-on-ink-mute:   #9aa1b3;
+  --c-ink-line:      rgba(243, 244, 248, 0.14);
+  --c-ink-accent:    #8aa2ff;
+
   --c-ok:            #0f8f4d;   /* verified / pass        */
   --c-ok-soft:       rgba(15, 143, 77, 0.12);
   --c-bad:           #d23842;   /* failed / blocked       */
