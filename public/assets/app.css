@@ -639,3 +639,76 @@ label.lbl {
   }
   .tile:hover { transform: none; }
 }
+
+/* ---- Classic Studio library ------------------------------------------ */
+.library-page {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-grouped: #f5f5f7;
+  --fill: rgba(29, 29, 31, .055);
+  --fill-2: rgba(29, 29, 31, .10);
+  --label: #1d1d1f;
+  --label-2: #6e6e73;
+  --label-3: #86868b;
+  --separator: rgba(29, 29, 31, .13);
+  --glass: rgba(255, 255, 255, .84);
+  --glass-border: rgba(255, 255, 255, .72);
+  --shadow: none;
+  --shadow-lg: 0 12px 30px rgba(29, 29, 31, .08);
+}
+.library-page .nav { background: var(--glass); }
+.library-page .nav .brand { gap: 8px; text-transform: none; }
+.library-page .nav .brand img { width: 24px; height: 24px; flex: 0 0 auto; }
+.library-page .page { max-width: 1160px; padding-top: 0; }
+.library-intro {
+  max-width: 760px;
+  padding: clamp(4.5rem, 9vw, 8rem) 0 clamp(3rem, 6vw, 5rem);
+}
+.library-intro h1 {
+  max-width: 14ch;
+  margin: 0;
+  font-size: clamp(2.8rem, 6vw, 5.25rem);
+  font-weight: 620;
+  line-height: .98;
+  letter-spacing: -.06em;
+}
+.library-intro .tag { max-width: 48ch; margin: 24px 0 0; font-size: 18px; }
+.library-intro .btn { margin-top: 22px; }
+.library-kicker {
+  margin: 0 0 14px;
+  color: var(--label-2);
+  font: var(--footnote);
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+.library-page #list {
+  gap: 0;
+  border-top: 1px solid var(--separator);
+}
+.library-page .tile {
+  min-height: 0;
+  padding: 24px;
+  border: 0;
+  border-bottom: 1px solid var(--separator);
+  border-radius: 0;
+  box-shadow: none;
+}
+.library-page .tile:hover {
+  transform: none;
+  background: #f5f5f7;
+  box-shadow: none;
+}
+.library-page .tile .kicker { color: var(--label-2); }
+.library-page .tile h3 { letter-spacing: -.02em; }
+.library-page .tile .meta { color: var(--label-3); }
+.library-page .loading { border-radius: 12px; }
+.library-page .site-foot { max-width: 1160px; }
+@media (min-width: 640px) {
+  .library-page #list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .library-page .tile:nth-child(odd) { border-right: 1px solid var(--separator); }
+}
+@media (max-width: 639px) {
+  .library-intro { padding-top: 4rem; }
+  .library-intro h1 { font-size: clamp(2.7rem, 13vw, 4rem); }
+}

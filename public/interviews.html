@@ -10,13 +10,15 @@
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/app.css" />
   </head>
-  <body>
+  <body class="library-page">
     <a class="skip" href="#main">Skip to content</a>
     <header id="site-header"></header>
     <main id="main" class="page">
-      <p class="eyebrow">Prep</p>
-      <h1>Interviews</h1>
-      <p class="tag">What interviewers want to hear — and the answer you can actually give.</p>
+      <section class="library-intro" aria-labelledby="interviews-title">
+        <p class="library-kicker">Summaverick library</p>
+        <h1 id="interviews-title">Interview preparation, with real technical depth.</h1>
+        <p class="tag">Questions and answers from the original interview library, organised for serious preparation.</p>
+      </section>
       <div id="error" class="error" hidden></div>
       <div class="grid auto" id="list">
         <p class="loading" id="loading">Loading…</p>

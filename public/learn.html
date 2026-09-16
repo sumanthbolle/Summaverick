@@ -10,14 +10,16 @@
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/app.css" />
   </head>
-  <body>
+  <body class="library-page">
     <a class="skip" href="#main">Skip to content</a>
     <header id="site-header"></header>
     <main id="main" class="page">
-      <p class="eyebrow">Library</p>
-      <h1>Learn</h1>
-      <p class="tag">Essays and tutorials. Interviews live next door.</p>
-      <p><a class="btn" href="/interviews">Interview bank</a></p>
+      <section class="library-intro" aria-labelledby="library-title">
+        <p class="library-kicker">Summaverick library</p>
+        <h1 id="library-title">Learn through the work.</h1>
+        <p class="tag">Technical essays and tutorials, preserved from the original library.</p>
+        <p><a class="btn ghost" href="/interviews">Explore interviews</a></p>
+      </section>
       <div id="error" class="error" hidden></div>
       <div class="grid auto" id="list">
         <p class="loading" id="loading">Loading…</p>

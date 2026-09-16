@@ -10,22 +10,21 @@
 
 :root {
   /* ---- Neutral ramp (light) ------------------------------------------- */
-  --c-bg:            #fbfbfd;   /* page ground            */
-  --c-bg-elev:       #f2f2f6;   /* recessed panels        */
+  --c-bg:            #ffffff;   /* page ground            */
+  --c-bg-elev:       #f5f5f7;   /* recessed panels        */
   --c-surface:       #ffffff;   /* cards, raised surfaces */
   --c-surface-2:     #f7f7fa;   /* nested surfaces        */
   --c-line:          rgba(15, 15, 20, 0.10);  /* hairlines */
   --c-line-strong:   rgba(15, 15, 20, 0.18);
 
-  --c-text:          #16161c;   /* primary text  ~15:1    */
-  --c-text-dim:      #4a4a55;   /* secondary     ~7.5:1   */
+  --c-text:          #1d1d1f;   /* primary text  ~15:1    */
+  --c-text-dim:      #6e6e73;   /* secondary     ~5:1     */
   --c-text-mute:     #6d6d78;   /* tertiary      ~4.7:1   */
 
   /* ---- Brand + signal ------------------------------------------------- */
-  /* Monochrome: the accent is ink, so buttons/signals read black on light. */
-  --c-accent:        #1b1b20;   /* mono ink               */
-  --c-accent-press:  #000000;
-  --c-accent-soft:   rgba(20, 20, 26, 0.08);
+  --c-accent:        #0071e3;   /* restrained blue action */
+  --c-accent-press:  #0077ed;
+  --c-accent-soft:   rgba(0, 113, 227, 0.10);
   --c-on-accent:     #ffffff;
 
   /* Company masthead / footer — always ink, independent of theme. Neutral
