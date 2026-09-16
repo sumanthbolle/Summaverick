@@ -26,7 +26,7 @@ describe("Classic Studio public contract", () => {
     const css = text("public/assets/css/site.css");
 
     expect(home).toContain("summaverick-uncontained-sum.svg");
-    expect(home).toContain("sumanth-reveal-v1.png");
+    expect(home).not.toContain("sumanth-reveal-v1.png");
     expect(home).toContain("We turn product ambition into working software.");
     expect(home).toContain('id="expertise"');
     expect(home).toContain('id="work"');
