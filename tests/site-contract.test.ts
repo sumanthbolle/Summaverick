@@ -26,13 +26,29 @@ describe("Classic Studio public contract", () => {
     const css = text("public/assets/css/site.css");
 
     expect(home).toContain("summaverick-uncontained-sum.svg");
-    expect(home).toContain("sumanth-reveal-v1.png");
-    expect(home).toContain("We turn product ambition into working software.");
+    expect(home).not.toContain("sumanth-reveal-v1.png");
+    expect(home).toContain("We build software people are glad to use.");
     expect(home).toContain('id="expertise"');
     expect(home).toContain('id="work"');
     expect(home).toContain('id="contact"');
     expect(css).toContain(".studio-hero");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
+  it("only links to homepage sections that exist", () => {
+    const home = text("public/index.html");
+    const ids = new Set(
+      [...home.matchAll(/id="([^"]+)"/g)].map((m) => m[1] as string)
+    );
+
+    for (const page of ["public/index.html", "public/ask.html"]) {
+      const anchors = [...text(page).matchAll(/href="\/?#([^"]+)"/g)].map(
+        (m) => m[1] as string
+      );
+      for (const anchor of anchors) {
+        expect(ids, `${page} links to #${anchor}`).toContain(anchor);
+      }
+    }
   });
 
   it("keeps blog and interview routes in the shared studio library", () => {
