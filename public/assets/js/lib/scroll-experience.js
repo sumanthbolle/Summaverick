@@ -93,23 +93,55 @@ function buildProgressBar(lenis) {
   });
 }
 
-/* ---- Masthead intro: headline lines rise on load ---------------------- */
+/* ---- Masthead intro: headline rises word-by-word on load -------------- */
 function playMastheadIntro(gsap) {
   const copy = $(".mast-copy");
   const panel = $(".mast-panel");
   if (!copy) return;
 
-  const bits = [
-    copy.querySelector(".kicker"),
-    copy.querySelector(".display"),
-    copy.querySelector(".lead"),
-    copy.querySelector(".mast-cta"),
-  ].filter(Boolean);
+  const kicker = copy.querySelector(".kicker");
+  const display = copy.querySelector(".display");
+  const lead = copy.querySelector(".lead");
+  const cta = copy.querySelector(".mast-cta");
 
-  gsap.set([...bits, panel].filter(Boolean), { opacity: 0, y: 24 });
-  const tl = gsap.timeline({ defaults: { ease: "power3.out", duration: 0.9 } });
-  tl.to(bits, { opacity: 1, y: 0, stagger: 0.09 }, 0.1);
-  if (panel) tl.to(panel, { opacity: 1, y: 0 }, 0.35);
+  // Split the headline into masked words so each rises out of its own line.
+  const words = display ? splitWords(display) : [];
+
+  gsap.set([kicker, lead, cta, panel].filter(Boolean), { opacity: 0, y: 22 });
+  if (display) gsap.set(display, { opacity: 1 }); // words carry the motion now
+  if (words.length) gsap.set(words, { yPercent: 118 });
+
+  const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+  if (kicker) tl.to(kicker, { opacity: 1, y: 0, duration: 0.7 }, 0.05);
+  if (words.length) tl.to(words, { yPercent: 0, duration: 0.9, stagger: 0.055 }, 0.15);
+  else if (display) tl.to(display, { opacity: 1, y: 0, duration: 0.9 }, 0.15);
+  if (lead) tl.to(lead, { opacity: 1, y: 0, duration: 0.8 }, 0.42);
+  if (panel) tl.to(panel, { opacity: 1, y: 0, duration: 0.9 }, 0.48);
+  if (cta) tl.to(cta, { opacity: 1, y: 0, duration: 0.8 }, 0.55);
+}
+
+/* Wrap each word of an element in an overflow-clipped mask so it can slide up
+ * from below its own baseline. Returns the inner word spans to animate. */
+function splitWords(node) {
+  const text = node.textContent;
+  node.textContent = "";
+  const words = [];
+  text.split(/(\s+)/).forEach((chunk) => {
+    if (chunk === "") return;
+    if (/^\s+$/.test(chunk)) {
+      node.append(document.createTextNode(chunk));
+      return;
+    }
+    const mask = document.createElement("span");
+    mask.className = "word-mask";
+    const inner = document.createElement("span");
+    inner.className = "word";
+    inner.textContent = chunk;
+    mask.append(inner);
+    node.append(mask);
+    words.push(inner);
+  });
+  return words;
 }
 
 /* ---- The "tide": scroll-linked parallax on the masthead atmosphere ----- */

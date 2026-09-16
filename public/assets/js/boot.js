@@ -6,6 +6,7 @@
 import { initChrome } from "./chrome.js";
 import { initContent } from "./content.js";
 import { initScrollExperience } from "./lib/scroll-experience.js";
+import { initMotion } from "./lib/motion.js";
 
 function boot() {
   initChrome();
@@ -13,6 +14,8 @@ function boot() {
   // the plain IntersectionObserver reveal in content.js.
   const rich = initScrollExperience();
   initContent({ reveal: !rich });
+  // Second motion layer (magnetic buttons, tilt, count-up, marquee, rail).
+  if (rich) initMotion();
 }
 
 if (document.readyState === "loading") {
