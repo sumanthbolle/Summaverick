@@ -158,15 +158,15 @@ function initLeadForm() {
     e.preventDefault();
     const data = new FormData(form);
     if (data.get("company_url")) {
-      status.textContent = "Thank you. We will reply shortly.";
+      status.textContent = "Thanks — we have your note and will be in touch.";
       form.reset();
       return;
     }
     if (!data.get("email")) {
-      status.textContent = "An email address is required so we can reply.";
+      status.textContent = "We need an email address so we can write back.";
       return;
     }
-    status.textContent = "Thank you. We will reply shortly.";
+    status.textContent = "Thanks — we have your note and will be in touch.";
     form.reset();
   });
 }
