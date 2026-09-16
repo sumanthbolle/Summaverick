@@ -9,5 +9,6 @@ dist/
 .env
 coverage/
 .superpowers/
+.worktrees/
 # scripts/data/ holds the one-time migration source JSON copied from the old
 # repo; it is committed so CI can run seeds reproducibly. It is never served.
