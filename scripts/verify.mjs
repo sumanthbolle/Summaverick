@@ -45,8 +45,12 @@ const coreChecks = [
         "home is still the placeholder stub, not the product site"
       );
       assert(
-        /Learn\. Research\. Resolve/i.test(text),
-        "home missing product headline"
+        text.includes("We turn product ambition into working software."),
+        "home missing Classic Studio product-engineering headline"
+      );
+      assert(
+        text.includes("summaverick-uncontained-sum.svg"),
+        "home missing Uncontained Sum brand asset"
       );
     },
   },
