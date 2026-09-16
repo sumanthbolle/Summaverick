@@ -135,8 +135,18 @@ export function mountChrome({ active } = {}) {
   if (header && !header.dataset.ready) {
     header.className = "nav";
     header.dataset.ready = "1";
-    const brand = el("a", { class: "brand", href: "/", text: "summaverick" });
-    brand.setAttribute("aria-label", "summaverick home");
+    const brand = el("a", { class: "brand", href: "/" });
+    brand.setAttribute("aria-label", "Summaverick home");
+    const mark = el("img", {
+      attrs: {
+        src: "/assets/img/summaverick-uncontained-sum.svg",
+        alt: "",
+        width: "24",
+        height: "24",
+        "aria-hidden": "true",
+      },
+    });
+    brand.append(mark, document.createTextNode("Summaverick"));
     const links = el("nav", { class: "nav-links", attrs: { "aria-label": "Primary" } });
     for (const l of LINKS) {
       const a = el("a", { href: l.href, text: l.label });

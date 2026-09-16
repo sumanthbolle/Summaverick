@@ -34,4 +34,14 @@ describe("Classic Studio public contract", () => {
     expect(css).toContain(".studio-hero");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
+
+  it("keeps blog and interview routes in the shared studio library", () => {
+    const learn = text("public/learn.html");
+    const interviews = text("public/interviews.html");
+    const chrome = text("public/assets/app.js");
+
+    expect(learn).toContain("library-page");
+    expect(interviews).toContain("library-page");
+    expect(chrome).toContain("summaverick-uncontained-sum.svg");
+  });
 });
