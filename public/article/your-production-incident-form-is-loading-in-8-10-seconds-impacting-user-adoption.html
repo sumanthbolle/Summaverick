@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your production Incident form is loading in 8-10 seconds, impacting user adoption. Users report the delay occurs consistently during form load, not on subsequent interactions. You've identified three Business Rules executing on form load, each performing GlideRecord queries. Walk me through your diagnostic approach, explain what's likely causing the slowdown, and show me how you'd optimize this with code examples. What trade-offs would you consider before implementing async rules, and how would you measure improvement? — Summaverick</title>
+  <meta name="description" content="Why Interviewers Ask This The 8-10 second load time indicates synchronous processing is blocking the user interface. Business Rules executing during form load are particularly problematic because…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-production-incident-form-is-loading-in-8-10-seconds-impacting-user-adoption" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your production Incident form is loading in 8-10 seconds, impacting user adoption. Users report the delay occurs consistently during form load, not on subsequent interactions. You've identified three Business Rules executing on form load, each performing GlideRecord queries. Walk me through your diagnostic approach, explain what's likely causing the slowdown, and show me how you'd optimize this with code examples. What trade-offs would you consider before implementing async rules, and how would you measure improvement? — Summaverick" />
+  <meta property="og:description" content="Why Interviewers Ask This The 8-10 second load time indicates synchronous processing is blocking the user interface. Business Rules executing during form load are particularly problematic because…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-production-incident-form-is-loading-in-8-10-seconds-impacting-user-adoption" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Performance</p>
+        <h1>Your production Incident form is loading in 8-10 seconds, impacting user adoption. Users report the delay occurs consistently during form load, not on subsequent interactions. You've identified three Business Rules executing on form load, each performing GlideRecord queries. Walk me through your diagnostic approach, explain what's likely causing the slowdown, and show me how you'd optimize this with code examples. What trade-offs would you consider before implementing async rules, and how would you measure improvement?</h1>
+        <p class="article-meta">Senior · ServiceNow · Feb 2026</p>
+        <div class="prose">
+<h4>Why Interviewers Ask This</h4><p>The 8-10 second load time indicates synchronous processing is blocking the user interface. Business Rules executing during form load are particularly problematic because they're <strong>blocking operations</strong>—the form won't render until the rule completes. The culprit is likely nested GlideRecord queries without proper filtering, or rules that weren't designed with form load performance in mind.</p><p>Your diagnostic approach should start by identifying which rule causes the delay. Enable debug logging, check the session log for execution time, and use browser developer tools to measure network vs. script execution time. This distinguishes between server-side rule delays versus client-side rendering issues.</p><h4>The Solution</h4><pre>// PROBLEMATIC BUSINESS RULE (Synchronous, Blocking)
+if (current.priority == '1') {
+  var incidents = new GlideRecord('incident');
+  incidents.query();
+  while (incidents.next()) {
+    var changes = new GlideRecord('change_request');
+    changes.query();
+    while (changes.next()) {
+      if (changes.assignment_group == incidents.assignment_group) {
+        current.related_changes = incidents.number;
+      }
+    }
+  }
+}
+// OPTIMIZED SOLUTION: Extract to Script Include + Async Rule
+// Business Rule: async execution
+if (current.priority == '1') {
+  var processor = new IncidentProcessor();
+  processor.linkRelatedChanges(current.sys_id);
+}
+// Script Include: IncidentProcessor
+var IncidentProcessor = Class.create();
+IncidentProcessor.prototype = {
+  linkRelatedChanges: function(incidentId) {
+    var incident = new GlideRecord('incident');
+    incident.addQuery('sys_id', incidentId);
+    incident.addQuery('priority', '1');
+    incident.query();
+    if (incident.next()) {
+      var changes = new GlideRecord('change_request');
+      changes.addQuery('assignment_group', incident.assignment_group);
+      changes.setLimit(10);
+      changes.query();
+      if (changes.next()) {
+        incident.related_changes = changes.number;
+        incident.update();
+      }
+    }
+  },
+  type: 'IncidentProcessor'
+};</pre><h4>Senior Considerations</h4><ul><li><strong>Async vs. Sync Trade-offs:</strong> Async rules execute after the transaction completes, eliminating form load delays. However, users won't see updated values immediately—use async only when immediate UI feedback isn't required. For critical validations or field updates users expect to see, keep rules synchronous but optimize their execution.</li><li><strong>Query Optimization:</strong> The nested loop pattern is a classic performance killer. Always use addQuery() to filter at the database level before iterating. Limit result sets with setLimit(). Index frequently queried fields like assignment_group and priority.</li><li><strong>Measurement Strategy:</strong> Use ServiceNow's Performance Analytics to measure form load baseline before changes. Track both client and server execution time separately. Set a target of sub-3 second loads; anything over 3-4 seconds frustrates users.</li><li><strong>setWorkflow(false) Consideration:</strong> If your rule updates related records, use setWorkflow(false) to prevent cascading rule triggers, but document this decision—it can mask unintended side effects.</li><li><strong>Conditional Execution:</strong> Wrap rules with specific conditions (current.priority == '1') rather than running on all inserts/updates. This prevents unnecessary execution on records that don't match criteria.</li><li><strong>Production Validation:</strong> Never convert to async without testing user workflows. Some processes depend on synchronous updates completing before subsequent actions. Load test with production-like data volumes—performance issues often surface only under realistic conditions.</li><li><strong>Monitoring Post-Deployment:</strong> Track form load times after optimization. If improvements plateau, investigate client scripts, UI policies, and reference field loads—often the culprit isn't Business Rules alone but their combination with other form components.</li></ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/production-incident-form-incident-do-is-taking-8-12-seconds-to-load-for-end-user" rel="prev"><small>‹ Previous</small><strong>Production Incident form (incident.do) is taking 8-12 seconds to load for end users across multiple roles. OOTB load time should be ~2 seconds. Users report consistent delays even on new incidents. Browser dev tools show 90% of time in 'Waiting (TTFB)' with high server response time. No recent customizations, but team added 3 new Business Rules last sprint: one on 'display' for field population, one on 'query' for list collecting, and one on 'after' insert/update for notifications. &lt;strong&gt;Your task:&lt;/strong&gt; Walk through your &lt;strong&gt;diagnosis approach&lt;/strong&gt; (tools/metrics you'd check first), identify &lt;strong&gt;likely root causes&lt;/strong&gt; with evidence, propose &lt;strong&gt;3 solution options&lt;/strong&gt; with trade-offs, and provide &lt;strong&gt;production rollout considerations&lt;/strong&gt;. Include a code example showing a problematic Business Rule and its optimized version. &lt;strong&gt;What we're evaluating:&lt;/strong&gt; Systematic problem-solving (not just 'use async'), production impact awareness, and ability to balance performance vs. business needs. Bonus: Mention edge cases like high-volume forms or mobile users.</strong></a>
+          <a href="/article/in-a-10-developer-team-working-on-a-single-shared-dev-instance-you-re-experienci" rel="next"><small>Next ›</small><strong>In a 10-developer team working on a single shared dev instance, you're experiencing frequent Update Set conflicts during promotion to UAT. Last week, 3 out of 5 Update Sets failed preview with 40+ conflicts each, mostly on Business Rules and Script Includes, delaying a critical release by 2 days. Team reports 'I didn't know that record was in someone else's US'. Describe your &lt;strong&gt;diagnosis approach&lt;/strong&gt; to identify root causes, list &lt;strong&gt;3+ solution options&lt;/strong&gt; with trade-offs, and explain &lt;strong&gt;production deployment considerations&lt;/strong&gt;. What metrics would you track to prevent recurrence? Bonus: Show a code snippet that detects if a record is in another dev's active Update Set (hint: query sys_update_version).</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your production Incident form is loading in 8-10 seconds, impacting user adoption. Users report the delay occurs consistently during form load, not on subsequent interactions. You've identified three Business Rules executing on form load, each performing GlideRecord queries. Walk me through your diagnostic approach, explain what's likely causing the slowdown, and show me how you'd optimize this with code examples. What trade-offs would you consider before implementing async rules, and how would you measure improvement?",
+  "description": "Why Interviewers Ask This The 8-10 second load time indicates synchronous processing is blocking the user interface. Business Rules executing during form load are particularly problematic because…",
+  "datePublished": "2026-02-13T06:42:34.678Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

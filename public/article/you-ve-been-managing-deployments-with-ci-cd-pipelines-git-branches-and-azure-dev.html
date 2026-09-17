@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur? — Summaverick</title>
+  <meta name="description" content="What This Question Really Tests This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track configuration…" />
+  <link rel="canonical" href="https://summaverick.com/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur? — Summaverick" />
+  <meta property="og:description" content="What This Question Really Tests This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track configuration…" />
+  <meta property="og:url" content="https://summaverick.com/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>What This Question Really Tests</h4><p>This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track <em>configuration changes</em> (not source code) and move them between instances — and the limitations catch every developer coming from a Git workflow.</p><h4>The Mental Model</h4><pre>// Git Workflow (what you know)
+// feature-branch → commit → pull request → merge → CI/CD → deploy
+//
+// ServiceNow Update Set Workflow
+// Dev Instance → Make changes (auto-captured) →
+//   → Complete Update Set → Export XML →
+//   → Import to Test → Preview (conflict check) →
+//   → Commit → Repeat to Prod
+
+// An Update Set is like a Git stash that auto-captures every
+// config change you make while it's "In Progress"</pre><h4>What Transfers and What Doesn't</h4><ul><li><strong>What works like Git:</strong> Changes are grouped logically (like a feature branch), they move from Dev → Test → Prod (like environments), and you can preview conflicts before committing (like merge conflict detection).</li><li><strong>What breaks your Git brain:</strong> There's no branching. No diffing individual lines. No rollback to a previous commit. No pull requests or code review workflow built-in. If two developers change the same Business Rule in separate Update Sets, the last one committed wins — there's no three-way merge.</li></ul><h4>Real-World Problems</h4><ul><li><strong>The 'wrong Update Set' disaster:</strong> A developer forgets to switch their active Update Set and makes changes in the wrong one. Now unrelated customizations are bundled together. In Git terms, it's like committing to <code>main</code> instead of your feature branch — except there's no <code>git cherry-pick</code> to fix it easily.</li><li><strong>Collision on shared records:</strong> Two developers modify the same UI Policy. Both Update Sets capture the full record. Whichever is committed second overwrites the first entirely — no merge, no conflict resolution. The mitigation: communicate, use batch Update Sets, or use ServiceNow's newer Source Control Integration (connects to Git for scoped apps).</li><li><strong>Data vs Configuration:</strong> Update Sets only capture configuration (scripts, UI policies, ACLs). They do NOT capture data (records in custom tables, user records, CMDB entries). Data migration requires separate strategies — Import Sets, scripts, or ATF data.</li></ul><pre>// Checking which Update Set you're working in (common sanity check)
+var currentUS = gs.getUpdateSetName();
+gs.info('Currently working in: ' + currentUS);
+
+// Programmatically moving a record to the correct Update Set
+var us = new GlideRecord('sys_update_set');
+us.addQuery('name', 'My Feature Update Set');
+us.addQuery('state', 'in progress');
+us.query();
+if (us.next()) {
+  // Now switch context
+  gs.setCurrentUpdate(us.sys_id);
+}</pre><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>ServiceNow now offers Source Control Integration for Scoped Applications — this connects to Git repositories and gives you the branch/merge/PR workflow you're used to. If you're building scoped apps, push for this approach. For global configurations, Update Sets remain the primary mechanism, so learn the discipline of checking your active Update Set before every change.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" rel="prev"><small>‹ Previous</small><strong>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?</strong></a>
+          <a href="/article/in-asp-net-you-separate-concerns-with-controllers-services-and-repositories-in-s" rel="next"><small>Next ›</small><strong>In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?",
+  "description": "What This Question Really Tests This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track configuration…",
+  "datePublished": "2026-03-16T05:45:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

@@ -97,6 +97,17 @@ export default {
     if (!isApi) {
       const path = url.pathname.replace(/\/+$/, "") || "/";
       if (path.startsWith("/article/") && path.length > "/article/".length) {
+        // The library builder pre-renders every essay and interview to
+        // /article/<slug>.html. Serve the static page when it exists so an
+        // article never depends on the D1/R2 seed; fall back to the
+        // API-driven article.html for anything added after the last build.
+        const slug = path.slice("/article/".length).split("/")[0] ?? "";
+        if (slug && !slug.includes(".")) {
+          const staticRes = await env.ASSETS.fetch(
+            new Request(new URL(`/article/${slug}.html`, url.origin), req)
+          );
+          if (staticRes.status !== 404) return staticRes;
+        }
         const assetUrl = new URL("/article.html", url.origin);
         return env.ASSETS.fetch(new Request(assetUrl, req));
       }

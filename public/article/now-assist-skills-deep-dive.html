@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Now Assist Skills Deep Dive: Every Skill, Every Module, and How to Set Them Up — Summaverick</title>
+  <meta name="description" content="The complete reference for every Now Assist skill across ITSM, HRSD, CSM, and Creator — what each skill does, which plugin activates it, where it appears in the UI, and the step-by-step setup in the Admin Console." />
+  <link rel="canonical" href="https://summaverick.com/article/now-assist-skills-deep-dive" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Now Assist Skills Deep Dive: Every Skill, Every Module, and How to Set Them Up — Summaverick" />
+  <meta property="og:description" content="The complete reference for every Now Assist skill across ITSM, HRSD, CSM, and Creator — what each skill does, which plugin activates it, where it appears in the UI, and the step-by-step setup in the Admin Console." />
+  <meta property="og:url" content="https://summaverick.com/article/now-assist-skills-deep-dive" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">AI</p>
+        <h1>Now Assist Skills Deep Dive: Every Skill, Every Module, and How to Set Them Up</h1>
+        <p class="article-meta">Intermediate · 25 min read · May 2026</p>
+        <div class="prose">
+<h2>What This Article Covers</h2>
+<p>Now Assist is organized into <strong>skills</strong> — individual AI capabilities grouped by product module. Each skill can be independently enabled, configured, and monitored. This article is the complete reference: every skill, what it does, which plugin powers it, where it appears in the UI, and how to set it up.</p>
+
+<h2>The Now Assist Admin Console — Your Control Center</h2>
+<p>Before diving into individual skills, you need to know where everything is managed.</p>
+
+<pre>// Access the Admin Console:
+// Navigate to: All &gt; Now Assist &gt; Now Assist Admin
+//
+// What you see:
+// ┌─────────────────────────────────────┐
+// │  Dashboard                           │ → Usage stats, active skills, model health
+// │  Skills                              │ → Enable/disable/configure individual skills
+// │  Settings                            │ → Plugins, LLM config, data sharing
+// │  Analytics                           │ → Acceptance rates, feedback, trends
+// │  Generative AI Controller            │ → Guardrails, PII rules, topic restrictions
+// └─────────────────────────────────────┘</pre>
+
+<h2>ITSM Skills (IT Service Management)</h2>
+<p><strong>Install:</strong> the <em>Now Assist for ITSM</em> application (ServiceNow Store / Application Manager)</p>
+<p>These skills are designed for IT support agents who handle incidents, problems, and changes.</p>
+
+<h4>Incident Summarization</h4>
+<p><strong>What it does:</strong> Reads the entire history of an incident — work notes, additional comments, activity log, state transitions, and related records — and generates a concise human-readable summary.</p>
+<p><strong>Where you see it:</strong> The Now Assist panel on the right side of the incident form in Agent Workspace. Agent clicks "Summarize" and the summary appears within seconds.</p>
+<p><strong>When it is most valuable:</strong> Complex incidents with dozens of comments spanning days or weeks. Escalated incidents where the new agent needs context fast. Shift handoffs where the incoming agent needs to catch up on all active P1s.</p>
+<p><strong>Data dependency:</strong> Quality depends entirely on work note quality. If agents write detailed, structured notes, summaries are excellent. If work notes are empty or say "called user, waiting," the summary will reflect that emptiness.</p>
+
+<h4>Resolution Notes Generation</h4>
+<p><strong>What it does:</strong> When an agent resolves an incident, this skill drafts the close notes based on the work notes, actions taken, and resolution approach. The agent reviews the draft, edits if needed, and saves.</p>
+<p><strong>Where you see it:</strong> The Resolution Information section when the agent changes state to Resolved.</p>
+<p><strong>Why it matters:</strong> Consistent, complete resolution notes are critical for knowledge management and trend analysis. Most agents write minimal close notes when pressed for time. AI-generated drafts ensure every ticket has useful closure documentation.</p>
+
+<h4>Chat Summarization</h4>
+<p><strong>What it does:</strong> Summarizes a live chat or Virtual Agent conversation transcript. Particularly valuable when a chat gets transferred from Virtual Agent to a live agent, or from one agent to another.</p>
+<p><strong>Where you see it:</strong> Agent Workspace chat panel.</p>
+
+<h4>Chat Reply Recommendation</h4>
+<p><strong>What it does:</strong> During a live chat, suggests a response for the agent based on the conversation context and knowledge base content. The agent can accept the suggestion, modify it, or ignore it.</p>
+<p><strong>Where you see it:</strong> Below the chat input field — "Suggested reply" text that the agent can click to insert.</p>
+<p><strong>Data dependency:</strong> Quality depends on knowledge base coverage. If there are good KB articles for the topic being discussed, recommendations are strong. If the KB is sparse, recommendations will be generic.</p>
+
+<h4>KB Article Generation</h4>
+<p><strong>What it does:</strong> After resolving an incident, drafts a knowledge base article from the incident details and resolution. The idea: if this incident was resolved, the solution should be captured so the next person with the same issue can self-serve.</p>
+<p><strong>Where you see it:</strong> Post-resolution action — a "Create KB Article" option that generates a draft article.</p>
+
+<h4>Change Request Summarization</h4>
+<p><strong>What it does:</strong> Summarizes complex change requests — particularly useful for CAB (Change Advisory Board) reviewers who need to understand the change, its risk, and its impact without reading every detail.</p>
+
+<h4>Sidebar Discussion Summarization</h4>
+<p><strong>What it does:</strong> Summarizes sidebar chat discussions (collaboration chats) that occurred during incident resolution, so team members joining later can catch up.</p>
+
+<h2>HRSD Skills (HR Service Delivery)</h2>
+<p><strong>Install:</strong> the <em>Now Assist for HRSD</em> application (ServiceNow Store / Application Manager)</p>
+<p>Same core capabilities as ITSM but tailored for HR workflows. Key difference: HR data is more sensitive (PII, compensation, health), so guardrail configuration is critical.</p>
+
+<h4>HR Case Summarization</h4>
+<p>Same concept as Incident Summarization but for HR cases — benefits disputes, accommodation requests, employee relations issues.</p>
+
+<h4>Resolution Notes Generation</h4>
+<p>Drafts closure documentation for HR cases.</p>
+
+<h4>Chat Summarization &amp; Reply Recommendation</h4>
+<p>Supports HR chat interactions — particularly important for live agent handoffs during sensitive conversations.</p>
+
+<h4>KB Article Generation</h4>
+<p>Generates HR knowledge articles from resolved cases — "How to update tax withholding," "Steps to request FMLA leave."</p>
+
+<div class="warn-box">
+<h4>Privacy Note</h4>
+<p>HR data often contains PII and sensitive information. Before enabling HRSD skills, configure the Generative AI Controller to ensure PII is properly handled — names, SSNs, salary information, and health data should be filtered from AI prompts where appropriate.</p>
+</div>
+
+<h2>CSM Skills (Customer Service Management)</h2>
+<p><strong>Install:</strong> the <em>Now Assist for CSM</em> application (ServiceNow Store / Application Manager)</p>
+<p>Designed for customer-facing support teams.</p>
+
+<h4>Customer Case Summarization</h4>
+<p>Summarizes customer support cases — essential when cases span multiple agents, channels (chat, email, phone), and weeks of back-and-forth.</p>
+
+<h4>Email Reply Recommendation</h4>
+<p><strong>Unique to CSM:</strong> Drafts email responses to customer inquiries. The AI considers the case history, product context, and KB articles to generate a professional, contextual reply. The agent reviews and sends.</p>
+
+<h4>Voice Call Summarization</h4>
+<p><strong>Unique to CSM:</strong> When phone calls are transcribed, this skill summarizes the transcript into key points, action items, and next steps.</p>
+
+<h4>Chat Reply Recommendation &amp; Chat Summarization</h4>
+<p>Same as ITSM equivalents but configured for customer-facing conversations — tone and language are adjusted for external communication.</p>
+
+<h2>Creator Skills (For Developers and Admins)</h2>
+<p><strong>Install:</strong> the <em>Now Assist for Creator</em> application (ServiceNow Store / Application Manager)</p>
+<p>These skills help people build on the platform faster.</p>
+
+<h4>Flow Generation</h4>
+<p><strong>What it does:</strong> Describe a flow in natural language ("create a flow that sends a Slack notification when a P1 incident is created and the assignment group is empty") and AI generates the Flow Designer configuration.</p>
+<p><strong>Where you see it:</strong> Flow Designer — natural language input field.</p>
+
+<h4>Code Assist (Intelligent Code Recommendations)</h4>
+<p><strong>What it does:</strong> AI-powered code completion in the ServiceNow script editor. Suggests the next lines of code, explains existing scripts, and generates GlideRecord queries from descriptions.</p>
+<p><strong>Where you see it:</strong> Script editor across the platform — Business Rules, Script Includes, Client Scripts, etc.</p>
+
+<h4>Catalog Item Generation</h4>
+<p><strong>What it does:</strong> Describe a catalog item and AI generates the item configuration including variables, workflow, and approval rules.</p>
+
+<h4>Playbook Generation &amp; Recommendation</h4>
+<p><strong>What it does:</strong> Generates process playbook steps from descriptions and recommends playbook templates based on the use case.</p>
+
+<h4>App Generation</h4>
+<p><strong>What it does:</strong> Generates a starter application structure from a plain-English description of what the app should do.</p>
+
+<h4>Data Visualization Generation</h4>
+<p><strong>What it does:</strong> Creates dashboards and report visualizations from natural language — "show me P1 incidents by assignment group over the last 6 months as a line chart."</p>
+
+<h2>The Skill Kit — Building Custom Skills</h2>
+<p>When the out-of-box skills do not cover your use case, the <strong>Now Assist Skill Kit</strong> lets you build custom skills. This is an intermediate-to-advanced capability.</p>
+
+<pre>// What you can do with the Skill Kit:
+//
+// 1. Define a custom prompt template
+//    - System instructions + data context + user request
+//    - Example: "Summarize this change request focusing on risk factors"
+//
+// 2. Connect custom data sources
+//    - Pull from any ServiceNow table (not just OOB ones)
+//    - Include related record data, custom fields, attachments
+//
+// 3. Deploy to Now Assist panel or Context Menu
+//    - Appears alongside OOB skills in the Agent Workspace
+//    - Or as a right-click option on text fields (Elaborate, Shorten, Analyze)
+//
+// 4. Use Automated Prompt Optimization (APO)
+//    - Feed a dataset of 100+ records
+//    - APO reviews skill performance and suggests prompt improvements
+//    - Measures: correctness, faithfulness, latency
+//
+// 5. Integrate Predictive Intelligence
+//    - Add ML classification models to custom skills
+//    - Combine generative AI (text) with predictive AI (classification)</pre>
+
+<h2>LLM Configuration — Which Model Powers It</h2>
+
+<table>
+<tr><th>Option</th><th>What It Is</th><th>When to Use It</th></tr>
+<tr><td><strong>Now LLM</strong></td><td>ServiceNow's own hosted LLM. Data stays within ServiceNow boundary.</td><td>Default choice for most deployments. Best for data sovereignty and compliance.</td></tr>
+<tr><td><strong>Azure OpenAI</strong></td><td>Microsoft-hosted OpenAI models connected via API.</td><td>When your organization already has Azure OpenAI contracts or needs specific model capabilities.</td></tr>
+<tr><td><strong>Custom</strong></td><td>Bring-your-own LLM endpoint.</td><td>Advanced scenarios where neither Now LLM nor Azure OpenAI meets requirements.</td></tr>
+</table>
+
+<pre>// Configure LLM settings in:
+// Now Assist Admin Console &gt; Settings &gt; LLM Configuration
+//
+// Key settings:
+// - Active model (Now LLM or Azure OpenAI)
+// - API endpoint and credentials (for Azure OpenAI)
+// - Token limits per request
+// - Fallback behavior if primary model is unavailable</pre>
+
+<h2>Guardrails and Governance</h2>
+<p>Before enabling skills at scale, configure the Generative AI Controller:</p>
+
+<pre>// Navigate to: Now Assist Admin &gt; Generative AI Controller
+//
+// Key configurations:
+// 1. PII Handling
+//    - Mask PII in prompts (names, emails, SSNs, phone numbers)
+//    - Configure which PII types to mask vs. allow
+//
+// 2. Topic Restrictions
+//    - Block AI from generating content on certain topics
+//    - E.g., "Do not generate content about legal advice"
+//
+// 3. Response Quality
+//    - Max response length
+//    - Required citation of source data
+//    - Confidence threshold (below which AI declines to answer)
+//
+// 4. Audit Logging
+//    - Every AI interaction logged
+//    - What was sent to the model, what came back
+//    - Who requested it, when, and what action they took (accept/edit/dismiss)</pre>
+
+<div class="tip-box">
+<h4>Implementation Advice</h4>
+<p>Start with one module (ITSM is usually the best first choice — highest volume, most mature data). Enable 2-3 skills for a pilot group. Measure acceptance rates and feedback for 4-6 weeks. Then expand to more skills and more modules. The phased approach consistently outperforms big-bang AI rollouts.</p>
+</div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/virtual-agent-from-zero" rel="prev"><small>‹ Previous</small><strong>Virtual Agent from Zero: The Beginner-Friendly Guide to ServiceNow's Conversational AI</strong></a>
+          <a href="/article/csdm-end-to-end-deep-dive" rel="next"><small>Next ›</small><strong>CSDM End to End: How a Single Outage Traces from a Linux Box to a Business Service (With Tables, Queries, and the Stuff Nobody Explains)</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Now Assist Skills Deep Dive: Every Skill, Every Module, and How to Set Them Up",
+  "description": "The complete reference for every Now Assist skill across ITSM, HRSD, CSM, and Creator — what each skill does, which plugin activates it, where it appears in the UI, and the step-by-step setup in the Admin Console.",
+  "datePublished": "2026-05-08T12:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

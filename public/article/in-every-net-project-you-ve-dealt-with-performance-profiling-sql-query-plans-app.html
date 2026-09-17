@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM? — Summaverick</title>
+  <meta name="description" content="Reading Between the Lines Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You…" />
+  <link rel="canonical" href="https://summaverick.com/article/in-every-net-project-you-ve-dealt-with-performance-profiling-sql-query-plans-app" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM? — Summaverick" />
+  <meta property="og:description" content="Reading Between the Lines Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You…" />
+  <meta property="og:url" content="https://summaverick.com/article/in-every-net-project-you-ve-dealt-with-performance-profiling-sql-query-plans-app" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM?</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Reading Between the Lines</h4><p>Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You optimize within the platform's constraints. This tests whether you can be effective with platform-native tools.</p><h4>The First 5 Checks</h4><ul><li><strong>1. Transaction Log (System Diagnostics → Stats):</strong> Shows every HTTP request with response time breakdown — like Application Insights request traces. Filter by slow transactions (>5 seconds). Identifies whether the bottleneck is server processing, database queries, or network. This is your starting point.</li><li><strong>2. Slow Query Log:</strong> ServiceNow logs queries exceeding thresholds. Look for full table scans, missing indexes, or queries returning excessive rows. Like SQL Server's slow query log or EF's <code>Database.Log</code>. Check: <code>System Diagnostics → Slow Queries</code>.</li><li><strong>3. Business Rule Debug:</strong> Enable BR debugging to see which rules fire and their execution time. A single poorly written Before BR can add 3-5 seconds to every form save. Like profiling middleware execution time in ASP.NET.</li><li><strong>4. Client-side Performance:</strong> Browser DevTools (Network tab) shows how many AJAX calls the form makes. Excessive GlideAjax calls or heavy UI Scripts are common culprits. Like checking your React app's network waterfall.</li><li><strong>5. Semaphore & Worker Threads:</strong> Check <code>System Diagnostics → Semaphores</code>. If worker threads are saturated, all transactions queue up. Like thread pool starvation in .NET — your async code helps, but there's a ceiling.</li></ul><h4>Performance Anti-Patterns</h4><pre>// Anti-Pattern 1: GlideRecord in a loop (N+1 query)
+// Like .NET's lazy loading N+1 problem with EF
+var incidents = new GlideRecord('incident');
+incidents.query();
+while (incidents.next()) {
+  // BAD: Query inside loop = N+1
+  var caller = new GlideRecord('sys_user');
+  caller.get(incidents.caller_id);
+  gs.info(caller.name); // Separate query per incident!
+}
+
+// BETTER: Dot-walk the reference (like navigation properties)
+var incidents = new GlideRecord('incident');
+incidents.query();
+while (incidents.next()) {
+  // NOTE: dot-walking still does a per-record lookup (cached per
+  // transaction) — better than the explicit inner query above, but
+  // for large sets collect the sys_ids and run one batched query
+  gs.info(incidents.caller_id.getDisplayValue());
+}
+
+// Anti-Pattern 2: No setLimit() on queries
+// Like calling .ToList() on a million-row table
+var gr = new GlideRecord('sys_audit'); // Millions of rows!
+gr.query(); // Returns everything. Instance cries.
+
+// FIX: Always limit
+gr.setLimit(100);
+gr.orderByDesc('sys_created_on');
+gr.query();</pre><h4>Thinking Differently in SaaS</h4><ul><li><strong>You optimize queries, not infrastructure:</strong> Can't add more RAM or CPU. Reduce GlideRecord queries, use GlideAggregate for counts, index frequently queried fields.</li><li><strong>You optimize scripts, not threads:</strong> Can't tune thread pools. Keep Business Rules fast (&lt;200ms), move heavy work to async/scheduled jobs.</li><li><strong>You optimize architecture, not hardware:</strong> Can't horizontally scale. Design patterns matter more — batch processing, event-driven architecture, and caching lookup results in script variables (or system properties for rarely-changing values).</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Your performance instincts from .NET are your superpower in ServiceNow. N+1 queries, unnecessary data loading, synchronous operations blocking threads — the problems are identical. The tools are different, but the diagnostic thought process is exactly the same. Lead with 'show me the slow queries' and you'll earn instant credibility.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/your-team-wants-to-build-a-self-service-portal-for-employees-in-net-you-d-reach" rel="prev"><small>‹ Previous</small><strong>Your team wants to build a self-service portal for employees. In .NET, you'd reach for React/Angular with an API backend. In ServiceNow, there's 'Service Portal' and the newer 'UI Builder (Next Experience).' Compare these to what you know, and advise which to use for a new project in 2026.</strong></a>
+          <a href="/article/your-organization-discovered-that-user-pii-from-the-sys-user-table-is-being-expo" rel="next"><small>Next ›</small><strong>Your organization discovered that user PII from the sys_user table is being exposed to unauthorized users through a vulnerability in Access Control Lists (ACLs). The sys_user data is synchronized nightly from your corporate SSO system. You need to implement a data privacy strategy that protects PII in non-production environments while maintaining system functionality. Walk me through your diagnostic approach, explain the trade-offs between anonymization and deletion, and describe what happens if you anonymize sys_user records that are actively synchronized by SSO.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM?",
+  "description": "Reading Between the Lines Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You…",
+  "datePublished": "2026-03-16T04:35:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

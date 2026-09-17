@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group. — Summaverick</title>
+  <meta name="description" content="Setting the Stage GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and…" />
+  <link rel="canonical" href="https://summaverick.com/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group. — Summaverick" />
+  <meta property="og:description" content="Setting the Stage GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and…" />
+  <meta property="og:url" content="https://summaverick.com/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Scripting</p>
+        <h1>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.</h1>
+        <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Setting the Stage</h4><p>GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and consultant uses GlideRecord daily.</p><h4>What Is GlideRecord?</h4><p>GlideRecord is a server-side JavaScript API that lets you query, insert, update, and delete records from any ServiceNow table. It's your primary tool for interacting with the database — like SQL queries, but in JavaScript.</p><h4>Basic Operations</h4><pre>// === QUERY (SELECT) ===
+var gr = new GlideRecord('incident');     // Target the incident table
+gr.addQuery('priority', 1);               // WHERE priority = 1
+gr.addQuery('state', '!=', 6);            // AND state != Resolved
+gr.addQuery('assignment_group.name', 'Network Support'); // AND group name
+gr.orderByDesc('sys_created_on');         // ORDER BY created descending
+gr.setLimit(50);                          // LIMIT 50
+gr.query();                               // Execute the query
+
+while (gr.next()) {                       // Iterate through results
+  gs.info('Incident: ' + gr.getValue('number'));
+  gs.info('Caller: ' + gr.getDisplayValue('caller_id'));
+  gs.info('Created: ' + gr.getValue('sys_created_on'));
+}
+
+// === INSERT ===
+var newInc = new GlideRecord('incident');
+newInc.initialize();
+newInc.short_description = 'Server Down - Building A';
+newInc.priority = 1;
+// Look up the caller by user_name to get their sys_id
+var caller = new GlideRecord('sys_user');
+caller.addQuery('user_name', 'john.smith');
+caller.query();
+if (caller.next()) {
+  newInc.caller_id = caller.sys_id;
+}
+var newSysId = newInc.insert();  // Returns the sys_id of new record
+
+// === UPDATE ===
+var gr = new GlideRecord('incident');
+gr.get('number', 'INC0010001');   // Get a specific incident
+gr.state = 6;                     // Set state to Resolved
+gr.close_notes = 'Fixed by restarting the service';
+gr.update();                      // Save changes
+
+// === DELETE ===
+var gr = new GlideRecord('incident');
+gr.get('number', 'INC0010001');
+gr.deleteRecord();                // Delete the record</pre><h4>Key Methods to Know</h4><ul><li><code>addQuery(field, value)</code> — adds a WHERE condition</li><li><code>addQuery(field, operator, value)</code> — adds a WHERE with operator (!=, &gt;, &lt;, IN, etc.)</li><li><code>addEncodedQuery(string)</code> — adds a complex filter as encoded query string</li><li><code>query()</code> — executes the query</li><li><code>next()</code> — moves to the next record (returns false when done)</li><li><code>getValue(field)</code> — returns the raw database value</li><li><code>getDisplayValue(field)</code> — returns the display value</li><li><code>getRowCount()</code> — executes a full COUNT(*) query; avoid on large tables. Use <code>GlideAggregate</code> with <code>addAggregate('COUNT')</code> instead</li><li><code>get(field, value)</code> — shortcut to query a single record</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>When writing GlideRecord in an interview, always include <code>setLimit()</code> for queries on large tables, always use <code>getValue()</code> instead of dot-notation for field values, and always add <code>if (isLoading) return;</code> at the top if it's inside a Client Script. These small details signal experience.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" rel="prev"><small>‹ Previous</small><strong>What is an ACL (Access Control List) in ServiceNow? How does it protect data?</strong></a>
+          <a href="/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" rel="next"><small>Next ›</small><strong>What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.",
+  "description": "Setting the Stage GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and…",
+  "datePublished": "2026-03-16T07:15:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

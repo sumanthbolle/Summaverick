@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>In .NET, you've handled exceptions with try-catch, global exception handlers, and Application Insights for monitoring. How does error handling and debugging work in ServiceNow? Walk through the tools you'd use to diagnose a failing Business Rule in production. — Summaverick</title>
+  <meta name="description" content="Why This Comes Up in Interviews ServiceNow's debugging toolkit is different from Visual Studio's debugger or Application Insights — there are no breakpoints, no step-through debugging, and no local…" />
+  <link rel="canonical" href="https://summaverick.com/article/in-net-you-ve-handled-exceptions-with-try-catch-global-exception-handlers-and-ap" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="In .NET, you've handled exceptions with try-catch, global exception handlers, and Application Insights for monitoring. How does error handling and debugging work in ServiceNow? Walk through the tools you'd use to diagnose a failing Business Rule in production. — Summaverick" />
+  <meta property="og:description" content="Why This Comes Up in Interviews ServiceNow's debugging toolkit is different from Visual Studio's debugger or Application Insights — there are no breakpoints, no step-through debugging, and no local…" />
+  <meta property="og:url" content="https://summaverick.com/article/in-net-you-ve-handled-exceptions-with-try-catch-global-exception-handlers-and-ap" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>In .NET, you've handled exceptions with try-catch, global exception handlers, and Application Insights for monitoring. How does error handling and debugging work in ServiceNow? Walk through the tools you'd use to diagnose a failing Business Rule in production.</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Why This Comes Up in Interviews</h4><p>ServiceNow's debugging toolkit is different from Visual Studio's debugger or Application Insights — there are no breakpoints, no step-through debugging, and no local development environment. Everything runs on the remote instance. This question tests whether you can be effective with platform-native tools.</p><h4>The Debugging Toolkit Map</h4><pre>// .NET Debugging (what you know)
+// Visual Studio Debugger    → No equivalent (no breakpoints)
+// Console.WriteLine()       → gs.info(), gs.warn(), gs.error()
+// Application Insights      → System Logs + Transaction Logs
+// Exception stack trace     → Script Tracer output
+// Postman for API testing   → REST API Explorer (built-in)
+//
+// ServiceNow-Specific Tools:
+// Script Debugger           → Step-through for Business Rules
+// Session Debug             → Enable detailed logging per session
+// Transaction Log           → Performance + error correlation
+// Background Script         → Quick script testing (like LINQPad)</pre><h4>Diagnosing a Failing Business Rule</h4><ul><li><strong>Step 1 — Check System Logs:</strong> Navigate to System Logs → All. Filter by 'source' = the Business Rule name or by timestamp. Look for <code>gs.error()</code> output and JavaScript exceptions. Like checking Application Insights for your exception telemetry.</li><li><strong>Step 2 — Enable Session Debug:</strong> Go to the session debug modules: 'Debug Business Rule', 'Debug Security Rules'. This logs every BR execution, including timing and input/output — like setting the log level to DEBUG for a specific request in .NET.</li><li><strong>Step 3 — Script Tracer:</strong> This is the closest thing to a debugger. It records every server-side script execution with timing, showing the call stack. Like a poor man's Application Insights request trace.</li><li><strong>Step 4 — Background Script:</strong> Reproduce the issue in isolation by running the Business Rule logic directly in a Background Script. Like using LINQPad to test a C# method outside of your application.</li></ul><pre>// Structured error handling in a Business Rule
+(function executeRule(current, previous) {
+  try {
+    var helper = new IncidentHelper();
+    var result = helper.processEscalation(current);
+    
+    if (!result.success) {
+      gs.error('Escalation failed for ' + current.number + 
+               ': ' + result.message);
+      // Don't abort — log and continue gracefully
+    }
+  } catch (ex) {
+    // Catch JavaScript errors — like a global exception handler
+    gs.error('BR Exception on ' + current.number + 
+             ': ' + ex.message);
+    // Optionally create an incident for the error
+    var errInc = new GlideRecord('incident');
+    errInc.initialize();
+    errInc.short_description = 'System Error: Escalation BR';
+    errInc.description = ex.message + '\n' + ex.stack;
+    errInc.insert();
+  }
+})(current, previous);</pre><h4>Key Differences from .NET</h4><ul><li><strong>No local dev:</strong> You can't <code>F5</code> and debug locally. All testing happens on the instance. Background Scripts are your REPL.</li><li><strong>No structured logging framework:</strong> No Serilog, no NLog. Use <code>gs.info/warn/error()</code> with structured messages and correlation IDs (like the incident number).</li><li><strong>Transaction limits:</strong> Scripts that exceed execution time limits are killed by the platform — like Azure Functions timing out. Monitor with Transaction Logs.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>The REST API Explorer (System Web Services → REST API Explorer) is your built-in Postman. Use it to test Table API and Scripted REST calls with authentication already handled. Combined with Background Scripts for server-side testing, you have a workable debugging loop — just without the IDE comfort you're used to.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/you-ve-been-asked-in-an-interview-what-is-the-cmdb-and-why-does-it-matter-as-som" rel="prev"><small>‹ Previous</small><strong>You've been asked in an interview: 'What is the CMDB and why does it matter?' As someone who's managed SQL databases and application inventories, explain the CMDB concept to someone who thinks it's just another database table, and describe why organizations spend millions getting it right.</strong></a>
+          <a href="/article/your-team-wants-to-build-a-self-service-portal-for-employees-in-net-you-d-reach" rel="next"><small>Next ›</small><strong>Your team wants to build a self-service portal for employees. In .NET, you'd reach for React/Angular with an API backend. In ServiceNow, there's 'Service Portal' and the newer 'UI Builder (Next Experience).' Compare these to what you know, and advise which to use for a new project in 2026.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "In .NET, you've handled exceptions with try-catch, global exception handlers, and Application Insights for monitoring. How does error handling and debugging work in ServiceNow? Walk through the tools you'd use to diagnose a failing Business Rule in production.",
+  "description": "Why This Comes Up in Interviews ServiceNow's debugging toolkit is different from Visual Studio's debugger or Application Insights — there are no breakpoints, no step-through debugging, and no local…",
+  "datePublished": "2026-03-16T04:45:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

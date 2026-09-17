@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ServiceNow Client-Side APIs: g_form, g_user, g_list — The Methods That Control the Form — Summaverick</title>
+  <meta name="description" content="Complete reference for the three client-side objects you use in every Client Script and UI Action. Every method, what it returns, and when it breaks." />
+  <link rel="canonical" href="https://summaverick.com/article/client-side-api-reference" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="ServiceNow Client-Side APIs: g_form, g_user, g_list — The Methods That Control the Form — Summaverick" />
+  <meta property="og:description" content="Complete reference for the three client-side objects you use in every Client Script and UI Action. Every method, what it returns, and when it breaks." />
+  <meta property="og:url" content="https://summaverick.com/article/client-side-api-reference" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>ServiceNow Client-Side APIs: g_form, g_user, g_list — The Methods That Control the Form</h1>
+        <p class="article-meta">Beginner · 16 min read · Apr 2026</p>
+        <div class="prose">
+<h2>Where these run</h2>
+<p>Client-side scripts run in the user's browser, not on the server. You cannot use GlideRecord here. The three objects available to you are:</p>
+<ul>
+<li><code>g_form</code> — manipulates the current form (fields, labels, messages)</li>
+<li><code>g_user</code> — information about the logged-in user</li>
+<li><code>g_list</code> — manipulates list views (less common)</li>
+</ul>
+
+<h2>g_form — Form manipulation</h2>
+
+<h3>Get and set field values</h3>
+<pre>// Get the raw value (sys_id for reference fields, number for choice fields)
+var callerId = g_form.getValue('caller_id');       // sys_id string
+var priority = g_form.getValue('priority');         // '1'
+
+// Get the display value (the text the user sees)
+var callerName = g_form.getDisplayValue('caller_id'); // 'John Smith'
+
+// Set a field value
+g_form.setValue('priority', '2');
+g_form.setValue('assignment_group', 'a1b2c3d4...');  // must be sys_id for reference fields
+
+// Clear a field
+g_form.clearValue('assigned_to');</pre>
+
+<h3>Control field visibility and behavior</h3>
+<pre>// Hide/show a field
+g_form.setVisible('u_internal_notes', false);  // hide
+g_form.setVisible('u_internal_notes', true);   // show
+
+// Make a field mandatory
+g_form.setMandatory('assignment_group', true);
+
+// Make a field read-only
+g_form.setReadOnly('short_description', true);
+
+// Set a field label (useful for dynamic labels)
+g_form.setLabelOf('u_custom_field', 'New Label Text');</pre>
+
+<h3>Messages on the form</h3>
+<pre>// Info message (blue banner at top)
+g_form.addInfoMessage('This incident has been escalated.');
+
+// Error message (red banner at top)
+g_form.addErrorMessage('Missing required data.');
+
+// Field-level message (appears under a specific field)
+g_form.showFieldMsg('short_description', 'Must be at least 10 characters', 'error');
+g_form.hideFieldMsg('short_description');
+
+// Clear all messages
+g_form.clearMessages();</pre>
+
+<h3>Form state</h3>
+<pre>// Check if the form is for a new record
+if (g_form.isNewRecord()) {
+    // This is an insert, not an update
+}
+
+// Get the table name
+var table = g_form.getTableName();  // 'incident'
+
+// Get the sys_id of the current record
+var sysId = g_form.getUniqueValue();
+
+// Check if a field value has changed (useful in onChange)
+var changed = g_form.isFieldChanged('priority');  // only works in onChange context
+
+// Submit the form programmatically
+g_form.submit();</pre>
+
+<h3>Reference field lookups (getReference)</h3>
+<pre>// getReference is asynchronous — always use the callback form
+g_form.getReference('caller_id', function(callerRecord) {
+    // callerRecord is a GlideRecord-like object
+    var dept = callerRecord.department.getDisplayValue();
+    g_form.addInfoMessage('Caller department: ' + dept);
+});
+
+// NEVER use the synchronous form — it freezes the browser
+// var ref = g_form.getReference('caller_id'); // BAD — blocks UI</pre>
+
+<h2>g_user — Current user information</h2>
+<pre>// Basic user info
+var userName = g_user.userName;      // 'john.smith'
+var fullName = g_user.getFullName(); // 'John Smith'
+var userId   = g_user.userID;        // sys_id of the logged-in user
+
+// Role checks
+if (g_user.hasRole('admin')) {
+    // user has admin role
+}
+if (g_user.hasRole('itil')) {
+    // user has ITIL role
+}
+// hasRoleExactly checks the specific role, not inherited roles
+if (g_user.hasRoleExactly('incident_manager')) {
+    // user has incident_manager specifically, not just admin
+}
+
+// Client-side data from g_user.getClientData (set in Display Business Rule)
+// In Display BR:  g_scratchpad.isVIP = true;
+// In Client Script: var isVIP = g_scratchpad.isVIP;</pre>
+
+<h2>g_scratchpad — Pass server data to client</h2>
+<p><code>g_scratchpad</code> is an object populated by Display Business Rules on the server side, then available in Client Scripts. This is the correct way to pass server data to the client without making GlideAjax calls.</p>
+<pre>// === Display Business Rule (server-side, runs when form loads) ===
+(function executeRule(current, previous) {
+    g_scratchpad.callerIsVIP = current.caller_id.vip.toString();
+    g_scratchpad.openP1Count = new GlideAggregate('incident');
+    // ... calculate value ...
+    g_scratchpad.openP1Count = '5';
+})(current, previous);
+
+// === Client Script (onLoad, runs in browser) ===
+function onLoad() {
+    if (g_scratchpad.callerIsVIP === 'true') {
+        g_form.addInfoMessage('VIP caller — handle with priority.');
+    }
+}</pre>
+
+<h2>g_list — List view manipulation</h2>
+<p>Available only in list context (not forms). Less commonly used but important for UI Actions on lists.</p>
+<pre>// Get selected sys_ids from a list (checkboxes)
+var selectedIds = g_list.getChecked();  // comma-separated sys_ids
+
+// Refresh the current list
+g_list.refresh();
+
+// Get the list's table name
+var table = g_list.getTableName();
+
+// Get the current list filter (encoded query)
+var filter = g_list.getQuery();</pre>
+
+<h2>Common traps</h2>
+<ul>
+<li><strong>Using GlideRecord in a Client Script:</strong> It does not exist on the client side. Use <code>GlideAjax</code> to call a Script Include on the server if you need database access.</li>
+<li><strong>Synchronous getReference:</strong> The no-callback version of <code>g_form.getReference()</code> blocks the browser's main thread. Always pass a callback function.</li>
+<li><strong>g_user.hasRole('admin') returns true for admins on everything:</strong> Admin role bypasses all role checks. If you want to check a specific role without admin bypass, use <code>g_user.hasRoleExactly()</code>.</li>
+<li><strong>setValue on reference fields:</strong> You must pass a sys_id, not a display name. To set by display name, use <code>g_form.getReference()</code> first or pass both: there is no two-arg version for setValue reference, so you need the sys_id.</li>
+<li><strong>UI Policies override Client Scripts:</strong> If both control the same field, the UI Policy runs after the Client Script and wins. Do not use both on the same field unless you understand the execution order.</li>
+</ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/server-utility-apis-reference" rel="prev"><small>‹ Previous</small><strong>Server-Side Utility APIs You Use Every Day: GlideDateTime, GlideElement, gs Methods</strong></a>
+          <a href="/article/gliderecord-complete-reference" rel="next"><small>Next ›</small><strong>GlideRecord Complete Reference: Every Method You Actually Use in Production</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "ServiceNow Client-Side APIs: g_form, g_user, g_list — The Methods That Control the Form",
+  "description": "Complete reference for the three client-side objects you use in every Client Script and UI Action. Every method, what it returns, and when it breaks.",
+  "datePublished": "2026-04-07T13:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

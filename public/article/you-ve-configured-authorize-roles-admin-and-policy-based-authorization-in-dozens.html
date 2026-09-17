@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps. ServiceNow uses 'ACLs' — Access Control Lists — to protect data at the table, row, and field level. Walk me through how ACLs work, the evaluation order, and what surprises a developer used to role-based auth in .NET. — Summaverick</title>
+  <meta name="description" content="Why This Comes Up in Interviews ServiceNow ACLs are a declarative security layer that evaluates automatically on every data access — UI, API, scripts, everywhere. Unlike .NET where you explicitly…" />
+  <link rel="canonical" href="https://summaverick.com/article/you-ve-configured-authorize-roles-admin-and-policy-based-authorization-in-dozens" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps. ServiceNow uses 'ACLs' — Access Control Lists — to protect data at the table, row, and field level. Walk me through how ACLs work, the evaluation order, and what surprises a developer used to role-based auth in .NET. — Summaverick" />
+  <meta property="og:description" content="Why This Comes Up in Interviews ServiceNow ACLs are a declarative security layer that evaluates automatically on every data access — UI, API, scripts, everywhere. Unlike .NET where you explicitly…" />
+  <meta property="og:url" content="https://summaverick.com/article/you-ve-configured-authorize-roles-admin-and-policy-based-authorization-in-dozens" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps. ServiceNow uses 'ACLs' — Access Control Lists — to protect data at the table, row, and field level. Walk me through how ACLs work, the evaluation order, and what surprises a developer used to role-based auth in .NET.</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Why This Comes Up in Interviews</h4><p>ServiceNow ACLs are a declarative security layer that evaluates automatically on every data access — UI, API, scripts, everywhere. Unlike .NET where you explicitly decorate endpoints with <code>[Authorize]</code>, ACLs are always on. This is closer to SQL Server's row-level security or Azure AD's conditional access than ASP.NET's attribute-based auth.</p><h4>Evaluation Order (Most to Least Specific)</h4><pre>// ACL Evaluation Hierarchy
+// Think of it like CSS specificity — most specific wins
+//
+// 1. table.field    (e.g., incident.caller_id)     → Most specific
+// 2. table.*        (e.g., incident.*)              → Table-level
+// 3. *.field        (e.g., *.caller_id)             → Field across all tables
+// 4. *.*            (e.g., *.*)                     → Global default
+//
+// Operations: read, write, create, delete
+// Must pass BOTH the matching field rule AND the matching table rule.
+// More-specific rules stop processing of less-specific ones, and
+// several rules matching at the SAME point are OR'd (pass any one).
+
+// .NET Equivalent Mental Model:
+// [Authorize(Roles = "itil")]           → Role check in ACL
+// [Authorize(Policy = "SameTeam")]      → Script/Condition in ACL
+// Both must pass = AND behavior</pre><h4>The Three ACL Components</h4><ul><li><strong>Role requirement:</strong> Like <code>[Authorize(Roles = "itil")]</code>. User must have the specified role.</li><li><strong>Condition:</strong> A filter query on the record — like a LINQ <code>.Where()</code> clause. Example: <code>active=true^assigned_to=javascript:gs.getUserID()</code> means 'only if the record is active AND assigned to the current user.'</li><li><strong>Script:</strong> Advanced logic in JavaScript. Like writing a custom <code>IAuthorizationHandler</code> in .NET policy-based auth. Returns true/false.</li></ul><pre>// ACL Script example — like a custom IAuthorizationHandler
+// This runs on every read of the incident table
+answer = (function() {
+  // Allow if user is in the same department as the caller
+  var caller = current.caller_id.department;
+  var userDept = gs.getUser().getDepartmentID();
+  return caller == userDept;
+})();</pre><h4>What Surprises .NET Developers</h4><ul><li><strong>ACLs are always enforced:</strong> Unlike .NET where forgetting <code>[Authorize]</code> means open access, ServiceNow denies access by default if no ACL grants it. It's a whitelist model, not a blacklist.</li><li><strong>Admin bypasses everything:</strong> The <code>admin</code> role skips ACL evaluation entirely — unless the ACL script explicitly checks for admin. This is like having a global <code>[AllowAnonymous]</code> override for admins, which can be a security concern.</li><li><strong>API calls respect ACLs:</strong> If you call the Table API as a service account, ACLs on that user's roles determine what's returned. There's no separate API auth layer — unlike .NET where you might have different auth for UI vs API.</li><li><strong>Row + field AND catches people:</strong> If the table-level ACL requires role 'itil' AND the field-level ACL requires role 'incident_manager', the user needs BOTH roles — like stacking <code>[Authorize]</code> attributes. But note the flip side: multiple ACLs matching at the <em>same</em> point are OR'd, so passing any one of them is enough.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Enable <strong>Debug Security Rules</strong> (System Security &gt; Debugging) in your dev instance — it's like adding <code>app.UseDeveloperExceptionPage()</code> for auth. You'll see exactly which ACLs evaluated, which passed, and which blocked access. Essential for debugging 'why can't this user see this record?' issues.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/in-asp-net-you-separate-concerns-with-controllers-services-and-repositories-in-s" rel="prev"><small>‹ Previous</small><strong>In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC.</strong></a>
+          <a href="/article/you-re-used-to-managing-nuget-packages-and-npm-modules-with-clear-dependency-tre" rel="next"><small>Next ›</small><strong>You're used to managing NuGet packages and npm modules with clear dependency trees. ServiceNow has 'Scoped Applications' and 'Global scope.' Explain the scoping model to a full-stack developer, why it matters, and what goes wrong when teams ignore it.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps. ServiceNow uses 'ACLs' — Access Control Lists — to protect data at the table, row, and field level. Walk me through how ACLs work, the evaluation order, and what surprises a developer used to role-based auth in .NET.",
+  "description": "Why This Comes Up in Interviews ServiceNow ACLs are a declarative security layer that evaluates automatically on every data access — UI, API, scripts, everywhere. Unlike .NET where you explicitly…",
+  "datePublished": "2026-03-16T05:35:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

@@ -1,0 +1,5 @@
+# summaverick.com
+User-agent: *
+Allow: /
+
+Sitemap: https://summaverick.com/sitemap.xml

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>You've set up hundreds of automated CI/CD tests in xUnit and NUnit. Your ServiceNow team mentions 'ATF' — Automated Test Framework. How does it compare to your .NET testing experience, and what kind of testing does ServiceNow handle that's fundamentally different from unit testing code? — Summaverick</title>
+  <meta name="description" content="Reading Between the Lines ATF (Automated Test Framework) is ServiceNow's built-in testing platform. But unlike xUnit/NUnit which test code in isolation, ATF tests platform behavior — form loads,…" />
+  <link rel="canonical" href="https://summaverick.com/article/you-ve-set-up-hundreds-of-automated-ci-cd-tests-in-xunit-and-nunit-your-servicen" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="You've set up hundreds of automated CI/CD tests in xUnit and NUnit. Your ServiceNow team mentions 'ATF' — Automated Test Framework. How does it compare to your .NET testing experience, and what kind of testing does ServiceNow handle that's fundamentally different from unit testing code? — Summaverick" />
+  <meta property="og:description" content="Reading Between the Lines ATF (Automated Test Framework) is ServiceNow's built-in testing platform. But unlike xUnit/NUnit which test code in isolation, ATF tests platform behavior — form loads,…" />
+  <meta property="og:url" content="https://summaverick.com/article/you-ve-set-up-hundreds-of-automated-ci-cd-tests-in-xunit-and-nunit-your-servicen" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>You've set up hundreds of automated CI/CD tests in xUnit and NUnit. Your ServiceNow team mentions 'ATF' — Automated Test Framework. How does it compare to your .NET testing experience, and what kind of testing does ServiceNow handle that's fundamentally different from unit testing code?</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Reading Between the Lines</h4><p>ATF (Automated Test Framework) is ServiceNow's built-in testing platform. But unlike xUnit/NUnit which test code in isolation, ATF tests <em>platform behavior</em> — form loads, workflow executions, security rules, and UI interactions. It's closer to Selenium + integration testing than pure unit testing.</p><h4>The Comparison</h4><pre>// .NET Testing Pyramid (what you know)
+// Unit Tests (xUnit)     → Test individual methods/classes
+// Integration Tests      → Test API endpoints, DB operations
+// E2E Tests (Selenium)   → Test full UI workflows
+//
+// ServiceNow ATF Maps To:
+// Server-side steps      → Integration tests (BR fires correctly)
+// Form-based steps       → E2E tests (form loads, fields populate)
+// Flow/Workflow steps    → Integration tests (automation works)
+// Security steps         → Auth tests (ACLs enforce correctly)
+// No pure unit testing   → Script Includes tested via server steps</pre><h4>What ATF Handles That's Different</h4><ul><li><strong>Configuration testing:</strong> Did the UI Policy hide the right field? Does the Business Rule auto-populate the correct value? These aren't code tests — they're platform behavior tests. No equivalent in .NET because you write the behavior; in ServiceNow, you configure it.</li><li><strong>Impersonation:</strong> ATF can run tests as different users to verify role-based access — like having test fixtures that swap identity mid-test. <code>Run as User: helpdesk.agent</code> → verify they can create incidents but can't delete them.</li><li><strong>Parameterized test suites:</strong> Group ATF tests into suites that run against specific Update Sets before deployment — like a gate in your Azure DevOps pipeline. This is how mature ServiceNow teams prevent regressions.</li></ul><pre>// ATF Test Step Example — Server-side Script step
+// (like writing an xUnit [Fact] method)
+(function(outputs, steps, params, stepResult, assertEqual) {
+  // Arrange: Create a test incident
+  var gr = new GlideRecord('incident');
+  gr.initialize();
+  gr.short_description = 'ATF Test Incident';
+  gr.impact = 1;
+  gr.urgency = 1;
+  gr.insert();
+  
+  // Act: Re-query to check Business Rule fired
+  gr.get(gr.sys_id);
+  
+  // Assert: Priority should be auto-calculated to 1 (Critical)
+  assertEqual({
+    name: 'Priority auto-calculated',
+    shouldbe: '1',
+    value: gr.getValue('priority')
+  });
+  
+  // Cleanup
+  gr.deleteRecord();
+})(outputs, steps, params, stepResult, assertEqual);</pre><h4>Limitations vs .NET Testing</h4><ul><li><strong>No mocking framework:</strong> You can't mock GlideRecord calls like you'd mock <code>IRepository</code> with Moq. Tests hit real tables.</li><li><strong>No TDD workflow:</strong> ATF tests are created in the UI, not in an IDE. The feedback loop is slower than <code>dotnet test --watch</code>.</li><li><strong>Test data management:</strong> ATF creates real records during tests. Cleanup is manual unless you build it into your test steps.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Think of ATF as your integration test suite with Selenium-like capabilities built in. Use it for regression testing before deployments — especially for Business Rules, ACLs, and Flows. For Script Include logic, write ATF server-side steps that exercise the methods directly, similar to calling service methods in integration tests.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/you-re-used-to-managing-nuget-packages-and-npm-modules-with-clear-dependency-tre" rel="prev"><small>‹ Previous</small><strong>You're used to managing NuGet packages and npm modules with clear dependency trees. ServiceNow has 'Scoped Applications' and 'Global scope.' Explain the scoping model to a full-stack developer, why it matters, and what goes wrong when teams ignore it.</strong></a>
+          <a href="/article/in-net-you-validate-user-input-with-data-annotations-fluentvalidation-and-client" rel="next"><small>Next ›</small><strong>In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. ServiceNow has 'Client Scripts' and 'UI Policies' that seem to do similar things. When would you use one over the other, and where do .NET developers typically trip up?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "You've set up hundreds of automated CI/CD tests in xUnit and NUnit. Your ServiceNow team mentions 'ATF' — Automated Test Framework. How does it compare to your .NET testing experience, and what kind of testing does ServiceNow handle that's fundamentally different from unit testing code?",
+  "description": "Reading Between the Lines ATF (Automated Test Framework) is ServiceNow's built-in testing platform. But unlike xUnit/NUnit which test code in isolation, ATF tests platform behavior — form loads,…",
+  "datePublished": "2026-03-16T05:25:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

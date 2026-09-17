@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>JavaScript Inside ServiceNow: var, let, const, Types, and What Actually Runs Where — Summaverick</title>
+  <meta name="description" content="ServiceNow runs JavaScript but it is not the same JavaScript you write in a browser or Node.js. This is the ground-up reference — variables, types, scope, and the engine differences that trip people up from day one." />
+  <link rel="canonical" href="https://summaverick.com/article/javascript-inside-servicenow-from-scratch" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="JavaScript Inside ServiceNow: var, let, const, Types, and What Actually Runs Where — Summaverick" />
+  <meta property="og:description" content="ServiceNow runs JavaScript but it is not the same JavaScript you write in a browser or Node.js. This is the ground-up reference — variables, types, scope, and the engine differences that trip people up from day one." />
+  <meta property="og:url" content="https://summaverick.com/article/javascript-inside-servicenow-from-scratch" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>JavaScript Inside ServiceNow: var, let, const, Types, and What Actually Runs Where</h1>
+        <p class="article-meta">Beginner · 20 min read · Apr 2026</p>
+        <div class="prose">
+<h2>The first thing to know</h2>
+<p>ServiceNow runs two completely separate JavaScript environments. Code that works on one side will crash on the other.</p>
+<table>
+<tr><th></th><th>Server-side</th><th>Client-side</th></tr>
+<tr><td>Runs in</td><td>ServiceNow's Java-based server (Rhino engine)</td><td>The user's web browser</td></tr>
+<tr><td>Script types</td><td>Business Rules, Script Includes, Scheduled Jobs, Fix Scripts, Background Scripts</td><td>Client Scripts, UI Policies (scripted), UI Actions (client)</td></tr>
+<tr><td>JS version</td><td>ES5 (no let/const, no arrow functions, no template literals in global scope)</td><td>Modern ES6+ (depends on the user's browser)</td></tr>
+<tr><td>Database access</td><td>Yes — GlideRecord, GlideAggregate</td><td>No — must use GlideAjax to call server</td></tr>
+<tr><td>Available objects</td><td><code>current</code>, <code>previous</code>, <code>gs</code>, <code>GlideRecord</code></td><td><code>g_form</code>, <code>g_user</code>, <code>g_list</code></td></tr>
+</table>
+
+<h2>Variables: var, let, const</h2>
+
+<h3>Server-side (Business Rules, Script Includes)</h3>
+<p>The server uses the <strong>Rhino engine</strong> which only supports <strong>ES5</strong> in global scope. That means:</p>
+<pre>// This works everywhere on the server:
+var name = 'incident';
+var count = 0;
+var isActive = true;
+
+// This FAILS in global-scope server scripts:
+// let name = 'incident';    // SyntaxError
+// const MAX = 100;          // SyntaxError
+// var msg = `Hello ${name}`; // SyntaxError — no template literals
+
+// EXCEPTION: Scoped applications run on a newer engine (ES2021+)
+// In scoped apps, let/const/arrow functions DO work:
+// let x = 10;  // works in scoped app scripts
+// const y = 20; // works in scoped app scripts</pre>
+<p><strong>Rule of thumb:</strong> In global scope, use <code>var</code>. In scoped applications, you can use <code>let</code> and <code>const</code>. When in doubt, use <code>var</code> — it works everywhere.</p>
+
+<h3>Client-side (Client Scripts)</h3>
+<p>Client scripts run in the browser, so modern JS works fine:</p>
+<pre>// All of these work in Client Scripts:
+var oldWay = 'works';
+let newWay = 'also works';
+const CONSTANT = 'works too';
+var msg = `Hello ${oldWay}`; // template literals work</pre>
+
+<h3>var vs let — the actual difference</h3>
+<pre>// var is function-scoped — it leaks out of blocks
+for (var i = 0; i &lt; 5; i++) {
+    // i is visible here
+}
+gs.info(i); // 5 — var leaks out of the for loop
+
+// let is block-scoped — it stays inside the block
+for (let j = 0; j &lt; 5; j++) {
+    // j is visible here
+}
+// gs.info(j); // ReferenceError — j does not exist here
+
+// const — like let but cannot be reassigned
+const MAX_RETRIES = 3;
+// MAX_RETRIES = 5; // TypeError — cannot reassign</pre>
+
+<h2>Data types</h2>
+<pre>// String
+var desc = 'Server is down';
+var desc2 = "Also a string";  // single or double quotes both work
+
+// Number (integer and decimal are the same type)
+var priority = 1;
+var percent = 99.5;
+
+// Boolean
+var isActive = true;
+var isClosed = false;
+
+// Null and Undefined
+var assigned = null;       // explicitly set to nothing
+var notSet;                // undefined — never assigned a value
+// gs.nil() checks for null, undefined, AND empty string:
+gs.info(gs.nil(null));       // true
+gs.info(gs.nil(undefined));  // true
+gs.info(gs.nil(''));         // true
+gs.info(gs.nil('hello'));    // false
+
+// Array
+var priorities = [1, 2, 3, 4];
+gs.info(priorities[0]);     // 1
+gs.info(priorities.length); // 4
+
+// Object
+var config = {
+    table: 'incident',
+    limit: 50,
+    active: true
+};
+gs.info(config.table);      // 'incident'
+gs.info(config['limit']);   // 50 — bracket notation also works</pre>
+
+<h2>Type gotchas in ServiceNow</h2>
+<p>GlideRecord fields do not return plain JavaScript types. They return <strong>GlideElement</strong> objects. This causes bugs that are hard to spot.</p>
+<pre>var gr = new GlideRecord('incident');
+gr.get('number', 'INC0010001');
+
+// WRONG — comparing a GlideElement to a string
+if (gr.priority == '1') {
+    // This MIGHT work, but it is unreliable.
+    // gr.priority is a GlideElement object, not a string.
+}
+
+// CORRECT — use getValue() to get the raw string value
+if (gr.getValue('priority') == '1') {
+    // This always works. getValue returns a plain string.
+}
+
+// WRONG — concatenating GlideElement into a string
+var msg = 'Priority is ' + gr.priority;
+// This calls toString() on the GlideElement, which usually works
+// but can behave unexpectedly with reference fields.
+
+// CORRECT — explicit getValue
+var msg = 'Priority is ' + gr.getValue('priority');
+
+// WRONG — storing a GlideElement in a variable for later use
+var saved = gr.caller_id;
+gr.next(); // moves to next record
+gs.info(saved); // NOW POINTS TO THE NEW RECORD'S caller_id!
+// GlideElement is a reference to the cursor position, not a copy.
+
+// CORRECT — store the value, not the element
+var saved = gr.getValue('caller_id');
+gr.next();
+gs.info(saved); // still has the original value</pre>
+
+<h2>Functions</h2>
+<pre>// Basic function (works everywhere)
+function calculatePriority(impact, urgency) {
+    if (impact == 1 && urgency == 1) return 1;
+    if (impact == 1 || urgency == 1) return 2;
+    return 3;
+}
+var p = calculatePriority(1, 2); // returns 2
+
+// Function in a Business Rule (the wrapper pattern)
+// ServiceNow wraps your BR code in an IIFE:
+(function executeRule(current, previous) {
+    // 'current' = the record being saved
+    // 'previous' = the record before changes (null on insert)
+
+    current.priority = calculatePriority(
+        current.getValue('impact'),
+        current.getValue('urgency')
+    );
+})(current, previous);
+
+// Arrow functions — ONLY in scoped apps or client scripts
+// var calc = (a, b) => a + b;  // fails in global server scope
+// Use regular functions on the server in global scope.</pre>
+
+<h2>Loops</h2>
+<pre>// for loop — iterate a known number of times
+for (var i = 0; i &lt; 10; i++) {
+    gs.info('Iteration ' + i);
+}
+
+// while loop — the GlideRecord pattern
+var gr = new GlideRecord('incident');
+gr.addQuery('active', true);
+gr.setLimit(100);
+gr.query();
+while (gr.next()) {
+    gs.info(gr.getValue('number'));
+}
+// gr.next() returns false when there are no more records
+
+// for...in — iterate over object keys
+var config = { table: 'incident', limit: 50 };
+for (var key in config) {
+    gs.info(key + ' = ' + config[key]);
+}
+// Output: table = incident, limit = 50
+
+// Array iteration
+var items = ['one', 'two', 'three'];
+for (var i = 0; i &lt; items.length; i++) {
+    gs.info(items[i]);
+}
+// .forEach works in scoped apps and client scripts:
+// items.forEach(function(item) { gs.info(item); });</pre>
+
+<h2>Conditionals</h2>
+<pre>// if / else if / else
+var priority = gr.getValue('priority');
+if (priority == '1') {
+    gs.info('Critical');
+} else if (priority == '2') {
+    gs.info('High');
+} else {
+    gs.info('Normal or lower');
+}
+
+// == vs === (loose vs strict equality)
+gs.info(1 == '1');   // true — loose comparison, converts types
+gs.info(1 === '1');  // false — strict comparison, different types
+// In ServiceNow, getValue() always returns strings, so:
+// gr.getValue('priority') == 1   → true (loose, works)
+// gr.getValue('priority') === 1  → false (strict, different types)
+// gr.getValue('priority') === '1' → true (strict, both strings)
+// Best practice: use == when comparing getValue output to numbers,
+// or convert explicitly: Number(gr.getValue('priority')) === 1
+
+// Ternary operator
+var label = (priority == '1') ? 'Critical' : 'Not critical';
+
+// Switch statement
+switch (gr.getValue('state')) {
+    case '1': gs.info('New'); break;
+    case '2': gs.info('In Progress'); break;
+    case '6': gs.info('Resolved'); break;
+    case '7': gs.info('Closed'); break;
+    default: gs.info('Other state');
+}</pre>
+
+<h2>Strings</h2>
+<pre>var desc = 'Email server down in building A';
+
+desc.length;                    // 33
+desc.indexOf('server');         // 6 (position of first match)
+desc.indexOf('xyz');            // -1 (not found)
+desc.includes('server');        // true (scoped apps/client only)
+desc.toLowerCase();             // 'email server down in building a'
+desc.toUpperCase();             // 'EMAIL SERVER DOWN IN BUILDING A'
+desc.substring(0, 5);          // 'Email'
+desc.split(' ');                // ['Email', 'server', 'down', 'in', 'building', 'A']
+desc.replace('down', 'offline'); // 'Email server offline in building A'
+desc.trim();                    // removes leading/trailing whitespace
+
+// String concatenation
+var msg = 'Incident ' + gr.getValue('number') + ' is priority ' + gr.getValue('priority');
+
+// Template literals (scoped apps and client scripts only)
+// var msg = `Incident ${number} is priority ${priority}`;</pre>
+
+<h2>Arrays</h2>
+<pre>var groups = ['Network', 'Database', 'Security'];
+
+groups.length;          // 3
+groups[0];              // 'Network'
+groups.push('Storage'); // adds to end: ['Network','Database','Security','Storage']
+groups.pop();           // removes last: ['Network','Database','Security']
+groups.indexOf('Database'); // 1
+groups.join(', ');      // 'Network, Database, Security'
+
+// Check if value exists in array
+if (groups.indexOf('Network') !== -1) {
+    gs.info('Found it');
+}
+
+// Build an array from GlideRecord results
+var numbers = [];
+var gr = new GlideRecord('incident');
+gr.addQuery('priority', 1);
+gr.setLimit(10);
+gr.query();
+while (gr.next()) {
+    numbers.push(gr.getValue('number'));
+}
+gs.info('P1 incidents: ' + numbers.join(', '));</pre>
+
+<h2>Objects / JSON</h2>
+<pre>// Create an object
+var incident = {
+    number: 'INC0010001',
+    priority: 1,
+    active: true,
+    tags: ['network', 'vpn']
+};
+
+// Access properties
+gs.info(incident.number);       // 'INC0010001'
+gs.info(incident['priority']);  // 1
+
+// Add/modify properties
+incident.state = 'New';
+incident.priority = 2;
+
+// Convert to JSON string (for logging, REST payloads, etc.)
+var jsonStr = JSON.stringify(incident);
+gs.info(jsonStr);
+// {"number":"INC0010001","priority":2,"active":true,"tags":["network","vpn"],"state":"New"}
+
+// Parse JSON string back to object
+var parsed = JSON.parse(jsonStr);
+gs.info(parsed.number); // 'INC0010001'
+
+// Common use: REST API responses
+var response = new sn_ws.RESTMessageV2('MyAPI', 'GET');
+var body = response.execute().getBody();
+var data = JSON.parse(body);  // parse response body into usable object</pre>
+
+<h2>Error handling</h2>
+<pre>// try/catch — prevent your script from crashing the entire transaction
+try {
+    var gr = new GlideRecord('incident');
+    gr.get('number', 'INC0010001');
+    var result = JSON.parse(gr.getValue('u_custom_json_field'));
+    gs.info(result.key);
+} catch (e) {
+    gs.error('Failed to parse JSON: ' + e.message);
+    // The script continues instead of crashing
+}
+
+// try/catch/finally
+try {
+    // risky operation
+} catch (e) {
+    gs.error('Error: ' + e.message);
+} finally {
+    // runs no matter what — cleanup code goes here
+}
+
+// When to use try/catch:
+// - Parsing JSON from external systems (malformed data)
+// - REST API calls (network failures)
+// - Any operation where bad data could crash your Business Rule</pre>
+
+<h2>Scope — the #1 confusion point</h2>
+<pre>// Variables declared with var inside a function are LOCAL to that function
+function myFunction() {
+    var localVar = 'only exists here';
+    gs.info(localVar); // works
+}
+// gs.info(localVar); // ReferenceError — does not exist outside
+
+// Variables declared outside any function are GLOBAL to the script
+var globalVar = 'visible everywhere in this script';
+function test() {
+    gs.info(globalVar); // works — can see the outer variable
+}
+
+// In Business Rules, 'current' and 'previous' are provided by the platform.
+// You do not declare them. They are injected into the script context:
+(function executeRule(current, previous) {
+    // current = the record being modified
+    // previous = the record BEFORE your changes (null on insert)
+    // Both are GlideRecord objects pointing to the current row
+})(current, previous);</pre>
+
+<h2>What does NOT work on the server</h2>
+<pre>// These are browser/Node.js features. They do not exist on the ServiceNow server.
+
+// setTimeout / setInterval — no timers on server
+// setTimeout(function() { }, 1000); // does not exist
+
+// console.log — use gs.info instead
+// console.log('test'); // does not exist
+
+// document / window / DOM — there is no browser on the server
+// document.getElementById('test'); // does not exist
+
+// fetch / XMLHttpRequest — use RESTMessageV2 instead
+// fetch('https://api.example.com'); // does not exist
+
+// require / import — use gs.include for Script Includes
+// var lib = require('mylib'); // does not exist
+
+// Promise / async / await — not available in global scope server scripts
+// Use GlideHTTPRequest or synchronous REST calls</pre>
+
+<h2>Quick reference: where to write each script type</h2>
+<table>
+<tr><th>I want to...</th><th>Write a...</th><th>Navigate to</th></tr>
+<tr><td>Validate data before save</td><td>Before Business Rule</td><td>System Definition > Business Rules</td></tr>
+<tr><td>Create related records after save</td><td>After Business Rule</td><td>System Definition > Business Rules</td></tr>
+<tr><td>Show/hide fields on a form</td><td>Client Script (onLoad/onChange) or UI Policy</td><td>System Definition > Client Scripts</td></tr>
+<tr><td>Validate before form submit</td><td>Client Script (onSubmit)</td><td>System Definition > Client Scripts</td></tr>
+<tr><td>Reusable server function</td><td>Script Include</td><td>System Definition > Script Includes</td></tr>
+<tr><td>Call server from client</td><td>GlideAjax + Script Include (extends AbstractAjaxProcessor)</td><td>Both</td></tr>
+<tr><td>Run something on a schedule</td><td>Scheduled Job</td><td>System Definition > Scheduled Jobs</td></tr>
+<tr><td>One-time data cleanup</td><td>Fix Script or Background Script</td><td>System Definition > Fix Scripts, or Scripts - Background</td></tr>
+<tr><td>Custom button on a form</td><td>UI Action</td><td>System Definition > UI Actions</td></tr>
+</table>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/scripting-keywords-deep-dive" rel="prev"><small>‹ Previous</small><strong>Every Scripting Keyword That Matters in ServiceNow: current, previous, g_form, gs, and the Objects You Must Know</strong></a>
+          <a href="/article/debugging-diagnostics-reference" rel="next"><small>Next ›</small><strong>Debugging ServiceNow: Session Debug, Slow Queries, Transaction Logs, and Script Tracing</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "JavaScript Inside ServiceNow: var, let, const, Types, and What Actually Runs Where",
+  "description": "ServiceNow runs JavaScript but it is not the same JavaScript you write in a browser or Node.js. This is the ground-up reference — variables, types, scope, and the engine differences that trip people up from day one.",
+  "datePublished": "2026-04-07T17:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

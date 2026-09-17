@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster. — Summaverick</title>
+  <meta name="description" content="Setting the Stage Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration…" />
+  <link rel="canonical" href="https://summaverick.com/article/you-ve-handled-dozens-of-data-migrations-using-ef-migrations-ssis-or-custom-etl" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster. — Summaverick" />
+  <meta property="og:description" content="Setting the Stage Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration…" />
+  <meta property="og:url" content="https://summaverick.com/article/you-ve-handled-dozens-of-data-migrations-using-ef-migrations-ssis-or-custom-etl" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster.</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Setting the Stage</h4><p>Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration scripts, the concept is identical — but the terminology and failure modes are ServiceNow-specific.</p><h4>The ETL Pipeline Comparison</h4><pre>// .NET / SSIS ETL Flow (what you know)
+// CSV/API → DataReader → Transform (C# mapping) → SqlBulkCopy → Target DB
+//
+// ServiceNow Import Set Flow
+// CSV/API/Excel → Import Set (staging table) →
+//   → Transform Map (field mapping + logic) →
+//   → Target Table (e.g., cmdb_ci_server)
+
+// Transform Map = Your AutoMapper profile + validation logic
+// Coalesce Field = Your upsert key (like MERGE...ON in SQL)</pre><h4>Transform Map — Your Field Mapper</h4><ul><li><strong>Field mapping:</strong> Source column 'server_name' → Target field 'name'. Direct mapping, like AutoMapper's <code>CreateMap&lt;Source, Target&gt;()</code>.</li><li><strong>Coalesce field:</strong> The match key for upsert logic. If a target record with this value exists, UPDATE. If not, INSERT. Like SQL Server's <code>MERGE...ON target.serial_number = source.serial_number</code>.</li><li><strong>Transform scripts:</strong> onBefore, onAfter, onStart, onComplete — hooks at every stage of the transform. Like EF's <code>SaveChanges</code> interceptors or SSIS package event handlers.</li></ul><h4>The Coalesce Disaster Scenario</h4><pre>// THE SETUP:
+// Nightly import of 50,000 server records from a vendor CSV
+// Coalesce field: 'name' (hostname)
+//
+// THE PROBLEM:
+// 200 servers have the same hostname 'WEBSERVER' across
+// different data centers. The vendor differentiates by serial_number,
+// but the coalesce is only on 'name'.
+//
+// WHAT HAPPENS:
+// Import finds 'WEBSERVER' in target → Updates the SAME record
+// 200 times, overwriting with the last CSV row's data.
+// 199 servers vanish from the CMDB.
+//
+// THE FIX: Composite coalesce
+// Set BOTH 'name' AND 'serial_number' as coalesce fields
+// Now the match key is: WHERE name='WEBSERVER' AND serial='SN-12345'
+// Each server gets its own record
+
+// Transform Script to validate before insert
+(function transformRow(source, target, map, log, action) {
+  // Prevent duplicates — check if already imported in this batch
+  if (!source.u_serial_number || source.u_serial_number == '') {
+    log.warn('Skipping row: missing serial number');
+    ignore = true; // Skip this row
+    return;
+  }
+  
+  // Data quality — trim whitespace (classic ETL issue)
+  target.serial_number = source.u_serial_number.toString().trim();
+  target.name = source.u_hostname.toString().trim();
+})(source, target, map, log, action);</pre><h4>Senior Considerations</h4><ul><li><strong>Staging table cleanup:</strong> Import Set staging tables grow forever unless you configure auto-cleanup. Like temp tables in your ETL that never get truncated.</li><li><strong>Run order matters:</strong> If multiple Transform Maps exist for one Import Set, they run sequentially. A second map can reference records created by the first — useful for parent-child relationships.</li><li><strong>Error handling:</strong> Transform errors create records in the Import Set Log. Monitor these like you'd monitor SSIS package execution logs.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Always test your coalesce strategy with production-like data volumes before go-live. The same instincts you have about choosing a proper PRIMARY KEY or UNIQUE constraint in SQL apply directly to coalesce fields. When in doubt, use a composite key — it's always safer than a single field.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/explain-servicenow-s-table-hierarchy-and-inheritance-model-how-does-it-compare-t" rel="prev"><small>‹ Previous</small><strong>Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake.</strong></a>
+          <a href="/article/your-background-includes-building-service-catalog-or-self-service-portals-with-f" rel="next"><small>Next ›</small><strong>Your background includes building Service Catalog or self-service portals with forms that kick off backend workflows. ServiceNow has a 'Service Catalog' with 'Catalog Items', 'Record Producers', and 'Order Guides.' Explain each to a developer who's built shopping-cart-style request systems before, and describe the full lifecycle of a catalog request.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster.",
+  "description": "Setting the Stage Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration…",
+  "datePublished": "2026-03-16T05:05:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

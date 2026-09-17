@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What is an ACL (Access Control List) in ServiceNow? How does it protect data? — Summaverick</title>
+  <meta name="description" content="Why This Matters in an Interview Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the…" />
+  <link rel="canonical" href="https://summaverick.com/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="What is an ACL (Access Control List) in ServiceNow? How does it protect data? — Summaverick" />
+  <meta property="og:description" content="Why This Matters in an Interview Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the…" />
+  <meta property="og:url" content="https://summaverick.com/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Security</p>
+        <h1>What is an ACL (Access Control List) in ServiceNow? How does it protect data?</h1>
+        <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Why This Matters in an Interview</h4><p>Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the entire platform.</p><h4>What Is an ACL?</h4><p>An ACL is a security rule that controls access to tables, records, and individual fields. When a user tries to view an incident, update a change request, or delete a CI — the platform checks the ACLs to determine if that action is allowed.</p><h4>The Three Components of an ACL</h4><ul><li><strong>1. Roles:</strong> Which role(s) does the user need? e.g., <code>itil</code>, <code>admin</code>, <code>incident_manager</code>. A user must have the specified role to pass this check.</li><li><strong>2. Conditions:</strong> Filter conditions on the record. e.g., 'Only if the record is assigned to the user's group.' This provides row-level security.</li><li><strong>3. Script:</strong> Advanced JavaScript logic for complex authorization. Returns true (allow) or false (deny).</li></ul><pre>// ACL Example:
+// Table: incident
+// Operation: write
+// Role required: itil
+// Condition: active=true
+// Meaning: Users with 'itil' role can edit incidents, but only active ones
+
+// ACL Script Example:
+// Allow editing only if the incident belongs to the user's assignment group
+answer = gs.getUser().isMemberOf(current.assignment_group);</pre><h4>Evaluation Order</h4><ul><li><strong>ACLs are matched from most specific to least specific — the first match at each level is the one that gets evaluated:</strong></li><li><code>incident.caller_id</code> — field-level ACL (most specific)</li><li><code>incident.*</code> — table-level ACL</li><li><code>*.*</code> — global ACL (least specific)</li><li>To reach a field, the user must pass <strong>both</strong> the matching field-level ACL <strong>and</strong> the matching table-level ACL. But when several ACLs match at the <em>same</em> point (e.g., two ACLs on incident.caller_id), passing <strong>any one</strong> of them grants access (OR) — so adding another ACL at the same level can actually loosen access.</li></ul><h4>Key Facts for Interviews</h4><ul><li><strong>Deny by default:</strong> If no ACL grants access, access is denied. Unlike some systems where everything is open unless restricted.</li><li><strong>Admin bypasses ACLs:</strong> Users with the <code>admin</code> role skip ACL checks entirely (unless the ACL script explicitly handles admin).</li><li><strong>Applies everywhere:</strong> ACLs enforce on UI, REST API, list views, reports, exports — not just forms.</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>The classic trick question: 'If I create a read ACL on the incident table requiring the itil role, and another read ACL on incident.priority requiring the incident_manager role — what happens when a user with only the itil role opens an incident?' Answer: They can see the incident (table ACL passes) but the priority field will be hidden/empty (field ACL fails). Both ACLs evaluate independently.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" rel="prev"><small>‹ Previous</small><strong>What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?</strong></a>
+          <a href="/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" rel="next"><small>Next ›</small><strong>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "What is an ACL (Access Control List) in ServiceNow? How does it protect data?",
+  "description": "Why This Matters in an Interview Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the…",
+  "datePublished": "2026-03-16T07:20:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

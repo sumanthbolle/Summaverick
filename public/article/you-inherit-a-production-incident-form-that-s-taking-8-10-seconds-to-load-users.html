@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>You inherit a production Incident form that's taking 8-10 seconds to load. Users are complaining, but the form only has 45 fields and 3 related lists with &lt;50 records each. Walk me through your diagnostic approach. What are the likely culprits, and how would you prioritize investigating them? Then show me code that demonstrates a common performance problem and its solution. — Summaverick</title>
+  <meta name="description" content="Setting the Stage An 8-10 second load time on a relatively simple form suggests the issue isn't form complexity alone. The out-of-the-box Incident form loads in ~2 seconds, and anything over 3-4…" />
+  <link rel="canonical" href="https://summaverick.com/article/you-inherit-a-production-incident-form-that-s-taking-8-10-seconds-to-load-users" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="You inherit a production Incident form that's taking 8-10 seconds to load. Users are complaining, but the form only has 45 fields and 3 related lists with &lt;50 records each. Walk me through your diagnostic approach. What are the likely culprits, and how would you prioritize investigating them? Then show me code that demonstrates a common performance problem and its solution. — Summaverick" />
+  <meta property="og:description" content="Setting the Stage An 8-10 second load time on a relatively simple form suggests the issue isn't form complexity alone. The out-of-the-box Incident form loads in ~2 seconds, and anything over 3-4…" />
+  <meta property="og:url" content="https://summaverick.com/article/you-inherit-a-production-incident-form-that-s-taking-8-10-seconds-to-load-users" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Performance</p>
+        <h1>You inherit a production Incident form that's taking 8-10 seconds to load. Users are complaining, but the form only has 45 fields and 3 related lists with &lt;50 records each. Walk me through your diagnostic approach. What are the likely culprits, and how would you prioritize investigating them? Then show me code that demonstrates a common performance problem and its solution.</h1>
+        <p class="article-meta">Senior · ServiceNow · Feb 2026</p>
+        <div class="prose">
+<h4>Setting the Stage</h4><p>An 8-10 second load time on a relatively simple form suggests the issue isn't form complexity alone. The out-of-the-box Incident form loads in ~2 seconds, and anything over 3-4 seconds is considered slow by users. With only 45 fields and small related lists, you're likely dealing with inefficient scripts, unnecessary synchronous operations, or poorly optimized business rules rather than data volume.</p><h4>Diagnostic Approach (What Makes This Senior)</h4><p><strong>Phase 1: Isolate the Layer</strong> - First, determine where time is spent: network latency, server processing, or browser rendering. Open browser DevTools (Network and Performance tabs) to measure server response time versus client-side script execution. If the server responds in 1 second but total load is 8 seconds, the problem is client-side scripts or related list rendering.</p><p><strong>Phase 2: Methodical Elimination</strong> - Don't randomly remove elements. Instead: (1) Disable all client scripts and UI policies, reload, and note the improvement; (2) Re-enable them one category at a time; (3) Check if related lists are set to load 'on demand' or 'after form loads'—switching to on-demand can dramatically reduce initial load time. A user reported 20-30 second related list loads that improved by deferring their initialization.</p><p><strong>Phase 3: Deep Inspection</strong> - Check for: (a) Synchronous GlideRecord queries in onLoad scripts that block the browser; (b) UI policies with complex conditions evaluated on every field; (c) Reference fields with large choice lists lacking filters; (d) Business rules executing on form load when they should only run on update/insert; (e) Multiple onLoad scripts doing similar work instead of consolidated logic.</p><h4>The Solution</h4><pre>// PROBLEM: Synchronous blocking query in onLoad script
+function onLoad() {
+  var caller = g_form.getValue('caller_id');
+  var grCaller = new GlideRecord('sys_user');
+  grCaller.addQuery('sys_id', caller);
+  grCaller.query(); // BLOCKS - synchronous
+  if (grCaller.next()) {
+    g_form.setValue('assignment_group', grCaller.assignment_group);
+  }
+}
+// SOLUTION: Asynchronous approach with GlideAjax
+function onLoad() {
+  var caller = g_form.getValue('caller_id');
+  if (caller) {
+    var ga = new GlideAjax('GetCallerInfo');
+    ga.addParam('sysparm_caller_id', caller);
+    ga.getXMLAnswer(function(answer) {
+      g_form.setValue('assignment_group', answer);
+    });
+  }
+}
+// Server-side script processor (GetCallerInfo)
+var caller_id = this.getParameter('sysparm_caller_id');
+var gr = new GlideRecord('sys_user');
+gr.get(caller_id);
+answer = gr.assignment_group.toString();</pre><h4>Senior Considerations</h4><ul><li><strong>Root Cause vs. Symptom</strong> - A 'slow form' complaint could originate from network issues, browser extensions, or instance performance. Separate diagnosis from solution. Don't optimize scripts if the real issue is a missing database index on a related list query.</li><li><strong>Trade-offs Matter</strong> - Deferring related list loads improves perceived performance but delays user access to that data. Document the choice: is 3-second form + 2-second related list load better UX than 8-second complete load? Depends on user workflow.</li><li><strong>Avoid Premature Optimization</strong> - A great answer includes asking: 'Is this actually a problem for users, or is it acceptable?' If 80% of users are satisfied, optimizing further wastes effort. Use performance monitoring to establish baselines.</li><li><strong>Caching Considerations</strong> - Implementing client-side caching for reference data (e.g., assignment groups) can help, but requires cache invalidation strategy. Too short = unnecessary queries; too long = stale data. This is a production risk.</li><li><strong>Browser and Network Variability</strong> - Internet Explorer performs 3x slower than Chrome. Users on slow networks or VPNs may see different times. Document whether the 8-second complaint is widespread or isolated to specific users/locations.</li><li><strong>Monitoring is Ongoing</strong> - Set up a performance dashboard tracking form load times by form, user location, and time of day. Slow form loads often spike during peak hours due to instance load, not form design.</li><li><strong>Business Rule Audit</strong> - Display business rules execute on form load and can be expensive. Verify none are doing unnecessary queries. Move calculation logic to server-side where possible.</li><li><strong>Production Impact</strong> - Before deploying optimizations, test on a clone of production data. A change that improves load time with 10 related list records might fail with 10,000 records.</li></ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/your-enterprise-customer-has-a-5-year-old-servicenow-instance-with-a-cmdb-that-n" rel="prev"><small>‹ Previous</small><strong>Your enterprise customer has a 5-year-old ServiceNow instance with a CMDB that no teams trust or use. CMDB Health Dashboard shows 68% data completeness, 42% compliance, 27% duplicate CIs across 150k+ records, and relationship accuracy at 35%. Change Management abandonment rate is 45% because impact analysis fails due to stale data. Stakeholders blame 'bad Discovery patterns' but audits reveal mixed sources: 40% Discovery, 35% Excel imports, 20% Service Graph Connectors, 5% manual. As lead architect, outline your &lt;strong&gt;diagnosis approach&lt;/strong&gt; (not just symptoms), propose &lt;strong&gt;3 solution options&lt;/strong&gt; with trade-offs, and detail &lt;strong&gt;production rollout considerations&lt;/strong&gt;. Include a scripted example diagnosing a real issue: why a critical Linux server CI shows as 'Retired' despite active pings in monitoring. What separates a good answer (listing fixes) from great (holistic transformation with metrics)?</strong></a>
+          <a href="/article/your-servicenow-production-instance-handles-500-000-daily-transactions-across-in" rel="next"><small>Next ›</small><strong>Your ServiceNow production instance handles 500,000 daily transactions across Incident, Change, and CMDB tables. Over the past week, users report 2-5 second delays in form loads and submissions, spiking during peak hours (8-10 AM). Transaction logs show average response times jumped from 200ms to 3.5s. Business impact: 15% SLA breaches on incident resolution. You notice an outbound REST integration to VendorX's API (via Integration Hub Flow Designer) running every 5 minutes, syncing 10,000 CMDB CIs. It's configured with scripted REST steps for data transformation. No errors in integration logs, but VendorX reports receiving requests. &lt;strong&gt;Walk us through your diagnosis approach (tools/metrics), root cause hypotheses, 3+ solution options with trade-offs, and production rollout plan. Include code showing the likely problematic pattern and your fix.&lt;/strong&gt; What separates a good answer (basic fix) from great (architectural resilience)?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "You inherit a production Incident form that's taking 8-10 seconds to load. Users are complaining, but the form only has 45 fields and 3 related lists with <50 records each. Walk me through your diagnostic approach. What are the likely culprits, and how would you prioritize investigating them? Then show me code that demonstrates a common performance problem and its solution.",
+  "description": "Setting the Stage An 8-10 second load time on a relatively simple form suggests the issue isn't form complexity alone. The out-of-the-box Incident form loads in ~2 seconds, and anything over 3-4…",
+  "datePublished": "2026-02-03T06:34:19.188Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

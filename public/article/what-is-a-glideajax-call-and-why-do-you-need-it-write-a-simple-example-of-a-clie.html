@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What is a GlideAjax call, and why do you need it? Write a simple example of a Client Script calling a server-side Script Include using GlideAjax. — Summaverick</title>
+  <meta name="description" content="What This Question Really Tests This is a top-tier beginner question because it tests understanding of the client-server boundary — the most important architectural concept in ServiceNow development.…" />
+  <link rel="canonical" href="https://summaverick.com/article/what-is-a-glideajax-call-and-why-do-you-need-it-write-a-simple-example-of-a-clie" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="What is a GlideAjax call, and why do you need it? Write a simple example of a Client Script calling a server-side Script Include using GlideAjax. — Summaverick" />
+  <meta property="og:description" content="What This Question Really Tests This is a top-tier beginner question because it tests understanding of the client-server boundary — the most important architectural concept in ServiceNow development.…" />
+  <meta property="og:url" content="https://summaverick.com/article/what-is-a-glideajax-call-and-why-do-you-need-it-write-a-simple-example-of-a-clie" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Scripting</p>
+        <h1>What is a GlideAjax call, and why do you need it? Write a simple example of a Client Script calling a server-side Script Include using GlideAjax.</h1>
+        <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>What This Question Really Tests</h4><p>This is a top-tier beginner question because it tests understanding of the client-server boundary — the most important architectural concept in ServiceNow development.</p><h4>Why You Need GlideAjax</h4><p>Client Scripts run in the browser. They can manipulate the form with <code>g_form</code>, but they <strong>cannot</strong> query the database directly. GlideRecord is a server-side-only API. So when a Client Script needs data from the database, it must ask the server — and GlideAjax is the mechanism for that request.</p><p>Think of it as making an AJAX call to a backend API endpoint, except the 'endpoint' is a Script Include method.</p><h4>Step-by-Step Example</h4><pre>// ============================================
+// STEP 1: Create the Script Include (server-side)
+// Name: UserInfoHelper
+// Accessible from: All application scopes
+// ============================================
+var UserInfoHelper = Class.create();
+UserInfoHelper.prototype = Object.extendsObject(
+  AbstractAjaxProcessor, {  // MUST extend this for GlideAjax
+  
+  // This method will be callable from the client
+  getUserDepartment: function() {
+    var userId = this.getParameter('sysparm_user_id');
+    var gr = new GlideRecord('sys_user');
+    if (gr.get(userId)) {
+      return gr.getDisplayValue('department');
+    }
+    return 'Unknown';
+  },
+  
+  type: 'UserInfoHelper'
+});
+
+// ============================================
+// STEP 2: Create the Client Script (client-side)
+// Type: onChange
+// Field: caller_id
+// ============================================
+function onChange(control, oldValue, newValue, isLoading) {
+  if (isLoading || newValue === '') return;
+  
+  // Create the GlideAjax call
+  var ga = new GlideAjax('UserInfoHelper');  // Script Include name
+  ga.addParam('sysparm_name', 'getUserDepartment'); // Method to call
+  ga.addParam('sysparm_user_id', newValue);  // Pass the user's sys_id
+  
+  // Make the call (asynchronous — doesn't freeze the form)
+  ga.getXMLAnswer(function(answer) {
+    // 'answer' contains the return value from the server
+    g_form.setValue('u_department', answer);
+  });
+}</pre><h4>How It Works</h4><ul><li><strong>Client Script</strong> creates a GlideAjax object pointing to the Script Include name</li><li>Passes the method name via <code>sysparm_name</code> parameter</li><li>Passes any custom data via additional <code>sysparm_</code> parameters</li><li>Calls <code>getXMLAnswer()</code> with a callback function — this is asynchronous</li><li>ServiceNow server receives the request, instantiates the Script Include, calls the method, and returns the result</li><li>The callback function receives the result and updates the form</li></ul><h4>Important Rules</h4><ul><li>The Script Include <strong>must extend AbstractAjaxProcessor</strong> to be callable via GlideAjax</li><li>Use <code>this.getParameter('sysparm_xxx')</code> to read parameters on the server side</li><li>Always use the <strong>asynchronous</strong> pattern (<code>getXMLAnswer</code>) — the synchronous version (<code>getXMLWait</code>) freezes the browser</li><li>Return values are always strings — if you need objects, use <code>JSON.stringify()</code> and <code>JSON.parse()</code></li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>If asked to whiteboard a GlideAjax call, always include: (1) the Script Include extending AbstractAjaxProcessor, (2) the Client Script with sysparm_name, and (3) the asynchronous callback. Missing any of these three pieces signals you've only read about it, not used it.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" rel="prev"><small>‹ Previous</small><strong>What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?</strong></a>
+          <a href="/article/what-are-the-different-tables-in-servicenow-and-what-does-table-extends-table-me" rel="next"><small>Next ›</small><strong>What are the different tables in ServiceNow, and what does 'table extends table' mean? Give an example.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "What is a GlideAjax call, and why do you need it? Write a simple example of a Client Script calling a server-side Script Include using GlideAjax.",
+  "description": "What This Question Really Tests This is a top-tier beginner question because it tests understanding of the client-server boundary — the most important architectural concept in ServiceNow development.…",
+  "datePublished": "2026-03-16T07:05:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

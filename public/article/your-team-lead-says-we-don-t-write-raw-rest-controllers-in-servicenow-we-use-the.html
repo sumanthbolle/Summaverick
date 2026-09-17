@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard? — Summaverick</title>
+  <meta name="description" content="Why Interviewers Ask This This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard? — Summaverick" />
+  <meta property="og:description" content="Why Interviewers Ask This This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Why Interviewers Ask This</h4><p>This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API for every table (Table API), plus the ability to build custom endpoints (Scripted REST) when you need more control.</p><h4>The Direct Comparison</h4><pre>// ASP.NET Web API (what you've built)
+[Route("api/incidents")]
+public class IncidentController : ApiController {
+  [HttpGet] public IEnumerable&lt;Incident&gt; GetAll() { ... }
+  [HttpGet("{id}")] public Incident Get(string id) { ... }
+  [HttpPost] public IActionResult Create(Incident model) { ... }
+}
+
+// ServiceNow Table API (auto-generated, zero code)
+// GET  /api/now/table/incident              → GetAll
+// GET  /api/now/table/incident/{sys_id}     → Get by ID
+// POST /api/now/table/incident              → Create
+// PUT  /api/now/table/incident/{sys_id}     → Update
+// Every table gets this for free — no controller needed</pre><h4>Table API vs Scripted REST</h4><ul><li><strong>Table API</strong> = Like scaffolded controllers from <code>dotnet aspnet-codegenerator</code>. Zero code, full CRUD, supports query parameters (<code>sysparm_query</code>, <code>sysparm_fields</code>, <code>sysparm_limit</code>). Perfect for standard integrations. It's the equivalent of OData endpoints in .NET — auto-exposed, filterable, paginated.</li><li><strong>Scripted REST API</strong> = Like writing a custom <code>ApiController</code> from scratch. You define the HTTP method, path, query params, and write the processing logic. Use when Table API isn't enough — custom business logic, aggregations, multi-table joins, or non-CRUD operations.</li></ul><pre>// Scripted REST API Resource (like a .NET Controller Action)
+(function process(request, response) {
+  var incidentId = request.pathParams.id;
+  
+  // Custom logic — aggregate child tasks
+  var gr = new GlideRecord('incident');
+  if (gr.get(incidentId)) {
+    var taskCount = new GlideAggregate('task');
+    taskCount.addQuery('parent', incidentId);
+    taskCount.addAggregate('COUNT');
+    taskCount.query();
+    
+    response.setBody({
+      number: gr.getValue('number'),
+      state: gr.getDisplayValue('state'),
+      child_task_count: taskCount.next() ? 
+        parseInt(taskCount.getAggregate('COUNT')) : 0
+    });
+  } else {
+    response.setStatus(404);
+    response.setBody({error: 'Incident not found'});
+  }
+})(request, response);</pre><h4>What Catches Developers Off Guard</h4><ul><li><strong>No model binding:</strong> There's no <code>[FromBody]</code> attribute. You parse the request body manually with <code>request.body.data</code> — feels like Express.js more than ASP.NET.</li><li><strong>ACLs still apply:</strong> Unlike .NET where you explicitly add <code>[Authorize]</code>, ServiceNow's ACL system enforces row-level and field-level security on Table API calls by default. Your API consumer only sees records they're authorized to access.</li><li><strong>Response format:</strong> Table API wraps everything in <code>{"result": [...]}</code>. If you're building a mobile app expecting flat JSON, Scripted REST gives you full control over the response shape.</li><li><strong>Rate limiting is platform-managed:</strong> No need to implement your own throttling middleware — ServiceNow handles rate limits at the instance level.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Think of Table API as your auto-generated OData endpoints and Scripted REST as your custom ApiControllers. The decision matrix is the same: use the auto-generated path for standard CRUD, build custom when business logic demands it. Your instinct to version APIs, validate input, and return proper HTTP status codes transfers perfectly.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/in-your-net-projects-you-ve-used-middleware-action-filters-and-database-triggers" rel="prev"><small>‹ Previous</small><strong>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer?</strong></a>
+          <a href="/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" rel="next"><small>Next ›</small><strong>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?",
+  "description": "Why Interviewers Ask This This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API…",
+  "datePublished": "2026-03-16T05:50:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

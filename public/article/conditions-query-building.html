@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Conditions and Query Building in ServiceNow: Filters, Encoded Queries, Condition Builder, and Script Equivalents — Summaverick</title>
+  <meta name="description" content="Every way to filter records in ServiceNow — from the UI condition builder to encoded queries to GlideRecord addQuery to dot-walking. How they connect and when to use each one." />
+  <link rel="canonical" href="https://summaverick.com/article/conditions-query-building" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Conditions and Query Building in ServiceNow: Filters, Encoded Queries, Condition Builder, and Script Equivalents — Summaverick" />
+  <meta property="og:description" content="Every way to filter records in ServiceNow — from the UI condition builder to encoded queries to GlideRecord addQuery to dot-walking. How they connect and when to use each one." />
+  <meta property="og:url" content="https://summaverick.com/article/conditions-query-building" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>Conditions and Query Building in ServiceNow: Filters, Encoded Queries, Condition Builder, and Script Equivalents</h1>
+        <p class="article-meta">Beginner · 14 min read · Apr 2026</p>
+        <div class="prose">
+<h2>Three ways to filter records</h2>
+<p>In ServiceNow, you filter records in three places. They all generate the same thing underneath — an <strong>encoded query</strong>.</p>
+<table>
+<tr><th>Where</th><th>How</th><th>Used by</th></tr>
+<tr><td>List filter (UI)</td><td>Condition builder — dropdown menus</td><td>Admins, end users</td></tr>
+<tr><td>Encoded query string</td><td>Text string like <code>priority=1^active=true</code></td><td>URL params, scripts, reports</td></tr>
+<tr><td>GlideRecord addQuery</td><td>JavaScript method calls</td><td>Developers in scripts</td></tr>
+</table>
+
+<h2>The condition builder (UI)</h2>
+<p>Every list view has a filter icon (funnel). Click it, and you get the condition builder. You pick a field, an operator, and a value. You can chain conditions with AND/OR.</p>
+<p>After building your filter, you can get the encoded query string: right-click the breadcrumb above the list and select <strong>"Copy query"</strong>. This gives you a string you can paste into scripts.</p>
+
+<h2>Encoded query syntax</h2>
+<p>An encoded query is a string representation of filter conditions. <code>^</code> means AND. <code>^OR</code> means OR. <code>^NQ</code> means a new query (OR group).</p>
+<pre>// Simple conditions
+priority=1                          // priority equals 1
+active=true                         // active is true
+state!=6                            // state is not 6 (Resolved)
+
+// Chaining with AND (^)
+priority=1^active=true^state!=6
+// priority = 1 AND active = true AND state != 6
+
+// OR conditions (^OR)
+priority=1^ORpriority=2
+// priority = 1 OR priority = 2
+
+// Grouped OR with AND
+priority=1^ORpriority=2^active=true
+// (priority = 1 OR priority = 2) AND active = true
+
+// Special operators
+short_descriptionLIKEvpn           // contains 'vpn'
+short_descriptionSTARTSWITHEmail   // starts with 'Email'
+short_descriptionENDSWITHfailed    // ends with 'failed'
+assigned_toISEMPTY                 // field is empty
+assigned_toISNOTEMPTY              // field is not empty
+sys_created_on&gt;2026-01-01        // created after Jan 1
+sys_created_onONToday              // created today
+sys_created_onRELATIVEGE@hour@ago@24  // created in last 24 hours
+
+// Reference field dot-walking
+assignment_group.name=Network Ops   // group name (through reference)
+caller_id.department.name=IT        // caller's department name
+
+// IN operator
+stateIN1,2,3                       // state is 1, 2, or 3
+stateNOT IN6,7                     // state is not 6 or 7</pre>
+
+<h2>Using encoded queries in scripts</h2>
+<pre>// Instead of multiple addQuery calls:
+var gr = new GlideRecord('incident');
+gr.addQuery('priority', 1);
+gr.addQuery('active', true);
+gr.addQuery('state', '!=', 6);
+gr.query();
+
+// You can do this in one line:
+var gr = new GlideRecord('incident');
+gr.addEncodedQuery('priority=1^active=true^state!=6');
+gr.query();
+
+// Both produce the exact same SQL query. Use whichever is clearer.
+// For complex filters, encoded queries are often easier to read
+// and you can copy them directly from the list filter UI.</pre>
+
+<h3>Building encoded queries dynamically</h3>
+<pre>// Build a query string from variables
+var table = 'incident';
+var maxAge = 30;
+var groups = ['Network Ops', 'Database Admins'];
+
+var query = 'active=true';
+query += '^sys_created_on>=' + gs.daysAgo(maxAge);
+query += '^assignment_group.nameIN' + groups.join(',');
+
+var gr = new GlideRecord(table);
+gr.addEncodedQuery(query);
+gr.query();
+gs.info('Matching records: ' + gr.getRowCount());</pre>
+
+<h2>Dot-walking</h2>
+<p>Dot-walking lets you traverse reference fields to access fields on related records. It works in queries, getValue, and getDisplayValue.</p>
+<pre>var gr = new GlideRecord('incident');
+gr.addQuery('priority', 1);
+gr.query();
+while (gr.next()) {
+    // Direct field
+    gs.info(gr.getValue('number'));
+
+    // One level: caller's name
+    gs.info(gr.getDisplayValue('caller_id'));
+
+    // Two levels: caller's department name
+    gs.info(gr.getValue('caller_id.department'));       // sys_id of department
+    gs.info(gr.getDisplayValue('caller_id.department')); // 'IT'
+
+    // Three levels: caller's department head's email
+    gs.info(gr.getValue('caller_id.department.dept_head.email'));
+}
+
+// Dot-walking in queries works the same way:
+var gr = new GlideRecord('incident');
+gr.addQuery('caller_id.department.name', 'IT');
+gr.addQuery('caller_id.vip', true);
+gr.query();
+// Finds incidents where the caller is in the IT department AND is a VIP</pre>
+
+<h3>Dot-walking performance trap</h3>
+<pre>// BAD: dot-walking inside a loop fires a separate query per row
+var gr = new GlideRecord('incident');
+gr.addQuery('active', true);
+gr.setLimit(500);
+gr.query();
+while (gr.next()) {
+    // Each of these is a separate database query!
+    var email = gr.caller_id.email.toString();
+    var dept = gr.caller_id.department.name.toString();
+}
+// For 500 rows, this could be 1000+ extra queries.
+
+// BETTER: query the related table separately and build a lookup
+var users = {};
+var userGr = new GlideRecord('sys_user');
+userGr.addQuery('sys_id', 'IN', callerIds.join(','));
+userGr.query();
+while (userGr.next()) {
+    users[userGr.getValue('sys_id')] = {
+        email: userGr.getValue('email'),
+        dept: userGr.getDisplayValue('department')
+    };
+}</pre>
+
+<h2>Condition builder in Business Rules, Notifications, etc.</h2>
+<p>Many ServiceNow configuration records (Business Rules, Notifications, UI Policies, ACLs) have a "Condition" field that uses the same condition builder as list filters. The condition is stored as an encoded query string internally.</p>
+<pre>// When you configure a Business Rule with condition:
+//   priority = 1 AND state changes to Resolved
+// The platform stores it as:
+//   priority=1^stateVALCHANGES6
+
+// VALCHANGES is a special operator meaning "value changed to"
+// It only evaluates to true during the transaction where the change happens.
+// Other special operators:
+//   VALCHANGES  — value changed to
+//   ANYTHING    — field was modified (any change)
+//   SAMEAS      — same as another field's value
+//   NSAMEAS     — not same as another field's value</pre>
+
+<h2>Quick reference table</h2>
+<table>
+<tr><th>I want to</th><th>UI operator</th><th>Encoded query</th><th>addQuery equivalent</th></tr>
+<tr><td>Equals</td><td>is</td><td><code>priority=1</code></td><td><code>addQuery('priority', 1)</code></td></tr>
+<tr><td>Not equals</td><td>is not</td><td><code>state!=6</code></td><td><code>addQuery('state', '!=', 6)</code></td></tr>
+<tr><td>Greater than</td><td>greater than</td><td><code>priority&gt;2</code></td><td><code>addQuery('priority', '>', 2)</code></td></tr>
+<tr><td>Contains</td><td>contains</td><td><code>short_descriptionLIKEvpn</code></td><td><code>addQuery('short_description', 'CONTAINS', 'vpn')</code></td></tr>
+<tr><td>Starts with</td><td>starts with</td><td><code>numberSTARTSWITHINC</code></td><td><code>addQuery('number', 'STARTSWITH', 'INC')</code></td></tr>
+<tr><td>Is empty</td><td>is empty</td><td><code>assigned_toISEMPTY</code></td><td><code>addNullQuery('assigned_to')</code> <em>or</em> encoded <code>assigned_toISEMPTY</code></td></tr>
+<tr><td>In list</td><td>is one of</td><td><code>stateIN1,2,3</code></td><td><code>addQuery('state', 'IN', '1,2,3')</code></td></tr>
+<tr><td>Changed to</td><td>changes to</td><td><code>stateVALCHANGES6</code></td><td><code>current.state.changesTo(6)</code> (in BR)</td></tr>
+</table>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/csdm-end-to-end-deep-dive" rel="prev"><small>‹ Previous</small><strong>CSDM End to End: How a Single Outage Traces from a Linux Box to a Business Service (With Tables, Queries, and the Stuff Nobody Explains)</strong></a>
+          <a href="/article/scripting-keywords-deep-dive" rel="next"><small>Next ›</small><strong>Every Scripting Keyword That Matters in ServiceNow: current, previous, g_form, gs, and the Objects You Must Know</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Conditions and Query Building in ServiceNow: Filters, Encoded Queries, Condition Builder, and Script Equivalents",
+  "description": "Every way to filter records in ServiceNow — from the UI condition builder to encoded queries to GlideRecord addQuery to dot-walking. How they connect and when to use each one.",
+  "datePublished": "2026-04-07T19:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

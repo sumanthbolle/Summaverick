@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Service Catalog Scripting: Record Producers, Variables, Catalog Client Scripts, and Order Guides — Summaverick</title>
+  <meta name="description" content="Everything that happens between a user clicking 'Order Now' and the fulfillment task landing on someone's queue. Tables, variable types, catalog-specific scripts, and the gotchas that bite in production." />
+  <link rel="canonical" href="https://summaverick.com/article/catalog-scripting-reference" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Service Catalog Scripting: Record Producers, Variables, Catalog Client Scripts, and Order Guides — Summaverick" />
+  <meta property="og:description" content="Everything that happens between a user clicking 'Order Now' and the fulfillment task landing on someone's queue. Tables, variable types, catalog-specific scripts, and the gotchas that bite in production." />
+  <meta property="og:url" content="https://summaverick.com/article/catalog-scripting-reference" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>Service Catalog Scripting: Record Producers, Variables, Catalog Client Scripts, and Order Guides</h1>
+        <p class="article-meta">Intermediate · 15 min read · Apr 2026</p>
+        <div class="prose">
+<h2>How the catalog works internally</h2>
+<p>When a user submits a catalog item, ServiceNow creates three types of records:</p>
+<table>
+<tr><th>Table</th><th>Record Type</th><th>What it represents</th></tr>
+<tr><td><code>sc_request</code></td><td>Request</td><td>The overall order (REQ0010001). One per submission.</td></tr>
+<tr><td><code>sc_req_item</code></td><td>Requested Item (RITM)</td><td>One per catalog item ordered (RITM0010001). Contains variable values.</td></tr>
+<tr><td><code>sc_task</code></td><td>Catalog Task</td><td>Fulfillment work assigned to teams (SCTASK0010001).</td></tr>
+</table>
+<p>Variable values are stored in <code>sc_item_option</code> and linked to the RITM via <code>sc_item_option_mtom</code>.</p>
+
+<h3>Reading variable values in scripts</h3>
+<pre>// In a Catalog Item workflow or Business Rule on sc_req_item:
+var ritmGr = new GlideRecord('sc_req_item');
+ritmGr.get('number', 'RITM0010001');
+
+// Access variables through the variables object
+var laptopModel = ritmGr.variables.laptop_model.getDisplayValue();
+var justification = ritmGr.variables.justification.toString();
+
+// In a Catalog Item script (server-side):
+// 'current' is the RITM record
+var model = current.variables.laptop_model;</pre>
+
+<h2>Record Producers</h2>
+<p>A Record Producer creates a record on a target table (like <code>incident</code>) through the Service Catalog UI. The user fills out catalog-style variables, and the Record Producer maps them to fields on the target table.</p>
+
+<pre>// Record Producer script (runs on submit, server-side)
+// 'current' is the target table record (e.g., incident)
+// 'producer' has the variable values
+
+current.short_description = producer.description;
+current.category = producer.category;
+current.priority = producer.urgency_level;
+
+// Set caller to the person who submitted
+current.caller_id = gs.getUserID();</pre>
+
+<p><strong>When to use Record Producer vs Catalog Item:</strong></p>
+<ul>
+<li><strong>Record Producer:</strong> When the goal is to create a record on an existing table (incident, change_request, etc.) from the catalog. The user sees a catalog form, but the output is a standard record, not a RITM.</li>
+<li><strong>Catalog Item:</strong> When you need the full request lifecycle (Request → RITM → Tasks) with approvals, fulfillment workflows, and catalog-specific tracking.</li>
+</ul>
+
+<h2>Variable Sets</h2>
+<p>A Variable Set is a reusable group of variables shared across multiple catalog items. Instead of creating the same "Delivery Address" fields on 15 different items, create one Variable Set and attach it to all of them.</p>
+<pre>// Variable sets are just containers — access their variables
+// the same way via current.variables.variable_name</pre>
+
+<h2>Catalog Client Scripts</h2>
+<p>These are Client Scripts that run specifically on catalog item forms. They have the same event types (onLoad, onChange, onSubmit) but operate on catalog variables instead of table fields.</p>
+
+<pre>// Catalog Client Script — onChange
+// Variable: 'laptop_model'
+function onChange(control, oldValue, newValue, isLoading) {
+    if (isLoading) return;
+
+    // Show/hide the 'special_requirements' variable based on model
+    if (newValue === 'MacBook Pro 16') {
+        g_form.setVisible('special_requirements', true);
+        g_form.setMandatory('special_requirements', true);
+    } else {
+        g_form.setVisible('special_requirements', false);
+        g_form.setMandatory('special_requirements', false);
+    }
+}
+
+// Catalog Client Script — onSubmit
+function onSubmit() {
+    var model = g_form.getValue('laptop_model');
+    var justification = g_form.getValue('justification');
+
+    if (model === 'MacBook Pro 16' && !justification) {
+        g_form.addErrorMessage('Justification required for MacBook Pro 16.');
+        return false;  // prevent submission
+    }
+    return true;
+}</pre>
+
+<h3>Catalog UI Policy</h3>
+<p>Same concept as a regular UI Policy but scoped to catalog variables. Controls visibility, mandatory state, and read-only state of catalog variables without code.</p>
+<p>When Laptop Model = "MacBook Pro 16" → make Special Requirements mandatory. Configured entirely through the UI, no JavaScript needed.</p>
+
+<h2>Order Guides</h2>
+<p>An Order Guide bundles multiple catalog items into a single guided ordering experience. The user walks through steps, and at the end, multiple RITMs are created.</p>
+<p>Order Guide scripts can pre-populate variables on child items based on selections in earlier steps:</p>
+<pre>// Order Guide Rule script — maps a variable from the guide to child items
+// 'guide_variables' holds the Order Guide level variables
+// 'item_variables' holds the current item's variables
+
+item_variables.delivery_location = guide_variables.office_location;
+item_variables.cost_center = guide_variables.department_cost_center;</pre>
+
+<h2>Common traps</h2>
+<ul>
+<li><strong>Catalog Client Scripts vs regular Client Scripts:</strong> Catalog Client Scripts only run on catalog forms. Regular Client Scripts on <code>sc_req_item</code> run on the RITM form, not the catalog order form. These are different contexts.</li>
+<li><strong>Variable names vs labels:</strong> In scripts, use the variable <em>name</em> (e.g., <code>laptop_model</code>), not the label ("Laptop Model"). The name is set when you create the variable and cannot contain spaces.</li>
+<li><strong>Two-step variable access:</strong> <code>current.variables.var_name</code> in server-side scripts, <code>g_form.getValue('var_name')</code> in client-side scripts. They look different but access the same data.</li>
+<li><strong>Multi-row variable sets (MRVS):</strong> These store tabular data and are accessed differently — <code>current.variables.mvrs_name.getRowCount()</code> and iterating rows. They do not work like regular variables.</li>
+</ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/debugging-diagnostics-reference" rel="prev"><small>‹ Previous</small><strong>Debugging ServiceNow: Session Debug, Slow Queries, Transaction Logs, and Script Tracing</strong></a>
+          <a href="/article/server-utility-apis-reference" rel="next"><small>Next ›</small><strong>Server-Side Utility APIs You Use Every Day: GlideDateTime, GlideElement, gs Methods</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Service Catalog Scripting: Record Producers, Variables, Catalog Client Scripts, and Order Guides",
+  "description": "Everything that happens between a user clicking 'Order Now' and the fulfillment task landing on someone's queue. Tables, variable types, catalog-specific scripts, and the gotchas that bite in production.",
+  "datePublished": "2026-04-07T15:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

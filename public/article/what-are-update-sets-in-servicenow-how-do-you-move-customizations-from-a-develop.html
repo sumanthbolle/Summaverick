@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What are Update Sets in ServiceNow? How do you move customizations from a development instance to production? — Summaverick</title>
+  <meta name="description" content="Context Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding…" />
+  <link rel="canonical" href="https://summaverick.com/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="What are Update Sets in ServiceNow? How do you move customizations from a development instance to production? — Summaverick" />
+  <meta property="og:description" content="Context Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding…" />
+  <meta property="og:url" content="https://summaverick.com/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?</h1>
+        <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Context</h4><p>Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding it is essential for any role.</p><h4>What Is an Update Set?</h4><p>An Update Set is a container that automatically captures every configuration change you make while it's active. When you modify a Business Rule, create a UI Policy, or add a field to a table — that change is recorded in your current Update Set.</p><h4>The Migration Process</h4><pre>// Step-by-step deployment:
+//
+// 1. SET your Update Set (Dev instance)
+//    System Settings → Developer tab → Select 'My Feature Update Set'
+//    Everything you change is now captured here
+//
+// 2. MAKE your changes
+//    Create Business Rules, modify forms, add fields, etc.
+//    Each change = one record in the Update Set
+//
+// 3. COMPLETE the Update Set
+//    Mark it as 'Complete' — no more changes can be added
+//
+// 4. EXPORT from Dev
+//    Right-click → Export to XML (or use Remote instance connection)
+//
+// 5. IMPORT to Test/Prod
+//    Retrieved Update Sets → Import from XML
+//
+// 6. PREVIEW
+//    System previews all changes and flags conflicts
+//    'This Business Rule already exists — overwrite?'
+//
+// 7. COMMIT
+//    Apply all changes to the target instance</pre><h4>What Update Sets Capture (and Don't)</h4><ul><li><strong>DO capture:</strong> Business Rules, Client Scripts, UI Policies, UI Actions, Script Includes, ACLs, form layouts, System Properties, Scheduled Jobs, Flow Designer flows, table schema changes (new fields/tables).</li><li><strong>DON'T capture:</strong> Data records (incidents, users, CMDB CIs), homepage/dashboard configurations (user-specific), report definitions (sometimes), attachment content.</li></ul><h4>Common Mistakes</h4><ul><li><strong>Wrong Update Set:</strong> Forgetting to switch your active Update Set before making changes. Your changes end up in the 'Default' Update Set and get mixed with other unrelated work. Always check your current Update Set before starting.</li><li><strong>Missing dependencies:</strong> You create a Script Include in one Update Set and a Business Rule that calls it in another. If you deploy the Business Rule first, it fails because the Script Include doesn't exist yet. Always track dependencies and deploy in order.</li><li><strong>Overwriting changes:</strong> Two developers modify the same Business Rule in different Update Sets. The second one committed overwrites the first — no merge, just overwrite. Communication is critical.</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>If asked 'How is this different from Git?' — explain that Update Sets capture configuration changes automatically (you don't 'commit' individual changes), there's no branching or merging, and the last commit wins on conflicts. For scoped applications, ServiceNow now offers Source Control Integration with Git, which is closer to what modern developers expect.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/what-is-the-difference-between-a-client-script-and-a-ui-policy-when-would-you-ch" rel="prev"><small>‹ Previous</small><strong>What is the difference between a Client Script and a UI Policy? When would you choose one over the other?</strong></a>
+          <a href="/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" rel="next"><small>Next ›</small><strong>What is an ACL (Access Control List) in ServiceNow? How does it protect data?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?",
+  "description": "Context Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding…",
+  "datePublished": "2026-03-16T07:25:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

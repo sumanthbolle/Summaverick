@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your enterprise customer has a critical integration between ServiceNow Incident Management and Jira. Production data shows: 500 incidents/day average, peaking at 2,500 during major outages. Current batch MID Server job runs every 15 minutes, processing updates via REST API. However, during last quarter's Black Friday outage, 847 incidents were created in ServiceNow but only 312 synced to Jira within SLA (under 2 minutes), causing dev teams to miss escalations and delay resolution by 45+ minutes on average. Stakeholders demand 'real-time sync' but IT ops warns of API rate limits (10k calls/hour) and MID Server CPU spikes to 95% during peaks. &lt;strong&gt;Question:&lt;/strong&gt; Walk us through your root cause diagnosis approach. Propose 3+ integration architecture options (batch vs real-time vs hybrid) with clear trade-offs. Provide production code example showing the current problematic batch script AND your recommended fix. Explain &lt;strong&gt;why&lt;/strong&gt; your approach scales and what monitoring you'd implement. — Summaverick</title>
+  <meta name="description" content="Context In production, batch integrations fail SLAs during volume spikes because they process queued changes at fixed intervals, creating inherent latency. Root cause diagnosis starts with ServiceNow…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-enterprise-customer-has-a-critical-integration-between-servicenow-incident" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your enterprise customer has a critical integration between ServiceNow Incident Management and Jira. Production data shows: 500 incidents/day average, peaking at 2,500 during major outages. Current batch MID Server job runs every 15 minutes, processing updates via REST API. However, during last quarter's Black Friday outage, 847 incidents were created in ServiceNow but only 312 synced to Jira within SLA (under 2 minutes), causing dev teams to miss escalations and delay resolution by 45+ minutes on average. Stakeholders demand 'real-time sync' but IT ops warns of API rate limits (10k calls/hour) and MID Server CPU spikes to 95% during peaks. &lt;strong&gt;Question:&lt;/strong&gt; Walk us through your root cause diagnosis approach. Propose 3+ integration architecture options (batch vs real-time vs hybrid) with clear trade-offs. Provide production code example showing the current problematic batch script AND your recommended fix. Explain &lt;strong&gt;why&lt;/strong&gt; your approach scales and what monitoring you'd implement. — Summaverick" />
+  <meta property="og:description" content="Context In production, batch integrations fail SLAs during volume spikes because they process queued changes at fixed intervals, creating inherent latency. Root cause diagnosis starts with ServiceNow…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-enterprise-customer-has-a-critical-integration-between-servicenow-incident" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Integration</p>
+        <h1>Your enterprise customer has a critical integration between ServiceNow Incident Management and Jira. Production data shows: 500 incidents/day average, peaking at 2,500 during major outages. Current batch MID Server job runs every 15 minutes, processing updates via REST API. However, during last quarter's Black Friday outage, 847 incidents were created in ServiceNow but only 312 synced to Jira within SLA (under 2 minutes), causing dev teams to miss escalations and delay resolution by 45+ minutes on average. Stakeholders demand 'real-time sync' but IT ops warns of API rate limits (10k calls/hour) and MID Server CPU spikes to 95% during peaks. &lt;strong&gt;Question:&lt;/strong&gt; Walk us through your root cause diagnosis approach. Propose 3+ integration architecture options (batch vs real-time vs hybrid) with clear trade-offs. Provide production code example showing the current problematic batch script AND your recommended fix. Explain &lt;strong&gt;why&lt;/strong&gt; your approach scales and what monitoring you'd implement.</h1>
+        <p class="article-meta">Senior · ServiceNow · Feb 2026</p>
+        <div class="prose">
+<h4>Context</h4><p>In production, batch integrations fail SLAs during volume spikes because they process queued changes at fixed intervals, creating inherent latency. Root cause diagnosis starts with ServiceNow System Logs, MID Server stats (CPU/Memory), and IntegrationHub transaction logs to confirm: API throttling, payload bloat, or unhandled errors. Query <code>syslog</code> for 'REST' errors during peaks, check Flow Designer execution stats, and correlate with incident volume via Performance Analytics. Good answers identify symptoms (delay); great answers quantify impact (e.g., '45min resolution delay = $X lost SLA credits') and trace to specifics like unpaginated queries or missing idempotency.</p><h4>The Solution</h4><p><strong>Current Problematic Batch Script (Scheduled Job, runs every 15min):</strong></p><pre>// Problem: Single bulk query overloads MID Server, no error handling, no dedup
+(function() {
+    var inc = new GlideRecord('incident');
+    inc.addQuery('sys_updated_on', '&gt;', gs.minutesAgo(15));
+    inc.addQuery('state', '!=', 7); // Exclude closed
+    inc.query();
+    while(inc.next()) {
+        var jiraPayload = {key: inc.number, fields: {status: inc.state.getDisplayValue()}};
+        var r = new sn_ws.RESTMessageV2();
+        r.setEndpoint('https://jira.company.com/rest/api/2/issue/' + inc.jira_key);
+        r.setRequestBody(JSON.stringify(jiraPayload));
+        r.setHttpMethod('PUT');
+        var response = r.execute();
+        if(response.getStatusCode() != 204) gs.error('Jira sync failed: ' + response.getErrorMessage());
+    }
+})();</pre><p><strong>Recommended Fix: Event-Driven Hybrid (Business Rule + Transform Map):</strong> Use 'after Update' Business Rule for real-time critical fields (state/priority), fallback to scheduled batch for non-urgent. Why? 80/20 rule: 80% updates are routine (batch), 20% urgent (real-time) avoids rate limits.</p><pre>// Business Rule: after Update, incident table - Real-time for high-priority
+(function executeRule(current, previous) {
+    if (current.priority &lt;= 2 &amp;&amp; current.state.changes() || current.priority.changes()) { // Critical only
+        var grEvent = new GlideRecord('sysevent');
+        grEvent.initialize();
+        grEvent.setValue('name', 'incident.jira.sync');
+        grEvent.setValue('parm1', current.getUniqueValue());
+        grEvent.insert();
+    }
+})(current, previous);
+
+// Event Script: Processes real-time queue with rate limiting
+(function runAction(/*void*/context) {
+    var id = context.getParameterValue('parm1');
+    var inc = new GlideRecord('incident');
+    if (!inc.get(id)) return;
+    // Rate limit: Check last 10 calls
+    var limitCheck = new GlideAggregate('syslog');
+    limitCheck.addQuery('level', 'info');
+    limitCheck.addQuery('sys_created_on', '&gt;', gs.secondsAgo(60));
+    limitCheck.addAggregate('COUNT');
+    limitCheck.query();
+    if (limitCheck.next() &amp;&amp; limitCheck.getAggregate('COUNT') &gt; 10) return;
+    // Sync logic here (same as batch but single record)
+    gs.info('Jira real-time sync: ' + inc.number);
+})(current, previous);</pre><h4>Senior Considerations</h4><ul><li><strong>Trade-offs Matrix:</strong> Batch (low cost, high latency); Real-time (Business Rules/Webhooks: zero-latency but chatty APIs); Hybrid (best: SLA compliance w/o overload). Great answers include table comparing throughput/cost/failure modes.</li><li><strong>Scalability Why:</strong> Event-driven scales horizontally (add MID Servers), idempotent (sys_id check prevents dupes), rate-limited (avoids 429s). Handles 2.5k peaks by prioritizing P1/P2 only.</li><li><strong>Production Hardening:</strong> Idempotency via <code>u_jira_last_synced</code> field; retry queue (Transform Map on failure); monitor via Flow Designer dashboards + AIOps for anomaly detection on sync_lag KPI.</li><li><strong>Edge Cases:</strong> Network partitions (dead letter queue), data skew (Jira-&gt;ServiceNow conflicts via ECC Queue), audit via <code>sys_audit</code>. Great: Discuss IntegrationHub event persistence.</li><li><strong>Great vs Good:</strong> Good = 'Use REST Message'; Great = Quantifies ROI ('reduces MTTR 45min'), proposes A/B testing via Scoped Apps, references docs.servicenow.com for Event Management scaling.</li></ul><p>Bottom line: the hybrid approach protects the SLA during spikes without paying for a fully real-time pipeline.</p>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/your-production-servicenow-instance-is-experiencing-slow-transaction-times-durin" rel="prev"><small>‹ Previous</small><strong>Your production ServiceNow instance is experiencing slow transaction times during peak hours. Users report that certain form submissions take 8-12 seconds to complete, but your transaction logs show server processing time is only 1.2 seconds. The delays appear random across different modules. Walk me through your diagnostic approach: What are the most likely culprits, how would you isolate the root cause, and what are the trade-offs between different solutions?</strong></a>
+          <a href="/article/your-enterprise-customer-has-a-5-year-old-servicenow-instance-with-a-cmdb-that-n" rel="next"><small>Next ›</small><strong>Your enterprise customer has a 5-year-old ServiceNow instance with a CMDB that no teams trust or use. CMDB Health Dashboard shows 68% data completeness, 42% compliance, 27% duplicate CIs across 150k+ records, and relationship accuracy at 35%. Change Management abandonment rate is 45% because impact analysis fails due to stale data. Stakeholders blame 'bad Discovery patterns' but audits reveal mixed sources: 40% Discovery, 35% Excel imports, 20% Service Graph Connectors, 5% manual. As lead architect, outline your &lt;strong&gt;diagnosis approach&lt;/strong&gt; (not just symptoms), propose &lt;strong&gt;3 solution options&lt;/strong&gt; with trade-offs, and detail &lt;strong&gt;production rollout considerations&lt;/strong&gt;. Include a scripted example diagnosing a real issue: why a critical Linux server CI shows as 'Retired' despite active pings in monitoring. What separates a good answer (listing fixes) from great (holistic transformation with metrics)?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your enterprise customer has a critical integration between ServiceNow Incident Management and Jira. Production data shows: 500 incidents/day average, peaking at 2,500 during major outages. Current batch MID Server job runs every 15 minutes, processing updates via REST API. However, during last quarter's Black Friday outage, 847 incidents were created in ServiceNow but only 312 synced to Jira within SLA (under 2 minutes), causing dev teams to miss escalations and delay resolution by 45+ minutes on average. Stakeholders demand 'real-time sync' but IT ops warns of API rate limits (10k calls/hour) and MID Server CPU spikes to 95% during peaks. <strong>Question:</strong> Walk us through your root cause diagnosis approach. Propose 3+ integration architecture options (batch vs real-time vs hybrid) with clear trade-offs. Provide production code example showing the current problematic batch script AND your recommended fix. Explain <strong>why</strong> your approach scales and what monitoring you'd implement.",
+  "description": "Context In production, batch integrations fail SLAs during volume spikes because they process queued changes at fixed intervals, creating inherent latency. Root cause diagnosis starts with ServiceNow…",
+  "datePublished": "2026-02-05T06:40:52.416Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

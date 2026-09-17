@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Debugging ServiceNow: Session Debug, Slow Queries, Transaction Logs, and Script Tracing — Summaverick</title>
+  <meta name="description" content="When something breaks in production and you have 10 minutes to find it. System diagnostics, session debug modules, transaction logs, and the logs that actually tell you what happened." />
+  <link rel="canonical" href="https://summaverick.com/article/debugging-diagnostics-reference" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Debugging ServiceNow: Session Debug, Slow Queries, Transaction Logs, and Script Tracing — Summaverick" />
+  <meta property="og:description" content="When something breaks in production and you have 10 minutes to find it. System diagnostics, session debug modules, transaction logs, and the logs that actually tell you what happened." />
+  <meta property="og:url" content="https://summaverick.com/article/debugging-diagnostics-reference" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>Debugging ServiceNow: Session Debug, Slow Queries, Transaction Logs, and Script Tracing</h1>
+        <p class="article-meta">Intermediate · 14 min read · Apr 2026</p>
+        <div class="prose">
+<h2>Where to look first</h2>
+<p>When something is broken — a Business Rule is not firing, a form is slow, a notification is not sending — there are specific logs and tools for each problem. Do not guess. Go to the data.</p>
+
+<table>
+<tr><th>Problem</th><th>Where to look</th><th>Navigation path</th></tr>
+<tr><td>Script errors</td><td>System Logs > All</td><td><code>syslog_list.do</code></td></tr>
+<tr><td>Slow forms/transactions</td><td>Transaction Log</td><td><code>syslog_transaction_list.do</code></td></tr>
+<tr><td>Slow database queries</td><td>Slow Queries</td><td><code>sys_slow_query_list.do</code></td></tr>
+<tr><td>Email not sending</td><td>Email Log</td><td><code>sys_email_list.do</code></td></tr>
+<tr><td>Business Rule not firing</td><td>Session Debug > Business Rule</td><td>See below</td></tr>
+<tr><td>ACL blocking access</td><td>Session Debug > Security</td><td>See below</td></tr>
+<tr><td>Flow Designer errors</td><td>Flow Execution Details</td><td>Flow Designer > Executions</td></tr>
+<tr><td>Integration failures</td><td>Outbound HTTP logs</td><td><code>sys_outbound_http_log_list.do</code></td></tr>
+</table>
+
+<h2>Session Debug</h2>
+<p>Session Debug turns on detailed tracing for your current session. It does not affect other users. Enable it, reproduce the issue, then check the output in System Logs.</p>
+
+<h3>Enable via the System Diagnostics menu</h3>
+<pre>// Navigate to: System Diagnostics > Session Debug > Enable All
+// Or enable specific modules:
+//   Debug Business Rule — shows which BRs fire, in what order, execution time
+//   Debug Security Rules — shows ACL evaluation for every field/table access
+//   Debug SQL — shows the raw SQL generated by GlideRecord queries
+//   Debug Log — shows all gs.log/info/warn/error output
+
+// After enabling, perform the action you want to debug (e.g., save an incident)
+// Then check: System Logs > All (filter by your session)</pre>
+
+<h3>What Debug Business Rule shows you</h3>
+<pre>// Example output in System Logs after saving an incident:
+// 
+// === Business Rule: Set Priority (BEFORE, order 100) ===
+// Table: incident
+// Condition: priority changes
+// Result: EXECUTED (4.2ms)
+//
+// === Business Rule: Auto-Assign (AFTER, order 200) ===
+// Table: incident
+// Condition: assignment_group is empty
+// Result: SKIPPED (condition false)
+//
+// This tells you exactly which rules ran, which were skipped, and why.</pre>
+
+<h3>What Debug Security shows you</h3>
+<pre>// Example output when a user can't see a field:
+//
+// ACL: incident.caller_id (read)
+// Role required: itil — PASS
+// Condition: active=true — PASS
+// Script: answer = ... — FAIL
+// Result: DENIED
+//
+// Now you know exactly which ACL is blocking and which check failed.</pre>
+
+<h2>System Logs</h2>
+<pre>// Everything you write with gs.info, gs.warn, gs.error shows up here
+// Filter by source to find your script's output:
+gs.info('My debug output', 'MyScriptInclude');
+
+// In the syslog table, filter:
+//   Source = MyScriptInclude
+//   Level = Info/Warning/Error
+//   Created > last 10 minutes</pre>
+
+<h2>Transaction Log</h2>
+<p>Every HTTP request to the instance is logged with timing data. When a form is slow, find the transaction here.</p>
+<pre>// Navigate to: syslog_transaction_list.do
+// Key fields:
+//   URL — which page/form/API was requested
+//   Response time — total milliseconds
+//   SQL count — number of database queries
+//   Business Rule time — time spent in BRs
+//
+// Red flags:
+//   Response time > 5000ms — slow transaction
+//   SQL count > 100 — too many queries (N+1 problem likely)
+//   Business Rule time > 2000ms — heavy BR logic</pre>
+
+<h2>Slow Query Log</h2>
+<p>Queries that take longer than the threshold (default 500ms) are automatically logged here.</p>
+<pre>// Navigate to: sys_slow_query_list.do
+// Key fields:
+//   Table — which table was queried
+//   Execution time — how long the query took
+//   Source — which script/BR triggered it
+//   Query — the encoded query string
+//
+// Common causes:
+//   Missing index on a filtered field
+//   No setLimit() on a large table query
+//   Dot-walking through multiple reference fields
+//   GlideRecord loop inside another GlideRecord loop (N+1)</pre>
+
+<h2>Email debugging</h2>
+<pre>// When a notification does not send, check these in order:
+// 1. sys_email_list.do — is the email record created? What is its state?
+//    States: ready, sent, send-failed, skipped
+//
+// 2. If state = skipped:
+//    Check the notification's conditions and "Who will receive" config
+//    Check if the user unsubscribed (notification_preference table)
+//
+// 3. If state = send-failed:
+//    Check syslog for SMTP errors
+//
+// 4. In sub-production instances:
+//    Check glide.email.test.user property — it redirects ALL email
+//    to a single address. This is by design to prevent test emails
+//    going to real users.</pre>
+
+<h2>Script debugging without session debug</h2>
+<pre>// Quick debugging pattern for Business Rules:
+(function executeRule(current, previous) {
+    // Temporarily add targeted logging
+    gs.info('[BR:SetPriority] Fired on ' + current.number +
+            ' | impact=' + current.getValue('impact') +
+            ' | urgency=' + current.getValue('urgency') +
+            ' | old_priority=' + (previous ? previous.getValue('priority') : 'N/A'));
+
+    // Your logic here...
+
+    gs.info('[BR:SetPriority] Result: priority set to ' + current.getValue('priority'));
+})(current, previous);
+
+// Find your logs: System Logs > All, filter Source CONTAINS SetPriority</pre>
+
+<h2>Stats.do — Quick instance diagnostics</h2>
+<p>Navigate to <code>your-instance.service-now.com/stats.do</code> for a quick overview of instance health: memory usage, active transactions, semaphore counts, node status, and session counts. Useful during performance incidents when you need a fast read on whether the instance itself is under stress.</p>
+
+<h2>Common traps</h2>
+<ul>
+<li><strong>Session debug left on:</strong> Debug sessions generate large amounts of log data. Always disable after you are done. Leaving it on in production degrades performance.</li>
+<li><strong>Logging sensitive data:</strong> <code>gs.info</code> writes to syslog which is visible to admins. Never log passwords, PII, or API keys.</li>
+<li><strong>Debug output not showing:</strong> If you enabled debug but see nothing, check that you are looking at the correct time window and that your script actually executed. Also verify you are on the correct node in a multi-node instance.</li>
+<li><strong>Transaction log vs slow query:</strong> A slow transaction does not always mean a slow query. The time could be in Business Rule execution, external REST calls, or Flow Designer actions. Check the breakdown columns.</li>
+</ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/javascript-inside-servicenow-from-scratch" rel="prev"><small>‹ Previous</small><strong>JavaScript Inside ServiceNow: var, let, const, Types, and What Actually Runs Where</strong></a>
+          <a href="/article/catalog-scripting-reference" rel="next"><small>Next ›</small><strong>Service Catalog Scripting: Record Producers, Variables, Catalog Client Scripts, and Order Guides</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Debugging ServiceNow: Session Debug, Slow Queries, Transaction Logs, and Script Tracing",
+  "description": "When something breaks in production and you have 10 minutes to find it. System diagnostics, session debug modules, transaction logs, and the logs that actually tell you what happened.",
+  "datePublished": "2026-04-07T16:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

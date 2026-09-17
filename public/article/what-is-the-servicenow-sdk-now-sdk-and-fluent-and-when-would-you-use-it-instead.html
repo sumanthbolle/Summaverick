@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What is the ServiceNow SDK (Now SDK) and Fluent, and when would you use it instead of App Engine Studio? — Summaverick</title>
+  <meta name="description" content="What the Interviewer Wants to Hear They want to know you understand the modern, code-first way to build ServiceNow apps — the Now SDK and its declarative Fluent library — and that you can articulate…" />
+  <link rel="canonical" href="https://summaverick.com/article/what-is-the-servicenow-sdk-now-sdk-and-fluent-and-when-would-you-use-it-instead" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="What is the ServiceNow SDK (Now SDK) and Fluent, and when would you use it instead of App Engine Studio? — Summaverick" />
+  <meta property="og:description" content="What the Interviewer Wants to Hear They want to know you understand the modern, code-first way to build ServiceNow apps — the Now SDK and its declarative Fluent library — and that you can articulate…" />
+  <meta property="og:url" content="https://summaverick.com/article/what-is-the-servicenow-sdk-now-sdk-and-fluent-and-when-would-you-use-it-instead" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Architecture</p>
+        <h1>What is the ServiceNow SDK (Now SDK) and Fluent, and when would you use it instead of App Engine Studio?</h1>
+        <p class="article-meta">Senior · ServiceNow · Jul 2026</p>
+        <div class="prose">
+<h4>What the Interviewer Wants to Hear</h4>
+<p>They want to know you understand the modern, code-first way to build ServiceNow apps — the <strong>Now SDK</strong> and its declarative <strong>Fluent</strong> library — and that you can articulate when it beats clicking through App Engine Studio. Strong candidates frame it as source-control-first development, not a replacement for the platform.</p>
+
+<h4>The Answer</h4>
+<p>The <strong>ServiceNow SDK (Now SDK)</strong> lets you build a scoped application as TypeScript source on your own machine, using <strong>Fluent</strong> — a declarative library where each platform artifact (table, business rule, script include, ACL, REST API, flow, ATF test) is a typed function call. You then run a build that transforms that code into deployable metadata and pushes it to an instance.</p>
+<p>The point is <strong>engineering discipline</strong>: your app lives in Git, so you get real diffs, pull requests, code review, and repeatable CI/CD builds — instead of shuttling Update Sets between instances.</p>
+<pre>import { BusinessRule } from '@servicenow/sdk/core'
+import { setOrderPriority } from '../server/set-order-priority'
+
+BusinessRule({
+    $id: Now.ID['set_order_priority'],
+    name: 'Set Order Priority',
+    active: true,
+    table: 'x_myapp_order',
+    when: 'before',
+    action: ['insert', 'update'],
+    script: setOrderPriority, // preferred: JS module (Now.include still works)
+})</pre>
+<p>The declarative "when it runs" lives in the <code>.now.ts</code> file; server logic preferably lives in a <code>src/server</code> module with typed Glide APIs. A project has <code>now.config.json</code> (scope + <code>scopeId</code>), <code>src/fluent</code>, and <code>now-sdk build</code> / <code>now-sdk install</code> steps.</p>
+
+<h4>SDK vs App Engine Studio</h4>
+<ul>
+<li>Choose the <strong>SDK/Fluent</strong> for engineering-led teams that want Git, code review, TypeScript types, and CI/CD across environments.</li>
+<li>Choose <strong>App Engine Studio / the platform UI</strong> for fast low-code work by admins and citizen developers, or small single-instance apps.</li>
+<li>They coexist — an SDK-built app still opens in the platform.</li>
+</ul>
+
+<div class="tip-box"><strong>Score points:</strong> mention that <code>Now.ID['...']</code> maps to stable sys_ids in <code>src/fluent/generated/keys.ts</code> (never hand-edit; never invent sys_ids), that JS modules are preferred over inlined <code>Now.include</code> scripts, that <code>now-sdk install</code> pushes the build to an instance, and that <em>ServiceNow/sdk-examples</em> plus <code>now-sdk explain</code> are the canonical references.</div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/interviews"><small>‹ Previous</small><strong>Back to the collection</strong></a>
+          <a href="/article/what-is-servicenow-and-why-do-enterprises-use-it-explain-it-as-if-you-re-talking" rel="next"><small>Next ›</small><strong>What is ServiceNow, and why do enterprises use it? Explain it as if you're talking to someone who has never heard of the platform.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "What is the ServiceNow SDK (Now SDK) and Fluent, and when would you use it instead of App Engine Studio?",
+  "description": "What the Interviewer Wants to Hear They want to know you understand the modern, code-first way to build ServiceNow apps — the Now SDK and its declarative Fluent library — and that you can articulate…",
+  "datePublished": "2026-07-02T12:00:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
