@@ -1,9 +1,8 @@
 /*
- * type.css — the typeface and the type system.
+ * type.css — the typeface and the type scale.
  *
- * Geist (variable) for text and UI; Geist Mono (variable) for traces, code and
- * data — the mono is the site's working voice, since the product is a machine
- * showing its work. Files are vendored under /assets/fonts (latin subset).
+ * Geist (variable) for text and UI; Geist Mono for traces, citations and
+ * data. Files are vendored under /assets/fonts (latin subset).
  */
 
 @font-face {
@@ -29,53 +28,32 @@ body {
   color: var(--c-text);
   font-feature-settings: "ss01", "cv01";
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3, h4 {
   color: var(--c-text);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   text-wrap: balance;
 }
 
-.display {
-  font-size: var(--step-5);
-  line-height: 0.98;
-  letter-spacing: -0.03em;
-  font-weight: 560;
-}
-
 h1, .h1 { font-size: var(--step-4); }
-h2, .h2 { font-size: var(--step-3); }
-h3, .h3 { font-size: var(--step-2); letter-spacing: var(--tracking-snug); }
-h4, .h4 { font-size: var(--step-1); letter-spacing: var(--tracking-snug); line-height: var(--leading-snug); }
+h2 { font-size: var(--step-3); }
+h3 { font-size: var(--step-2); letter-spacing: var(--tracking-snug); }
+h4 { font-size: var(--step-1); letter-spacing: var(--tracking-snug); line-height: var(--leading-snug); }
 
 p { text-wrap: pretty; }
 
 .lead {
   font-size: var(--step-1);
   line-height: var(--leading-snug);
-  color: var(--c-text-dim);
   letter-spacing: var(--tracking-snug);
-  font-weight: 400;
+  font-weight: var(--weight-regular);
+  color: var(--c-text-dim);
 }
-
-.eyebrow {
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--c-text-mute);
-  font-weight: 500;
-}
-
-.mono { font-family: var(--font-mono); }
 
 small, .small { font-size: var(--step--1); }
 
 .text-dim  { color: var(--c-text-dim); }
 .text-mute { color: var(--c-text-mute); }
-.text-ok   { color: var(--c-ok); }
-.text-bad  { color: var(--c-bad); }
