@@ -1,11 +1,14 @@
 /*
- * tokens.css — the single source of truth for colour, space, type scale,
- * radii, motion and elevation. Nothing anywhere else in the site hardcodes a
- * hex value; every colour resolves to a token defined here.
+ * tokens.css — colour, space, type scale, radii, motion and elevation.
+ * Every colour in the site resolves to a token defined here.
  *
- * Themes: light is the base on bare :root. Dark is applied when the OS asks
- * for it (unless the visitor forced light) and when the visitor forces dark.
- * Body text clears 4.5:1 contrast against its background in both themes.
+ * Light is the base on :root; dark follows the operating system. There is no
+ * in-app appearance switch — HIG "Dark Mode > Best practices" asks apps to
+ * respect the systemwide choice rather than add a second setting people have
+ * to keep in sync.
+ *
+ * Contrast: body text clears 4.5:1 on its background in both appearances, and
+ * the accent clears 4.5:1 on both the page and the recessed panels.
  */
 
 :root {
@@ -17,62 +20,67 @@
   --c-line:          rgba(15, 15, 20, 0.10);  /* hairlines */
   --c-line-strong:   rgba(15, 15, 20, 0.18);
 
-  --c-text:          #1d1d1f;   /* primary text  ~15:1    */
-  --c-text-dim:      #6e6e73;   /* secondary     ~5:1     */
-  --c-text-mute:     #6d6d78;   /* tertiary      ~4.7:1   */
+  --c-text:          #1d1d1f;   /* primary    16.8:1 */
+  --c-text-dim:      #6e6e73;   /* secondary   5.1:1 */
+  --c-text-mute:     #6d6d78;   /* tertiary    5.1:1 */
 
-  /* ---- Brand + signal ------------------------------------------------- */
-  --c-accent:        #0071e3;   /* restrained blue action */
-  --c-accent-press:  #0077ed;
-  --c-accent-soft:   rgba(0, 113, 227, 0.10);
-  --c-on-accent:     #ffffff;
+  /* ---- Accent ---------------------------------------------------------
+     Two roles, because no single blue can both read as text on white and
+     carry white text at 4.5:1. --c-accent tints text and links; --c-accent-
+     fill backs solid controls. */
+  --c-accent:        #0066cc;   /* 5.1:1 on the recessed panels  */
+  --c-accent-press:  #0058b0;
+  --c-accent-soft:   rgba(0, 102, 204, 0.10);
+  --c-accent-fill:   #0066cc;
+  --c-on-accent:     #ffffff;   /* 5.6:1 on the fill             */
 
-  /* Company masthead / footer — always ink, independent of theme. Neutral
-     near-black with grey/white text (no blue cast). */
+  /* ---- Ink ------------------------------------------------------------
+     The footer and the depth band are ink in both appearances, so they
+     carry their own ramp. */
   --c-ink:           #0d0d11;
-  --c-ink-2:         #17171c;
   --c-on-ink:        #f4f4f7;
   --c-on-ink-dim:    #c6c6cf;
   --c-on-ink-mute:   #9a9aa6;
   --c-ink-line:      rgba(244, 244, 247, 0.14);
-  --c-ink-accent:    #e9e9f0;   /* near-white — for hovers on ink */
 
-  --c-ok:            #0f8f4d;   /* verified / pass        */
+  /* ---- Status ---------------------------------------------------------
+     Always paired with a glyph or a label. HIG "Color > Inclusive color":
+     never let colour be the only carrier of meaning. */
+  --c-ok:            #0f8f4d;
   --c-ok-soft:       rgba(15, 143, 77, 0.12);
-  --c-bad:           #d23842;   /* failed / blocked       */
+  --c-bad:           #d23842;
   --c-bad-soft:      rgba(210, 56, 66, 0.12);
-  --c-warn:          #b8791a;   /* caution                */
-  --c-warn-soft:     rgba(184, 121, 26, 0.12);
 
-  /* Retrieval-layer identity (scene 3). Neutral ramp. */
-  --c-layer-1:       #16161c;
-  --c-layer-2:       #6d6d78;
-  --c-layer-3:       #9a9aa6;   /* dimmed, off by default */
-
-  /* ---- Type ----------------------------------------------------------- */
+  /* ---- Type -----------------------------------------------------------
+     Geist for text, Geist Mono for traces and data. Two families, per HIG
+     "Typography > Conveying hierarchy". */
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", "JetBrains Mono",
     "Cascadia Code", Menlo, Consolas, monospace;
 
-  /* Fluid scale. Steps stay proportional across the viewport range. */
+  /* Fluid scale. Body lands at 17-18px, the platform default for reading. */
   --step--1: clamp(0.82rem, 0.79rem + 0.14vw, 0.9rem);
-  --step-0:  clamp(1.0rem,  0.96rem + 0.2vw,  1.12rem);   /* body ~17-18px */
+  --step-0:  clamp(1rem,    0.96rem + 0.2vw,  1.12rem);
   --step-1:  clamp(1.2rem,  1.11rem + 0.44vw, 1.5rem);
   --step-2:  clamp(1.5rem,  1.32rem + 0.9vw,  2.1rem);
-  --step-3:  clamp(1.9rem,  1.55rem + 1.7vw,  3.0rem);
-  --step-4:  clamp(2.4rem,  1.8rem  + 3.0vw,  4.2rem);
-  --step-5:  clamp(3.0rem,  2.0rem  + 5.0vw,  6.0rem);    /* hero display  */
+  --step-3:  clamp(1.9rem,  1.55rem + 1.7vw,  3rem);
+  --step-4:  clamp(2.4rem,  1.8rem  + 3vw,    4.2rem);
 
-  --leading-tight:  1.04;
+  /* Weights stay on the three the HIG recommends for body and headings: no
+     Thin, no Light, and no in-between variable weights that read as
+     accidents. */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+
+  --leading-tight:  1.05;
   --leading-snug:   1.22;
   --leading-normal: 1.55;
   --tracking-tight: -0.022em;
   --tracking-snug:  -0.012em;
-  --tracking-wide:  0.06em;
 
   /* ---- Space (4px base) ----------------------------------------------- */
-  --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
@@ -81,11 +89,12 @@
   --space-7: 3rem;
   --space-8: 4rem;
   --space-9: 6rem;
-  --space-10: 8rem;
-  --space-12: 12rem;
 
-  --measure: 68ch;                 /* readable text column */
-  --container: 76rem;              /* page max width       */
+  --container: 76rem;
+
+  /* Minimum comfortable hit area for a pointer. Touch targets get --tap. */
+  --hit: 28px;
+  --tap: 44px;
 
   /* ---- Radii ---------------------------------------------------------- */
   --radius-sm: 8px;
@@ -95,30 +104,21 @@
   --radius-pill: 999px;
 
   /* ---- Elevation ------------------------------------------------------ */
-  --shadow-1: 0 1px 2px rgba(15, 15, 20, 0.06),
-              0 1px 1px rgba(15, 15, 20, 0.04);
   --shadow-2: 0 6px 20px rgba(15, 15, 20, 0.08),
               0 2px 6px rgba(15, 15, 20, 0.05);
-  --shadow-3: 0 20px 60px rgba(15, 15, 20, 0.14),
-              0 6px 18px rgba(15, 15, 20, 0.08);
 
   /* ---- Motion --------------------------------------------------------- */
   --dur-fast: 160ms;
   --dur-base: 260ms;
-  --dur-slow: 460ms;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);   /* settle, Apple-ish     */
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-emph: cubic-bezier(0.16, 1, 0.3, 1);    /* emphasised reveal     */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* ---- Focus ---------------------------------------------------------- */
   --focus-ring: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
 
   color-scheme: light;
 }
 
-/* Dark — OS-driven, unless the visitor forced light. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root {
     --c-bg:          #0a0a0d;
     --c-bg-elev:     #101015;
     --c-surface:     #131319;
@@ -130,65 +130,21 @@
     --c-text-dim:    #b6b6c2;
     --c-text-mute:   #8b8b98;
 
-    /* Monochrome: on dark, the accent is near-white so buttons read white. */
-    --c-accent:      #f4f4f7;
-    --c-accent-press:#ffffff;
-    --c-accent-soft: rgba(255, 255, 255, 0.14);
-    --c-on-accent:   #0a0a0d;
+    /* Same blue, brighter so it still reads on a dark ground (6.6:1); the
+       fill stays deep enough to carry white at 4.9:1. */
+    --c-accent:      #2997ff;
+    --c-accent-press:#55aeff;
+    --c-accent-soft: rgba(41, 151, 255, 0.16);
+    --c-accent-fill: #0a6fd6;
+    --c-on-accent:   #ffffff;
 
     --c-ok:          #33cc7a;
     --c-ok-soft:     rgba(51, 204, 122, 0.16);
     --c-bad:         #ff6069;
     --c-bad-soft:    rgba(255, 96, 105, 0.16);
-    --c-warn:        #f0b13a;
-    --c-warn-soft:   rgba(240, 177, 58, 0.16);
 
-    --c-layer-1:     #f4f4f7;
-    --c-layer-2:     #8b8b98;
-    --c-layer-3:     #6d6d78;
-
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.55);
-    --shadow-3: 0 24px 70px rgba(0, 0, 0, 0.6);
-
-    --focus-ring: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
 
     color-scheme: dark;
   }
-}
-
-/* Dark — visitor forced it (wins in both directions). */
-:root[data-theme="dark"] {
-  --c-bg:          #0a0a0d;
-  --c-bg-elev:     #101015;
-  --c-surface:     #131319;
-  --c-surface-2:   #1a1a22;
-  --c-line:        rgba(255, 255, 255, 0.10);
-  --c-line-strong: rgba(255, 255, 255, 0.20);
-
-  --c-text:        #f4f4f7;
-  --c-text-dim:    #b6b6c2;
-  --c-text-mute:   #8b8b98;
-
-  --c-accent:      #f4f4f7;
-  --c-accent-press:#ffffff;
-  --c-accent-soft: rgba(255, 255, 255, 0.14);
-  --c-on-accent:   #0a0a0d;
-
-  --c-ok:          #33cc7a;
-  --c-ok-soft:     rgba(51, 204, 122, 0.16);
-  --c-bad:         #ff6069;
-  --c-bad-soft:    rgba(255, 96, 105, 0.16);
-  --c-warn:        #f0b13a;
-  --c-warn-soft:   rgba(240, 177, 58, 0.16);
-
-  --c-layer-1:     #f4f4f7;
-  --c-layer-2:     #8b8b98;
-  --c-layer-3:     #6d6d78;
-
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.55);
-  --shadow-3: 0 24px 70px rgba(0, 0, 0, 0.6);
-
-  color-scheme: dark;
 }

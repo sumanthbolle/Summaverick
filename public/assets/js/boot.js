@@ -1,15 +1,12 @@
-/*
- * boot.js — company homepage. Core chrome and a progressive hero reveal.
- */
+/* boot.js — homepage. Shared chrome and the contact form; the hero entrance
+ * is a CSS animation so it never depends on this file loading. */
 
 import { initChrome } from "./chrome.js";
-import { initContent } from "./content.js";
-import { initStudioHero } from "./home.js";
+import { initLeadForm } from "./lead-form.js";
 
 function boot() {
   initChrome();
-  initStudioHero();
-  initContent({ reveal: false });
+  initLeadForm();
 }
 
 if (document.readyState === "loading") {

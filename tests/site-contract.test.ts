@@ -51,6 +51,23 @@ describe("Classic Studio public contract", () => {
     }
   });
 
+  it("keeps every colour in the token layer", () => {
+    for (const sheet of ["public/assets/css/site.css", "public/assets/css/type.css"]) {
+      const css = text(sheet);
+      expect(css, `${sheet} hard-codes a hex colour`).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+      expect(css, `${sheet} hard-codes an rgb colour`).not.toMatch(/\brgba?\(/i);
+    }
+  });
+
+  it("follows the system appearance instead of an in-page override", () => {
+    const tokens = text("public/assets/css/tokens.css");
+
+    expect(tokens).toContain("@media (prefers-color-scheme: dark)");
+    for (const page of ["public/index.html", "public/ask.html"]) {
+      expect(text(page), `${page} pins an appearance`).not.toContain("data-theme");
+    }
+  });
+
   it("keeps blog and interview routes in the shared studio library", () => {
     const learn = text("public/learn.html");
     const interviews = text("public/interviews.html");

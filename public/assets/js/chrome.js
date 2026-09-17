@@ -1,6 +1,9 @@
 /*
- * Shared chrome for the company surface (home, ask). Theme, scrolled nav,
- * mobile drawer, and the copyright year. Product tools keep /assets/app.js.
+ * Shared chrome for the company surface (home, ask). Scrolled nav, mobile
+ * drawer, and the copyright year. Product tools keep /assets/app.js.
+ *
+ * There is no appearance switch: the palette follows prefers-color-scheme so
+ * the site matches whatever the visitor already chose system-wide.
  */
 
 import { $ } from "./lib/dom.js";
@@ -13,19 +16,6 @@ export function initChrome() {
   };
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
-
-  const toggle = $("#theme-toggle");
-  toggle?.addEventListener("click", () => {
-    const root = document.documentElement;
-    const current =
-      root.getAttribute("data-theme") ||
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    const next = current === "dark" ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try {
-      localStorage.setItem("sv-theme", next);
-    } catch (e) {}
-  });
 
   const yr = $("[data-year]");
   if (yr) yr.textContent = String(new Date().getFullYear());
