@@ -2,16 +2,22 @@
  * tokens.css — colour, space, type scale, radii, motion and elevation.
  * Every colour in the site resolves to a token defined here.
  *
- * Light is the base on :root; dark follows the operating system. There is no
- * in-app appearance switch — HIG "Dark Mode > Best practices" asks apps to
- * respect the systemwide choice rather than add a second setting people have
- * to keep in sync.
+ * The palette is monochrome: ink text, grey washes, and solid black/white
+ * controls. There is one blue nowhere on the site; status colours (green,
+ * red) appear only beside a glyph or label, never alone.
  *
- * Contrast: body text clears 4.5:1 on its background in both appearances, and
- * the accent clears 4.5:1 on both the page and the recessed panels.
+ * Appearance: light is the base. The dark ramp applies when the operating
+ * system asks for it, unless the visitor picked otherwise with the nav
+ * toggle — an explicit data-theme on <html> always wins. The two dark
+ * blocks below must stay identical; one answers the OS, the other answers
+ * the toggle.
+ *
+ * Contrast: body text clears 4.5:1 on its background in both appearances,
+ * and the solid controls carry their label at 15:1 or better.
  */
 
-:root {
+:root,
+:root[data-theme="light"] {
   /* ---- Neutral ramp (light) ------------------------------------------- */
   --c-bg:            #ffffff;   /* page ground            */
   --c-bg-elev:       #f5f5f7;   /* recessed panels        */
@@ -24,15 +30,14 @@
   --c-text-dim:      #6e6e73;   /* secondary   5.1:1 */
   --c-text-mute:     #6d6d78;   /* tertiary    5.1:1 */
 
-  /* ---- Accent ---------------------------------------------------------
-     Two roles, because no single blue can both read as text on white and
-     carry white text at 4.5:1. --c-accent tints text and links; --c-accent-
-     fill backs solid controls. */
-  --c-accent:        #0066cc;   /* 5.1:1 on the recessed panels  */
-  --c-accent-press:  #0058b0;
-  --c-accent-soft:   rgba(0, 102, 204, 0.10);
-  --c-accent-fill:   #0066cc;
-  --c-on-accent:     #ffffff;   /* 5.6:1 on the fill             */
+  /* ---- Controls -------------------------------------------------------
+     Solid ink buttons with paper labels. Links are ink too, told apart by
+     their underline rather than their hue. */
+  --c-accent:        #1d1d1f;
+  --c-accent-press:  #000000;
+  --c-accent-soft:   rgba(15, 15, 20, 0.08);
+  --c-accent-fill:   #1d1d1f;
+  --c-on-accent:     #ffffff;   /* 16.8:1 on the fill            */
 
   /* ---- Ink ------------------------------------------------------------
      The footer and the depth band are ink in both appearances, so they
@@ -112,13 +117,13 @@
   --dur-base: 260ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 
-  --focus-ring: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
+  --focus-ring: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-text);
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --c-bg:          #0a0a0d;
     --c-bg-elev:     #101015;
     --c-surface:     #131319;
@@ -130,13 +135,12 @@
     --c-text-dim:    #b6b6c2;
     --c-text-mute:   #8b8b98;
 
-    /* Same blue, brighter so it still reads on a dark ground (6.6:1); the
-       fill stays deep enough to carry white at 4.9:1. */
-    --c-accent:      #2997ff;
-    --c-accent-press:#55aeff;
-    --c-accent-soft: rgba(41, 151, 255, 0.16);
-    --c-accent-fill: #0a6fd6;
-    --c-on-accent:   #ffffff;
+    /* Paper buttons with ink labels — the same control, inverted. */
+    --c-accent:      #f4f4f7;
+    --c-accent-press:#ffffff;
+    --c-accent-soft: rgba(244, 244, 247, 0.12);
+    --c-accent-fill: #f4f4f7;
+    --c-on-accent:   #0a0a0d;   /* 15.2:1 on the fill */
 
     --c-ok:          #33cc7a;
     --c-ok-soft:     rgba(51, 204, 122, 0.16);
@@ -147,4 +151,33 @@
 
     color-scheme: dark;
   }
+}
+
+/* Explicit choice from the nav toggle. Must match the block above. */
+:root[data-theme="dark"] {
+  --c-bg:          #0a0a0d;
+  --c-bg-elev:     #101015;
+  --c-surface:     #131319;
+  --c-surface-2:   #1a1a22;
+  --c-line:        rgba(255, 255, 255, 0.10);
+  --c-line-strong: rgba(255, 255, 255, 0.20);
+
+  --c-text:        #f4f4f7;
+  --c-text-dim:    #b6b6c2;
+  --c-text-mute:   #8b8b98;
+
+  --c-accent:      #f4f4f7;
+  --c-accent-press:#ffffff;
+  --c-accent-soft: rgba(244, 244, 247, 0.12);
+  --c-accent-fill: #f4f4f7;
+  --c-on-accent:   #0a0a0d;
+
+  --c-ok:          #33cc7a;
+  --c-ok-soft:     rgba(51, 204, 122, 0.16);
+  --c-bad:         #ff6069;
+  --c-bad-soft:    rgba(255, 96, 105, 0.16);
+
+  --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
 }

@@ -41,7 +41,8 @@ describe("Classic Studio public contract", () => {
       [...home.matchAll(/id="([^"]+)"/g)].map((m) => m[1] as string)
     );
 
-    for (const page of ["public/index.html", "public/ask.html"]) {
+    const articleSample = "public/article/ai-agents-servicenow-beginner.html";
+    for (const page of ["public/index.html", "public/ask.html", "public/learn.html", "public/interviews.html", articleSample]) {
       const anchors = [...text(page).matchAll(/href="\/?#([^"]+)"/g)].map(
         (m) => m[1] as string
       );
@@ -59,12 +60,28 @@ describe("Classic Studio public contract", () => {
     }
   });
 
-  it("follows the system appearance instead of an in-page override", () => {
+  it("stays monochrome — no blue anywhere in the stylesheets", () => {
+    const blues = ["#0066cc", "#0058b0", "#0071e3", "#0077ed", "#0a6fd6", "#2997ff", "#55aeff", "#0a84ff", "#409cff"];
+    for (const sheet of ["public/assets/css/tokens.css", "public/assets/app.css"]) {
+      const css = text(sheet);
+      for (const blue of blues) {
+        expect(css, `${sheet} still contains ${blue}`).not.toContain(blue);
+      }
+    }
+  });
+
+  it("lets the visitor override the system appearance", () => {
     const tokens = text("public/assets/css/tokens.css");
 
+    // OS default plus an explicit choice that always wins.
     expect(tokens).toContain("@media (prefers-color-scheme: dark)");
-    for (const page of ["public/index.html", "public/ask.html"]) {
-      expect(text(page), `${page} pins an appearance`).not.toContain("data-theme");
+    expect(tokens).toContain(':root[data-theme="dark"]');
+    expect(tokens).toContain(':root[data-theme="light"]');
+
+    for (const page of ["public/index.html", "public/ask.html", "public/learn.html"]) {
+      const html = text(page);
+      expect(html, `${page} has no appearance toggle`).toContain('id="theme-toggle"');
+      expect(html, `${page} flashes before paint`).toContain("sv-theme");
     }
   });
 
@@ -133,7 +150,8 @@ describe("Classic Studio public contract", () => {
 
     const sitemap = text("public/sitemap.xml");
     for (const slug of slugs) {
-      expect(sitemap, slug).toContain(`/article/${slug}`);
+      // Slugs with & are XML-escaped in the sitemap, as the builder writes.
+      expect(sitemap, slug).toContain(`/article/${slug.replace(/&/g, "&amp;")}`);
     }
     expect(text("public/robots.txt")).toContain("Sitemap: https://summaverick.com/sitemap.xml");
   });
