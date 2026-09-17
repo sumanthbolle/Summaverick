@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What is the Import Set and Transform Map in ServiceNow? Describe a scenario where you'd use them. — Summaverick</title>
+  <meta name="description" content="What the Interviewer Wants to Hear Data import is a critical operation in every ServiceNow implementation. Import Sets and Transform Maps are how external data (CSV files, API feeds, Excel…" />
+  <link rel="canonical" href="https://summaverick.com/article/what-is-the-import-set-and-transform-map-in-servicenow-describe-a-scenario-where" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="What is the Import Set and Transform Map in ServiceNow? Describe a scenario where you'd use them. — Summaverick" />
+  <meta property="og:description" content="What the Interviewer Wants to Hear Data import is a critical operation in every ServiceNow implementation. Import Sets and Transform Maps are how external data (CSV files, API feeds, Excel…" />
+  <meta property="og:url" content="https://summaverick.com/article/what-is-the-import-set-and-transform-map-in-servicenow-describe-a-scenario-where" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Integration</p>
+        <h1>What is the Import Set and Transform Map in ServiceNow? Describe a scenario where you'd use them.</h1>
+        <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>What the Interviewer Wants to Hear</h4><p>Data import is a critical operation in every ServiceNow implementation. Import Sets and Transform Maps are how external data (CSV files, API feeds, Excel spreadsheets) gets loaded into ServiceNow tables.</p><h4>The Two-Step Process</h4><ul><li><strong>Import Set:</strong> The raw data landing zone. External data is loaded into a temporary staging table first — not directly into the target table. This staging table is called an Import Set table.</li><li><strong>Transform Map:</strong> The mapping rules that convert staging data into target table records. It defines which source column maps to which target field, and includes logic for data transformation and upsert handling.</li></ul><h4>Real Scenario: Employee Onboarding</h4><pre>// HR sends a CSV every Monday with new hires:
+// first_name, last_name, email, department, start_date
+// John, Smith, john.smith@company.com, Engineering, 2026-04-01
+// Jane, Doe, jane.doe@company.com, Marketing, 2026-04-01
+
+// STEP 1: Data Source (scheduled or manual)
+// Configure a Data Source pointing to the CSV file location
+// ServiceNow reads the CSV and loads rows into staging table
+
+// STEP 2: Import Set (staging table)
+// Table: u_new_hire_import
+// Each CSV row becomes a record in this staging table
+// Data is raw — no validation yet
+
+// STEP 3: Transform Map
+// Maps staging columns to target table (sys_user):
+//   u_first_name  → first_name
+//   u_last_name   → last_name  
+//   u_email       → email
+//   u_department  → department (lookup by name)
+//   u_start_date  → u_start_date
+//
+// Coalesce field: email
+// If email exists in sys_user → UPDATE that record
+// If email doesn't exist → INSERT new record
+
+// STEP 4: Transform runs
+// Each staging row is transformed and written to sys_user
+// Transform scripts can run additional logic:
+(function transformRow(source, target, map, log, action) {
+  // Auto-generate user_name from email
+  target.user_name = source.u_email.toString().split('@')[0];
+  // Set default password
+  target.user_password = 'Welcome2026!';
+})(source, target, map, log, action);</pre><h4>Key Concepts</h4><ul><li><strong>Coalesce field:</strong> The matching key for upsert logic. If a record with this value exists in the target, UPDATE it. If not, INSERT a new one.</li><li><strong>Transform scripts:</strong> Run before/after each row or at the start/end of the entire import. Use for data cleanup, validation, or custom logic.</li><li><strong>Import Set Run:</strong> Each import execution creates a 'run' record with success/failure counts. Check here for errors.</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>The typical gotcha question: 'What happens if you set the wrong coalesce field?' If the field isn't unique (e.g., 'department' instead of 'email'), the transform will update the FIRST matching record for all rows with the same department — destroying data. Always choose a unique identifier as the coalesce field.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/what-is-the-difference-between-getvalue-and-getdisplayvalue-in-gliderecord-why-d" rel="prev"><small>‹ Previous</small><strong>What is the difference between getValue() and getDisplayValue() in GlideRecord? Why does this matter?</strong></a>
+          <a href="/article/what-are-roles-and-groups-in-servicenow-how-do-they-work-together-to-control-wha" rel="next"><small>Next ›</small><strong>What are Roles and Groups in ServiceNow? How do they work together to control what users can see and do?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "What is the Import Set and Transform Map in ServiceNow? Describe a scenario where you'd use them.",
+  "description": "What the Interviewer Wants to Hear Data import is a critical operation in every ServiceNow implementation. Import Sets and Transform Maps are how external data (CSV files, API feeds, Excel…",
+  "datePublished": "2026-03-16T06:50:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

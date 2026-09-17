@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Explain the difference between an Incident, a Problem, a Change Request, and a Service Request. Give a real-world scenario that connects all four. — Summaverick</title>
+  <meta name="description" content="Why This Comes Up in Interviews This question tests your ITIL fundamentals. Every ServiceNow admin and developer needs to know these four record types cold — they're the backbone of ITSM. The Four…" />
+  <link rel="canonical" href="https://summaverick.com/article/explain-the-difference-between-an-incident-a-problem-a-change-request-and-a-serv" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Explain the difference between an Incident, a Problem, a Change Request, and a Service Request. Give a real-world scenario that connects all four. — Summaverick" />
+  <meta property="og:description" content="Why This Comes Up in Interviews This question tests your ITIL fundamentals. Every ServiceNow admin and developer needs to know these four record types cold — they're the backbone of ITSM. The Four…" />
+  <meta property="og:url" content="https://summaverick.com/article/explain-the-difference-between-an-incident-a-problem-a-change-request-and-a-serv" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>Explain the difference between an Incident, a Problem, a Change Request, and a Service Request. Give a real-world scenario that connects all four.</h1>
+        <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Why This Comes Up in Interviews</h4><p>This question tests your ITIL fundamentals. Every ServiceNow admin and developer needs to know these four record types cold — they're the backbone of ITSM.</p><h4>The Four Pillars</h4><ul><li><strong>Incident:</strong> Something is broken or not working as expected RIGHT NOW. Focus: restore service as quickly as possible. Not about finding root cause — just get things working again. <em>'The printer on floor 3 isn't printing.'</em></li><li><strong>Problem:</strong> The investigation into WHY incidents keep happening. Focus: find the root cause and eliminate it permanently. <em>'Floor 3 printer fails every Monday because the print spooler service crashes during the weekly backup.'</em></li><li><strong>Change Request:</strong> A planned modification to the IT environment that goes through approval and risk assessment. Focus: minimize disruption while implementing necessary changes. <em>'Schedule a maintenance window to move the print spooler to a separate server so the backup doesn't crash it.'</em></li><li><strong>Service Request:</strong> A standard, pre-approved request for something the user needs. No break/fix, no investigation, no risk assessment — just fulfillment. <em>'I need a new toner cartridge for the floor 3 printer.'</em></li></ul><h4>A Scenario That Connects All Four</h4><pre>// MONDAY 9:00 AM
+// 15 employees report: 'I can't access the CRM application'
+// → 15 Incidents created (INC0045001 through INC0045015)
+// → Service Desk applies workaround: restart the app server
+// → All 15 incidents resolved
+
+// TUESDAY 9:00 AM
+// Same thing happens again! 12 new incidents.
+// → Service Desk creates a Problem (PRB0002001)
+//   'CRM application crashes every morning around 9 AM'
+// → Problem team investigates: the database connection pool
+//   exhausts at peak login time because the pool size is too small
+
+// WEDNESDAY
+// → Problem team creates a Change Request (CHG0003001)
+//   'Increase CRM database connection pool from 50 to 200'
+// → Change goes to Change Advisory Board (CAB) for approval
+// → Approved for Thursday night maintenance window
+
+// THURSDAY NIGHT
+// → Change implemented, tested, closed successful
+// → Problem resolved, linked to Change
+// → All related Incidents auto-updated
+
+// MEANWHILE (unrelated)
+// → Employee submits a Service Request: 'I need CRM admin access'
+//   (RITM0006001) — goes through standard approval workflow</pre><h4>Key Relationships</h4><ul><li>Multiple <strong>Incidents</strong> can be linked to one <strong>Problem</strong></li><li>A <strong>Problem</strong> can generate a <strong>Change Request</strong> as its fix</li><li>A <strong>Change Request</strong> resolves the <strong>Problem</strong>, which closes the <strong>Incidents</strong></li><li><strong>Service Requests</strong> are independent — they're about fulfilling needs, not fixing issues</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>Memorize this: Incident = firefighting. Problem = detective work. Change = planned surgery. Service Request = shopping. That analogy alone will make your answer memorable.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/what-are-the-different-types-of-scripts-in-servicenow-list-them-explain-where-ea" rel="prev"><small>‹ Previous</small><strong>What are the different types of scripts in ServiceNow? List them, explain where each one runs, and give a one-line example of when you'd use each.</strong></a>
+          <a href="/article/what-is-a-business-rule-in-servicenow-explain-the-different-types-before-after-a" rel="next"><small>Next ›</small><strong>What is a Business Rule in ServiceNow? Explain the different types (before, after, async, display) and when each one fires.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Explain the difference between an Incident, a Problem, a Change Request, and a Service Request. Give a real-world scenario that connects all four.",
+  "description": "Why This Comes Up in Interviews This question tests your ITIL fundamentals. Every ServiceNow admin and developer needs to know these four record types cold — they're the backbone of ITSM. The Four…",
+  "datePublished": "2026-03-16T07:45:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your enterprise customer has 5 ServiceNow production instances (each ~10k users) serving different business units: HR, IT, Finance, Legal, and Sales. Over the past 6 months, you've observed escalating issues: HR instance shows 20% workflow timeouts during peak payroll cycles (8-10 AM daily), IT hits 95% CPU spikes from Service Catalog requests, Finance reports CMDB query latencies &gt;5s under audit loads, Legal complains of cross-reference data leaks between cases, and Sales experiences notification delivery delays &gt;2min. Instance cloning for dev/test is consuming 40+ hours weekly, and upgrade testing is siloed. The customer is evaluating a multi-instance strategy shift to mitigate these. Walk me through your root cause diagnosis approach, recommend 3+ solution options with trade-offs, and outline production migration steps. Why would you choose one over others for this scale? &lt;strong&gt;Production Code Challenge:&lt;/strong&gt; Current BR on incident.insert (global scope, all instances) is causing the CPU spikes - it queries 50k+ records without indexing: &lt;pre&gt;function onInsert(current, previous) { var gr = new GlideRecord('incident'); gr.addQuery('priority', '1'); gr.query(); while(gr.next()) { // process... } }&lt;/pre&gt; Rewrite this as an efficient, domain/multi-tenant aware solution using GlideAggregate and async processing. — Summaverick</title>
+  <meta name="description" content="What This Question Really Tests In a multi-instance setup like this (5 instances, 10k users each), symptoms point to resource contention, poor isolation, and inefficient code. Root cause diagnosis…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-enterprise-customer-has-5-servicenow-production-instances-each-10k-users-se" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your enterprise customer has 5 ServiceNow production instances (each ~10k users) serving different business units: HR, IT, Finance, Legal, and Sales. Over the past 6 months, you've observed escalating issues: HR instance shows 20% workflow timeouts during peak payroll cycles (8-10 AM daily), IT hits 95% CPU spikes from Service Catalog requests, Finance reports CMDB query latencies &gt;5s under audit loads, Legal complains of cross-reference data leaks between cases, and Sales experiences notification delivery delays &gt;2min. Instance cloning for dev/test is consuming 40+ hours weekly, and upgrade testing is siloed. The customer is evaluating a multi-instance strategy shift to mitigate these. Walk me through your root cause diagnosis approach, recommend 3+ solution options with trade-offs, and outline production migration steps. Why would you choose one over others for this scale? &lt;strong&gt;Production Code Challenge:&lt;/strong&gt; Current BR on incident.insert (global scope, all instances) is causing the CPU spikes - it queries 50k+ records without indexing: &lt;pre&gt;function onInsert(current, previous) { var gr = new GlideRecord('incident'); gr.addQuery('priority', '1'); gr.query(); while(gr.next()) { // process... } }&lt;/pre&gt; Rewrite this as an efficient, domain/multi-tenant aware solution using GlideAggregate and async processing. — Summaverick" />
+  <meta property="og:description" content="What This Question Really Tests In a multi-instance setup like this (5 instances, 10k users each), symptoms point to resource contention, poor isolation, and inefficient code. Root cause diagnosis…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-enterprise-customer-has-5-servicenow-production-instances-each-10k-users-se" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Architecture</p>
+        <h1>Your enterprise customer has 5 ServiceNow production instances (each ~10k users) serving different business units: HR, IT, Finance, Legal, and Sales. Over the past 6 months, you've observed escalating issues: HR instance shows 20% workflow timeouts during peak payroll cycles (8-10 AM daily), IT hits 95% CPU spikes from Service Catalog requests, Finance reports CMDB query latencies &gt;5s under audit loads, Legal complains of cross-reference data leaks between cases, and Sales experiences notification delivery delays &gt;2min. Instance cloning for dev/test is consuming 40+ hours weekly, and upgrade testing is siloed. The customer is evaluating a multi-instance strategy shift to mitigate these. Walk me through your root cause diagnosis approach, recommend 3+ solution options with trade-offs, and outline production migration steps. Why would you choose one over others for this scale? &lt;strong&gt;Production Code Challenge:&lt;/strong&gt; Current BR on incident.insert (global scope, all instances) is causing the CPU spikes - it queries 50k+ records without indexing: &lt;pre&gt;function onInsert(current, previous) { var gr = new GlideRecord('incident'); gr.addQuery('priority', '1'); gr.query(); while(gr.next()) { // process... } }&lt;/pre&gt; Rewrite this as an efficient, domain/multi-tenant aware solution using GlideAggregate and async processing.</h1>
+        <p class="article-meta">Senior · ServiceNow · Jan 2026</p>
+        <div class="prose">
+<h4>What This Question Really Tests</h4><p>In a multi-instance setup like this (5 instances, 10k users each), symptoms point to resource contention, poor isolation, and inefficient code. Root cause diagnosis starts with <strong>structured triage</strong>: (1) Review Instance Scan/HealthScan for CPU/memory baselines; (2) Analyze Transaction Logs & Slow Query logs via Performance Analytics for top consumers (e.g., BRs, workflows); (3) Use System Diagnostics > Slow Queries to pinpoint unindexed scans; (4) Check domain separation config via Domain Management for leaks; (5) Correlate with MID Server logs for discovery/CMDB issues. Avoid jumping to multi-instance—first rule out code/config fixes, as cloning overhead suggests underutilized capacity.</p><h4>The Solution</h4><p><strong>Diagnosis confirms the global BR as primary culprit</strong>—full table scans on insert amplify across instances. Solution: Replace with GlideAggregate for aggregation, domain filtering, and event-driven async via gs.eventQueue() for decoupling. This sharply reduces the synchronous load and respects multi-tenancy.</p><pre>function onInsert(current, previous) {
+  // Domain-aware filter for multi-instance safety
+  var domain = gs.getUser().getDomainID();
+  var ga = new GlideAggregate('incident');
+  ga.addQuery('priority', '1');
+  ga.addQuery('sys_domain', domain); // Tenant isolation
+  ga.addAggregate('COUNT');
+  ga.query();
+  if (ga.next()) {
+    var highPriorityCount = ga.getAggregate('COUNT');
+    // Async event for processing, avoids sync blocking
+    gs.eventQueue('inc.high.priority.threshold', current, highPriorityCount, domain);
+  }
+}</pre><p>Handle the event in a Script Action or Script Include: process the batch via a scheduled job and cache repeated lookups in script variables for the duration of the run (there is no external cache like Redis available on the platform).</p><h4>Senior Considerations</h4><ul><li><strong>3 Options with Trade-offs:</strong> <em>Option 1: Optimize single sub-prod instance</em> (fix code, add indexes, Flow Designer async)—cheapest/fastest, but shared DB risks cascades (good answer stops here). <em>Option 2: Domain Separation</em> (logical isolation via sys_domain_path)—scales to 100+ tenants, zero data migration, but complex ACLs/debugging; ideal if &lt;20 tenants. <em>Option 3: Multi-Instance (recommended)</em>—physical isolation, per-tenant scaling/upgrade cadence, but 3x infra cost, integration via Integration Hub, data sync via Transform Maps. Choose #3 for regulated units (Legal/Finance) needing strict isolation vs. perf.</li><li><strong>Production Migration:</strong> Pilot HR instance to new pod (A/B test 2wks), use Update Sets for config, RITM-driven cutover with rollback (clone-back), monitor via AIOps. Edge case: cross-release upgrade drift—standardize via Instance Clone selective.</li><li><strong>What Separates Good vs Great:</strong> A good answer lists domain separation vs multi-instance; a great one explains where domain separation stops scaling in practice, discusses failure modes (e.g., cross-domain queries via Database Views), proposes monitoring (Event Management rules), and justifies the choice via total cost of ownership at large user counts.</li><li><strong>Why Async + Aggregate:</strong> Sync BRs block transactions (5s+ latency); aggregate avoids N+1, events decouple for elastic queues—core to ServiceNow's multi-tenant DNA. Test both patterns on a PDI with realistic record volumes and compare.</li></ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/your-servicenow-production-instance-handles-500-000-daily-transactions-across-in" rel="prev"><small>‹ Previous</small><strong>Your ServiceNow production instance handles 500,000 daily transactions across Incident, Change, and CMDB tables. Over the past week, users report 2-5 second delays in form loads and submissions, spiking during peak hours (8-10 AM). Transaction logs show average response times jumped from 200ms to 3.5s. Business impact: 15% SLA breaches on incident resolution. You notice an outbound REST integration to VendorX's API (via Integration Hub Flow Designer) running every 5 minutes, syncing 10,000 CMDB CIs. It's configured with scripted REST steps for data transformation. No errors in integration logs, but VendorX reports receiving requests. &lt;strong&gt;Walk us through your diagnosis approach (tools/metrics), root cause hypotheses, 3+ solution options with trade-offs, and production rollout plan. Include code showing the likely problematic pattern and your fix.&lt;/strong&gt; What separates a good answer (basic fix) from great (architectural resilience)?</strong></a>
+          <a href="/article/you-receive-a-production-incident-users-with-the-incident-manager-role-report-th" rel="next"><small>Next ›</small><strong>You receive a production incident: users with the 'incident_manager' role report they cannot edit the 'Assignment Group' field on incidents, even though their role should grant write access. Management says this worked last week. You have 15 minutes to diagnose before escalation. Walk me through your systematic approach, including what you'd check first, what could cause this, and how you'd implement a fix. Show me code for both the problem diagnosis and solution.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your enterprise customer has 5 ServiceNow production instances (each ~10k users) serving different business units: HR, IT, Finance, Legal, and Sales. Over the past 6 months, you've observed escalating issues: HR instance shows 20% workflow timeouts during peak payroll cycles (8-10 AM daily), IT hits 95% CPU spikes from Service Catalog requests, Finance reports CMDB query latencies >5s under audit loads, Legal complains of cross-reference data leaks between cases, and Sales experiences notification delivery delays >2min. Instance cloning for dev/test is consuming 40+ hours weekly, and upgrade testing is siloed. The customer is evaluating a multi-instance strategy shift to mitigate these. Walk me through your root cause diagnosis approach, recommend 3+ solution options with trade-offs, and outline production migration steps. Why would you choose one over others for this scale? <strong>Production Code Challenge:</strong> Current BR on incident.insert (global scope, all instances) is causing the CPU spikes - it queries 50k+ records without indexing: <pre>function onInsert(current, previous) { var gr = new GlideRecord('incident'); gr.addQuery('priority', '1'); gr.query(); while(gr.next()) { // process... } }</pre> Rewrite this as an efficient, domain/multi-tenant aware solution using GlideAggregate and async processing.",
+  "description": "What This Question Really Tests In a multi-instance setup like this (5 instances, 10k users each), symptoms point to resource contention, poor isolation, and inefficient code. Root cause diagnosis…",
+  "datePublished": "2026-01-31T06:22:01.990Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

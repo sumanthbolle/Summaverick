@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your enterprise customer has 5,000 users across 3 business units (HR, Finance, IT) on a single ServiceNow instance. Recently, HR workflows are spiking CPU usage to 90% during payroll runs (affecting 2,000 users), causing IT incidents to timeout globally. Logs show cross-domain queries hitting 10M rows/day without isolation. Customer demands data isolation for compliance (GDPR/SOX) but wants to retain shared configs. You're seeing 20% monthly growth in incidents. &lt;strong&gt;Question:&lt;/strong&gt; Diagnose the root cause systematically. Propose 3 multi-instance strategies with trade-offs. Provide a script showing the performance bottleneck and your fix. Explain production rollout considerations for zero-downtime. — Summaverick</title>
+  <meta name="description" content="What the Interviewer Wants to Hear Root cause diagnosis starts with triage: Check System Performance &gt; Transactions for slow queries, then System Logs &gt; Errors for domain leaks. Use System Diagnostics…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-enterprise-customer-has-5-000-users-across-3-business-units-hr-finance-it-o" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your enterprise customer has 5,000 users across 3 business units (HR, Finance, IT) on a single ServiceNow instance. Recently, HR workflows are spiking CPU usage to 90% during payroll runs (affecting 2,000 users), causing IT incidents to timeout globally. Logs show cross-domain queries hitting 10M rows/day without isolation. Customer demands data isolation for compliance (GDPR/SOX) but wants to retain shared configs. You're seeing 20% monthly growth in incidents. &lt;strong&gt;Question:&lt;/strong&gt; Diagnose the root cause systematically. Propose 3 multi-instance strategies with trade-offs. Provide a script showing the performance bottleneck and your fix. Explain production rollout considerations for zero-downtime. — Summaverick" />
+  <meta property="og:description" content="What the Interviewer Wants to Hear Root cause diagnosis starts with triage: Check System Performance &gt; Transactions for slow queries, then System Logs &gt; Errors for domain leaks. Use System Diagnostics…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-enterprise-customer-has-5-000-users-across-3-business-units-hr-finance-it-o" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Architecture</p>
+        <h1>Your enterprise customer has 5,000 users across 3 business units (HR, Finance, IT) on a single ServiceNow instance. Recently, HR workflows are spiking CPU usage to 90% during payroll runs (affecting 2,000 users), causing IT incidents to timeout globally. Logs show cross-domain queries hitting 10M rows/day without isolation. Customer demands data isolation for compliance (GDPR/SOX) but wants to retain shared configs. You're seeing 20% monthly growth in incidents. &lt;strong&gt;Question:&lt;/strong&gt; Diagnose the root cause systematically. Propose 3 multi-instance strategies with trade-offs. Provide a script showing the performance bottleneck and your fix. Explain production rollout considerations for zero-downtime.</h1>
+        <p class="article-meta">Senior · ServiceNow · Jan 2026</p>
+        <div class="prose">
+<h4>What the Interviewer Wants to Hear</h4><p>Root cause diagnosis starts with triage: Check <strong>System Performance > Transactions</strong> for slow queries, then <strong>System Logs > Errors</strong> for domain leaks. Use <strong>System Diagnostics > Slow Queries</strong> to identify unfiltered cross-domain scans (e.g., incident.getRowCount() without domain.addQuery()). Metrics reveal HR payroll workflows (e.g., Business Rule on payroll table) querying global incident tables, bypassing domain separation—common in single-instance setups lacking row-level security (RLS).</p><p>Key issues: No domain isolation (shared sys_id prefixes leak), resource contention (CPU throttling), scalability limits (single DB bottleneck at 10M queries/day).</p><h4>The Solution</h4><p><strong>Diagnosis Script (Problem Demo):</strong> This GlideAggregate reveals unfiltered cross-domain query bloat.</p><pre>var ga = new GlideAggregate('incident');
+ga.addQuery('active', true);
+ga.addAggregate('COUNT');
+ga.groupBy('sys_domain'); // Group to count per domain
+// PROBLEM: No domain filter - scans ALL domains (10M rows)
+ga.query();
+var count = 0, domains = 0;
+while (ga.next()) {
+  count += ga.getAggregate('COUNT');
+  domains++; // Each group = one distinct domain
+}
+gs.info('Total Incidents: ' + count + ', Domains Hit: ' + domains);</pre><p><strong>Solution Script (Multi-Instance Domain Isolation):</strong> Fix adds tenant-aware filtering + async partitioning.</p><pre>var ga = new GlideAggregate('incident');
+ga.addQuery('active', true);
+ga.addQuery('sys_domain', gs.getUser().getDomainID()); // FIX: enforce domain filtering
+ga.addAggregate('COUNT');
+ga.query();
+var count = ga.next() ? ga.getAggregate('COUNT') : 0;
+gs.info('Filtered Incidents: ' + count);</pre><h4>3 Strategy Options with Trade-offs</h4><ul><li><strong>Option 1: Enhance Domain Separation (Single Instance)</strong>: Activate full domain sep (data/process/UI). Pros: No migration, shared configs. Cons: Logical isolation only (query leaks possible), scales to ~50K users. Cost: Low. Use for 80% cases.</li><li><strong>Option 2: Separate Instances per Business Unit (Recommended)</strong>: dedicated instances (HR/Finance/IT) integrated via Integration Hub. Pros: true isolation, independent sizing and upgrade schedules. Cons: config sync overhead, additional licensing. Ideal for compliance + growth.</li><li><strong>Option 3: Per-Tenant Dedicated Instances</strong>: Full separation. Pros: Max isolation/security. Cons: High cost (5x infra), no shared metadata, complex failover. Avoid unless regulated industry mandates.</li></ul><h4>Senior Considerations</h4><ul><li><strong>Why Separate Instances Win Here:</strong> Balances hard isolation with configurability (shared apps promoted from a common repo). Trade-off: cross-instance reporting and lookups add latency—mitigate with event-driven integrations via Integration Hub rather than synchronous calls.</li><li><strong>Production Rollout (Zero-Downtime):</strong> Stage the cutover: clone prod to the new instances, migrate configuration via Update Sets/app repo and data via Transform Maps (scripted, batched), and load test with production-like concurrency before go-live. Monitor via PA dashboards (CPU &lt;70%). Fallback: keep the original instance warm until sign-off.</li><li><strong>Edge Cases/Failure Modes:</strong> Domain path explosion (use sys_domain_path indexing). Burst spikes: work with ServiceNow on instance sizing — customers cannot add or auto-scale nodes themselves. Audit: Enable Field Watcher for leaks. Great answers quantify the improvement from their own sub-prod measurements and discuss cost trade-offs honestly.</li><li><strong>Great vs. Good:</strong> A good answer lists the options; a great one measures actual impact in a sub-prod test, covers rollback, and cites the official domain separation documentation. Expect the probe: 'How would you test isolation pre-prod?'</li></ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/in-production-a-critical-executive-dashboard-report-is-timing-out-consistently-d" rel="prev"><small>‹ Previous</small><strong>In production, a critical executive dashboard report is timing out consistently during peak hours (8-10 AM). The report aggregates &lt;strong&gt;incident data from the past 90 days&lt;/strong&gt; across 5 assignment groups (500K+ records total), grouping by &lt;strong&gt;CI, Priority, and State&lt;/strong&gt; with a &lt;strong&gt;pivot table&lt;/strong&gt; showing MTTR calculations. Users report 'Report timeout after 120 seconds'. Logs show high CPU on the reporting node and slow DB queries. Walk us through your &lt;strong&gt;diagnosis approach&lt;/strong&gt;, propose &lt;strong&gt;3+ solution options with trade-offs&lt;/strong&gt;, and explain &lt;strong&gt;production rollout considerations&lt;/strong&gt;. What metrics would you monitor post-implementation? &lt;strong&gt;Follow-up:&lt;/strong&gt; Show a scripted filter example that could cause this issue vs. an optimized version.</strong></a>
+          <a href="/article/your-production-environment-has-a-nightly-scheduled-import-set-job-pulling-50-00" rel="next"><small>Next ›</small><strong>Your production environment has a nightly scheduled import set job pulling 50,000 asset records from a vendor CSV feed into the staging table `u_asset_import`. Over the last 3 weeks, you've observed the target `alm_asset` table growing by 1.2 million records instead of the expected ~50K updates/inserts. Duplicate detection is enabled with `serial_number` as the coalesce field, yet sys_audit shows 85% of inserts are duplicates with identical serial numbers. &lt;strong&gt;Walk us through your systematic diagnosis approach (first 3 diagnostic steps with specific queries/logs to check). Then provide 3 solution options with trade-offs. Finally, show code for the PROBLEM (what's likely happening) and SOLUTION (your recommended fix).&lt;/strong&gt; &lt;strong&gt;Production context:&lt;/strong&gt; This runs at 2AM daily on a clustered production instance with Identification Reconciliation active. Business impact: CMDB health score dropped 40%, license reconciliation failing. No recent changes to transform map or data source.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your enterprise customer has 5,000 users across 3 business units (HR, Finance, IT) on a single ServiceNow instance. Recently, HR workflows are spiking CPU usage to 90% during payroll runs (affecting 2,000 users), causing IT incidents to timeout globally. Logs show cross-domain queries hitting 10M rows/day without isolation. Customer demands data isolation for compliance (GDPR/SOX) but wants to retain shared configs. You're seeing 20% monthly growth in incidents. <strong>Question:</strong> Diagnose the root cause systematically. Propose 3 multi-instance strategies with trade-offs. Provide a script showing the performance bottleneck and your fix. Explain production rollout considerations for zero-downtime.",
+  "description": "What the Interviewer Wants to Hear Root cause diagnosis starts with triage: Check System Performance > Transactions for slow queries, then System Logs > Errors for domain leaks. Use System Diagnostics…",
+  "datePublished": "2026-01-26T06:19:57.565Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

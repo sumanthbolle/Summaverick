@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request? — Summaverick</title>
+  <meta name="description" content="Why Interviewers Ask This The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the…" />
+  <link rel="canonical" href="https://summaverick.com/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request? — Summaverick" />
+  <meta property="og:description" content="Why Interviewers Ask This The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the…" />
+  <meta property="og:url" content="https://summaverick.com/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?</h1>
+        <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Why Interviewers Ask This</h4><p>The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the front-end form.</p><h4>What Is the Service Catalog?</h4><p>The Service Catalog is a self-service portal where employees can browse and request services or products — like an internal shopping site. Instead of sending emails or calling the help desk, users find what they need, fill out a form, and submit.</p><h4>Catalog vs Incident — The Key Difference</h4><ul><li><strong>Incident:</strong> Something is BROKEN. Reactive. 'My laptop won't turn on.' The goal is to fix it fast.</li><li><strong>Service Request (Catalog):</strong> The user WANTS something. Proactive. 'I need a new laptop.' The goal is to fulfill the order through a defined process.</li></ul><h4>The Components</h4><ul><li><strong>Catalog Item:</strong> A requestable service or product. 'Request a Laptop', 'VPN Access', 'New Hire Onboarding Package'.</li><li><strong>Variables:</strong> The form fields specific to that item. Laptop model dropdown, justification text field, delivery date picker.</li><li><strong>Variable Sets:</strong> Reusable groups of variables shared across multiple catalog items. A 'Delivery Address' variable set used by laptop, monitor, and phone requests.</li><li><strong>Workflow / Flow:</strong> The backend process that handles approval and fulfillment.</li></ul><h4>What Happens When a User Submits</h4><pre>// User clicks 'Order Now' on 'Request a Laptop'
+//
+// 1. REQUEST created (sc_request) — REQ0010001
+//    The overall 'order' record
+//
+// 2. REQUESTED ITEM created (sc_req_item) — RITM0010001
+//    The specific line item (one per catalog item ordered)
+//    Contains all the variable values (laptop model, etc.)
+//
+// 3. APPROVAL triggered
+//    Flow/Workflow checks: Does this need manager approval?
+//    If cost > $500, route to manager → If approved, continue
+//
+// 4. CATALOG TASKS created (sc_task)
+//    SCTASK0010001: 'Procurement: Order laptop from vendor'
+//    SCTASK0010002: 'IT: Configure laptop and install software'
+//    SCTASK0010003: 'Facilities: Ship to employee's desk'
+//
+// 5. Each task assigned to the relevant team
+//    Teams work their tasks independently
+//
+// 6. All tasks complete → RITM auto-closes → REQ auto-closes
+//    User gets a notification: 'Your laptop is on its way!'</pre><div class='tip-box'><h5>💡 Interview Tip</h5><p>Know the table relationships: <code>sc_request</code> (the order) → <code>sc_req_item</code> (the line item) → <code>sc_task</code> (the fulfillment tasks). If asked 'Where are the user's variable answers stored?' — values are stored in the <code>sc_item_option</code> table, linked to the RITM via the <code>sc_item_option_mtom</code> many-to-many table.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" rel="prev"><small>‹ Previous</small><strong>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.</strong></a>
+          <a href="/article/what-is-a-glideajax-call-and-why-do-you-need-it-write-a-simple-example-of-a-clie" rel="next"><small>Next ›</small><strong>What is a GlideAjax call, and why do you need it? Write a simple example of a Client Script calling a server-side Script Include using GlideAjax.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?",
+  "description": "Why Interviewers Ask This The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the…",
+  "datePublished": "2026-03-16T07:10:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

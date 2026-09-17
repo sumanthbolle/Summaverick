@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -69,12 +69,72 @@ describe("Classic Studio public contract", () => {
   });
 
   it("keeps blog and interview routes in the shared studio library", () => {
-    const learn = text("public/learn.html");
-    const interviews = text("public/interviews.html");
     const chrome = text("public/assets/app.js");
 
-    expect(learn).toContain("library-page");
-    expect(interviews).toContain("library-page");
     expect(chrome).toContain("summaverick-uncontained-sum.svg");
+  });
+
+  it("ships the full writing library as static pages", () => {
+    // Slug scheme mirrors scripts/build-library.mjs (which itself mirrors
+    // scripts/seed-content.ts): posts use uniqueId minus trailing timestamp,
+    // interviews use the slugified question, -<id> breaks clashes.
+    const slugify = (s: string) =>
+      String(s ?? "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80)
+        .replace(/-+$/g, "");
+    const used = new Set<string>();
+    const unique = (base: string, id: string) => {
+      let slug = base || `item-${id}`;
+      if (used.has(slug)) slug = `${slug}-${id}`;
+      used.add(slug);
+      return slug;
+    };
+
+    const posts = JSON.parse(text("scripts/data/posts.json")) as Array<{
+      id: number | string;
+      uniqueId?: string;
+      title: string;
+    }>;
+    const qas = JSON.parse(text("scripts/data/interviews.json")) as Array<{
+      id: number | string;
+      question: string;
+    }>;
+    const slugs = [
+      ...posts.map((p) => {
+        const flat = String(p.uniqueId ?? "").replace(/\//g, "-");
+        return unique(flat ? flat.replace(/-\d{10,}$/, "") : slugify(p.title), String(p.id));
+      }),
+      ...qas.map((q) => unique(slugify(q.question), String(q.id))),
+    ];
+
+    expect(posts).toHaveLength(52);
+    expect(qas).toHaveLength(57);
+    for (const slug of slugs) {
+      expect(existsSync(resolve(root, `public/article/${slug}.html`)), slug).toBe(true);
+    }
+
+    // Listing pages carry every title and need no API to render. Titles
+    // are HTML-escaped in the markup, so compare the escaped form.
+    const esc = (s: string) =>
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    const learn = text("public/learn.html");
+    const interviews = text("public/interviews.html");
+    expect(learn).not.toContain("/api/content");
+    expect(interviews).not.toContain("/api/content");
+    for (const p of posts) expect(learn, p.title).toContain(esc(p.title));
+    for (const q of qas) expect(interviews, q.question).toContain(esc(q.question));
+
+    const sitemap = text("public/sitemap.xml");
+    for (const slug of slugs) {
+      expect(sitemap, slug).toContain(`/article/${slug}`);
+    }
+    expect(text("public/robots.txt")).toContain("Sitemap: https://summaverick.com/sitemap.xml");
   });
 });

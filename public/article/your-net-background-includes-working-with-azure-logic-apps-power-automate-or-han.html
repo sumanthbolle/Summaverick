@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow automation. ServiceNow has 'Flow Designer' which the team says replaces a lot of custom coding. Compare Flow Designer to what you've used, and explain when you'd still write code instead of using it. — Summaverick</title>
+  <meta name="description" content="Context Flow Designer is ServiceNow's low-code automation engine. If you've used Azure Logic Apps or Power Automate, the paradigm is identical: trigger → condition → action → repeat. The question…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-net-background-includes-working-with-azure-logic-apps-power-automate-or-han" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow automation. ServiceNow has 'Flow Designer' which the team says replaces a lot of custom coding. Compare Flow Designer to what you've used, and explain when you'd still write code instead of using it. — Summaverick" />
+  <meta property="og:description" content="Context Flow Designer is ServiceNow's low-code automation engine. If you've used Azure Logic Apps or Power Automate, the paradigm is identical: trigger → condition → action → repeat. The question…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-net-background-includes-working-with-azure-logic-apps-power-automate-or-han" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow automation. ServiceNow has 'Flow Designer' which the team says replaces a lot of custom coding. Compare Flow Designer to what you've used, and explain when you'd still write code instead of using it.</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>Context</h4><p>Flow Designer is ServiceNow's low-code automation engine. If you've used Azure Logic Apps or Power Automate, the paradigm is identical: trigger → condition → action → repeat. The question tests whether you can identify when low-code is the right choice vs when custom scripting is needed.</p><h4>The Direct Comparison</h4><pre>// Azure Logic Apps (what you know)
+// Trigger: When HTTP request received / When item created
+// → Condition: If priority == 'High'
+// → Action: Send email, Create Teams message, Update SQL record
+// → Parallel: Run multiple actions concurrently
+//
+// ServiceNow Flow Designer (the equivalent)
+// Trigger: Record Created/Updated, Scheduled, Inbound Email
+// → Condition: If Priority is Critical
+// → Action: Create Task, Send Notification, Update Record
+// → Parallel: Run flow actions in parallel paths
+// → Subflow: Reusable flow (like calling another Logic App)</pre><h4>What Flow Designer Handles Well</h4><ul><li><strong>Approval workflows:</strong> Ask for approval → route based on role/amount → auto-escalate if no response. Drag and drop, no code.</li><li><strong>Record lifecycle:</strong> When incident created → assign to group → if not acknowledged in 15 min → escalate. Built-in SLA timers.</li><li><strong>Integration actions:</strong> REST calls, ServiceNow actions, and Integration Hub spokes (pre-built connectors, like Logic App connectors) for Slack, Teams, Jira, etc.</li><li><strong>Error handling:</strong> Try/Catch blocks, retry logic, error subflows — all configurable without code.</li></ul><h4>When You'd Still Write Code</h4><pre>// Complex data transformations that Flow Designer can't handle
+// Example: Parsing a nested JSON payload from an external API
+
+// Flow Designer Action: 'Run Script' step
+(function execute(inputs, outputs) {
+  var payload = JSON.parse(inputs.raw_json);
+  var assets = [];
+  
+  // Recursive parsing — too complex for drag-and-drop
+  function extractAssets(node, parent) {
+    if (node.type === 'asset') {
+      assets.push({
+        name: node.name,
+        parent: parent,
+        serial: node.metadata.serial_number
+      });
+    }
+    if (node.children) {
+      node.children.forEach(function(child) {
+        extractAssets(child, node.name);
+      });
+    }
+  }
+  
+  extractAssets(payload.root, null);
+  outputs.parsed_assets = JSON.stringify(assets);
+})(inputs, outputs);</pre><h4>Key Differences from Azure Logic Apps</h4><ul><li><strong>No consumption-based pricing:</strong> Flow Designer runs are included in your ServiceNow license — no per-execution costs like Logic Apps consumption tier.</li><li><strong>Built-in platform context:</strong> Flow Designer natively understands ServiceNow tables, roles, and records. No need to configure API connections to your own platform — unlike Logic Apps where you'd set up a SQL connector even for your own database.</li><li><strong>Process Automation Designer (PAD):</strong> For complex multi-stage processes, ServiceNow has PAD which orchestrates multiple flows — think of it as Durable Functions orchestrating multiple Logic Apps.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Use the same decision matrix you use in .NET: if it's a standard workflow (approval, notification, record update), use Flow Designer — it's maintained by admins, visible to business users, and survives upgrades. Write code only when the logic is genuinely complex or performance-critical. The 80/20 rule applies: 80% of automations should be low-code.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/in-net-you-validate-user-input-with-data-annotations-fluentvalidation-and-client" rel="prev"><small>‹ Previous</small><strong>In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. ServiceNow has 'Client Scripts' and 'UI Policies' that seem to do similar things. When would you use one over the other, and where do .NET developers typically trip up?</strong></a>
+          <a href="/article/explain-servicenow-s-table-hierarchy-and-inheritance-model-how-does-it-compare-t" rel="next"><small>Next ›</small><strong>Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow automation. ServiceNow has 'Flow Designer' which the team says replaces a lot of custom coding. Compare Flow Designer to what you've used, and explain when you'd still write code instead of using it.",
+  "description": "Context Flow Designer is ServiceNow's low-code automation engine. If you've used Azure Logic Apps or Power Automate, the paradigm is identical: trigger → condition → action → repeat. The question…",
+  "datePublished": "2026-03-16T05:15:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

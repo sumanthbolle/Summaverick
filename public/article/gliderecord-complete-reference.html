@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GlideRecord Complete Reference: Every Method You Actually Use in Production — Summaverick</title>
+  <meta name="description" content="The one GlideRecord page you bookmark. Query, insert, update, delete patterns with real output, performance traps, and the methods nobody explains properly." />
+  <link rel="canonical" href="https://summaverick.com/article/gliderecord-complete-reference" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="GlideRecord Complete Reference: Every Method You Actually Use in Production — Summaverick" />
+  <meta property="og:description" content="The one GlideRecord page you bookmark. Query, insert, update, delete patterns with real output, performance traps, and the methods nobody explains properly." />
+  <meta property="og:url" content="https://summaverick.com/article/gliderecord-complete-reference" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>GlideRecord Complete Reference: Every Method You Actually Use in Production</h1>
+        <p class="article-meta">Beginner · 18 min read · Apr 2026</p>
+        <div class="prose">
+<h2>What GlideRecord is</h2>
+<p>GlideRecord is the server-side JavaScript API for reading and writing database records in ServiceNow. Every Business Rule, Script Include, Scheduled Job, and Fix Script you write will use it. Think of it as a cursor-based query builder — you build a query, execute it, then iterate row by row.</p>
+
+<h2>Query (SELECT)</h2>
+<pre>var gr = new GlideRecord('incident');
+gr.addQuery('priority', 1);
+gr.addQuery('state', '!=', 6);            // 6 = Resolved
+gr.addQuery('assignment_group.name', 'Network Ops');  // dot-walk through reference
+gr.orderByDesc('sys_created_on');
+gr.setLimit(20);
+gr.query();
+
+while (gr.next()) {
+    gs.info(gr.getValue('number'));           // INC0010045
+    gs.info(gr.getDisplayValue('caller_id')); // John Smith
+    gs.info(gr.getValue('caller_id'));        // 6816f79cc0a8016401... (sys_id)
+}</pre>
+<p><strong>What actually happens:</strong> <code>query()</code> sends SQL to the database. <code>next()</code> moves the cursor to the next row. When there are no more rows, <code>next()</code> returns <code>false</code> and the loop ends.</p>
+
+<h3>addQuery operators</h3>
+<table>
+<tr><th>Operator</th><th>Example</th><th>What it does</th></tr>
+<tr><td>=</td><td><code>addQuery('priority', 1)</code></td><td>Exact match (default)</td></tr>
+<tr><td>!=</td><td><code>addQuery('state', '!=', 6)</code></td><td>Not equal</td></tr>
+<tr><td>&gt;</td><td><code>addQuery('sys_created_on', '&gt;', '2026-01-01')</code></td><td>Greater than</td></tr>
+<tr><td>&lt;</td><td><code>addQuery('priority', '&lt;', 3)</code></td><td>Less than</td></tr>
+<tr><td>IN</td><td><code>addQuery('state', 'IN', '1,2,3')</code></td><td>Value in comma-separated list</td></tr>
+<tr><td>NOT IN</td><td><code>addQuery('state', 'NOT IN', '6,7')</code></td><td>Value not in list</td></tr>
+<tr><td>STARTSWITH</td><td><code>addQuery('number', 'STARTSWITH', 'INC')</code></td><td>String starts with</td></tr>
+<tr><td>CONTAINS</td><td><code>addQuery('short_description', 'CONTAINS', 'VPN')</code></td><td>String contains</td></tr>
+<tr><td>ISEMPTY / null</td><td><code>addNullQuery('assigned_to')</code></td><td>Field is null/empty (prefer addNullQuery in script)</td></tr>
+<tr><td>ISNOTEMPTY</td><td><code>addNotNullQuery('assigned_to')</code></td><td>Field has a value</td></tr>
+</table>
+
+<h3>OR queries</h3>
+<pre>var gr = new GlideRecord('incident');
+var q1 = gr.addQuery('priority', 1);
+q1.addOrCondition('priority', 2);   // priority = 1 OR priority = 2
+gr.query();</pre>
+
+<h3>Encoded queries</h3>
+<p>Instead of chaining addQuery calls, paste the encoded query string directly. Copy it from any list filter in the UI — click the filter icon, set your conditions, right-click the breadcrumb, and select "Copy query."</p>
+<pre>var gr = new GlideRecord('incident');
+gr.addEncodedQuery('priority=1^stateNOT IN6,7^assignment_group.name=Network Ops');
+gr.query();
+
+// This does the same thing as the three addQuery calls above.
+// Encoded queries are faster to write and easier to paste from the UI.</pre>
+
+<h2>Get a single record</h2>
+<pre>// By sys_id
+var gr = new GlideRecord('incident');
+gr.get('a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6');
+
+// By field value
+var gr = new GlideRecord('incident');
+gr.get('number', 'INC0010001');
+
+// gr.get() returns true/false. No need to call query() or next().</pre>
+
+<h2>Insert</h2>
+<pre>var gr = new GlideRecord('incident');
+gr.initialize();
+gr.short_description = 'Printer offline on floor 3';
+gr.priority = 3;
+gr.assignment_group.setDisplayValue('Service Desk');  // look up by name
+var newSysId = gr.insert();  // returns the sys_id of the new record
+gs.info('Created: ' + newSysId);</pre>
+
+<h2>Update</h2>
+<pre>var gr = new GlideRecord('incident');
+gr.get('number', 'INC0010001');
+gr.state = 6;  // Resolved
+gr.close_notes = 'Restarted the print spooler service.';
+gr.update();</pre>
+
+<h3>Bulk update</h3>
+<pre>// Close all resolved incidents older than 7 days
+var gr = new GlideRecord('incident');
+gr.addQuery('state', 6);
+gr.addQuery('resolved_at', '&lt;', gs.daysAgo(7));
+gr.query();
+while (gr.next()) {
+    gr.state = 7;  // Closed
+    gr.update();
+}
+// For large volumes, use gr.setWorkflow(false) to skip Business Rules
+// and gr.autoSysFields(false) to skip sys_updated_on/by changes.</pre>
+
+<h2>Delete</h2>
+<pre>var gr = new GlideRecord('incident');
+gr.get('number', 'INC9999999');
+gr.deleteRecord();
+
+// Bulk delete — be very careful
+var gr = new GlideRecord('u_temp_import');
+gr.addQuery('sys_created_on', '&lt;', gs.daysAgo(30));
+gr.deleteMultiple();  // Deletes all matching records without loading them</pre>
+
+<h2>getValue vs getDisplayValue vs dot notation</h2>
+<table>
+<tr><th>Method</th><th>Returns</th><th>Use when</th></tr>
+<tr><td><code>gr.getValue('caller_id')</code></td><td>sys_id string</td><td>Comparisons, integrations, storing references</td></tr>
+<tr><td><code>gr.getDisplayValue('caller_id')</code></td><td>Display name</td><td>Messages, emails, UI display</td></tr>
+<tr><td><code>gr.caller_id</code></td><td>GlideElement object</td><td>Avoid — behaves unpredictably in comparisons</td></tr>
+<tr><td><code>gr.getValue('state')</code></td><td>'1' (internal number)</td><td>Logic, conditions</td></tr>
+<tr><td><code>gr.getDisplayValue('state')</code></td><td>'New' (label)</td><td>Display only — labels change with language</td></tr>
+</table>
+
+<h2>GlideAggregate</h2>
+<p>When you need COUNT, SUM, MIN, MAX, or AVG — do not loop through GlideRecord and count manually.</p>
+<pre>// Count open P1 incidents
+var ga = new GlideAggregate('incident');
+ga.addQuery('priority', 1);
+ga.addQuery('active', true);
+ga.addAggregate('COUNT');
+ga.query();
+if (ga.next()) {
+    gs.info('Open P1 count: ' + ga.getAggregate('COUNT'));
+}
+
+// Count per assignment group
+var ga = new GlideAggregate('incident');
+ga.addQuery('active', true);
+ga.addAggregate('COUNT');
+ga.groupBy('assignment_group');
+ga.query();
+while (ga.next()) {
+    gs.info(ga.getDisplayValue('assignment_group') + ': ' + ga.getAggregate('COUNT'));
+}</pre>
+
+<h2>Common traps</h2>
+<ul>
+<li><strong>Querying the task table:</strong> <code>new GlideRecord('task')</code> returns incidents + changes + problems + catalog tasks + everything else that extends task. Always query the specific child table unless you genuinely want all task types.</li>
+<li><strong>getRowCount():</strong> Runs a full <code>COUNT(*)</code> against the database. On tables with millions of rows, this is expensive. Use <code>GlideAggregate</code> instead.</li>
+<li><strong>Dot-walking in loops:</strong> <code>gr.caller_id.department.name</code> fires a separate query per iteration. For bulk operations, query the related table separately and build a lookup map.</li>
+<li><strong>Missing setLimit():</strong> Without a limit, your query can return hundreds of thousands of rows. Always set a limit unless you specifically need all records.</li>
+<li><strong>gr.field = value vs gr.setValue('field', value):</strong> Both work for most fields, but <code>setValue</code> is safer for reference fields and journal fields. Use <code>setValue</code> in script includes; direct assignment in business rules is fine.</li>
+</ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/client-side-api-reference" rel="prev"><small>‹ Previous</small><strong>ServiceNow Client-Side APIs: g_form, g_user, g_list — The Methods That Control the Form</strong></a>
+          <a href="/article/servicenow-ai-buzzwords-2026-easy-guide" rel="next"><small>Next ›</small><strong>ServiceNow AI Buzzwords Explained (Easy): AI Agents, Agentic AI, AI Control Tower, RaptorDB, and More</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "GlideRecord Complete Reference: Every Method You Actually Use in Production",
+  "description": "The one GlideRecord page you bookmark. Query, insert, update, delete patterns with real output, performance traps, and the methods nobody explains properly.",
+  "datePublished": "2026-04-07T12:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

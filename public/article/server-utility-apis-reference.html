@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Server-Side Utility APIs You Use Every Day: GlideDateTime, GlideElement, gs Methods — Summaverick</title>
+  <meta name="description" content="The utility APIs that show up in every Business Rule and Script Include but nobody explains in one place. Date math, field inspection, system properties, and logging." />
+  <link rel="canonical" href="https://summaverick.com/article/server-utility-apis-reference" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Server-Side Utility APIs You Use Every Day: GlideDateTime, GlideElement, gs Methods — Summaverick" />
+  <meta property="og:description" content="The utility APIs that show up in every Business Rule and Script Include but nobody explains in one place. Date math, field inspection, system properties, and logging." />
+  <meta property="og:url" content="https://summaverick.com/article/server-utility-apis-reference" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>Server-Side Utility APIs You Use Every Day: GlideDateTime, GlideElement, gs Methods</h1>
+        <p class="article-meta">Beginner · 14 min read · Apr 2026</p>
+        <div class="prose">
+<h2>GlideDateTime — Date and time operations</h2>
+<p>ServiceNow stores dates in UTC internally. <code>GlideDateTime</code> handles timezone conversion, date math, and formatting.</p>
+
+<pre>// Current date/time
+var now = new GlideDateTime();
+gs.info(now.getValue());        // '2026-04-07 14:30:00' (UTC, internal)
+gs.info(now.getDisplayValue()); // '2026-04-07 09:30:00' (user's timezone)
+
+// Create from string
+var dt = new GlideDateTime('2026-01-15 08:00:00');
+
+// Date math — add/subtract
+var dt = new GlideDateTime();
+dt.addDaysUTC(7);               // add 7 days
+dt.addSeconds(3600);             // add 1 hour
+dt.addYearsUTC(1);               // add 1 year
+
+// Compare dates
+var dt1 = new GlideDateTime('2026-01-01 00:00:00');
+var dt2 = new GlideDateTime('2026-06-01 00:00:00');
+gs.info(dt1.before(dt2));       // true
+gs.info(dt1.after(dt2));        // false
+
+// Difference between dates
+var diff = GlideDateTime.subtract(dt1, dt2);  // returns GlideDuration
+gs.info(diff.getDayPart());     // number of days between
+
+// Get parts
+gs.info(now.getYearUTC());      // 2026
+gs.info(now.getMonthUTC());     // 4
+gs.info(now.getDayOfMonthUTC()); // 7
+
+// gs date helpers — quick shortcuts
+gs.info(gs.now());              // current date/time in user's format
+gs.info(gs.nowDateTime());      // current date/time in system format
+gs.info(gs.daysAgo(7));         // date/time 7 days ago
+gs.info(gs.beginningOfLastMonth()); // first day of previous month</pre>
+
+<h2>GlideElement — Field-level operations</h2>
+<p>When you access <code>gr.field_name</code> on a GlideRecord, you get a GlideElement object, not a raw value. These methods let you inspect and manipulate individual fields.</p>
+
+<pre>var gr = new GlideRecord('incident');
+gr.get('number', 'INC0010001');
+
+// Check if a field changed (only works in Business Rules with 'previous')
+if (gr.priority.changes()) {
+    gs.info('Priority changed');
+}
+
+// Check if field changed TO a specific value
+if (gr.state.changesTo(6)) {
+    gs.info('State changed to Resolved');
+}
+
+// Check if field changed FROM a specific value
+if (gr.state.changesFrom(1)) {
+    gs.info('State was previously New');
+}
+
+// Check if a field is empty
+if (gr.assigned_to.nil()) {
+    gs.info('No one assigned');
+}
+// gs.nil() works the same way
+if (gs.nil(gr.getValue('assigned_to'))) {
+    gs.info('Also no one assigned');
+}
+
+// Get the field's label (not the column name)
+gs.info(gr.priority.getLabel());  // 'Priority'
+
+// Get choice list display value
+gs.info(gr.priority.getDisplayValue());  // '1 - Critical'
+
+// Reference field helpers
+gs.info(gr.caller_id.getRefRecord().getValue('email'));  // get the referenced record</pre>
+
+<h2>gs (GlideSystem) — System utilities</h2>
+
+<h3>Logging</h3>
+<pre>gs.info('Informational message');           // System Logs > All
+gs.warn('Warning message');                  // shows as warning level
+gs.error('Error message');                   // shows as error level
+gs.debug('Debug message');                   // only shows when debug enabled
+
+// Log with source context (appears in Source column)
+gs.log('message', 'MyScriptInclude');        // legacy, use gs.info instead</pre>
+
+<h3>User context</h3>
+<pre>gs.info(gs.getUserID());          // sys_id of current user
+gs.info(gs.getUserName());        // 'john.smith'
+gs.info(gs.getUserDisplayName()); // 'John Smith'
+gs.info(gs.getUser().getEmail()); // 'john@example.com'
+
+// Check roles (server-side)
+if (gs.hasRole('admin')) { }
+if (gs.hasRole('itil')) { }</pre>
+
+<h3>System properties</h3>
+<pre>// Read a system property
+var val = gs.getProperty('glide.servlet.uri');  // instance URL
+var custom = gs.getProperty('x_myapp.feature_flag', 'default_value');
+
+// Set a system property (use carefully)
+gs.setProperty('x_myapp.last_sync', gs.nowDateTime());</pre>
+
+<h3>Messages and events</h3>
+<pre>// Show messages to the user (in Business Rules)
+gs.addInfoMessage('Record saved successfully.');
+gs.addErrorMessage('Cannot close without resolution notes.');
+
+// Queue an event (for notifications, flows, or custom processing)
+gs.eventQueue('incident.escalated', current, gs.getUserID(), current.getValue('assignment_group'));
+
+// Prefer instantiating the Script Include (Class.create pattern).
+// gs.include('MyUtilityLibrary') still exists for older includes, but
+// new MyUtilityLibrary() is the usual modern call site.
+var utils = new MyUtilityLibrary();</pre>
+
+<h3>Data Policy vs UI Policy</h3>
+<p>Both control field mandatory/read-only behavior, but at different layers:</p>
+<table>
+<tr><th>Feature</th><th>UI Policy</th><th>Data Policy</th></tr>
+<tr><td>Runs on</td><td>Client (browser) only</td><td>Server + Client</td></tr>
+<tr><td>Enforced via API</td><td>No — only on the form</td><td>Yes — REST, import, scripts all respect it</td></tr>
+<tr><td>Configuration</td><td>UI-only, no code</td><td>UI-only, no code</td></tr>
+<tr><td>Use when</td><td>Form-only field behavior</td><td>Data integrity regardless of entry point</td></tr>
+</table>
+<p>If a field must always be mandatory — even for records created via API or Import Set — use a Data Policy. If it only matters when a user is filling out a form, UI Policy is sufficient.</p>
+
+<h2>Common traps</h2>
+<ul>
+<li><strong>GlideDateTime timezone confusion:</strong> <code>getValue()</code> returns UTC, <code>getDisplayValue()</code> returns the user's timezone. When comparing dates in scripts, always use <code>getValue()</code> or UTC methods.</li>
+<li><strong>gr.field.nil() vs gs.nil():</strong> Both work, but <code>gs.nil()</code> also handles null, undefined, and empty strings. Prefer <code>gs.nil(gr.getValue('field'))</code> for defensive coding.</li>
+<li><strong>gs.getProperty() performance:</strong> System properties are cached, so repeated calls are fast. But do not call <code>gs.getProperty()</code> inside a tight loop on a high-volume table — read it once and store it in a variable.</li>
+<li><strong>gs.addInfoMessage in async Business Rules:</strong> Will not display. The user's transaction is already complete. Only works in before/after BRs where the form is still in context.</li>
+</ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/catalog-scripting-reference" rel="prev"><small>‹ Previous</small><strong>Service Catalog Scripting: Record Producers, Variables, Catalog Client Scripts, and Order Guides</strong></a>
+          <a href="/article/client-side-api-reference" rel="next"><small>Next ›</small><strong>ServiceNow Client-Side APIs: g_form, g_user, g_list — The Methods That Control the Form</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Server-Side Utility APIs You Use Every Day: GlideDateTime, GlideElement, gs Methods",
+  "description": "The utility APIs that show up in every Business Rule and Script Include but nobody explains in one place. Date math, field inspection, system properties, and logging.",
+  "datePublished": "2026-04-07T14:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

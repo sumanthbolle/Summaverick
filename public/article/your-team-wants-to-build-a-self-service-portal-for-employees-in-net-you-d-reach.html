@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your team wants to build a self-service portal for employees. In .NET, you'd reach for React/Angular with an API backend. In ServiceNow, there's 'Service Portal' and the newer 'UI Builder (Next Experience).' Compare these to what you know, and advise which to use for a new project in 2026. — Summaverick</title>
+  <meta name="description" content="What the Interviewer Wants to Hear ServiceNow has two portal frameworks, and choosing between them is a real architectural decision teams face. This tests whether you understand the platform direction…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-team-wants-to-build-a-self-service-portal-for-employees-in-net-you-d-reach" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your team wants to build a self-service portal for employees. In .NET, you'd reach for React/Angular with an API backend. In ServiceNow, there's 'Service Portal' and the newer 'UI Builder (Next Experience).' Compare these to what you know, and advise which to use for a new project in 2026. — Summaverick" />
+  <meta property="og:description" content="What the Interviewer Wants to Hear ServiceNow has two portal frameworks, and choosing between them is a real architectural decision teams face. This tests whether you understand the platform direction…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-team-wants-to-build-a-self-service-portal-for-employees-in-net-you-d-reach" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Core Concepts</p>
+        <h1>Your team wants to build a self-service portal for employees. In .NET, you'd reach for React/Angular with an API backend. In ServiceNow, there's 'Service Portal' and the newer 'UI Builder (Next Experience).' Compare these to what you know, and advise which to use for a new project in 2026.</h1>
+        <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <div class="prose">
+<h4>What the Interviewer Wants to Hear</h4><p>ServiceNow has two portal frameworks, and choosing between them is a real architectural decision teams face. This tests whether you understand the platform direction and can make a pragmatic recommendation — not just pick the newest shiny thing.</p><h4>The Frontend Framework Comparison</h4><pre>// What You've Built (SPA + API)
+// React/Angular frontend → REST API backend → SQL Database
+// Full control, custom everything, your infrastructure
+//
+// ServiceNow Service Portal (Legacy, but mature)
+// AngularJS 1.x widgets → Server-side controllers → GlideRecord
+// Built-in, no infrastructure, extensive OOB widgets
+//
+// ServiceNow UI Builder / Next Experience (Modern)
+// Web Components (Seismic framework) → UI Builder config →
+// Data Resources → GlideRecord / REST
+// Low-code, drag-and-drop, platform-native, mobile-ready</pre><h4>Service Portal — The jQuery of ServiceNow</h4><ul><li><strong>Technology:</strong> AngularJS 1.x (yes, the old Angular). Widgets with HTML + CSS + Client Controller + Server Script.</li><li><strong>Strengths:</strong> Massive ecosystem of existing widgets, well-documented, battle-tested in enterprise environments. If you need something working today, plenty of examples exist.</li><li><strong>Weaknesses:</strong> AngularJS is legacy. Performance issues with complex pages. Limited mobile support. ServiceNow's strategic investment is shifting away from it.</li><li><strong>Think of it as:</strong> ASP.NET Web Forms — still works, still everywhere, but not where the platform is going.</li></ul><h4>UI Builder / Next Experience — The Future</h4><ul><li><strong>Technology:</strong> Web Components (ServiceNow's Seismic design system). Drag-and-drop builder with data binding.</li><li><strong>Strengths:</strong> Mobile-first, workspace-integrated, low-code friendly, supports Now Experience components. ServiceNow's strategic direction — all new features land here first.</li><li><strong>Weaknesses:</strong> Younger ecosystem, fewer community examples, custom component development requires learning Seismic framework. Some complex patterns that were easy in AngularJS widgets require more effort.</li><li><strong>Think of it as:</strong> Blazor or Next.js — modern, component-based, but still maturing in the ecosystem.</li></ul><h4>The 2026 Recommendation</h4><pre>// Decision Matrix:
+// New project, greenfield          → UI Builder
+// Existing Service Portal to extend → Stay on Service Portal
+// Complex custom UI, tight deadline → Service Portal (more examples)
+// Mobile-first requirement          → UI Builder (native support)
+// Workspace integration needed      → UI Builder (only option)
+// Team has AngularJS experience     → Service Portal for speed
+// Long-term maintainability         → UI Builder (future-proof)</pre><h4>The Pragmatic Answer for Interviews</h4><p>'For a new project in 2026, I'd default to UI Builder unless there's a specific technical blocker. The platform direction is clear — Now Experience and workspaces are where ServiceNow is investing. However, if the team has deep Service Portal expertise and needs to ship quickly, Service Portal is still fully supported and gets the job done. The worst choice is mixing both frameworks in the same user experience — pick one and commit.'</p><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>If you're a React developer, UI Builder's component model will feel more natural — it's declarative, component-based, and uses data binding patterns you recognize. If you're coming from jQuery/AngularJS, Service Portal widgets will feel immediately familiar. Either way, your frontend skills transfer — the concepts of state management, API calls, and component lifecycle are universal.</p></div>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/in-net-you-ve-handled-exceptions-with-try-catch-global-exception-handlers-and-ap" rel="prev"><small>‹ Previous</small><strong>In .NET, you've handled exceptions with try-catch, global exception handlers, and Application Insights for monitoring. How does error handling and debugging work in ServiceNow? Walk through the tools you'd use to diagnose a failing Business Rule in production.</strong></a>
+          <a href="/article/in-every-net-project-you-ve-dealt-with-performance-profiling-sql-query-plans-app" rel="next"><small>Next ›</small><strong>In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your team wants to build a self-service portal for employees. In .NET, you'd reach for React/Angular with an API backend. In ServiceNow, there's 'Service Portal' and the newer 'UI Builder (Next Experience).' Compare these to what you know, and advise which to use for a new project in 2026.",
+  "description": "What the Interviewer Wants to Hear ServiceNow has two portal frameworks, and choosing between them is a real architectural decision teams face. This tests whether you understand the platform direction…",
+  "datePublished": "2026-03-16T04:40:00.000Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

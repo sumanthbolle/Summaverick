@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>IRM for Beginners: How ServiceNow Connects Risk, Compliance, and Business Decisions — Summaverick</title>
+  <meta name="description" content="Learn IRM in very simple terms and see how enterprises map controls, risks, and policy evidence in one platform." />
+  <link rel="canonical" href="https://summaverick.com/article/irm-enterprise-basics" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="IRM for Beginners: How ServiceNow Connects Risk, Compliance, and Business Decisions — Summaverick" />
+  <meta property="og:description" content="Learn IRM in very simple terms and see how enterprises map controls, risks, and policy evidence in one platform." />
+  <meta property="og:url" content="https://summaverick.com/article/irm-enterprise-basics" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
+        <p class="kicker">ServiceNow</p>
+        <h1>IRM for Beginners: How ServiceNow Connects Risk, Compliance, and Business Decisions</h1>
+        <p class="article-meta">Beginner · 12 min read · Mar 2026</p>
+        <div class="prose">
+<h2>What is IRM?</h2>
+<p><strong>IRM (Integrated Risk Management)</strong> helps organizations manage risk, controls, policy obligations, and compliance activities in a connected model.</p>
+<p>Instead of siloed spreadsheets, IRM centralizes risk decisions and evidence.</p>
+
+<h3>Simple IRM Building Blocks</h3>
+<h3>GRC Tables in the Platform</h3>
+<p>IRM/GRC ships as scoped applications with their own tables. Two you will meet immediately:</p>
+<table>
+  <tr><th>Table</th><th>What it stores</th></tr>
+  <tr><td><code>sn_compliance_control</code></td><td>Controls — the preventive/detective mechanisms, with owners and attestation state</td></tr>
+  <tr><td><code>sn_grc_profile</code></td><td>Entities — the things risks and controls apply to (systems, processes, departments)</td></tr>
+</table>
+<p>Policies, risks, issues, and indicators live in further tables within the Policy and Compliance and Risk Management scopes — explore them from the application navigator on a PDI rather than memorizing names.</p>
+<pre>// Quick look: how many active controls exist? (run in Background Scripts)
+var ga = new GlideAggregate('sn_compliance_control');
+ga.addQuery('active', true);
+ga.addAggregate('COUNT');
+ga.query();
+if (ga.next()) {
+    gs.info('Active controls: ' + ga.getAggregate('COUNT'));
+}</pre>
+
+<ul>
+  <li><strong>Risk:</strong> what could go wrong and impact objectives.</li>
+  <li><strong>Control:</strong> preventive/detective mechanism.</li>
+  <li><strong>Policy/Requirement:</strong> governance expectations.</li>
+  <li><strong>Issue:</strong> control gap requiring remediation.</li>
+</ul>
+
+<div class="scenario-box">
+  <h4>Enterprise Example: SOX + ISO Overlap</h4>
+  <p>A global finance organization reduced duplicate audit work by mapping one control to multiple obligations (SOX, ISO, internal policy) and tracking evidence once.</p>
+</div>
+
+<h3>Why Leaders Invest in IRM</h3>
+<ul>
+  <li>Single view of enterprise risk posture</li>
+  <li>Clear control ownership</li>
+  <li>Faster audit readiness</li>
+  <li>Fewer manual evidence chases</li>
+</ul>
+
+<h3>Beginner Rollout Sequence</h3>
+<ol>
+  <li>Define top enterprise risks and taxonomy.</li>
+  <li>Map key controls with owners.</li>
+  <li>Attach obligations and testing schedules.</li>
+  <li>Track issues and remediation lifecycle.</li>
+</ol>
+
+<div class="tip-box">
+  <h4>Keep It Practical</h4>
+  <p>Start with one domain (for example IT risk) and mature operating rhythm before broad enterprise expansion.</p>
+</div>
+
+
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/secops-vulnerability-response" rel="prev"><small>‹ Previous</small><strong>SecOps in ServiceNow: A Beginner-Friendly Guide to Vulnerability Response with Enterprise Examples</strong></a>
+          <a href="/article/app-engine-beginner-guide" rel="next"><small>Next ›</small><strong>ServiceNow App Engine Explained: Build Enterprise Apps Without Reinventing the Platform</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "IRM for Beginners: How ServiceNow Connects Risk, Compliance, and Business Decisions",
+  "description": "Learn IRM in very simple terms and see how enterprises map controls, risks, and policy evidence in one platform.",
+  "datePublished": "2026-03-21T05:00:00Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

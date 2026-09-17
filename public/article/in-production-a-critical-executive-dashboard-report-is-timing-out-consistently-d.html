@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>In production, a critical executive dashboard report is timing out consistently during peak hours (8-10 AM). The report aggregates &lt;strong&gt;incident data from the past 90 days&lt;/strong&gt; across 5 assignment groups (500K+ records total), grouping by &lt;strong&gt;CI, Priority, and State&lt;/strong&gt; with a &lt;strong&gt;pivot table&lt;/strong&gt; showing MTTR calculations. Users report 'Report timeout after 120 seconds'. Logs show high CPU on the reporting node and slow DB queries. Walk us through your &lt;strong&gt;diagnosis approach&lt;/strong&gt;, propose &lt;strong&gt;3+ solution options with trade-offs&lt;/strong&gt;, and explain &lt;strong&gt;production rollout considerations&lt;/strong&gt;. What metrics would you monitor post-implementation? &lt;strong&gt;Follow-up:&lt;/strong&gt; Show a scripted filter example that could cause this issue vs. an optimized version. — Summaverick</title>
+  <meta name="description" content="Why This Comes Up in Interviews A complex report timing out in production typically stems from inefficient database queries scanning massive datasets without proper indexing, combined with peak-hour…" />
+  <link rel="canonical" href="https://summaverick.com/article/in-production-a-critical-executive-dashboard-report-is-timing-out-consistently-d" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="In production, a critical executive dashboard report is timing out consistently during peak hours (8-10 AM). The report aggregates &lt;strong&gt;incident data from the past 90 days&lt;/strong&gt; across 5 assignment groups (500K+ records total), grouping by &lt;strong&gt;CI, Priority, and State&lt;/strong&gt; with a &lt;strong&gt;pivot table&lt;/strong&gt; showing MTTR calculations. Users report 'Report timeout after 120 seconds'. Logs show high CPU on the reporting node and slow DB queries. Walk us through your &lt;strong&gt;diagnosis approach&lt;/strong&gt;, propose &lt;strong&gt;3+ solution options with trade-offs&lt;/strong&gt;, and explain &lt;strong&gt;production rollout considerations&lt;/strong&gt;. What metrics would you monitor post-implementation? &lt;strong&gt;Follow-up:&lt;/strong&gt; Show a scripted filter example that could cause this issue vs. an optimized version. — Summaverick" />
+  <meta property="og:description" content="Why This Comes Up in Interviews A complex report timing out in production typically stems from inefficient database queries scanning massive datasets without proper indexing, combined with peak-hour…" />
+  <meta property="og:url" content="https://summaverick.com/article/in-production-a-critical-executive-dashboard-report-is-timing-out-consistently-d" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Performance</p>
+        <h1>In production, a critical executive dashboard report is timing out consistently during peak hours (8-10 AM). The report aggregates &lt;strong&gt;incident data from the past 90 days&lt;/strong&gt; across 5 assignment groups (500K+ records total), grouping by &lt;strong&gt;CI, Priority, and State&lt;/strong&gt; with a &lt;strong&gt;pivot table&lt;/strong&gt; showing MTTR calculations. Users report 'Report timeout after 120 seconds'. Logs show high CPU on the reporting node and slow DB queries. Walk us through your &lt;strong&gt;diagnosis approach&lt;/strong&gt;, propose &lt;strong&gt;3+ solution options with trade-offs&lt;/strong&gt;, and explain &lt;strong&gt;production rollout considerations&lt;/strong&gt;. What metrics would you monitor post-implementation? &lt;strong&gt;Follow-up:&lt;/strong&gt; Show a scripted filter example that could cause this issue vs. an optimized version.</h1>
+        <p class="article-meta">Senior · ServiceNow · Jan 2026</p>
+        <div class="prose">
+<h4>Why This Comes Up in Interviews</h4><p>A complex report timing out in production typically stems from inefficient database queries scanning massive datasets without proper indexing, combined with peak-hour resource contention. With 500K+ incident records over 90 days, the pivot aggregation by CI, Priority, and State triggers full table scans, Cartesian products from unoptimized joins, and heavy CPU for MTTR calculations—all exacerbated by dashboard multi-threading limits and reporting node saturation.</p><p><strong>Diagnosis Approach (Senior Expectation):</strong> Don't jump to code fixes. First, reproduce in sub-prod with similar data volume. Check <strong>System Logs & Transaction Logs</strong> for query plans (enable SQL trace). Use <strong>System Diagnostics > Slow Queries</strong> to identify the culprit. Monitor <strong>Node CPU/Memory</strong> via Stats.do and <strong>DB execution plans</strong> via JDBC probes. Validate indexes on <code>incident.sys_created_on</code>, <code>cmdb_ci</code>, <code>priority</code>, <code>state</code>. Great answers quantify: "Query scans 2M rows, 80% CPU spike, no CI index hit."</p><h4>The Solution</h4><p><strong>Problem: Inefficient Scripted Filter (causes full scan)</strong></p><pre>var problematicFilter = function() {
+  var gr = new GlideRecord('incident');
+  gr.addQuery('sys_created_on', 'STARTSWITH', gs.beginningOfLast90Days());
+  gr.addJoinQuery('cmdb_ci', 'cmdb_ci', 'sys_id', 'cmdb_ci');
+  gr.addAggregate('COUNT', 'number');
+  gr.addAggregate('AVG', 'business_duration');
+  gr.query(); // Scans ALL records, no indexes, pivot explodes
+  while(gr.next()) { /* heavy processing */ }
+  return 'sys_idIN' + getAllSysIds(gr);
+};</pre><p><strong>Solution: Optimized Scripted Filter with Indexing & Limits</strong></p><pre>var optimizedFilter = function() {
+  var gr = new GlideRecord('incident');
+  gr.addQuery('sys_created_on', '>=', gs.beginningOfLast90Days());
+  gr.addQuery('assignment_group', 'IN', groupSysIds.join(','));
+  gr.orderBy('sys_created_on');
+  gr.setLimit(500000); // Prevent OOM
+  gr.query(); // Leverages compound index
+  var ciMap = {};
+  while(gr.next()) {
+    var ci = gr.getValue('cmdb_ci');
+    ciMap[ci] = (ciMap[ci] || 0) + 1;
+  }
+  return 'sys_idIN' + Object.keys(ciMap).join(',');
+};</pre><h4>Senior Considerations</h4><ul><li><strong>Three Solution Options w/ Trade-offs:</strong> 1) <em>Quick Fix - Add Indexes & Row Limits</em>: Index <code>incident.sys_created_on,assignment_group,cmdb_ci</code> (fastest ROI, but doesn't scale beyond 1M rows). 2) <em>Mid-term - Scheduled Reports + PA Indicators</em>: Offload to Performance Analytics with breakdowns (reduces live load 90%, but 15-min latency vs. real-time). 3) <em>Strategic - Data Warehouse Export</em>: Nightly ETL to external BI (scales infinitely, but $cost + data staleness).</li><li><strong>Production Rollout:</strong> Test in DEV & PERF with 110% data volume. Stagger: Indexes first (no downtime), then report config. Use <strong>Update Sets</strong> for scripted filters. Monitor with <strong>APM/Splunk</strong> for 48hrs post-deploy.</li><li><strong>Great Answer Separators:</strong> Quantifies impact ("reduces query time 85% via index hit ratio"), discusses <strong>edge cases</strong> (holiday data spikes, null CI handling), failure modes (index fragmentation), and <strong>holistic metrics</strong>: Report load time &lt;30s, Node CPU &lt;70%, User abandonment rate=0%.</li><li><strong>Why This Matters:</strong> Good candidates fix syntax. Seniors prevent recurrence via root cause (missing indexes on high-cardinality fields) and balance user experience with platform stability.</li></ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/you-receive-a-production-incident-users-with-the-incident-manager-role-report-th" rel="prev"><small>‹ Previous</small><strong>You receive a production incident: users with the 'incident_manager' role report they cannot edit the 'Assignment Group' field on incidents, even though their role should grant write access. Management says this worked last week. You have 15 minutes to diagnose before escalation. Walk me through your systematic approach, including what you'd check first, what could cause this, and how you'd implement a fix. Show me code for both the problem diagnosis and solution.</strong></a>
+          <a href="/article/your-enterprise-customer-has-5-000-users-across-3-business-units-hr-finance-it-o" rel="next"><small>Next ›</small><strong>Your enterprise customer has 5,000 users across 3 business units (HR, Finance, IT) on a single ServiceNow instance. Recently, HR workflows are spiking CPU usage to 90% during payroll runs (affecting 2,000 users), causing IT incidents to timeout globally. Logs show cross-domain queries hitting 10M rows/day without isolation. Customer demands data isolation for compliance (GDPR/SOX) but wants to retain shared configs. You're seeing 20% monthly growth in incidents. &lt;strong&gt;Question:&lt;/strong&gt; Diagnose the root cause systematically. Propose 3 multi-instance strategies with trade-offs. Provide a script showing the performance bottleneck and your fix. Explain production rollout considerations for zero-downtime.</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "In production, a critical executive dashboard report is timing out consistently during peak hours (8-10 AM). The report aggregates <strong>incident data from the past 90 days</strong> across 5 assignment groups (500K+ records total), grouping by <strong>CI, Priority, and State</strong> with a <strong>pivot table</strong> showing MTTR calculations. Users report 'Report timeout after 120 seconds'. Logs show high CPU on the reporting node and slow DB queries. Walk us through your <strong>diagnosis approach</strong>, propose <strong>3+ solution options with trade-offs</strong>, and explain <strong>production rollout considerations</strong>. What metrics would you monitor post-implementation? <strong>Follow-up:</strong> Show a scripted filter example that could cause this issue vs. an optimized version.",
+  "description": "Why This Comes Up in Interviews A complex report timing out in production typically stems from inefficient database queries scanning massive datasets without proper indexing, combined with peak-hour…",
+  "datePublished": "2026-01-29T06:30:31.300Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>

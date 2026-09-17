@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Your ServiceNow instance integrates with an external HR system via OAuth 2.0 for employee data sync. Production logs show intermittent 401 Unauthorized errors during peak hours (8-10 AM), affecting 15% of daily syncs (500 records/hour). Users report delayed onboarding tickets. External system confirms their API is stable, tokens expire every 24 hours, and rate limits are 1000 calls/hour (well above usage). No issues in dev/subprod. Impersonating the integration user works fine manually. &lt;strong&gt;Question:&lt;/strong&gt; Walk me through your root cause diagnosis approach. Propose 2-3 solution options with trade-offs. Provide a Script Include showing the problematic auth code and your fixed version. What production monitoring would you implement? — Summaverick</title>
+  <meta name="description" content="What the Interviewer Wants to Hear Intermittent 401 errors during peak hours suggest timing-related issues like token expiry mid-sync, clock skew between systems, or concurrent refresh races.…" />
+  <link rel="canonical" href="https://summaverick.com/article/your-servicenow-instance-integrates-with-an-external-hr-system-via-oauth-2-0-for" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta property="og:title" content="Your ServiceNow instance integrates with an external HR system via OAuth 2.0 for employee data sync. Production logs show intermittent 401 Unauthorized errors during peak hours (8-10 AM), affecting 15% of daily syncs (500 records/hour). Users report delayed onboarding tickets. External system confirms their API is stable, tokens expire every 24 hours, and rate limits are 1000 calls/hour (well above usage). No issues in dev/subprod. Impersonating the integration user works fine manually. &lt;strong&gt;Question:&lt;/strong&gt; Walk me through your root cause diagnosis approach. Propose 2-3 solution options with trade-offs. Provide a Script Include showing the problematic auth code and your fixed version. What production monitoring would you implement? — Summaverick" />
+  <meta property="og:description" content="What the Interviewer Wants to Hear Intermittent 401 errors during peak hours suggest timing-related issues like token expiry mid-sync, clock skew between systems, or concurrent refresh races.…" />
+  <meta property="og:url" content="https://summaverick.com/article/your-servicenow-instance-integrates-with-an-external-hr-system-via-oauth-2-0-for" />
+  <meta property="og:type" content="article" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/tokens.css" />
+  <link rel="stylesheet" href="/assets/css/type.css" />
+  <link rel="stylesheet" href="/assets/css/site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <a class="nav-brand" href="/" aria-label="Summaverick — home">
+      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+      <span>Summaverick</span>
+    </a>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn" aria-current="page">Writing</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
+        <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-panel" id="nav-panel" hidden>
+    <nav aria-label="Mobile">
+      <a href="/#expertise">How we work</a>
+      <a href="/#work">Work</a>
+      <a href="/#company">About</a>
+      <a href="/learn">Writing</a>
+      <a href="/interviews">Interview questions</a>
+      <a href="/ask">Research agent</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </div>
+  <main id="main">
+    <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
+    <div class="container article-wrap">
+      <article class="article-inner">
+        <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
+        <p class="kicker">Integration</p>
+        <h1>Your ServiceNow instance integrates with an external HR system via OAuth 2.0 for employee data sync. Production logs show intermittent 401 Unauthorized errors during peak hours (8-10 AM), affecting 15% of daily syncs (500 records/hour). Users report delayed onboarding tickets. External system confirms their API is stable, tokens expire every 24 hours, and rate limits are 1000 calls/hour (well above usage). No issues in dev/subprod. Impersonating the integration user works fine manually. &lt;strong&gt;Question:&lt;/strong&gt; Walk me through your root cause diagnosis approach. Propose 2-3 solution options with trade-offs. Provide a Script Include showing the problematic auth code and your fixed version. What production monitoring would you implement?</h1>
+        <p class="article-meta">Senior · ServiceNow · Feb 2026</p>
+        <div class="prose">
+<h4>What the Interviewer Wants to Hear</h4><p>Intermittent 401 errors during peak hours suggest timing-related issues like token expiry mid-sync, clock skew between systems, or concurrent refresh races. Diagnosis starts with logs: filter Integration Logs and System Logs for 'OAuth' or '401' with correlation IDs. Check token expiry via REST API Explorer as integration user. Verify instance time sync (gs.getSession().getTimeZone()). Test load with Scripted REST API simulating 500 calls. Review OAuth provider config for grant type (client credentials?) and scope. Impersonate user to rule out ACLs/roles. External system audit logs confirm no blocks.</p><h4>The Solution</h4><p><strong>Problematic Code (typical race-condition prone):</strong></p><pre>var OAuthUtil = Class.create();
+OAuthUtil.prototype = {
+    initialize: function() {},
+    getToken: function() {
+        var r = new sn_ws.RESTMessageV2();
+        r.setEndpoint('https://hr.example.com/oauth/token');
+        r.setHttpMethod('POST');
+        r.setRequestHeader('Authorization', 'Basic ' + gs.getProperty('hr.client.secret'));
+        r.setRequestBody('grant_type=client_credentials');
+        var response = r.execute();
+        if (response.getStatusCode() == 200) {
+            var token = JSON.parse(response.getBody()).access_token;
+            gs.setProperty('hr.oauth.token', token); // Unsafe shared prop
+            return token;
+        }
+        gs.error('Token fetch failed');
+    },
+    callHRAPI: function() {
+        var token = gs.getProperty('hr.oauth.token');
+        // Use token - fails if expired mid-batch
+    },
+    type: 'OAuthUtil'
+};</pre><p><strong>Fixed Code (thread-safe with expiry check):</strong></p><pre>var SecureOAuthUtil = Class.create();
+SecureOAuthUtil.prototype = {
+    initialize: function() {
+        this.tokenTable = 'x_custom_oauth_tokens'; // Illustrative only — prefer the
+        // platform OAuth 2.0 credential store (OAuth Entity / GlideOAuthClient),
+        // which handles refresh + encrypted storage. If you must use a table,
+        // make the token field Password2 (encrypted), never plain text.
+        this.expiryBuffer = 300; // 5min buffer
+    },
+    getToken: function() {
+        var gr = new GlideRecord(this.tokenTable);
+        gr.addQuery('name', 'hr_api');
+        gr.query();
+        if (gr.next()) {
+            var expires = new GlideDateTime(gr.getValue('expires_at'));
+            var cutoff = new GlideDateTime(); // now
+            cutoff.addSeconds(this.expiryBuffer);
+            if (expires.after(cutoff)) { // compare with after()/before(),
+                                         // never with > on GlideDateTime
+                return gr.getValue('access_token');
+            }
+        }
+        return this.refreshToken();
+    },
+    refreshToken: function() {
+        var r = new sn_ws.RESTMessageV2();
+        // ... (token request as above)
+        var tokenData = JSON.parse(r.getBody());
+        var gr = new GlideRecord(this.tokenTable);
+        gr.get('name', 'hr_api') || gr.initialize();
+        gr.access_token = tokenData.access_token;
+        gr.expires_at = new GlideDateTime();
+        gr.expires_at.addSeconds(tokenData.expires_in - this.expiryBuffer);
+        gr.update();
+        return tokenData.access_token;
+    },
+    type: 'SecureOAuthUtil'
+};</pre><h4>Senior Considerations</h4><ul><li><strong>Diagnosis Depth:</strong> Reading the logs is the baseline; go further by correlating ECC Queue entries, Flow Contexts, and external-system timestamps, and by scripting a load test.</li><li><strong>Options & Trade-offs:</strong> 1) Platform OAuth credential store / IntegrationHub credential (preferred): the instance manages refresh and encrypted storage. 2) Custom token table (above): workable for exotic providers, but you own expiry, races, and encryption. 3) Mutex Script Include: prevents refresh races; added complexity for high TPS.</li><li><strong>Production Hardening:</strong> Event Registry alerts on 401>5%, Performance Analytics on sync latency, least-privilege role (itil + custom API), rotate secrets via Vault, A/B test in subprod.</li><li><strong>Edge Cases:</strong> Clock skew (use NTP), provider revokes, network partitions (retry w/ exp backoff), token blacklist.</li><li><strong>Why This Matters:</strong> 15% failure cascades to business (onboarding delays); scales to 10k/hr without rework.</li></ul>
+        </div>
+        <nav class="article-pager" aria-label="More in this collection">
+          <a href="/article/you-re-supporting-a-production-scoped-application-that-needs-to-read-and-update" rel="prev"><small>‹ Previous</small><strong>You're supporting a production scoped application that needs to read and update records in the global Incident table from within a business rule. Developers report intermittent 'cross-scope access denied' errors, but the errors don't occur consistently—sometimes the same code works, sometimes it fails. The table's Application Access tab shows 'Can read' and 'Can update' are checked. Walk me through your diagnostic approach: what would you check first, what are the root causes you'd investigate, and what solution would you recommend with trade-offs?</strong></a>
+          <a href="/article/your-organization-has-a-cmdb-with-50-000-cis-but-adoption-is-critically-low-only" rel="next"><small>Next ›</small><strong>Your organization has a CMDB with 50,000 CIs, but adoption is critically low—only 15% of IT teams actively use it for change impact analysis. Discovery is running, but the data is stale (average age: 45 days), relationships are incomplete, and teams report false positives when they try to trace dependencies. Leadership is questioning the ROI. Walk me through how you'd diagnose the root cause and present a phased recovery plan with trade-offs. What would you check first, and why?</strong></a>
+        </nav>
+      </article>
+    </div>
+  </main>
+  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+
+  <script type="module" src="/assets/js/boot.js"></script>
+</body>
+</html>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Your ServiceNow instance integrates with an external HR system via OAuth 2.0 for employee data sync. Production logs show intermittent 401 Unauthorized errors during peak hours (8-10 AM), affecting 15% of daily syncs (500 records/hour). Users report delayed onboarding tickets. External system confirms their API is stable, tokens expire every 24 hours, and rate limits are 1000 calls/hour (well above usage). No issues in dev/subprod. Impersonating the integration user works fine manually. <strong>Question:</strong> Walk me through your root cause diagnosis approach. Propose 2-3 solution options with trade-offs. Provide a Script Include showing the problematic auth code and your fixed version. What production monitoring would you implement?",
+  "description": "What the Interviewer Wants to Hear Intermittent 401 errors during peak hours suggest timing-related issues like token expiry mid-sync, clock skew between systems, or concurrent refresh races.…",
+  "datePublished": "2026-02-08T06:34:15.198Z",
+  "author": {
+    "@type": "Organization",
+    "name": "Summaverick",
+    "url": "https://summaverick.com"
+  }
+}
+  </script>
+<script>
+(function () {
+  var bar = document.querySelector("[data-progress]");
+  if (!bar) return;
+  var tick = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? Math.min(1, Math.max(0, h.scrollTop / max)) : 0;
+    bar.style.transform = "scaleX(" + p + ")";
+  };
+  document.addEventListener("scroll", tick, { passive: true });
+  tick();
+})();
+</script>
