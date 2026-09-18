@@ -713,6 +713,181 @@ body[data-nav-open] { overflow: hidden; }
   color: var(--c-on-accent);
 }
 
+.ask-note {
+  margin: var(--space-5) 0 0;
+  padding: var(--space-4);
+  border: 1px solid var(--c-line);
+  border-left: 3px solid var(--c-accent);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+  max-width: 62ch;
+}
+.ask-note strong { color: var(--c-text); }
+.ask-examples-label { margin: var(--space-6) 0 0; }
+
+.ask-smallprint {
+  max-width: 68ch;
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--c-line);
+}
+.ask-smallprint h2 {
+  margin: 0 0 var(--space-4);
+  font-size: var(--step-0);
+  font-weight: var(--weight-semibold);
+}
+.ask-smallprint ul { margin: 0; padding-left: 1.2em; }
+.ask-smallprint li {
+  margin-bottom: var(--space-3);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+.ask-smallprint strong { color: var(--c-text); }
+
+/* ---- Answer card -------------------------------------------------------
+   The result, in the order a reader needs it: what kind of result this is,
+   the answer if one was written, the sources, then what was and was not
+   checked. The retrieval trace sits below, collapsed. */
+.answer-card { display: grid; gap: var(--space-4); padding: var(--space-5); }
+.ask-live:empty { display: none; }
+.ask-live:not(:empty) { border-bottom: 1px solid var(--c-line); }
+.answer-card + * { margin-top: 0; }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  margin: 0;
+  padding: 0.3em 0.75em;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-pill);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+.status-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-pill[data-tone="ok"] { background: var(--c-ok-soft); color: var(--c-ok); border-color: transparent; }
+.status-pill[data-tone="warn"] { background: var(--c-bad-soft); color: var(--c-bad); border-color: transparent; }
+.status-pill[data-tone="info"] { background: var(--c-accent-soft); color: var(--c-accent); border-color: transparent; }
+
+.answer-card__note,
+.answer-card__scope {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+.answer-card__text {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--c-text);
+  font-size: var(--step-0);
+  line-height: var(--leading-normal);
+  white-space: pre-wrap;
+}
+.answer-card__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.answer-card__next {
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+}
+.answer-card__next a { text-decoration: underline; text-underline-offset: 3px; }
+
+.sources__title,
+.checks__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step--1);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-snug);
+  text-transform: uppercase;
+  color: var(--c-text-mute);
+}
+.sources__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-4); }
+.source {
+  padding: var(--space-4);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+.source__meta {
+  margin: 0 0 var(--space-2);
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+.source__title { margin: 0; font-size: var(--step-0); font-weight: var(--weight-medium); text-wrap: pretty; }
+.source__title a { text-decoration: underline; text-underline-offset: 3px; }
+.source__snippet {
+  margin: var(--space-2) 0 0;
+  max-width: 72ch;
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+
+.checks {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+.checks dt {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+.checks dt::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 0.4em;
+  border-radius: 50%;
+  background: var(--c-text-mute);
+}
+.checks dt[data-tone="ok"]::before { background: var(--c-ok); }
+.checks dt[data-tone="warn"]::before { background: var(--c-bad); }
+.checks dt[data-tone="bad"]::before { background: var(--c-bad); }
+.checks dd {
+  margin: 0;
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+
+.trace-details {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--c-line);
+}
+.trace-details summary {
+  min-height: var(--hit);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+.trace-details summary:hover { color: var(--c-text); }
+.trace-details .trace { padding: var(--space-3) 0 0; }
+
+@media (max-width: 640px) {
+  .checks { grid-template-columns: 1fr; gap: var(--space-2); }
+  .checks dd { margin-bottom: var(--space-3); }
+}
+
 /* ======================================================================== *
  * Library — the Writing section. Listing pages and pre-rendered articles.
  * ======================================================================== */

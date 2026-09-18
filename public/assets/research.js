@@ -114,7 +114,13 @@ function renderEvidence(evidence) {
 }
 
 function renderClaims(claims) {
-  if (!claims.length) return el("p", { class: "muted", text: "No claims were extracted." });
+  if (!claims || !claims.length) {
+    return el("p", {
+      class: "muted",
+      text:
+        "Not applicable — groundedness is only checked sentence by sentence when a model wrote the answer.",
+    });
+  }
   const wrap = el("div");
   for (const c of claims) {
     const row = el("div", { class: "claim" });
@@ -169,15 +175,32 @@ function renderEval(ev) {
   return wrap;
 }
 
-function renderVerification(v, sec, llm) {
+function renderChecks(checks, mode, layerErrors, sec, llm) {
   const dl = el("dl", { class: "kv" });
   const add = (k, node) => { dl.append(el("dt", { text: k }), node instanceof Node ? el("dd", {}, node) : el("dd", { text: node })); };
-  if (v) {
-    add("Verifier ok", badge(v.ok, "yes", "no"));
-    add("Confidence", v.confidence);
-    add("Citations", String(v.citationCount));
-    add("Unsupported claims", String(v.unsupportedClaimCount));
-    if (v.issues && v.issues.length) add("Issues", v.issues.join("; "));
+  add("Answer mode", mode || "—");
+  if (checks) {
+    add("Sources found", badge(checks.sourcesFound.ok, String(checks.sourcesFound.count), `${checks.sourcesFound.count} — below the required count`));
+    add(
+      "Source relevance",
+      `${checks.relevance.verdict} — top ${pct(checks.relevance.topScore)}, mean ${pct(checks.relevance.meanScore)} of the question's terms`
+    );
+    const g = checks.groundedness;
+    add(
+      "Groundedness",
+      g.status === "checked"
+        ? `${g.grounded}/${g.sentences} sentences traceable (${g.method})`
+        : `not applicable — ${g.method}`
+    );
+    if (g.status === "checked" && g.unsupported.length) {
+      add("Untraceable sentences", g.unsupported.join(" | "));
+    }
+    add("Completeness", checks.completeness.note);
+  } else {
+    add("Checks", "none — nothing was retrieved to check");
+  }
+  if (layerErrors && layerErrors.length) {
+    add("Unreachable layers", layerErrors.map((e) => `${e.source}: ${e.message}`).join("; "));
   }
   add("Read-only", badge(sec.readOnly, "enforced", "off"));
   add("Prompt-injection", badge(sec.promptInjectionDetected, "detected", "none", true));
@@ -219,10 +242,10 @@ function renderTrace(t) {
 
   root.append(section("3 · Retrieval layers", renderLayers(t.layers, t.answeredBy, t.candidateDocumentCount)));
   root.append(section("4 · Ranked evidence", renderEvidence(t.evidence)));
-  root.append(section("5 · Per-claim evidence verification", renderClaims(t.claims)));
+  root.append(section("5 · Per-sentence groundedness", renderClaims(t.claims)));
   root.append(section("6 · Evidence gates", renderGates(t.evidenceGates)));
-  root.append(section("7 · Verification, security & synthesis",
-    renderVerification(t.verification, t.security, t.llm)));
+  root.append(section("7 · Answer checks, security & synthesis",
+    renderChecks(t.checks, t.mode, t.layerErrors, t.security, t.llm)));
   root.append(section("8 · Adversarial + regression eval scores", renderEval(t.evalScores)));
 
   const events = renderEvents(t.events);

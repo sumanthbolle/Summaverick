@@ -37,8 +37,22 @@ export {
   createResearchContext,
 } from "./workflow";
 export type { ServiceNowResearchResult } from "./workflow";
-export { verifyServiceNowAnswer } from "./answer-verifier";
-export type { VerificationResult, ClaimVerdict } from "./answer-verifier";
+export { verifyServiceNowAnswer, assessGroundedness } from "./answer-verifier";
+export type {
+  VerificationResult,
+  ClaimVerdict,
+  AnswerChecks,
+  RelevanceVerdict,
+} from "./answer-verifier";
+export {
+  buildDocsQueryTerms,
+  extractPassage,
+  isTableOfContents,
+  parseFrontMatter,
+  parseTopicEntries,
+  plainSnippet,
+  termCoverage,
+} from "./retrieval/docs-text";
 export { DefaultSdkExplainProvider } from "./providers/sdk-explain-provider";
 export { DefaultServiceNowInstanceQueryProvider } from "./providers/sdk-query-provider";
 export {
@@ -72,4 +86,9 @@ export { checkFluentDeletionSafety } from "./tools/inspect-fluent-project";
 export { getEvalScores, runEvalSuite } from "./evals/eval-runner";
 export type { EvalScores, EvalCaseResult } from "./evals/eval-runner";
 export { runResearchPipeline } from "./pipeline";
-export type { ResearchTrace, ResearchPipelineResult } from "./pipeline";
+export type {
+  ResearchTrace,
+  ResearchPipelineResult,
+  ResearchAnswerMode,
+  ResearchSource,
+} from "./pipeline";

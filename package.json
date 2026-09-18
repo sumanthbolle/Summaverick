@@ -20,6 +20,7 @@
     "seed:content:local": "node scripts/seed-content.ts --local",
     "seed:content:remote": "node scripts/seed-content.ts --remote",
     "build:library": "node scripts/build-library.mjs",
+    "eval:research": "node scripts/eval-research.mjs",
     "verify": "node scripts/verify.mjs"
   },
   "dependencies": {

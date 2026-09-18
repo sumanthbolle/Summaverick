@@ -65,34 +65,54 @@
   <main id="main">
     <section class="ask-wrap">
       <div class="container ask-inner">
-        <p class="kicker">Research agent</p>
+        <p class="kicker">Research agent · internal demo</p>
         <h1 class="h1">Ask a ServiceNow question.</h1>
         <p class="lead">
-          You will see the work as it happens: how the question was read, where
-          the agent looked, what it declined to trust, and the source behind
-          every line of the answer.
+          A retrieval agent over the ServiceNow product documentation. It shows
+          you the passages it found, tells you how well they match your
+          question, and says plainly what it did not check.
+        </p>
+
+        <p class="ask-note">
+          <strong>Honest status:</strong> this deployment has no answer model
+          configured, so the agent returns the matching documentation passages
+          rather than prose. When a model key is set it writes an answer from
+          those passages and every sentence is checked back against them. It
+          has no access to any ServiceNow instance.
         </p>
 
         <form class="composer" data-ask-form>
-          <textarea class="composer-input" data-ask-input rows="2"
+          <label class="visually-hidden" for="ask-input">Your ServiceNow question</label>
+          <textarea class="composer-input" id="ask-input" data-ask-input rows="2"
             placeholder="How do I use GlideRecord to query the incident table?"
-            aria-label="Ask the research agent" maxlength="500"></textarea>
+            maxlength="500"></textarea>
           <button class="btn btn-primary btn-lg" type="submit" data-ask-run>Ask</button>
         </form>
 
-        <div class="chips" data-ask-chips></div>
+        <p class="small text-mute ask-examples-label" id="ask-examples-label">
+          Four questions with reviewed results:
+        </p>
+        <div class="chips" data-ask-chips role="group" aria-labelledby="ask-examples-label"></div>
 
-        <div class="agent-shell ask-results" data-ask-results hidden>
-          <div class="trace" data-ask-trace></div>
+        <div class="ask-results" data-ask-results hidden>
+          <p class="visually-hidden" role="status" aria-live="polite" data-ask-status></p>
+          <div class="agent-shell">
+            <div class="trace ask-live" data-ask-live></div>
+            <div data-ask-output></div>
+          </div>
         </div>
 
-        <p class="small text-mute" style="margin-top: var(--space-6)">
-          The agent only knows ServiceNow: the Fluent SDK, the product docs,
-          and, when switched on, read-only instance metadata. Questions are
-          rate limited, and anything that reads as a prompt-injection attempt
-          is turned away before it reaches a model. With no model key set, the
-          answer is the draft assembled from the evidence.
-        </p>
+        <div class="ask-smallprint">
+          <h2>What this agent does and does not do</h2>
+          <ul>
+            <li><strong>Scope.</strong> The ServiceNow product documentation for the current release family, plus the Fluent SDK documentation. Nothing outside ServiceNow, and no instance data.</li>
+            <li><strong>Relevance.</strong> Reported per run as the share of your question's distinctive terms that the closest passage matched. A weak match is labelled weak.</li>
+            <li><strong>Groundedness.</strong> Only checked when a model wrote an answer, and only as term overlap between each sentence and the cited passages. It does not test whether a sentence is true.</li>
+            <li><strong>Completeness.</strong> Never assessed. Nothing here decides whether your question was fully answered.</li>
+            <li><strong>Injection handling.</strong> Questions matching known prompt-injection patterns are rejected before any model call, and retrieved text is always treated as data rather than instructions. Both are pattern-based defences, not guarantees.</li>
+            <li><strong>Limits.</strong> Six questions a minute and fifty a day per browser.</li>
+          </ul>
+        </div>
       </div>
     </section>
   </main>

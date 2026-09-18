@@ -70,7 +70,12 @@ export interface ServiceNowDocumentReference {
 
 export interface ServiceNowDocument {
   title: string;
+  /** Raw file, front matter included. Metadata only — never answer text. */
   content: string;
+  /** The markdown body with the YAML front matter removed. */
+  body: string;
+  /** Parsed front-matter keys (title, release, doc_type, canonical_url, …). */
+  meta: Record<string, string>;
   canonicalUrl?: string;
   releaseFamily: string;
   path: string;
@@ -79,10 +84,19 @@ export interface ServiceNowDocument {
 }
 
 export interface ServiceNowDocsSearchInput {
+  /**
+   * The visitor's question, unmodified. Scoring derives its terms from this
+   * alone — see `buildDocsQueryTerms` for why expansions are kept out.
+   */
   query: string;
   releaseFamily?: string;
   modules?: string[];
   productAreas?: string[];
+  /**
+   * Front-matter `doc_type` values to favour, e.g. `concept` for a "what is"
+   * question and `task` for a "how do I" one.
+   */
+  preferDocTypes?: string[];
   limit: number;
 }
 
