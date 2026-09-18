@@ -48,6 +48,9 @@
      never let colour be the only carrier of meaning. */
   --c-ok:            #0f8f4d;
   --c-ok-soft:       rgba(15, 143, 77, 0.12);
+  /* Label text on --c-ok-soft. The plain --c-ok reaches only 3.3:1 there, so
+     anything readable rather than decorative uses this instead. */
+  --c-ok-strong:     #0a6b3a;
   --c-bad:           #d23842;
   --c-bad-soft:      rgba(210, 56, 66, 0.12);
 
@@ -140,6 +143,8 @@
 
     --c-ok:          #33cc7a;
     --c-ok-soft:     rgba(51, 204, 122, 0.16);
+    /* 6.7:1 on the soft fill here, so the light-mode darkening is not needed. */
+    --c-ok-strong:   #33cc7a;
     --c-bad:         #ff6069;
     --c-bad-soft:    rgba(255, 96, 105, 0.16);
 

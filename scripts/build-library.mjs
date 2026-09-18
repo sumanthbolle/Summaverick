@@ -215,7 +215,7 @@ function card(item) {
     .replace(/"/g, "");
   return `      <a class="lib-card" data-card data-cat="${esc(item.category)}" data-search="${esc(search)}" href="/article/${esc(item.slug)}">
         <p class="studio-kicker" style="margin:0">${esc(item.kicker)}</p>
-        <h3>${esc(item.title)}</h3>
+        <h2>${esc(item.title)}</h2>
         <p>${esc(item.excerpt)}</p>
         <p class="lib-meta">${esc(item.meta)}</p>
       </a>`;
@@ -227,7 +227,7 @@ function listingPage({ kicker, title, lead, stats, placeholder, filters, cards, 
     .join("\n          ");
   return `${head({ title, description, canonical })}
 ${header("learn")}
-  <main id="main">
+  <main id="main" tabindex="-1">
     <section class="library-hero" aria-labelledby="library-title">
       <div class="container">
         <p class="studio-kicker">${esc(kicker)}</p>
@@ -296,7 +296,7 @@ function articlePage({ item, prev, next }) {
     canonical: `${ORIGIN}/article/${item.slug}`,
   })}
 ${header("learn")}
-  <main id="main">
+  <main id="main" tabindex="-1">
     <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
     <div class="container article-wrap">
       <article class="article-inner">

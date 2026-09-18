@@ -13,6 +13,12 @@
  *
  *   node scripts/eval-research.mjs [--origin http://localhost:8787] [--json]
  *
+ * The endpoint allows 6 runs a minute and 50 a day per client, so a full pass
+ * takes a couple of minutes and a local origin that has already served a lot
+ * of traffic may need its `rl:res:*` keys cleared from the CONFIG namespace
+ * first. A case that cannot get past the limiter is reported as unevaluated,
+ * never as a result.
+ *
  * A case passes when the observed mode is one of its allowed modes AND, for
  * cases that must return sources, the top source's title or snippet contains
  * one of the expected terms. Nothing passes on HTTP 200 or a citation count.

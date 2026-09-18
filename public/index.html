@@ -57,7 +57,7 @@
     </nav>
   </div>
 
-  <main id="main">
+  <main id="main" tabindex="-1">
     <!-- 1 · Hero. Specialty, buyer, benefit and next step in the first screen,
          beside a screenshot of software that actually runs. -->
     <section class="hero" id="top" aria-labelledby="hero-title">
@@ -75,6 +75,11 @@
         <figure class="hero__shot">
           <a class="shot" href="/ask">
             <picture>
+              <!-- A phone-width crop, so the interface stays readable rather
+                   than becoming a texture. Aspect ratios are pinned in CSS at
+                   the same breakpoint, so neither swap shifts the layout. -->
+              <source media="(max-width: 560px)" srcset="/assets/img/shot-research-answer-narrow.webp" type="image/webp" />
+              <source media="(max-width: 560px)" srcset="/assets/img/shot-research-answer-narrow.png" />
               <source srcset="/assets/img/shot-research-answer.webp" type="image/webp" />
               <img src="/assets/img/shot-research-answer.png" alt="The Summaverick research agent answering a question about CI relationships in the CMDB: a status pill reading “Matching sources — no written answer”, then ServiceNow documentation sources, each with its publication, a match percentage and the excerpt that matched." width="1272" height="940" fetchpriority="high" decoding="async" />
             </picture>
@@ -116,23 +121,23 @@
         <div class="offers__grid">
           <article class="offer">
             <h3>ServiceNow applications and workflows</h3>
-            <p class="offer__problem"><span>The problem</span> Requests, approvals, and operational tasks are spread across forms, spreadsheets, and inboxes, or sit in an application nobody wants to change.</p>
+            <p class="offer__problem"><span class="field-label">The problem</span> Requests, approvals, and operational tasks are spread across forms, spreadsheets, and inboxes, or sit in an application nobody wants to change.</p>
             <p class="offer__what">We build the application screens and the workflow behind them, set up the permissions, write the tests, and hand over documentation your own team can work from.</p>
-            <p class="offer__benefit"><span>For the people using it</span> They know what to do next, and spend less time navigating the platform or chasing an update.</p>
+            <p class="offer__benefit"><span class="field-label">For the people using it</span> They know what to do next, and spend less time navigating the platform or chasing an update.</p>
             <a href="#contact">Discuss an application <span aria-hidden="true">›</span></a>
           </article>
           <article class="offer">
             <h3>Business-system integrations</h3>
-            <p class="offer__problem"><span>The problem</span> People copy records between tools by hand, or a sync fails quietly and nobody can say which record was lost or why.</p>
+            <p class="offer__problem"><span class="field-label">The problem</span> People copy records between tools by hand, or a sync fails quietly and nobody can say which record was lost or why.</p>
             <p class="offer__what">We map the fields, build the API integration, decide what happens when a call fails, log it where someone will see it, and document how to support it.</p>
-            <p class="offer__benefit"><span>For the people using it</span> Less repeated entry, and a clear signal when something genuinely needs a human.</p>
+            <p class="offer__benefit"><span class="field-label">For the people using it</span> Less repeated entry, and a clear signal when something genuinely needs a human.</p>
             <a href="#contact">Discuss an integration <span aria-hidden="true">›</span></a>
           </article>
           <article class="offer">
             <h3>AI tools for everyday work</h3>
-            <p class="offer__problem"><span>The problem</span> An AI idea works in a demo, then has no credible route into daily use: no evaluation, no permissions story, and nothing sensible to do when the model is wrong.</p>
+            <p class="offer__problem"><span class="field-label">The problem</span> An AI idea works in a demo, then has no credible route into daily use: no evaluation, no permissions story, and nothing sensible to do when the model is wrong.</p>
             <p class="offer__what">We build one focused assistant or workflow, with source handling, evaluation cases, access controls, and a defined fallback when it cannot help.</p>
-            <p class="offer__benefit"><span>For the people using it</span> Useful help inside the task they are already doing, with the evidence attached and an honest answer when there is none.</p>
+            <p class="offer__benefit"><span class="field-label">For the people using it</span> Useful help inside the task they are already doing, with the evidence attached and an honest answer when there is none.</p>
             <a href="/ask">See our own AI tool <span aria-hidden="true">›</span></a>
           </article>
         </div>
@@ -162,10 +167,10 @@
           <div class="case__body">
             <p class="case__status"><span class="status-pill" data-tone="ok">Internal tool</span> <span class="status-pill">Public demo</span></p>
             <h3>A ServiceNow research agent that shows its working</h3>
-            <p class="case__role"><span>Who it is for</span> Platform engineers and consultants who need a documented answer about ServiceNow behaviour and cannot afford a confident guess.</p>
-            <p class="case__problem"><span>The problem</span> A general chatbot answers ServiceNow questions fluently and cites nothing you can check. An earlier version of this agent was worse: it reached only the documentation's table-of-contents pages and reported “citations · verified” over text that did not answer the question.</p>
-            <p class="case__built"><span>What we built</span> Two-hop retrieval that picks the publications worth opening and then fetches the topic pages themselves; term weighting so a page sharing only common words cannot rank first; front-matter parsing so metadata never reaches the answer; and four separate checks in place of one verification badge.</p>
-            <p class="case__outcome"><span>What changed</span> The four sample questions on the demo now return the relevant concept or reference page — the CMDB question lands on the CI relationships concept page — and the interface names its own mode: a written answer, matched passages, nothing relevant found, or sources unreachable. A reviewed evaluation covers those four questions plus an off-topic question, a question with no matching documentation, and a run with no model configured.</p>
+            <p class="case__role"><span class="field-label">Who it is for</span> Platform engineers and consultants who need a documented answer about ServiceNow behaviour and cannot afford a confident guess.</p>
+            <p class="case__problem"><span class="field-label">The problem</span> A general chatbot answers ServiceNow questions fluently and cites nothing you can check. An earlier version of this agent was worse: it reached only the documentation's table-of-contents pages and reported “citations · verified” over text that did not answer the question.</p>
+            <p class="case__built"><span class="field-label">What we built</span> Two-hop retrieval that picks the publications worth opening and then fetches the topic pages themselves; term weighting so a page sharing only common words cannot rank first; front-matter parsing so metadata never reaches the answer; and four separate checks in place of one verification badge.</p>
+            <p class="case__outcome"><span class="field-label">What changed</span> The four sample questions on the demo now return the relevant concept or reference page — the CMDB question lands on the CI relationships concept page — and the interface names its own mode: a written answer, matched passages, nothing relevant found, or sources unreachable. A reviewed evaluation covers those four questions plus an off-topic question, a question with no matching documentation, and a run with no model configured.</p>
             <div class="studio-actions">
               <a class="btn btn-primary" href="/ask">Try the research agent</a>
               <a class="btn btn-quiet" href="/research">See the full retrieval trace</a>
@@ -221,7 +226,7 @@
             <h3>Understand</h3>
             <div>
               <p>A few direct conversations about the work as it happens today, who it breaks for, and what you can safely leave alone.</p>
-              <p class="studio-practice__out"><span>You get</span> a written scope: what we would build, what we would not, and the open questions.</p>
+              <p class="studio-practice__out"><span class="field-label">You get</span> a written scope: what we would build, what we would not, and the open questions.</p>
             </div>
           </article>
           <article class="studio-practice__item">
@@ -229,7 +234,7 @@
             <h3>Build</h3>
             <div>
               <p>Design and engineering happen together, in the open, with something running that you can use and argue with.</p>
-              <p class="studio-practice__out"><span>You get</span> working software in your environment, tests, and the reasoning behind the decisions.</p>
+              <p class="studio-practice__out"><span class="field-label">You get</span> working software in your environment, tests, and the reasoning behind the decisions.</p>
             </div>
           </article>
           <article class="studio-practice__item">
@@ -237,7 +242,7 @@
             <h3>Hand over</h3>
             <div>
               <p>We watch how people actually use it, clear away what slows them down, and leave your team able to change it without us.</p>
-              <p class="studio-practice__out"><span>You get</span> handover documentation, the support path, and a named owner on your side.</p>
+              <p class="studio-practice__out"><span class="field-label">You get</span> handover documentation, the support path, and a named owner on your side.</p>
             </div>
           </article>
         </div>
