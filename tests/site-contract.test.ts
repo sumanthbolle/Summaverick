@@ -35,6 +35,16 @@ describe("Classic Studio public contract", () => {
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
+  it("lets the hidden attribute win, so the library filters can hide a card", () => {
+    const css = text("public/assets/css/site.css");
+
+    // .lib-card sets display: grid, which beats the browser's own [hidden]
+    // rule at equal specificity. Without this the filters set the attribute
+    // and every card stays on screen.
+    expect(css).toMatch(/\[hidden\]\s*\{\s*display:\s*none\s*!important/);
+    expect(css).toMatch(/\.lib-card\s*\{[^}]*display:\s*grid/);
+  });
+
   it("names the specialties, the buyer and the next step in the first screen", () => {
     const home = text("public/index.html");
     const hero = home.slice(
