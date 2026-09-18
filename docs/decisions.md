@@ -2,6 +2,54 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-09-18 — Say only what the site can show
+
+**Decision.** The homepage leads with the two specialties, one concrete offer
+set, and work a visitor can open, in that order. Nothing claims an outcome the
+repository cannot evidence: no client names, no numbers, no testimonials, no
+partnership, no response-time promise. The research agent stops describing
+itself as verified and reports four separate checks instead.
+
+**Why.** The site promised good software without connecting it to a buyer, a
+problem, a deliverable, or evidence. Worse, the flagship demo returned
+documentation table-of-contents pages with raw front matter while reporting
+"6 citations · verified", so the one piece of visible proof argued against the
+team's AI work. A citation count had been standing in for answer quality.
+
+**What shipped.** Two-hop retrieval that reaches real topic pages; answer modes
+(written answer, matched passages, nothing relevant, sources unreachable,
+out of scope, blocked) that the interface labels honestly; a checks panel that
+separates source availability, relevance, groundedness and completeness and
+says which of them nothing measured; an eval over the four advertised samples
+plus an off-topic question, a question with no matching documentation, and an
+injection attempt; a homepage ordered hero → proof → offers → work → delivery
+→ team → resources → contact, illustrated with captures of our own tools; and
+a contact form that actually stores the enquiry.
+
+**Deliberately absent.** Client case studies, outcome figures and testimonials.
+The work section says plainly that no client project is published yet rather
+than filling the grid with placeholders.
+
+**Owner-supplied content still needed** (each blocks a section that is
+currently written around its absence, not a placeholder card):
+
+- A publishable client project: who it served, the problem, our exact
+  contribution and boundaries, an approved sanitised screenshot, an outcome
+  with a source, and permission to name the organisation. Until one exists the
+  work section is honest about being our own tools.
+- A photograph or professional portrait for the founder card, if wanted. The
+  card currently carries name, role, what he does, and a link.
+- Any real response-time commitment. The contact section describes who reads a
+  message and what the first conversation covers, and promises no timeframe.
+- `LEAD_NOTIFY_TO` (and `RESEND_API_KEY`) as Worker secrets. Without them an
+  enquiry is stored in D1 and readable at `/api/admin/leads`, but no email is
+  sent; the endpoint logs that it skipped the notification rather than
+  reporting a delivery it did not make.
+- Evidence for the numerical and production-performance claims in several
+  library article summaries, or an edit removing the unsupported precision.
+  Not audited here; the homepage deliberately features articles by topic
+  rather than quoting those figures.
+
 ## 2026-08-31 — Company homepage, not a scroll-scene personal site
 
 **Decision.** Replace the five-scene GSAP/Lenis homepage with a conventional
