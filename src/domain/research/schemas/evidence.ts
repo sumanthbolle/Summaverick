@@ -10,7 +10,12 @@ export interface ServiceNowEvidence {
   id: string;
   sourceType: ServiceNowSourceType;
   title: string;
+  /** Evidence text, wrapped in the untrusted markers for model prompts. */
   content: string;
+  /** Plain-text excerpt safe to render in a source card. */
+  snippet?: string;
+  /** Publication or collection the evidence came from, for display. */
+  publicationTitle?: string;
   sourceReference: string;
   canonicalUrl?: string;
   sdkVersion?: string;
@@ -26,7 +31,15 @@ export interface ServiceNowEvidence {
   lineEnd?: number;
   retrievedAt: string;
   authorityScore: number;
+  /** Blended score after ranking; the sort key. */
   relevanceScore: number;
+  /**
+   * How well the retrieved text matched the question, before authority and
+   * freshness were blended in. Ranking must not overwrite this, because it is
+   * the only signal that separates "we found sources" from "the sources are
+   * about the question".
+   */
+  retrievalRelevance?: number;
   freshnessScore: number;
   taskScoped: boolean;
   containsSensitiveData: boolean;

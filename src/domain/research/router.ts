@@ -39,7 +39,12 @@ export function routeServiceNowQuery(
 
   const sources: PlannedSource[] = [];
   if (intent.requiresSdkDocs && config.sdk.enabled) sources.push("sdk_explain");
-  if (intent.requiresProductDocs && config.documentation.enabled) {
+  // The product documentation is consulted for every routed question, not only
+  // when the classifier asks for it. The SDK layer needs a local Fluent project
+  // and the `now-sdk` CLI, which a Worker does not have, so skipping the docs
+  // for SDK questions left them with no retrievable source at all — and the
+  // Fluent documentation lives in the product docs anyway.
+  if (config.documentation.enabled) {
     sources.push("product_docs");
   }
   if (intent.requiresRepositoryContext) sources.push("local_repository");

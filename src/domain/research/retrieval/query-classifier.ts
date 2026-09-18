@@ -47,32 +47,118 @@ const MODULE_KEYWORDS: Record<string, string[]> = {
     "transform map",
     "update set",
   ],
+  // Access control has its own publication; the platform concepts pages only
+  // mention ACLs in passing.
+  access_control: [
+    "acl",
+    "acls",
+    "access control",
+    "security rule",
+    "elevated privilege",
+    "impersonation",
+  ],
+  // The Glide* APIs and the scoped/client API surface are documented in the
+  // api-reference publication, not alongside the platform concepts.
+  api_reference: [
+    "gliderecord",
+    "glide record",
+    "glideajax",
+    "glidesystem",
+    "glideform",
+    "glideuser",
+    "glidedatetime",
+    "scoped api",
+    "server-side api",
+    "client-side api",
+    "api reference",
+  ],
 };
 
+/** Terms that on their own place a question inside the ServiceNow platform. */
 const DOMAIN_MARKERS = [
   "servicenow",
   "service now",
   "now platform",
+  "now assist",
   "fluent",
   "@servicenow/sdk",
+  "now sdk",
   ".now.ts",
   "now.config.json",
   "gliderecord",
   "glide record",
+  "glideajax",
+  "glidesystem",
+  "glideform",
   "cmdb",
   "itsm",
   "itom",
   "hrsd",
   "secops",
+  "csdm",
   "business rule",
   "businessrule",
   "script include",
   "scriptinclude",
   "transform map",
   "update set",
+  "flow designer",
+  "integrationhub",
+  "integration hub",
+  "app engine",
+  "ui builder",
+  "virtual agent",
+  "service catalog",
+  "catalog item",
   "sys_",
   "sysid",
   "sys_id",
+];
+
+/**
+ * Platform artefacts that also exist outside ServiceNow (a Linux ACL, a
+ * generic workflow). They route into the domain only alongside a second
+ * platform signal, so the agent neither turns away a real ServiceNow question
+ * nor claims scope over an unrelated one.
+ */
+const AMBIGUOUS_MARKERS = [
+  "acl",
+  "acls",
+  "access control list",
+  "access control rule",
+  "ui policy",
+  "client script",
+  "configuration item",
+  "ci relationship",
+  "incident",
+  "change request",
+  "request item",
+  "catalog",
+  "workflow",
+  "import set",
+];
+
+const PLATFORM_CONTEXT = [
+  "table",
+  "tables",
+  "record",
+  "records",
+  "role",
+  "roles",
+  "field",
+  "fields",
+  "form",
+  "list",
+  "column",
+  "instance",
+  "platform",
+  "scope",
+  "scoped",
+  "portal",
+  "workspace",
+  "evaluate",
+  "evaluated",
+  "dictionary",
 ];
 
 const RELEASE_FAMILIES = [
@@ -88,7 +174,11 @@ const RELEASE_FAMILIES = [
 
 export function isServiceNowDomainQuery(query: string): boolean {
   const q = query.toLowerCase();
-  return DOMAIN_MARKERS.some((m) => q.includes(m));
+  if (DOMAIN_MARKERS.some((m) => q.includes(m))) return true;
+  return (
+    AMBIGUOUS_MARKERS.some((m) => q.includes(m)) &&
+    PLATFORM_CONTEXT.some((c) => q.includes(c))
+  );
 }
 
 export function classifyServiceNowIntent(query: string): ServiceNowIntentResult {
@@ -259,12 +349,24 @@ export function classifyServiceNowIntent(query: string): ServiceNowIntentResult 
   };
 }
 
+/**
+ * Modules whose keyword match was more specific come first, because downstream
+ * retrieval opens the publications of the leading modules. "How do I use
+ * GlideRecord to query the incident table?" matches both `itsm` (on
+ * "incident") and `api_reference` (on "gliderecord"); the longer match is the
+ * better description of the question.
+ */
 function detectModules(q: string): string[] {
-  const found: string[] = [];
+  const found: { module: string; specificity: number }[] = [];
   for (const [module, keywords] of Object.entries(MODULE_KEYWORDS)) {
-    if (keywords.some((k) => q.includes(k))) {
-      found.push(module);
-    }
+    const matched = keywords.filter((k) => q.includes(k));
+    if (!matched.length) continue;
+    found.push({
+      module,
+      specificity: Math.max(...matched.map((k) => k.trim().length)),
+    });
   }
-  return found;
+  return found
+    .sort((a, b) => b.specificity - a.specificity)
+    .map((entry) => entry.module);
 }

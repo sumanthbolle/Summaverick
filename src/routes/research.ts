@@ -175,12 +175,12 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
               key: "dedup", label: "dedup + rank",
               detail: `${t.candidateDocumentCount} ranked of ${totalCandidates} candidate(s)`, kind: "ok",
             });
-            if (t.verification) {
-              const v = t.verification;
+            if (t.checks) {
+              const c = t.checks;
               await sse.send("stage", {
-                key: "verify", label: "verify",
-                detail: `${v.citationCount} citation(s) · ${v.unsupportedClaimCount} unsupported claim(s)`,
-                kind: v.ok ? "ok" : "block",
+                key: "relevance", label: "source relevance",
+                detail: `closest source matched ${Math.round(c.relevance.topScore * 100)}% of the question's terms — ${c.relevance.verdict}`,
+                kind: c.relevance.verdict === "none" ? "block" : c.relevance.verdict === "weak" ? "muted" : "ok",
               });
             }
           } else {
@@ -188,13 +188,19 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
           }
 
           await sse.send("answer", {
+            // What kind of result this is: model_answer, source_passages,
+            // insufficient_evidence or out_of_scope. The UI must not present
+            // one as another.
+            mode: result.mode,
             text: result.answer,
-            citations: t.evidence.slice(0, 6).map((e) => ({ title: e.title, url: e.url ?? null, sourceType: e.sourceType })),
-            verification: t.verification,
+            sources: result.sources,
+            checks: t.checks,
+            claims: t.claims,
             llmUsed: t.llm.used,
             llmModel: t.llm.model,
-            // Why the model was not used (missing key, or an upstream/egress
-            // failure), so a fallback to the draft is explainable in the UI.
+            // Why prose was not written (no key configured, an upstream
+            // failure, or nothing relevant to write from).
+            llmReason: t.llm.reason,
             llmError: t.llm.error ?? null,
             // Compact summary only — the full case list is large and the public
             // scoreboard (T9) reads eval_results from D1, not this payload.
@@ -208,8 +214,15 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
 
           persistRun(ctx.env, ctx.exec, {
             id, deviceId: ctx.session.deviceId, query: q, intent: t.classification.intent,
-            layersJson: JSON.stringify(t.layers), citations: t.verification?.citationCount ?? 0,
-            verified: t.verification?.ok ? 1 : 0, injectionFlagged: 0,
+            layersJson: JSON.stringify(t.layers), citations: t.checks?.sourcesFound.count ?? 0,
+            // Only a groundedness check that actually ran and passed counts as
+            // verified; source availability alone never did.
+            verified:
+              t.checks?.groundedness.status === "checked" &&
+              t.checks.groundedness.unsupported.length === 0
+                ? 1
+                : 0,
+            injectionFlagged: 0,
             latencyMs: nowMs() - started, traceKey: `traces/${id}.json`,
             traceJson: JSON.stringify(t), status: "done", createdAt: started, finishedAt: nowMs(),
           });
@@ -242,12 +255,12 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
       if (!daily.allowed) return rateLimited(daily.resetAt);
 
       try {
-        const { answer, trace } = await runResearchPipeline({
+        const { answer, mode, sources, trace } = await runResearchPipeline({
           query: query!,
           env: ctx.env as unknown as Record<string, string | undefined>,
           perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
         });
-        return ok({ answer, trace });
+        return ok({ answer, mode, sources, trace });
       } catch (e) {
         console.error("research pipeline error", e);
         return serverError(e instanceof Error ? e.message : "research pipeline failed");
