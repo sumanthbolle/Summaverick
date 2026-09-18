@@ -118,6 +118,14 @@ function head({ title, description, canonical }) {
   <meta property="og:type" content="article" />
   <meta name="twitter:card" content="summary" />
   <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("sv-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/assets/css/tokens.css" />
   <link rel="stylesheet" href="/assets/css/type.css" />
   <link rel="stylesheet" href="/assets/css/site.css" />
@@ -143,6 +151,10 @@ function header(active) {
     </nav>
     <div class="nav-actions">
       <a class="btn btn-primary" href="/#contact">Contact</a>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark appearance">
+        <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+        <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+      </button>
       <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
         <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
       </button>
@@ -163,7 +175,7 @@ function header(active) {
 }
 
 function footer() {
-  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
 
   <script type="module" src="/assets/js/boot.js"></script>
 </body>
@@ -212,7 +224,7 @@ function card(item) {
     .join(" ")
     .toLowerCase()
     .replace(/"/g, "");
-  return `      <a class="lib-card" data-card data-cat="${esc(item.category)}" data-search="${esc(search)}" href="/article/${esc(item.slug)}">
+  return `      <a class="lib-card" data-card data-reveal data-cat="${esc(item.category)}" data-search="${esc(search)}" href="/article/${esc(item.slug)}">
         <p class="studio-kicker" style="margin:0">${esc(item.kicker)}</p>
         <h3>${esc(item.title)}</h3>
         <p>${esc(item.excerpt)}</p>
@@ -323,8 +335,9 @@ ${PROGRESS_SCRIPT}`;
 // --- sitemap + robots ------------------------------------------------------------
 function sitemapXml(urls) {
   const today = new Date().toISOString().slice(0, 10);
+  const xmlEsc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
-    .map((u) => `  <url><loc>${ORIGIN}${u}</loc><lastmod>${today}</lastmod></url>`)
+    .map((u) => `  <url><loc>${xmlEsc(ORIGIN + u)}</loc><lastmod>${today}</lastmod></url>`)
     .join("\n")}\n</urlset>\n`;
 }
 
