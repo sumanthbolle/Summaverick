@@ -6,6 +6,11 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* The browser's own `[hidden] { display: none }` loses to any author rule that
+   sets display, which is what a card or a panel almost always does. Without
+   this the library's filters set the attribute and nothing disappears. */
+[hidden] { display: none !important; }
+
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
@@ -163,7 +168,6 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
   border-top: 1px solid var(--c-line);
   overflow: auto;
 }
-.nav-panel[hidden] { display: none; }
 .nav-panel nav { display: grid; max-width: 28rem; }
 .nav-panel a {
   display: flex;
