@@ -228,9 +228,22 @@ export function parseFrontMatter(markdown: string): FrontMatter {
   for (const line of match[1]!.split(/\r?\n/)) {
     const pair = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
     if (!pair) continue;
-    meta[pair[1]!.toLowerCase()] = pair[2]!.trim().replace(/^["']|["']$/g, "");
+    // Values carry the same punctuation escaping as the body, and an escaped
+    // canonical_url would ship a broken link to the visitor.
+    meta[pair[1]!.toLowerCase()] = unescapeMarkdown(
+      pair[2]!.trim().replace(/^["']|["']$/g, "")
+    );
   }
   return { meta, body: markdown.slice(match[0].length).trim() };
+}
+
+/**
+ * The kind of page this is. ServiceNowDocs marks topic pages with
+ * `topic_type` (concept, task, reference) and navigation pages with
+ * `doc_type: toc`.
+ */
+export function documentKind(meta: Record<string, string>): string {
+  return (meta.topic_type || meta.doc_type || "").toLowerCase();
 }
 
 /**

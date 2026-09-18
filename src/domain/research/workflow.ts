@@ -181,6 +181,7 @@ export class ServiceNowDomainPack {
             query,
             releaseFamily: route.plan!.releaseFamily,
             modules: route.intent!.modules,
+            preferDocTypes: preferredDocTypes(route.intent!.intent),
             limit: 4,
           },
         });
@@ -320,6 +321,24 @@ function synthesizeDraftAnswer(input: {
     sdkVersion: input.sdkVersion,
     requiresInstanceValidation: input.requiresInstanceValidation,
   };
+}
+
+/** Which kind of documentation page best answers each kind of question. */
+function preferredDocTypes(intent: string): string[] {
+  switch (intent) {
+    case "product_concept":
+    case "release_comparison":
+      return ["concept"];
+    case "fluent_sdk":
+    case "code_review":
+      return ["reference", "task"];
+    case "configuration_guidance":
+    case "implementation_design":
+    case "troubleshooting":
+      return ["task", "concept"];
+    default:
+      return ["concept", "task", "reference"];
+  }
 }
 
 export function stripEvidenceWrapper(content: string): string {

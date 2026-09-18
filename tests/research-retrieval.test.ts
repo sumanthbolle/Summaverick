@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDocsQueryTerms,
   computeTermWeights,
+  documentKind,
   extractPassage,
   isTableOfContents,
   parseFrontMatter,
@@ -72,8 +73,8 @@ title: CI relationships in the CMDB
 locale: en-US
 release: australia
 bundle: platform
-doc_type: concept
-canonical_url: https://www.servicenow.com/docs/cmdb/ci-relationships
+topic_type: concept
+canonical_url: https://www.servicenow.com/docs/r/cmdb/c\\_CIRelationships.html
 ---
 
 # CI relationships in the CMDB
@@ -133,11 +134,20 @@ describe("documentation text handling", () => {
     const { meta, body } = parseFrontMatter(CI_RELATIONSHIPS_DOC);
 
     expect(meta.title).toBe("CI relationships in the CMDB");
-    expect(meta.doc_type).toBe("concept");
-    expect(meta.canonical_url).toBe("https://www.servicenow.com/docs/cmdb/ci-relationships");
+    expect(documentKind(meta)).toBe("concept");
+    // An escaped canonical_url would ship a broken link to the visitor.
+    expect(meta.canonical_url).toBe(
+      "https://www.servicenow.com/docs/r/cmdb/c_CIRelationships.html"
+    );
     expect(body.startsWith("# CI relationships in the CMDB")).toBe(true);
     expect(body).not.toContain("locale:");
     expect(body).not.toContain("---");
+  });
+
+  it("separates a navigation page from a topic page by its declared kind", () => {
+    expect(documentKind({ doc_type: "toc" })).toBe("toc");
+    expect(documentKind({ topic_type: "task", doc_type: "topic" })).toBe("task");
+    expect(documentKind({})).toBe("");
   });
 
   it("recognises a navigation page so it is never offered as an answer", () => {
@@ -232,7 +242,9 @@ describe("product documentation retrieval", () => {
     const top = evidence[0]!;
     expect(top.title).toContain("CI relationships");
     expect(top.sourceReference).toContain("c_CIRelationships.md");
-    expect(top.canonicalUrl).toBe("https://www.servicenow.com/docs/cmdb/ci-relationships");
+    expect(top.canonicalUrl).toBe(
+      "https://www.servicenow.com/docs/r/cmdb/c_CIRelationships.html"
+    );
     // No index page, and no front matter anywhere near the answer surface.
     expect(evidence.some((e) => e.sourceReference.endsWith("/index.md"))).toBe(false);
     expect(top.content).not.toContain("doc_type");

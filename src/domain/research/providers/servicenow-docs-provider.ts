@@ -20,6 +20,7 @@ import { sanitizeEvidenceContent } from "../security/prompt-injection";
 import {
   buildDocsQueryTerms,
   computeTermWeights,
+  documentKind,
   extractPassage,
   isTableOfContents,
   parseFrontMatter,
@@ -155,7 +156,13 @@ export class HttpServiceNowDocsProvider implements ServiceNowDocsProvider {
     for (const candidate of candidates) {
       if (evidence.length >= limit || fetches >= MAX_TOPIC_FETCHES) break;
       fetches += 1;
-      const item = await this.topicEvidence(candidate, releaseFamily, terms, phrases);
+      const item = await this.topicEvidence(
+        candidate,
+        releaseFamily,
+        terms,
+        phrases,
+        input.preferDocTypes ?? []
+      );
       if (item) evidence.push(item);
     }
 
@@ -270,7 +277,8 @@ export class HttpServiceNowDocsProvider implements ServiceNowDocsProvider {
     candidate: TopicCandidate,
     releaseFamily: string,
     terms: string[],
-    phrases: string[]
+    phrases: string[],
+    preferDocTypes: string[]
   ): Promise<ServiceNowEvidence | null> {
     let doc: ServiceNowDocument;
     try {
@@ -297,10 +305,14 @@ export class HttpServiceNowDocsProvider implements ServiceNowDocsProvider {
     // The passage carries most of the weight: it is what a visitor reads, and
     // weighting it by term distinctiveness is what separates a page about the
     // question from a page that merely shares the question's common words.
+    // "What is X and how does it work" wants the concept page, not the
+    // procedure for deleting one; the front matter already says which is which.
+    const docTypeBonus = preferDocTypes.includes(documentKind(doc.meta)) ? 0.06 : 0;
     const relevance = clamp01(
       candidate.score * 0.3 +
         weightedTermCoverage(`${heading} ${text}`, terms, candidate.weights) * 0.6 +
-        Math.min(1, phraseHits(text, phrases) * 0.5) * 0.1
+        Math.min(1, phraseHits(text, phrases) * 0.5) * 0.1 +
+        docTypeBonus
     );
 
     return {

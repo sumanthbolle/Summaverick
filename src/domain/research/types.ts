@@ -92,6 +92,11 @@ export interface ServiceNowDocsSearchInput {
   releaseFamily?: string;
   modules?: string[];
   productAreas?: string[];
+  /**
+   * Front-matter `doc_type` values to favour, e.g. `concept` for a "what is"
+   * question and `task` for a "how do I" one.
+   */
+  preferDocTypes?: string[];
   limit: number;
 }
 
