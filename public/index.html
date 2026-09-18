@@ -339,9 +339,12 @@
           <div class="field">
             <label for="lead-intent">What is this about?</label>
             <select id="lead-intent" name="intent">
-              <option value="servicenow_app">A ServiceNow application or workflow</option>
-              <option value="integration">An integration between systems</option>
-              <option value="ai_tool">An AI tool for everyday work</option>
+              <!-- The same three subjects as the offers above, so a visitor
+                   recognises the one they just read. Short enough that the
+                   closed select does not truncate at 360px. -->
+              <option value="servicenow_app">ServiceNow app or workflow</option>
+              <option value="integration">Business-system integration</option>
+              <option value="ai_tool">AI tool for everyday work</option>
               <option value="unsure">Not sure yet</option>
             </select>
           </div>
