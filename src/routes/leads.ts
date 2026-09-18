@@ -9,9 +9,13 @@
  * reads every message untrue. The row in D1 is now the record of receipt: the
  * email notification is a convenience on top of it, and the endpoint reports
  * whether it actually left so nothing claims delivery it cannot back up.
+ *
+ * It answers both the fetch the homepage makes and a plain form post, so a
+ * visitor without JavaScript gets a confirmation page rather than a reload
+ * that quietly discards what they wrote.
  */
 import type { Ctx, Env, RouteDef, RouteMaker } from "../types";
-import { badRequest, forbidden, json, newId, nowMs, ok, readJson } from "../lib/json";
+import { forbidden, json, newId, nowMs, readJson } from "../lib/json";
 import { clientKey, rateLimit } from "../lib/ratelimit";
 import { insertLead, listLeads } from "../db/queries";
 
@@ -94,99 +98,182 @@ async function notifyOwner(
   }
 }
 
+/**
+ * What happened, independent of how it gets reported. The route turns this
+ * into JSON for the homepage's fetch and into HTML for a plain form post.
+ */
+type Outcome =
+  | { kind: "stored"; reference: string }
+  | { kind: "invalid"; message: string }
+  | { kind: "rate_limited"; message: string; retryAfter: number }
+  | { kind: "not_stored"; message: string };
+
+const OUTCOME_STATUS = { stored: 200, invalid: 400, rate_limited: 429, not_stored: 503 } as const;
+
+/** A form post rather than the homepage's fetch, so the reply must be a page. */
+async function readBody(req: Request): Promise<LeadBody | null> {
+  const type = req.headers.get("content-type") ?? "";
+  if (type.includes("form")) {
+    try {
+      return Object.fromEntries(await req.formData()) as LeadBody;
+    } catch {
+      return null;
+    }
+  }
+  return readJson<LeadBody>(req);
+}
+
+const esc = (s: string) =>
+  s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+/**
+ * A self-contained reply for the no-JavaScript path: it has to say what
+ * happened and how to get back without relying on the homepage's scripts.
+ */
+function outcomePage(outcome: Outcome): Response {
+  const stored = outcome.kind === "stored";
+  const body = stored
+    ? `<h1>Message received</h1>
+      <p>Sumanth reads every enquiry and replies himself. Your reference is
+         <code>${esc(outcome.reference)}</code>.</p>`
+    : `<h1>That message did not send</h1>
+      <p>${esc(outcome.message)}</p>
+      <p>Nothing was lost on your side — go back and the text you wrote is still in the form.</p>`;
+  return new Response(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>${stored ? "Message received" : "Message not sent"} · Summaverick</title>
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/type.css">
+<link rel="stylesheet" href="/assets/css/site.css">
+</head><body><main id="main" class="container" style="padding-block: var(--space-8)">
+${body}<p><a href="/#contact">Back to Summaverick</a></p>
+</main></body></html>`,
+    {
+      status: OUTCOME_STATUS[outcome.kind],
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        ...(outcome.kind === "rate_limited" ? { "retry-after": String(outcome.retryAfter) } : {}),
+      },
+    }
+  );
+}
+
+function outcomeJson(outcome: Outcome): Response {
+  if (outcome.kind === "stored") return json({ ok: true, reference: outcome.reference });
+  return json(
+    { ok: false, error: outcome.kind, message: outcome.message },
+    {
+      status: OUTCOME_STATUS[outcome.kind],
+      headers: outcome.kind === "rate_limited" ? { "retry-after": String(outcome.retryAfter) } : {},
+    }
+  );
+}
+
+async function receiveLead(req: Request, ctx: Ctx, body: LeadBody): Promise<Outcome> {
+  // Honeypot. A bot filled a field no visitor can see, so answer the way a
+  // success looks and store nothing.
+  if (str(body.company_url, 200)) {
+    return { kind: "stored", reference: newId("lead") };
+  }
+
+  const email = str(body.email, MAX.email).toLowerCase();
+  if (!email) {
+    return { kind: "invalid", message: "An email address is required so we can reply." };
+  }
+  if (!plausibleEmail(email)) {
+    return { kind: "invalid", message: "That email address does not look complete." };
+  }
+
+  const message = str(body.message, MAX.message);
+  if (message.length < 10) {
+    return {
+      kind: "invalid",
+      message: "Tell us a little about the work — a sentence is enough.",
+    };
+  }
+
+  const rawIntent = str(body.intent, 40);
+  const intent: Intent = (INTENTS as readonly string[]).includes(rawIntent)
+    ? (rawIntent as Intent)
+    : "unsure";
+
+  const key = clientKey(req, ctx.session.deviceId);
+  const hourly = await rateLimit(ctx.env, `lead:h:${key}`, HOURLY.limit, HOURLY.window);
+  const daily = await rateLimit(ctx.env, `lead:d:${key}`, DAILY.limit, DAILY.window);
+  if (!hourly.allowed || !daily.allowed) {
+    const resetAt = hourly.allowed ? daily.resetAt : hourly.resetAt;
+    const mins = Math.max(1, Math.ceil((resetAt - nowMs()) / 60000));
+    return {
+      kind: "rate_limited",
+      message:
+        `That is a lot of messages from one place. Try again in about ` +
+        `${mins} ${mins === 1 ? "minute" : "minutes"}.`,
+      retryAfter: Math.max(60, mins * 60),
+    };
+  }
+
+  const lead = {
+    id: newId("lead"),
+    name: str(body.name, MAX.name),
+    email,
+    organisation: str(body.organisation, MAX.organisation),
+    intent,
+    message,
+  };
+
+  try {
+    await insertLead(ctx.env.DB, {
+      id: lead.id,
+      device_id: ctx.session.deviceId,
+      name: lead.name || null,
+      email: lead.email,
+      organisation: lead.organisation || null,
+      intent: lead.intent,
+      message: lead.message,
+      notified: 0,
+      user_agent: req.headers.get("user-agent")?.slice(0, 300) ?? null,
+      created_at: nowMs(),
+    });
+  } catch (e) {
+    console.error("[lead] could not be stored", e);
+    return {
+      kind: "not_stored",
+      message: "We could not save that message. Nothing was lost on your side — try again.",
+    };
+  }
+
+  // The visitor already has a stored enquiry; the notification is allowed to
+  // finish after the response.
+  ctx.exec.waitUntil(
+    (async () => {
+      const sent = await notifyOwner(ctx.env, lead);
+      if (!sent) return;
+      try {
+        await ctx.env.DB.prepare(`UPDATE leads SET notified = 1 WHERE id = ?`)
+          .bind(lead.id)
+          .run();
+      } catch (e) {
+        console.error("[lead] notified flag not written (non-fatal)", e);
+      }
+    })()
+  );
+
+  return { kind: "stored", reference: lead.id };
+}
+
 export function leadRoutes(route: RouteMaker): RouteDef[] {
   return [
     route("POST", "/api/leads", async (req, ctx: Ctx) => {
-      const body = await readJson<LeadBody>(req);
-      if (!body) return badRequest("a JSON body is required");
-
-      // Honeypot. A bot filled a field no visitor can see, so answer the way
-      // a success looks and store nothing.
-      if (str(body.company_url, 200)) {
-        return ok({ reference: newId("lead") });
+      const asPage = (req.headers.get("content-type") ?? "").includes("form");
+      const body = await readBody(req);
+      if (!body) {
+        const outcome: Outcome = { kind: "invalid", message: "That submission could not be read." };
+        return asPage ? outcomePage(outcome) : outcomeJson(outcome);
       }
-
-      const email = str(body.email, MAX.email).toLowerCase();
-      if (!email) return badRequest("an email address is required so we can reply");
-      if (!plausibleEmail(email)) return badRequest("that email address does not look complete");
-
-      const message = str(body.message, MAX.message);
-      if (message.length < 10) {
-        return badRequest("tell us a little about the work — a sentence is enough");
-      }
-
-      const rawIntent = str(body.intent, 40);
-      const intent: Intent = (INTENTS as readonly string[]).includes(rawIntent)
-        ? (rawIntent as Intent)
-        : "unsure";
-
-      const key = clientKey(req, ctx.session.deviceId);
-      const hourly = await rateLimit(ctx.env, `lead:h:${key}`, HOURLY.limit, HOURLY.window);
-      const daily = await rateLimit(ctx.env, `lead:d:${key}`, DAILY.limit, DAILY.window);
-      if (!hourly.allowed || !daily.allowed) {
-        const resetAt = hourly.allowed ? daily.resetAt : hourly.resetAt;
-        const mins = Math.max(1, Math.ceil((resetAt - nowMs()) / 60000));
-        return json(
-          {
-            ok: false,
-            error: "rate_limited",
-            message: `That is a lot of messages from one place. Try again in about ${mins} minute(s).`,
-          },
-          { status: 429, headers: { "retry-after": String(Math.max(60, mins * 60)) } }
-        );
-      }
-
-      const lead = {
-        id: newId("lead"),
-        name: str(body.name, MAX.name),
-        email,
-        organisation: str(body.organisation, MAX.organisation),
-        intent,
-        message,
-      };
-
-      try {
-        await insertLead(ctx.env.DB, {
-          id: lead.id,
-          device_id: ctx.session.deviceId,
-          name: lead.name || null,
-          email: lead.email,
-          organisation: lead.organisation || null,
-          intent: lead.intent,
-          message: lead.message,
-          notified: 0,
-          user_agent: req.headers.get("user-agent")?.slice(0, 300) ?? null,
-          created_at: nowMs(),
-        });
-      } catch (e) {
-        console.error("[lead] could not be stored", e);
-        return json(
-          {
-            ok: false,
-            error: "not_stored",
-            message: "We could not save that message. Nothing was lost on your side — try again.",
-          },
-          { status: 503 }
-        );
-      }
-
-      // The visitor already has a stored enquiry; the notification is allowed
-      // to finish after the response.
-      ctx.exec.waitUntil(
-        (async () => {
-          const sent = await notifyOwner(ctx.env, lead);
-          if (!sent) return;
-          try {
-            await ctx.env.DB.prepare(`UPDATE leads SET notified = 1 WHERE id = ?`)
-              .bind(lead.id)
-              .run();
-          } catch (e) {
-            console.error("[lead] notified flag not written (non-fatal)", e);
-          }
-        })()
-      );
-
-      return ok({ reference: lead.id });
+      const outcome = await receiveLead(req, ctx, body);
+      return asPage ? outcomePage(outcome) : outcomeJson(outcome);
     }),
 
     route("GET", "/api/admin/leads", async (req, ctx: Ctx) => {

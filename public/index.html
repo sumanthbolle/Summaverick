@@ -316,7 +316,10 @@
             <dd>It is stored so it can be answered, and it is not added to a mailing list.</dd>
           </dl>
         </div>
-        <form class="contact-form" data-lead-form novalidate>
+        <!-- A real action and method, so the form still reaches the endpoint
+             when the script does not load. lead-form.js sets novalidate and
+             takes over the submit to report errors beside each field. -->
+        <form class="contact-form" data-lead-form action="/api/leads" method="post">
           <div class="form-grid">
             <div class="field">
               <label for="lead-name">Your name</label>
@@ -344,7 +347,7 @@
           </div>
           <div class="field">
             <label for="lead-message">What is getting in the way?</label>
-            <textarea id="lead-message" name="message" aria-describedby="lead-message-error"></textarea>
+            <textarea id="lead-message" name="message" required minlength="10" aria-describedby="lead-message-error"></textarea>
             <p class="field-error" id="lead-message-error" hidden></p>
           </div>
           <div class="field hp" aria-hidden="true">

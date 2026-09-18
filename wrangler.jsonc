@@ -9,7 +9,12 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // With "404-page" handling the asset worker claims any navigation request
+    // it has no asset for, and answers a POST with 405 before the Worker runs.
+    // That broke the contact form for visitors without JavaScript, whose
+    // browser posts the form as a navigation.
+    "run_worker_first": ["/api/*"]
   },
   "routes": [
     { "pattern": "summaverick.com", "custom_domain": true },

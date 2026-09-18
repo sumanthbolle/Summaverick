@@ -54,6 +54,11 @@ export function initLeadForm() {
   const label = submit.textContent;
   let sending = false;
 
+  // The markup carries a real action and method so the form works without
+  // this script. Now that it has loaded, native validation steps aside for
+  // the per-field messages below.
+  form.noValidate = true;
+
   // Clear an error as soon as the visitor starts fixing it.
   for (const name of Object.keys(FIELD_MESSAGES)) {
     form.elements[name]?.addEventListener("input", () => clearFieldError(form, name));
