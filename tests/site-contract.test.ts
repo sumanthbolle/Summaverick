@@ -27,12 +27,48 @@ describe("Classic Studio public contract", () => {
 
     expect(home).toContain("summaverick-uncontained-sum.svg");
     expect(home).not.toContain("sumanth-reveal-v1.png");
-    expect(home).toContain("We build software people are glad to use.");
+    expect(home).toContain("Software that makes everyday work easier.");
     expect(home).toContain('id="expertise"');
     expect(home).toContain('id="work"');
     expect(home).toContain('id="contact"');
-    expect(css).toContain(".studio-hero");
+    expect(css).toContain(".hero__inner");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
+  it("names the specialties, the buyer and the next step in the first screen", () => {
+    const home = text("public/index.html");
+    const hero = home.slice(
+      home.indexOf('<section class="hero"'),
+      home.indexOf('<section class="proof"')
+    );
+
+    // Specialties, before a visitor has to scroll or interpret anything.
+    expect(hero).toContain("ServiceNow applications");
+    expect(hero).toContain("Integrations");
+    expect(hero).toContain("AI tools");
+    // One primary action and one route to the evidence.
+    expect(hero).toContain('href="#contact"');
+    expect(hero).toContain('href="#services"');
+    // A real interface, with its box reserved so the copy does not shift.
+    expect(hero).toMatch(/<img[^>]+shot-research-answer\.png/);
+    expect(hero).toMatch(/width="\d+" height="\d+"/);
+  });
+
+  it("keeps every homepage image dimensioned, so nothing reflows on load", () => {
+    const home = text("public/index.html");
+    for (const tag of home.match(/<img[^>]*>/g) ?? []) {
+      expect(tag, tag).toMatch(/\swidth="\d+"/);
+      expect(tag, tag).toMatch(/\sheight="\d+"/);
+    }
+  });
+
+  it("does not claim a client project it cannot attribute", () => {
+    const home = text("public/index.html");
+
+    // Every item in Selected work carries an honest status label.
+    const work = home.slice(home.indexOf('id="work"'), home.indexOf('id="expertise"'));
+    expect(work).toContain("Internal tool");
+    expect(work).toContain("No client project is published here yet.");
   });
 
   it("only links to homepage sections that exist", () => {

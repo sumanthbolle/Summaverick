@@ -269,6 +269,33 @@ body[data-nav-open] { overflow: hidden; }
   border: 0;
 }
 
+/* ---- Status pill --------------------------------------------------------
+   Labels the state of something honestly, wherever that is needed: the kind
+   of answer the research agent produced, or what a piece of work actually
+   is. The dot is decorative; the word carries the meaning. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  margin: 0;
+  padding: 0.3em 0.75em;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-pill);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+.status-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-pill[data-tone="ok"] { background: var(--c-ok-soft); color: var(--c-ok); border-color: transparent; }
+.status-pill[data-tone="warn"] { background: var(--c-bad-soft); color: var(--c-bad); border-color: transparent; }
+.status-pill[data-tone="info"] { background: var(--c-accent-soft); color: var(--c-accent); border-color: transparent; }
+
 /* ======================================================================== *
  * Homepage
  * ======================================================================== */
@@ -281,28 +308,37 @@ body[data-nav-open] { overflow: hidden; }
   letter-spacing: var(--tracking-snug);
 }
 
-.studio-hero {
-  padding: clamp(7rem, 12vw, 10rem) 0 clamp(4rem, 8vw, 7rem);
+/* ---- Hero ---------------------------------------------------------------
+   Copy and a real screenshot share the first screen. The copy comes first in
+   source order, so the narrow layout reads the offer before the picture. */
+.hero {
+  padding: clamp(6rem, 11vw, 9rem) 0 clamp(3.5rem, 7vw, 6rem);
   background: var(--c-bg-elev);
 }
-.studio-hero__inner { max-width: 54rem; }
+.hero__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: center;
+}
+.hero__copy { min-width: 0; }
 /* One short entrance, and nothing else on the page moves on its own. */
 @media (prefers-reduced-motion: no-preference) {
-  .studio-hero__inner { animation: hero-rise 700ms var(--ease-out) both; }
+  .hero__copy { animation: hero-rise 700ms var(--ease-out) both; }
 }
 @keyframes hero-rise {
   from { opacity: 0; transform: translateY(16px); }
 }
-.studio-hero h1 {
-  max-width: 21ch;
+.hero h1 {
+  max-width: 19ch;
   margin: 0;
-  font-size: clamp(2.75rem, 6vw, 5rem);
+  font-size: clamp(2.15rem, 4.4vw, 3.9rem);
   font-weight: var(--weight-semibold);
-  line-height: 1.04;
-  letter-spacing: -0.032em;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 .studio-lead {
-  max-width: 47ch;
+  max-width: 46ch;
   margin: var(--space-5) 0 0;
   color: var(--c-text-dim);
   font-size: var(--step-1);
@@ -314,35 +350,98 @@ body[data-nav-open] { overflow: hidden; }
   gap: var(--space-2);
   margin-top: var(--space-6);
 }
-.studio-hero__aside {
+.hero__aside {
+  max-width: 44ch;
   margin: var(--space-5) 0 0;
   color: var(--c-text-dim);
   font-size: var(--step--1);
 }
-.studio-hero__aside a { text-decoration: underline; text-underline-offset: 3px; }
 
-.studio-statement { padding: clamp(5rem, 10vw, 9rem) 0; }
-.studio-statement h2 {
-  max-width: 17ch;
-  margin: 0 auto;
-  font-size: clamp(2.4rem, 5vw, 4.6rem);
-  font-weight: var(--weight-semibold);
-  line-height: 1.06;
-  letter-spacing: -0.03em;
-  text-align: center;
+/* ---- Screenshot frame ---------------------------------------------------
+   A hairline and a radius, no device chrome: the interface has to stay big
+   enough to read. Dimensions are on the <img> so nothing shifts on load. */
+.shot {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-2);
+  transition: border-color var(--dur-fast) var(--ease-out);
 }
-.studio-statement h2 span { display: block; color: var(--c-text-dim); }
+.shot:hover { border-color: var(--c-accent); }
+.shot img { display: block; width: 100%; height: auto; }
+
+.hero__shot { margin: 0; min-width: 0; }
+.hero__shot figcaption {
+  max-width: 52ch;
+  margin-top: var(--space-4);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+.hero__shot figcaption a { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---- Early proof -------------------------------------------------------- */
+.proof {
+  padding: clamp(4rem, 8vw, 6.5rem) 0;
+  border-bottom: 1px solid var(--c-line);
+}
+.proof__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: start;
+}
+.proof h2 {
+  max-width: 22ch;
+  margin: 0;
+  font-size: var(--step-2);
+  letter-spacing: var(--tracking-tight);
+}
+.proof__lead > p {
+  max-width: 56ch;
+  margin: var(--space-4) 0 0;
+  color: var(--c-text-dim);
+}
+.proof__status {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-md);
+  background: var(--c-bg-elev);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+.proof__facts {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.proof__facts li {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--c-line-strong);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+.proof__facts strong { display: block; color: var(--c-text); }
 
 .studio-practice,
-.studio-work,
-.studio-depth,
-.studio-library,
+.offers,
+.work,
+.team,
+.resources,
 .studio-contact { padding: clamp(4.5rem, 9vw, 7rem) 0; }
 
 .studio-practice h2,
-.studio-work h2,
-.studio-depth h2,
-.studio-library h2,
+.offers h2,
+.work h2,
+.team h2,
+.resources h2,
 .studio-contact h2 {
   max-width: 18ch;
   margin: 0;
@@ -368,22 +467,27 @@ body[data-nav-open] { overflow: hidden; }
   font-family: var(--font-mono);
   font-size: var(--step--1);
 }
-.studio-practice__item h3,
-.studio-work__item h3,
-.studio-depth h3 {
+.studio-practice__item h3 {
   margin: 0;
   color: inherit;
   font-size: var(--step-1);
   letter-spacing: var(--tracking-snug);
 }
 .studio-practice__item p,
-.studio-work__item p,
-.studio-depth p,
-.studio-library p,
+.offers p,
+.work p,
+.resources p,
 .studio-contact p { color: var(--c-text-dim); }
 .studio-practice__item p { max-width: 48ch; margin: 0; }
+.studio-practice__item > div { display: grid; gap: var(--space-3); }
+/* "You get …" — the tangible output of the stage, not more description. */
+.studio-practice__out { font-size: var(--step--1); }
+.studio-practice__out > span {
+  color: var(--c-text-mute);
+  font-weight: var(--weight-medium);
+}
+.studio-practice__out > span::after { content: " · "; }
 
-.studio-work { background: var(--c-bg-elev); }
 .studio-section-head {
   display: flex;
   align-items: end;
@@ -391,140 +495,224 @@ body[data-nav-open] { overflow: hidden; }
   gap: var(--space-5);
 }
 .studio-section-head > p { max-width: 36ch; margin: 0; }
-.studio-work__list {
+
+/* ---- What we build ------------------------------------------------------
+   Each card runs problem → what we do → who benefits → next step, in that
+   order, so a visitor can stop reading as soon as it is not their problem. */
+.offers { background: var(--c-bg-elev); }
+.offers__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-5);
   margin-top: var(--space-7);
 }
-.studio-work__item { display: grid; gap: var(--space-5); min-width: 0; }
-.studio-work__item h3 { margin-top: var(--space-3); }
-.studio-work__item p { max-width: 41ch; margin: var(--space-3) 0 0; }
-.studio-work__item a {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--hit);
-  margin-top: var(--space-3);
-  font-weight: var(--weight-medium);
-}
-.studio-work__item a span { margin-left: 0.35em; transition: transform var(--dur-fast) var(--ease-out); }
-.studio-work__item a:hover span { transform: translateX(3px); }
-
-/* Two abstract marks standing in for the systems they link to. */
-.studio-work__visual {
-  position: relative;
-  min-height: 17rem;
-  overflow: hidden;
+.offer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
   border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
   background: var(--c-surface);
 }
-.studio-work__visual span,
-.studio-work__visual i { position: absolute; display: block; }
-.studio-work__visual--research span {
-  left: 11%;
-  right: 11%;
-  height: 1px;
-  background: var(--c-line-strong);
+.offer h3 {
+  margin: 0;
+  font-size: var(--step-1);
+  letter-spacing: var(--tracking-snug);
 }
-.studio-work__visual--research span:nth-child(1) { top: 29%; }
-.studio-work__visual--research span:nth-child(2) { top: 49%; }
-.studio-work__visual--research span:nth-child(3) { top: 69%; }
-.studio-work__visual--research i {
-  top: 37%;
-  left: 37%;
-  width: 26%;
-  height: 26%;
-  border: 1px solid var(--c-accent);
-  border-radius: var(--radius-pill);
-  background: var(--c-accent-soft);
+.offer p { margin: 0; font-size: var(--step--1); line-height: var(--leading-normal); }
+.offer__what { color: var(--c-text) !important; }
+.offer__problem > span,
+.offer__benefit > span {
+  display: block;
+  color: var(--c-text-mute);
+  font-weight: var(--weight-medium);
 }
-.studio-work__visual--platform span {
-  width: 31%;
-  height: 31%;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--radius-pill);
-  background: var(--c-surface-2);
+.offer__benefit {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--c-line);
 }
-.studio-work__visual--platform span:nth-child(1) { top: 18%; left: 17%; }
-.studio-work__visual--platform span:nth-child(2) { right: 17%; bottom: 18%; }
-.studio-work__visual--platform span:nth-child(3) {
-  top: 34%;
-  right: 30%;
-  width: 17%;
-  height: 17%;
-  border-color: transparent;
-  background: var(--c-accent);
+.offer > a {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
 }
-.studio-work__visual--platform i {
-  top: 50%;
-  left: 31%;
-  width: 38%;
-  height: 1px;
-  background: var(--c-line-strong);
-  transform: rotate(39deg);
+.offers__note {
+  max-width: 60ch;
+  margin: var(--space-6) 0 0;
+  font-size: var(--step--1);
 }
 
-/* Ink in both appearances, so it needs hairlines to stay a distinct band
-   when the rest of the page is already dark. */
-.studio-depth {
-  background: var(--c-ink);
-  color: var(--c-on-ink);
-  border-block: 1px solid var(--c-line);
+/* ---- Selected work -----------------------------------------------------
+   One project at full width, then the supporting ones — not a grid of
+   interchangeable tiles. */
+.case {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: start;
+  margin-top: var(--space-7);
+  padding-top: var(--space-7);
+  border-top: 1px solid var(--c-line-strong);
 }
-.studio-depth h2, .studio-depth h3 { color: var(--c-on-ink); }
-.studio-depth .studio-kicker { color: var(--c-on-ink-mute); }
-.studio-depth p { max-width: 40ch; color: var(--c-on-ink-dim); }
-.studio-depth__grid {
+.case__media { min-width: 0; }
+.case__caption {
+  max-width: 54ch;
+  margin: var(--space-4) 0 0;
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+.case__body { min-width: 0; display: grid; gap: var(--space-4); }
+.case__body h3 {
+  max-width: 24ch;
+  margin: 0;
+  font-size: var(--step-2);
+  letter-spacing: var(--tracking-snug);
+}
+.case__status { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; }
+.case__body p { margin: 0; max-width: 60ch; font-size: var(--step--1); line-height: var(--leading-normal); }
+.case__body p > span:first-child {
+  display: block;
+  color: var(--c-text-mute);
+  font-weight: var(--weight-medium);
+}
+.case__outcome { padding-top: var(--space-4); border-top: 1px solid var(--c-line); }
+
+.work__more {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-7);
+  gap: clamp(2rem, 5vw, 4rem);
   margin-top: var(--space-7);
+  padding-top: var(--space-7);
+  border-top: 1px solid var(--c-line-strong);
 }
-.studio-depth__grid article {
+.minicase { display: grid; gap: var(--space-3); min-width: 0; align-content: start; }
+.minicase__media { min-width: 0; margin-bottom: var(--space-2); }
+.minicase h3 { margin: 0; font-size: var(--step-1); letter-spacing: var(--tracking-snug); }
+.minicase p { margin: 0; max-width: 46ch; font-size: var(--step--1); line-height: var(--leading-normal); }
+.minicase > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+/* Said once, plainly, instead of a grid of placeholder cards. */
+.work__note {
+  max-width: 62ch;
+  margin: var(--space-7) 0 0;
   padding-top: var(--space-5);
-  border-top: 1px solid var(--c-ink-line);
+  border-top: 1px solid var(--c-line);
+  font-size: var(--step--1);
 }
 
-.studio-library { border-bottom: 1px solid var(--c-line); }
-.studio-library__grid,
+/* An arrow that leans forward on hover; used by every "next step" link. */
+.offer > a span,
+.minicase > a span,
+.resources__more a span { margin-left: 0.35em; transition: transform var(--dur-fast) var(--ease-out); }
+.offer > a:hover span,
+.minicase > a:hover span,
+.resources__more a:hover span { transform: translateX(3px); }
+
+/* ---- Team --------------------------------------------------------------- */
+.team {
+  background: var(--c-bg-elev);
+  border-top: 1px solid var(--c-line);
+}
+.team__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(2rem, 7vw, 6rem);
+  align-items: start;
+}
+.team__grid > div > p { max-width: 42ch; margin: var(--space-5) 0 0; color: var(--c-text-dim); }
+.team__people { display: grid; gap: var(--space-5); }
+.person {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+.person h3 { margin: 0; font-size: var(--step-1); letter-spacing: var(--tracking-snug); }
+.person__role {
+  margin: 0;
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+.person > p { margin: 0; max-width: 52ch; color: var(--c-text-dim); font-size: var(--step--1); line-height: var(--leading-normal); }
+.person__links a { text-decoration: underline; text-underline-offset: 3px; }
+.team__note { margin: 0; max-width: 52ch; color: var(--c-text-dim); font-size: var(--step--1); }
+
+/* ---- Resources ---------------------------------------------------------- */
+.resources__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin: var(--space-7) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.resources__list li {
+  min-width: 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--c-line-strong);
+}
+.resources__list .studio-kicker { margin-bottom: var(--space-3); }
+.resources__list h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step-1);
+  letter-spacing: var(--tracking-snug);
+  text-wrap: pretty;
+}
+.resources__list h3 a { color: inherit; }
+.resources__list h3 a:hover { color: var(--c-accent); text-decoration: none; }
+.resources__list p { margin: 0; font-size: var(--step--1); line-height: var(--leading-normal); }
+.resources__more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: var(--space-6) 0 0;
+}
+.resources__more a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-weight: var(--weight-medium);
+}
+
+.studio-contact { background: var(--c-bg-elev); }
 .studio-contact__grid {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   gap: clamp(2rem, 8vw, 8rem);
   align-items: start;
 }
-.studio-library__grid > div > p:last-child { max-width: 48ch; margin: 0; }
-.studio-library__counts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: var(--space-6);
-  border-top: 1px solid var(--c-line-strong);
-  border-bottom: 1px solid var(--c-line-strong);
-}
-.studio-library__counts a {
+/* What actually happens after Send, in the order a visitor wonders it. */
+.next-steps {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-5) 0;
-  color: var(--c-text);
+  margin: var(--space-6) 0 0;
 }
-.studio-library__counts a + a {
-  padding-left: var(--space-5);
-  border-left: 1px solid var(--c-line-strong);
+.next-steps dt {
+  color: var(--c-text-mute);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
 }
-.studio-library__counts a:hover { color: var(--c-accent); text-decoration: none; }
-.studio-library__counts strong {
-  font-size: var(--step-4);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-.studio-library__counts span {
-  max-width: 16ch;
+.next-steps dd {
+  max-width: 48ch;
+  margin: 0 0 var(--space-4);
   color: var(--c-text-dim);
   font-size: var(--step--1);
+  line-height: var(--leading-normal);
 }
-
-.studio-contact { background: var(--c-bg-elev); }
+.next-steps dd:last-child { margin-bottom: 0; }
 .studio-contact h2 { max-width: 14ch; }
 .studio-contact > .container > div > p:last-child {
   max-width: 39ch;
@@ -538,30 +726,67 @@ body[data-nav-open] { overflow: hidden; }
   border-radius: var(--radius-lg);
   background: var(--c-surface);
 }
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+/* Errors sit under the field they belong to and say what to do. */
+.field-error {
+  margin: 0;
+  color: var(--c-bad);
+  font-size: var(--step--1);
+}
+.field[data-invalid="true"] input,
+.field[data-invalid="true"] textarea { border-color: var(--c-bad); }
+.form-feedback {
+  margin: 0;
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: var(--leading-normal);
+}
+.form-feedback[data-tone="ok"] { color: var(--c-ok); }
+.form-feedback[data-tone="bad"] { color: var(--c-bad); }
+.form-feedback:empty { display: none; }
 
+/* ---- Homepage breakpoints ---------------------------------------------- */
+@media (max-width: 1000px) {
+  .hero__inner,
+  .proof__inner,
+  .case { grid-template-columns: 1fr; }
+  .offers__grid,
+  .resources__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero__inner { gap: var(--space-6); }
+  .case__body { margin-top: var(--space-2); }
+}
 @media (max-width: 860px) {
-  .studio-library__grid,
+  .team__grid,
   .studio-contact__grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
   .studio-practice__item,
-  .studio-work__list,
-  .studio-depth__grid { grid-template-columns: 1fr; }
+  .offers__grid,
+  .work__more,
+  .resources__list { grid-template-columns: 1fr; }
   .studio-practice__item { gap: var(--space-3); }
   .studio-section-head { display: block; }
   .studio-section-head > p { margin-top: var(--space-4); }
+  .resources__more { gap: var(--space-4); }
 }
 @media (max-width: 560px) {
-  .studio-hero { padding-top: calc(var(--space-9) + 3rem); }
-  .studio-hero h1 { max-width: 18ch; font-size: clamp(2.35rem, 10vw, 3.2rem); }
+  .hero { padding-top: calc(var(--space-8) + 3rem); }
+  .hero h1 { max-width: 20ch; font-size: clamp(2.05rem, 8.6vw, 2.6rem); }
   .studio-actions .btn { width: 100%; }
-  .studio-work__visual { min-height: 13rem; }
-  .studio-library__counts { grid-template-columns: 1fr; }
-  .studio-library__counts a + a {
-    padding-left: 0;
-    border-left: 0;
-    border-top: 1px solid var(--c-line-strong);
-  }
+  .proof,
+  .offers,
+  .work,
+  .team,
+  .resources,
+  .studio-practice,
+  .studio-contact { padding: var(--space-8) 0; }
+  .contact-form { padding: var(--space-5) var(--space-4); }
+  .form-actions .btn { width: 100%; }
 }
 
 /* ======================================================================== *
@@ -672,29 +897,6 @@ body[data-nav-open] { overflow: hidden; }
 .ask-live:empty { display: none; }
 .ask-live:not(:empty) { border-bottom: 1px solid var(--c-line); }
 .answer-card + * { margin-top: 0; }
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  justify-self: start;
-  margin: 0;
-  padding: 0.3em 0.75em;
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-pill);
-  font-size: var(--step--1);
-  font-weight: var(--weight-medium);
-}
-.status-pill::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.status-pill[data-tone="ok"] { background: var(--c-ok-soft); color: var(--c-ok); border-color: transparent; }
-.status-pill[data-tone="warn"] { background: var(--c-bad-soft); color: var(--c-bad); border-color: transparent; }
-.status-pill[data-tone="info"] { background: var(--c-accent-soft); color: var(--c-accent); border-color: transparent; }
 
 .answer-card__note,
 .answer-card__scope {

@@ -92,7 +92,12 @@ async function run(query) {
     body: JSON.stringify({ query }),
   });
 
-  if (res.status === 429) return { mode: "rate_limited" };
+  if (res.status === 429) {
+    return {
+      mode: "rate_limited",
+      retryAfter: Number(res.headers.get("retry-after") ?? 60),
+    };
+  }
   if (!res.ok || !res.body) return { mode: "unavailable", detail: `HTTP ${res.status}` };
 
   const text = await res.text();
@@ -129,6 +134,12 @@ async function run(query) {
 
 function evaluate(testCase, outcome) {
   const notes = [];
+  if (outcome.mode === "rate_limited") {
+    return {
+      passed: false,
+      notes: ["not evaluated — the endpoint's rate limit was still in force"],
+    };
+  }
   let passed = testCase.allow.includes(outcome.mode);
   if (!passed) notes.push(`mode ${outcome.mode}, wanted one of ${testCase.allow.join("/")}`);
 
@@ -186,11 +197,36 @@ function evaluate(testCase, outcome) {
   return { passed, notes };
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The public endpoint allows six runs per clock minute. Hitting that ceiling
+ * says nothing about answer quality, so wait out the window and ask again
+ * rather than scoring the limiter's response as the agent's answer.
+ *
+ * The daily cap also answers 429, and its retry-after is hours, so waits are
+ * capped: past that the case is reported as unevaluated rather than as a
+ * result, and the run fails for being incomplete.
+ */
+const MAX_WAIT_MS = 75_000;
+
+async function runWithBackoff(query) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const outcome = await run(query);
+    if (outcome.mode !== "rate_limited") return outcome;
+    const wait = (outcome.retryAfter + 1) * 1000;
+    if (wait > MAX_WAIT_MS) break;
+    console.error(`  (rate-limited; waiting ${Math.round(wait / 1000)}s)`);
+    await sleep(wait);
+  }
+  return { mode: "rate_limited" };
+}
+
 const results = [];
 for (const testCase of CASES) {
   let outcome;
   try {
-    outcome = await run(testCase.query);
+    outcome = await runWithBackoff(testCase.query);
   } catch (err) {
     outcome = { mode: "unreachable", detail: String(err) };
   }
@@ -205,8 +241,7 @@ for (const testCase of CASES) {
     passed,
     notes,
   });
-  // The public endpoint allows six runs a minute; stay inside it.
-  await new Promise((r) => setTimeout(r, 11000));
+  await sleep(11000);
 }
 
 const passed = results.filter((r) => r.passed).length;
@@ -223,7 +258,13 @@ if (asJson) {
     if (r.notes.length) console.log(`      ${r.notes.join("; ")}`);
     console.log("");
   }
+  const unevaluated = results.filter((r) => r.mode === "rate_limited");
   console.log(`${passed}/${results.length} passed`);
+  if (unevaluated.length) {
+    console.log(
+      `Not evaluated (rate limit): ${unevaluated.map((r) => r.id).join(", ")}`
+    );
+  }
   if (advertisedFailures.length) {
     console.log(
       `Advertised examples failing: ${advertisedFailures.map((r) => r.id).join(", ")}`

@@ -3,15 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Summaverick — software people are glad to use</title>
-  <meta name="description" content="Summaverick is a small product team. Strategy, design, engineering, and AI in one place, and the people you talk to first are the people who build it." />
+  <title>Summaverick — ServiceNow applications, integrations, and AI tools</title>
+  <meta name="description" content="Summaverick builds ServiceNow applications, connects the business systems around them, and puts useful AI inside everyday workflows. You talk to the person who designs and builds it." />
 
+  <link rel="canonical" href="https://summaverick.com/" />
   <link rel="icon" href="/assets/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
-  <meta property="og:title" content="Summaverick — software people are glad to use" />
-  <meta property="og:description" content="A small product team. Strategy, design, engineering, and AI in one place, and the people you talk to first are the people who build it." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://summaverick.com/" />
+  <meta property="og:title" content="Summaverick — ServiceNow applications, integrations, and AI tools" />
+  <meta property="og:description" content="We build ServiceNow applications, connect the business systems around them, and put useful AI inside everyday workflows." />
   <meta property="og:image" content="/assets/img/summaverick-logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="/assets/img/summaverick-logo.png" />
@@ -29,13 +32,13 @@
       <span>Summaverick</span>
     </a>
     <nav class="nav-links" id="nav-links" aria-label="Primary">
-      <a href="#expertise">How we work</a>
+      <a href="#services">What we build</a>
       <a href="#work">Work</a>
-      <a href="#company">About</a>
-      <a href="/learn">Writing</a>
+      <a href="#company">Team</a>
+      <a href="#library">Resources</a>
     </nav>
     <div class="nav-actions">
-      <a class="btn btn-primary" href="#contact">Contact</a>
+      <a class="btn btn-primary" href="#contact">Discuss your project</a>
       <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel">
         <span class="nav-toggle-bars" aria-hidden="true"></span><span class="visually-hidden">Menu</span>
       </button>
@@ -44,108 +47,352 @@
 
   <div class="nav-panel" id="nav-panel" hidden>
     <nav aria-label="Mobile">
-      <a href="#expertise">How we work</a>
+      <a href="#services">What we build</a>
       <a href="#work">Work</a>
-      <a href="#company">About</a>
-      <a href="/learn">Writing</a>
-      <a href="/interviews">Interview questions</a>
+      <a href="#expertise">How delivery works</a>
+      <a href="#company">Team</a>
+      <a href="#library">Resources</a>
       <a href="/ask">Research agent</a>
-      <a href="#contact">Contact</a>
+      <a href="#contact">Discuss your project</a>
     </nav>
   </div>
 
   <main id="main">
-    <section class="studio-hero" id="top" aria-labelledby="hero-title">
-      <div class="container studio-hero__inner">
-        <p class="studio-kicker">A small product team</p>
-        <h1 id="hero-title">We build software people are glad to use.</h1>
-        <p class="studio-lead">Strategy, design, engineering, and AI in one team. The people you talk to on the first call are the people who build it and ship it.</p>
-        <div class="studio-actions">
-          <a class="btn btn-primary btn-lg" href="#contact">Get in touch</a>
-          <a class="btn btn-quiet btn-lg" href="#work">See the work</a>
+    <!-- 1 · Hero. Specialty, buyer, benefit and next step in the first screen,
+         beside a screenshot of software that actually runs. -->
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="container hero__inner">
+        <div class="hero__copy">
+          <p class="studio-kicker">ServiceNow applications · Integrations · AI tools</p>
+          <h1 id="hero-title">Software that makes everyday work easier.</h1>
+          <p class="studio-lead">We help teams build ServiceNow applications, connect the business systems around them, and put useful AI inside everyday workflows. Summaverick is founder-led, so the person you talk to first is the person who designs and builds it.</p>
+          <div class="studio-actions">
+            <a class="btn btn-primary btn-lg" href="#contact">Discuss your project</a>
+            <a class="btn btn-quiet btn-lg" href="#services">See what we build</a>
+          </div>
+          <p class="hero__aside">Built for ServiceNow and platform owners, operations leaders, and anyone with an AI idea that needs a path into daily use.</p>
         </div>
-        <p class="studio-hero__aside">You can also <a href="/ask">try the research agent</a> or <a href="/learn">read the library</a>.</p>
+        <figure class="hero__shot">
+          <a class="shot" href="/ask">
+            <picture>
+              <source srcset="/assets/img/shot-research-answer.webp" type="image/webp" />
+              <img src="/assets/img/shot-research-answer.png" alt="The Summaverick research agent answering a question about CI relationships in the CMDB: a status pill reading “Matching sources — no written answer”, then ServiceNow documentation sources, each with its publication, a match percentage and the excerpt that matched." width="1272" height="940" fetchpriority="high" decoding="async" />
+            </picture>
+          </a>
+          <figcaption>Our ServiceNow research agent, answering its own sample question. It shows the passages it found and states plainly which checks it ran. <a href="/ask">Ask it something</a>.</figcaption>
+        </figure>
       </div>
     </section>
 
-    <section class="studio-statement" aria-labelledby="statement-title">
-      <div class="container">
-        <p class="studio-kicker">One team, start to finish</p>
-        <h2 id="statement-title">Founders get momentum. Bigger teams get rigour. <span>Everyone gets people who stay through the hard part.</span></h2>
-      </div>
-    </section>
-
-    <section class="studio-practice" id="expertise" aria-labelledby="practice-title">
-      <div class="container">
-        <p class="studio-kicker">How we work</p>
-        <h2 id="practice-title">Three steps, and the same people all the way through.</h2>
-        <div class="studio-practice__list">
-          <article class="studio-practice__item">
-            <span>01</span><h3>Listen</h3><p>We start with your problem, not our process. A few honest conversations to work out what is worth building, and what you can safely skip.</p>
-          </article>
-          <article class="studio-practice__item">
-            <span>02</span><h3>Build</h3><p>One team designs and engineers together, so there is something you can click on early, and again every week after that.</p>
-          </article>
-          <article class="studio-practice__item">
-            <span>03</span><h3>Keep improving</h3><p>We watch how people use it, clear away what slows them down, and add intelligence only where it earns its place.</p>
-          </article>
+    <!-- 2 · Early proof. One thing you can use in the next minute, labelled
+         with what it does and does not do. -->
+    <section class="proof" id="proof" aria-labelledby="proof-title">
+      <div class="container proof__inner">
+        <div class="proof__lead">
+          <p class="studio-kicker">Try it now</p>
+          <h2 id="proof-title">An AI tool you can test before you talk to us.</h2>
+          <p>Ask the research agent a ServiceNow question. It searches the public ServiceNow documentation, opens the topic pages it judges relevant, and returns the passages with their sources. It tells you when it found nothing worth showing you rather than writing something plausible.</p>
+          <p class="proof__status"><span class="status-pill" data-tone="ok">Live</span> Running against the public ServiceNow documentation. No answer-writing model is configured on this deployment, so it returns sourced passages rather than prose — the interface says so on every result.</p>
+          <div class="studio-actions">
+            <a class="btn btn-primary" href="/ask">Ask a ServiceNow question</a>
+            <a class="btn btn-quiet" href="#contact">Discuss a tool like this</a>
+          </div>
         </div>
+        <ul class="proof__facts">
+          <li><strong>Separate signals, not one badge.</strong> Sources found, how closely the closest source matched, whether a written answer traces back to a passage, and completeness — which nothing checks, and which says so.</li>
+          <li><strong>Scope stated up front.</strong> ServiceNow only. An off-topic question is declined instead of answered from nothing.</li>
+          <li><strong>Reviewed examples.</strong> Every sample question on the page is covered by an evaluation that checks the answer, not the HTTP status.</li>
+        </ul>
       </div>
     </section>
 
-    <section class="studio-work" id="work" aria-labelledby="work-title">
+    <!-- 3 · What we build. Problem, deliverables, benefit, next step. -->
+    <section class="offers" id="services" aria-labelledby="offers-title">
       <div class="container">
         <div class="studio-section-head">
-          <div><p class="studio-kicker">What we have built</p><h2 id="work-title">Systems you can try yourself.</h2></div>
-          <p>Rather than a wall of client logos, here is working software, with the reasoning behind it left in the open.</p>
+          <div><p class="studio-kicker">What we build</p><h2 id="offers-title">Three kinds of work.</h2></div>
+          <p>Each one starts from something that is slowing your team down, and ends with software they use without being told to.</p>
         </div>
-        <div class="studio-work__list">
-          <article class="studio-work__item">
-            <div class="studio-work__visual studio-work__visual--research" aria-hidden="true"><span></span><span></span><span></span><i></i></div>
-            <div><p class="studio-kicker">Answers you can check</p><h3>A research agent that shows its sources</h3><p>Ask a question and watch it work: where it looked, what it declined to trust, and the source behind every line of the answer.</p><a href="/ask">Try the research agent <span aria-hidden="true">›</span></a></div>
+        <div class="offers__grid">
+          <article class="offer">
+            <h3>ServiceNow applications and workflows</h3>
+            <p class="offer__problem"><span>The problem</span> Requests, approvals, and operational tasks are spread across forms, spreadsheets, and inboxes, or sit in an application nobody wants to change.</p>
+            <p class="offer__what">We build the application screens and the workflow behind them, set up the permissions, write the tests, and hand over documentation your own team can work from.</p>
+            <p class="offer__benefit"><span>For the people using it</span> They know what to do next, and spend less time navigating the platform or chasing an update.</p>
+            <a href="#contact">Discuss an application <span aria-hidden="true">›</span></a>
           </article>
-          <article class="studio-work__item">
-            <div class="studio-work__visual studio-work__visual--platform" aria-hidden="true"><span></span><span></span><span></span><i></i></div>
-            <div><p class="studio-kicker">Platform engineering</p><h3>ServiceNow systems people adopt</h3><p>Code-first applications, workflows, and integrations, written up in plain language for the builders who live with them.</p><a href="/learn">Read the library <span aria-hidden="true">›</span></a></div>
+          <article class="offer">
+            <h3>Business-system integrations</h3>
+            <p class="offer__problem"><span>The problem</span> People copy records between tools by hand, or a sync fails quietly and nobody can say which record was lost or why.</p>
+            <p class="offer__what">We map the fields, build the API integration, decide what happens when a call fails, log it where someone will see it, and document how to support it.</p>
+            <p class="offer__benefit"><span>For the people using it</span> Less repeated entry, and a clear signal when something genuinely needs a human.</p>
+            <a href="#contact">Discuss an integration <span aria-hidden="true">›</span></a>
+          </article>
+          <article class="offer">
+            <h3>AI tools for everyday work</h3>
+            <p class="offer__problem"><span>The problem</span> An AI idea works in a demo, then has no credible route into daily use: no evaluation, no permissions story, and nothing sensible to do when the model is wrong.</p>
+            <p class="offer__what">We build one focused assistant or workflow, with source handling, evaluation cases, access controls, and a defined fallback when it cannot help.</p>
+            <p class="offer__benefit"><span>For the people using it</span> Useful help inside the task they are already doing, with the evidence attached and an honest answer when there is none.</p>
+            <a href="/ask">See our own AI tool <span aria-hidden="true">›</span></a>
           </article>
         </div>
+        <p class="offers__note">We work as a short discovery, a scoped build, or ongoing improvement. Which fits is the first thing worth talking about.</p>
       </div>
     </section>
 
-    <section class="studio-depth" id="company" aria-labelledby="depth-title">
+    <!-- 4 · Selected work. One prominent story, then supporting ones. Every
+         item is software in this repository, labelled with what it is. -->
+    <section class="work" id="work" aria-labelledby="work-title">
       <div class="container">
-        <p class="studio-kicker">Where we go deep</p>
-        <h2 id="depth-title">Wide range, a few sharp edges.</h2>
-        <div class="studio-depth__grid">
-          <article><h3>AI systems</h3><p>Agents, retrieval, evaluation, and guardrails, designed around how people work rather than around the demo.</p></article>
-          <article><h3>Enterprise platforms</h3><p>ServiceNow and the operations around it, built with software discipline and a plan for getting people on board.</p></article>
+        <div class="studio-section-head">
+          <div><p class="studio-kicker">Selected work</p><h2 id="work-title">Software you can open right now.</h2></div>
+          <p>These are our own tools, not client deliveries. They are here because you can click them and judge the work yourself.</p>
+        </div>
+
+        <article class="case">
+          <div class="case__media">
+            <a class="shot" href="/ask">
+              <picture>
+                <source srcset="/assets/img/shot-research-checks.webp" type="image/webp" />
+                <img src="/assets/img/shot-research-checks.png" alt="The research agent's check panel for the CMDB question: sources found, four passages released; source relevance, strong, the closest passage matched 96 per cent of the question's distinctive terms; answer groundedness, not applicable because no model wrote an answer; answer completeness, not assessed automatically." width="1200" height="367" loading="lazy" decoding="async" />
+              </picture>
+            </a>
+            <p class="case__caption">What the agent reports about its own run, from the same CMDB question. Two checks passed, one did not apply, and one is not assessed at all — and it says which is which.</p>
+          </div>
+          <div class="case__body">
+            <p class="case__status"><span class="status-pill" data-tone="ok">Internal tool</span> <span class="status-pill">Public demo</span></p>
+            <h3>A ServiceNow research agent that shows its working</h3>
+            <p class="case__role"><span>Who it is for</span> Platform engineers and consultants who need a documented answer about ServiceNow behaviour and cannot afford a confident guess.</p>
+            <p class="case__problem"><span>The problem</span> A general chatbot answers ServiceNow questions fluently and cites nothing you can check. An earlier version of this agent was worse: it reached only the documentation's table-of-contents pages and reported “citations · verified” over text that did not answer the question.</p>
+            <p class="case__built"><span>What we built</span> Two-hop retrieval that picks the publications worth opening and then fetches the topic pages themselves; term weighting so a page sharing only common words cannot rank first; front-matter parsing so metadata never reaches the answer; and four separate checks in place of one verification badge.</p>
+            <p class="case__outcome"><span>What changed</span> The four sample questions on the demo now return the relevant concept or reference page — the CMDB question lands on the CI relationships concept page — and the interface names its own mode: a written answer, matched passages, nothing relevant found, or sources unreachable. A reviewed evaluation covers those four questions plus an off-topic question, a question with no matching documentation, and a run with no model configured.</p>
+            <div class="studio-actions">
+              <a class="btn btn-primary" href="/ask">Try the research agent</a>
+              <a class="btn btn-quiet" href="/research">See the full retrieval trace</a>
+            </div>
+          </div>
+        </article>
+
+        <div class="work__more">
+          <article class="minicase">
+            <div class="minicase__media">
+              <a class="shot" href="/quiz">
+                <picture>
+                  <source srcset="/assets/img/shot-quiz.webp" type="image/webp" />
+                  <img src="/assets/img/shot-quiz.png" alt="The Summaverick ServiceNow quiz after an answer is submitted: the chosen option marked incorrect in red, the correct one in green, and an explanation returned by the server." width="1040" height="519" loading="lazy" decoding="async" />
+                </picture>
+              </a>
+            </div>
+            <p class="case__status"><span class="status-pill">Internal tool</span></p>
+            <h3>ServiceNow practice quiz</h3>
+            <p>A question bank for people learning the platform. The correct answers are graded on the server and never sent to the browser, so the score means something.</p>
+            <a href="/quiz">Take the quiz <span aria-hidden="true">›</span></a>
+          </article>
+          <article class="minicase">
+            <div class="minicase__media">
+              <a class="shot" href="/learn">
+                <picture>
+                  <source srcset="/assets/img/shot-learn.webp" type="image/webp" />
+                  <img src="/assets/img/shot-learn.png" alt="The Summaverick writing library: a search box, topic filters, and a grid of guide cards with their reading time and date." width="1040" height="557" loading="lazy" decoding="async" />
+                </picture>
+              </a>
+            </div>
+            <p class="case__status"><span class="status-pill">Internal product</span></p>
+            <h3>The writing library, as a platform</h3>
+            <p>Every guide and interview answer is pre-rendered as a static page with search and filters, so the library loads and stays readable without waiting on an API.</p>
+            <a href="#library">See the resources <span aria-hidden="true">›</span></a>
+          </article>
+        </div>
+
+        <p class="work__note">No client project is published here yet. When one is, it will name who it served, what we contributed, and where the evidence comes from — with the customer's permission.</p>
+      </div>
+    </section>
+
+    <!-- 5 · How delivery works. Stages with outputs, no promised durations. -->
+    <section class="studio-practice" id="expertise" aria-labelledby="practice-title">
+      <div class="container">
+        <div class="studio-section-head">
+          <div><p class="studio-kicker">How delivery works</p><h2 id="practice-title">Three stages, and the same person throughout.</h2></div>
+          <p>We start from your problem rather than our process, and there is something you can click on early.</p>
+        </div>
+        <div class="studio-practice__list">
+          <article class="studio-practice__item">
+            <span>01</span>
+            <h3>Understand</h3>
+            <div>
+              <p>A few direct conversations about the work as it happens today, who it breaks for, and what you can safely leave alone.</p>
+              <p class="studio-practice__out"><span>You get</span> a written scope: what we would build, what we would not, and the open questions.</p>
+            </div>
+          </article>
+          <article class="studio-practice__item">
+            <span>02</span>
+            <h3>Build</h3>
+            <div>
+              <p>Design and engineering happen together, in the open, with something running that you can use and argue with.</p>
+              <p class="studio-practice__out"><span>You get</span> working software in your environment, tests, and the reasoning behind the decisions.</p>
+            </div>
+          </article>
+          <article class="studio-practice__item">
+            <span>03</span>
+            <h3>Hand over</h3>
+            <div>
+              <p>We watch how people actually use it, clear away what slows them down, and leave your team able to change it without us.</p>
+              <p class="studio-practice__out"><span>You get</span> handover documentation, the support path, and a named owner on your side.</p>
+            </div>
+          </article>
         </div>
       </div>
     </section>
 
-    <section class="studio-library" id="library" aria-labelledby="library-title">
-      <div class="container studio-library__grid">
-        <div><p class="studio-kicker">What we have learned</p><h2 id="library-title">We write down what we learn.</h2></div>
-        <div><p>Every essay and interview from the old library is here, easier to find and calmer to read.</p><div class="studio-library__counts"><a href="/learn"><strong>52</strong><span>Essays and guides</span></a><a href="/interviews"><strong>57</strong><span>Interview questions, answered</span></a></div></div>
+    <!-- 6 · Team. Founder-led, stated plainly. No invented colleagues. -->
+    <section class="team" id="company" aria-labelledby="team-title">
+      <div class="container team__grid">
+        <div>
+          <p class="studio-kicker">Team</p>
+          <h2 id="team-title">Small on purpose.</h2>
+          <p>Summaverick is founder-led. That is the whole promise of continuity: there is no account manager between the conversation and the code, because the person in the conversation is the person writing it.</p>
+        </div>
+        <div class="team__people">
+          <article class="person">
+            <h3>Sumanth Bolle</h3>
+            <p class="person__role">Founder · design and engineering</p>
+            <p>Designs and builds the work, and is who you talk to from the first message through handover. Writes the ServiceNow and AI guides in the library, and built the research agent on this site.</p>
+            <p class="person__links"><a href="https://sumanthbolle.com" rel="me">sumanthbolle.com</a></p>
+          </article>
+          <p class="team__note">When a project needs more hands than one, we say so before it starts rather than after.</p>
+        </div>
       </div>
     </section>
 
+    <!-- 7 · Resources. Learners get a labelled route out of the sales path. -->
+    <section class="resources" id="library" aria-labelledby="library-title">
+      <div class="container">
+        <div class="studio-section-head">
+          <div><p class="studio-kicker">Resources</p><h2 id="library-title">What we have worked out, written down.</h2></div>
+          <p>Free, source-grounded guides for people who work on the platform. Start with one of these, or search the whole library.</p>
+        </div>
+        <ul class="resources__list">
+          <li>
+            <p class="studio-kicker">ServiceNow</p>
+            <h3><a href="/article/cmdb-enterprise-basics">CMDB for Absolute Beginners: From Asset Lists to Service Impact Intelligence</a></h3>
+            <p>What a configuration management database is actually for, and the governance basics that decide whether it stays trustworthy.</p>
+          </li>
+          <li>
+            <p class="studio-kicker">AI</p>
+            <h3><a href="/article/ai-impl-virtual-agent">From Demo to Production: The Virtual Agent Architecture Demos Never Show You</a></h3>
+            <p>The parts of a conversational AI rollout that a demo leaves out, and what has to exist before people rely on it.</p>
+          </li>
+          <li>
+            <p class="studio-kicker">Platform engineering</p>
+            <h3><a href="/article/servicenow-now-sdk-fluent-guide">Building ServiceNow Apps with the Now SDK and Fluent</a></h3>
+            <p>Building on the platform in TypeScript, with source control first — how it works and where it still has edges.</p>
+          </li>
+        </ul>
+        <p class="resources__more">
+          <a href="/learn">Search the full library <span aria-hidden="true">›</span></a>
+          <a href="/interviews">Interview questions, answered <span aria-hidden="true">›</span></a>
+        </p>
+      </div>
+    </section>
+
+    <!-- 8 · Project conversation. Real follow-up, honest states. -->
     <section class="studio-contact" id="contact" aria-labelledby="contact-title">
       <div class="container studio-contact__grid">
-        <div><p class="studio-kicker">Get in touch</p><h2 id="contact-title">Tell us what you want to build.</h2><p>Describe what you are trying to change. A person reads every message and replies. There is no sales sequence.</p></div>
+        <div>
+          <p class="studio-kicker">Discuss your project</p>
+          <h2 id="contact-title">Tell us what is getting in the way.</h2>
+          <p>Describe the work you want to change, in whatever detail you have. You do not need a specification.</p>
+          <dl class="next-steps">
+            <dt>Who reads it</dt>
+            <dd>Sumanth, the founder. Not a sales team, and not an autoresponder sequence.</dd>
+            <dt>What happens next</dt>
+            <dd>A reply by email. If there is something to talk about, the first conversation covers the work as it happens today, your constraints, and whether we are the right people for it. If we are not, we will say so.</dd>
+            <dt>What we do with your message</dt>
+            <dd>It is stored so it can be answered, and it is not added to a mailing list.</dd>
+          </dl>
+        </div>
         <form class="contact-form" data-lead-form novalidate>
-          <div class="form-grid"><div class="field"><label for="lead-name">Your name</label><input id="lead-name" name="name" type="text" autocomplete="name" placeholder="Priya Sharma" /></div><div class="field"><label for="lead-email">Email</label><input id="lead-email" name="email" type="email" autocomplete="email" placeholder="name@example.com" required /></div></div>
-          <div class="field"><label for="lead-org">Where you work <span class="field-hint">(optional)</span></label><input id="lead-org" name="organisation" type="text" autocomplete="organization" /></div>
-          <div class="field"><label for="lead-intent">What would you like to build?</label><select id="lead-intent" name="intent"><option value="shape">Work out what to build</option><option value="build">Build something new</option><option value="ai">Design an AI system</option><option value="enterprise">Improve a platform we already have</option><option value="servicenow">Build on ServiceNow</option><option value="other">Something else</option></select></div>
-          <div class="field"><label for="lead-message">Tell us a little about it</label><textarea id="lead-message" name="message" placeholder="What are you trying to ship, and what is in the way?"></textarea></div>
-          <div class="field hp" aria-hidden="true"><label for="lead-company-url">Company URL</label><input id="lead-company-url" name="company_url" type="text" tabindex="-1" autocomplete="off" /></div>
-          <div><button class="btn btn-primary btn-lg" type="submit">Send message</button></div><p class="small text-mute" data-lead-status role="status"></p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="lead-name">Your name</label>
+              <input id="lead-name" name="name" type="text" autocomplete="name" aria-describedby="lead-name-error" />
+              <p class="field-error" id="lead-name-error" hidden></p>
+            </div>
+            <div class="field">
+              <label for="lead-email">Email</label>
+              <input id="lead-email" name="email" type="email" autocomplete="email" required aria-describedby="lead-email-error" />
+              <p class="field-error" id="lead-email-error" hidden></p>
+            </div>
+          </div>
+          <div class="field">
+            <label for="lead-org">Where you work <span class="field-hint">(optional)</span></label>
+            <input id="lead-org" name="organisation" type="text" autocomplete="organization" />
+          </div>
+          <div class="field">
+            <label for="lead-intent">What is this about?</label>
+            <select id="lead-intent" name="intent">
+              <option value="servicenow_app">A ServiceNow application or workflow</option>
+              <option value="integration">An integration between systems</option>
+              <option value="ai_tool">An AI tool for everyday work</option>
+              <option value="unsure">Not sure yet</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="lead-message">What is getting in the way?</label>
+            <textarea id="lead-message" name="message" aria-describedby="lead-message-error"></textarea>
+            <p class="field-error" id="lead-message-error" hidden></p>
+          </div>
+          <div class="field hp" aria-hidden="true">
+            <label for="lead-company-url">Company URL</label>
+            <input id="lead-company-url" name="company_url" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary btn-lg" type="submit" data-lead-submit>Send message</button>
+            <p class="form-feedback" data-lead-status role="status" aria-live="polite"></p>
+          </div>
         </form>
       </div>
     </section>
   </main>
 
-  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="#expertise">How we work</a></li><li><a href="#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+  <footer class="footer">
+    <div class="container footer-cols">
+      <div class="footer-brand">
+        <div class="footer-brand__mark">
+          <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" />
+          <span>Summaverick</span>
+        </div>
+        <p>ServiceNow applications, business-system integrations, and AI tools people actually use.</p>
+      </div>
+      <div>
+        <p class="footer-head">Company</p>
+        <ul>
+          <li><a href="#services">What we build</a></li>
+          <li><a href="#work">Work</a></li>
+          <li><a href="#expertise">How delivery works</a></li>
+          <li><a href="#company">Team</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-head">Try</p>
+        <ul>
+          <li><a href="/ask">Research agent</a></li>
+          <li><a href="/quiz">ServiceNow quiz</a></li>
+          <li><a href="/tools">Tools</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-head">Resources</p>
+        <ul>
+          <li><a href="/learn">Writing library</a></li>
+          <li><a href="/interviews">Interview questions</a></li>
+          <li><a href="#contact">Discuss your project</a></li>
+          <li><a href="/signin">Sign in</a></li>
+        </ul>
+        <p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p>
+      </div>
+    </div>
+  </footer>
 
   <script type="module" src="/assets/js/boot.js"></script>
 </body>
