@@ -9,6 +9,7 @@ import type {
   AttemptRow,
   ContentRow,
   CredentialRow,
+  LeadRow,
   MagicLinkRow,
   MetalsDailyRow,
   ProgressRow,
@@ -808,6 +809,37 @@ export async function getMetalSeries(
     )
     .bind(base, quote, sinceDay)
     .all<MetalsDailyRow>();
+  return r.results ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Project enquiries
+// ---------------------------------------------------------------------------
+
+export async function insertLead(db: D1Database, l: LeadRow): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO leads
+        (id, device_id, name, email, organisation, intent, message, notified,
+         user_agent, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      l.id, l.device_id, l.name, l.email, l.organisation, l.intent, l.message,
+      l.notified, l.user_agent, l.created_at
+    )
+    .run();
+}
+
+/** Newest enquiries first, for the admin surface. */
+export async function listLeads(
+  db: D1Database,
+  limit: number
+): Promise<LeadRow[]> {
+  const r = await db
+    .prepare(`SELECT * FROM leads ORDER BY created_at DESC LIMIT ?`)
+    .bind(limit)
+    .all<LeadRow>();
   return r.results ?? [];
 }
 

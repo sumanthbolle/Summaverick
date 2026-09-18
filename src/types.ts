@@ -17,6 +17,14 @@ export interface Env {
   PUBLIC_ORIGIN: string;
   MAGIC_LINK_FROM: string;
 
+  /**
+   * Where homepage project enquiries are emailed. Unset means enquiries are
+   * stored in D1 only — readable at /api/admin/leads, but nobody is told.
+   */
+  LEAD_NOTIFY_TO?: string;
+  /** Verified sender for enquiry notifications; falls back to MAGIC_LINK_FROM. */
+  LEAD_NOTIFY_FROM?: string;
+
   // Secrets (wrangler secret put)
   PERPLEXITY_API_KEY?: string;
   UPSC_PUBLISH_TOKEN?: string;

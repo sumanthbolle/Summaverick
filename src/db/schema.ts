@@ -176,3 +176,17 @@ export interface MetalsDailyRow {
   rate: number;
   fetched_at: number;
 }
+
+export interface LeadRow {
+  id: string;
+  device_id: string;
+  name: string | null;
+  email: string;
+  organisation: string | null;
+  intent: string; // servicenow_app | integration | ai_tool | unsure
+  message: string;
+  /** 1 once the notification email left the Worker. */
+  notified: number;
+  user_agent: string | null;
+  created_at: number;
+}
