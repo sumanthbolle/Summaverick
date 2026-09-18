@@ -98,26 +98,34 @@ function initAsk() {
 
   /** Percentages read better than 0–1 scores for a non-developer. */
   const pct = (n) => `${Math.round((n || 0) * 100)}%`;
+  const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
 
   const checkRows = (checks) => {
     if (!checks) return [];
     const relevance = checks.relevance || {};
     const grounded = checks.groundedness || {};
+    const count = checks.sourcesFound?.count ?? 0;
     const rows = [
       [
         CHECK_LABELS.sourcesFound,
-        `${checks.sourcesFound?.count ?? 0} passage(s) released`,
+        count === 0 ? "none released" : `${plural(count, "passage")} released`,
         checks.sourcesFound?.ok ? "ok" : "warn",
       ],
       [
         CHECK_LABELS.relevance,
-        `${relevance.verdict || "none"} — the closest passage matched ${pct(relevance.topScore)} of your question's distinctive terms`,
-        relevance.verdict === "strong" ? "ok" : relevance.verdict === "weak" ? "warn" : "bad",
+        // With nothing retrieved there is no closest passage, and quoting 0%
+        // would imply one was compared and scored badly.
+        count === 0
+          ? "not checked — there were no passages to compare against your question"
+          : `${relevance.verdict || "none"} — the closest passage matched ${pct(relevance.topScore)} of your question's distinctive terms`,
+        count === 0
+          ? "idle"
+          : relevance.verdict === "strong" ? "ok" : relevance.verdict === "weak" ? "warn" : "bad",
       ],
       [
         CHECK_LABELS.groundedness,
         grounded.status === "checked"
-          ? `${grounded.grounded} of ${grounded.sentences} sentence(s) trace back to a cited passage, by ${grounded.method}`
+          ? `${grounded.grounded} of ${plural(grounded.sentences, "sentence")} trace back to a cited passage, by ${grounded.method}`
           : "not applicable — no model wrote an answer, so there is no prose to check",
         grounded.status === "checked"
           ? (grounded.unsupported || []).length === 0
@@ -184,9 +192,11 @@ function initAsk() {
       "This agent reads the ServiceNow product documentation for the current release family, and the Fluent SDK documentation. It has no access to your instance, and it does not research anything outside ServiceNow.",
     ]);
 
+  // A bordered button, not the quiet variant: in a failed run this is the one
+  // thing to do next, and it has to look like something to press.
   const retryButton = () =>
     el("button", {
-      class: "btn btn-quiet",
+      class: "btn",
       type: "button",
       text: "Try that question again",
       onclick: () => ask(lastQuery),
