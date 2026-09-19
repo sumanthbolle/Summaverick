@@ -1466,6 +1466,10 @@ body[data-nav-open] { overflow: hidden; }
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
+  /* The hero and About sit on ink in both themes, so their accent always
+     takes the bright tuning regardless of the page ramp. */
+  .hero .text-spectrum,
+  .about .text-spectrum { background-image: var(--grad-spectrum-bright); }
   @media (prefers-reduced-motion: no-preference) {
     .text-spectrum { animation: sv-shimmer 6s linear infinite; }
   }

@@ -132,12 +132,20 @@
     #ffffff 58%, #9a9ea6 82%, #ffffff 100%
   );
   /* The one place colour is allowed: an "Apple Intelligence"-style spectrum,
-     for a single key phrase — never a whole headline. */
-  --grad-spectrum: linear-gradient(
+     for a single key phrase — never a whole headline. Two tunings: -bright for
+     dark grounds, -deep so it still clears contrast on the light ramp.
+     --grad-spectrum resolves to whichever suits the current theme. */
+  --grad-spectrum-bright: linear-gradient(
     100deg,
     #5a9bff 0%, #a06bff 20%, #ff6bcb 40%,
     #ff9a5a 58%, #ffd36b 72%, #5a9bff 100%
   );
+  --grad-spectrum-deep: linear-gradient(
+    100deg,
+    #2f6bff 0%, #7a3cff 22%, #d21f8a 44%,
+    #e0631f 64%, #b0830a 82%, #2f6bff 100%
+  );
+  --grad-spectrum: var(--grad-spectrum-deep);
   /* A single neutral spotlight, not coloured blobs. */
   --cine-spot: rgba(255, 255, 255, 0.12);
   --cine-spot-soft: rgba(255, 255, 255, 0.06);
@@ -175,6 +183,7 @@
 
     /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
     --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
+    --grad-spectrum: var(--grad-spectrum-bright);
 
     color-scheme: dark;
   }
@@ -208,6 +217,7 @@
 
   /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
   --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
+  --grad-spectrum: var(--grad-spectrum-bright);
 
   color-scheme: dark;
 }
