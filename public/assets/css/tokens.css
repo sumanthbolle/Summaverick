@@ -119,6 +119,24 @@
 
   --focus-ring: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-text);
 
+  /* ---- Cinematic / Apple-style layer ----------------------------------
+     Gradient headline paints. --grad-head reads on the page ground (dark
+     metal on the light ramp); --grad-head-ink always reads on an ink band;
+     --grad-hero is the vivid iridescent shimmer reserved for the homepage
+     hero. --aurora-* light the cinematic backgrounds. */
+  --grad-head: linear-gradient(168deg, #201f27 0%, #3a3b45 44%, #565863 100%);
+  --grad-head-ink: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
+  --grad-hero: linear-gradient(
+    100deg,
+    #aab6ff 0%, #d7c2ff 20%, #ffd2c4 40%,
+    #bfefff 62%, #ffffff 80%, #aab6ff 100%
+  );
+  --aurora-1: rgba(110, 132, 255, 0.55);
+  --aurora-2: rgba(196, 132, 255, 0.45);
+  --aurora-3: rgba(255, 176, 120, 0.42);
+  --aurora-4: rgba(120, 224, 255, 0.40);
+  --cine-ground: radial-gradient(120% 120% at 50% -10%, #16161f 0%, #0b0b10 55%, #07070b 100%);
+
   color-scheme: light;
 }
 
@@ -149,6 +167,9 @@
 
     --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.55);
 
+    /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
+    --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
+
     color-scheme: dark;
   }
 }
@@ -178,6 +199,9 @@
   --c-bad-soft:    rgba(255, 96, 105, 0.16);
 
   --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.55);
+
+  /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
+  --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
 
   color-scheme: dark;
 }
