@@ -64,7 +64,9 @@ try {
     client,
     `const copy = document.querySelector(".hero__copy").getBoundingClientRect();
      const panel = document.querySelector("[data-hero-panel]").getBoundingClientRect();
-     const steps = [...document.querySelectorAll("[data-stage-step]")].map(s => s.getBoundingClientRect());
+     // Only the shown walk-through: a hidden view reports zero-sized rects,
+     // which would read as two steps sharing a line.
+     const steps = [...document.querySelectorAll('[data-stage-view]:not([hidden]) [data-stage-step]')].map(s => s.getBoundingClientRect());
      const actions = [...document.querySelectorAll(".hero .btn")].map(b => {
        const r = b.getBoundingClientRect();
        return { label: b.textContent.trim(), top: Math.round(r.top), h: Math.round(r.height) };

@@ -1014,6 +1014,9 @@ body[data-nav-open] { overflow: hidden; }
 @media (max-width: 560px) {
   .studio-actions .btn { width: 100%; }
   .stage__controls .btn { flex: 1 1 100%; }
+  /* --hit is the dense desktop size. A finger needs the full target, and the
+     tabs and the in-illustration choices are the smallest controls here. */
+  .stage__tab, .btn-sm { min-height: var(--tap); }
   .stage__panel { padding: var(--space-4); }
   .stage__view { min-height: 0; }
   .stage__badge { width: 100%; text-align: center; }
