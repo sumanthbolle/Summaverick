@@ -126,9 +126,16 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
 }
 .nav-brand:hover { color: var(--c-text); text-decoration: none; }
 
-/* The mark is inline SVG so it takes the surrounding ink in both appearances
-   — an <img> cannot resolve currentColor. It never animates. */
-.brand-mark { flex: none; color: inherit; }
+/* The mark is the metallic "S" render, cropped to a square badge. It carries
+   its own dark ground, so a hairline ring keeps its edge defined on the dark
+   footer while staying invisible on the light nav. It never animates. */
+.brand-mark {
+  flex: none;
+  display: block;
+  border-radius: 7px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
 
 .nav-links { display: flex; align-items: center; gap: var(--space-2); }
 .nav-links a {

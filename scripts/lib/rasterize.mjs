@@ -116,3 +116,61 @@ export async function renderSvg(client, { svg, width, height, format = "png", qu
   const base64 = dataUrl.split(",")[1];
   return Buffer.from(base64, "base64");
 }
+
+/**
+ * Crop a rectangle out of a source image (given as raw bytes) and scale it to
+ * an output square/rect. Used to lift the bare "S" out of the supplied render
+ * for the icon and nav/footer marks, keeping the original metallic pixels.
+ */
+export async function cropImage(
+  client,
+  { imageBase64, mime = "image/jpeg", sx, sy, sw, sh, out, outH, format = "png", quality = 0.95, radius = 0 }
+) {
+  const w = out;
+  const h = outH ?? out;
+  const fmt = format === "webp" ? "image/webp" : format === "jpeg" ? "image/jpeg" : "image/png";
+  const dataUrl = await evaluate(
+    client,
+    `
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:${mime};base64,${imageBase64}"; });
+    const c = document.createElement("canvas");
+    c.width = ${w}; c.height = ${h};
+    const ctx = c.getContext("2d");
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    ${radius > 0 ? `const r=${radius};ctx.beginPath();ctx.moveTo(r,0);ctx.arcTo(${w},0,${w},${h},r);ctx.arcTo(${w},${h},0,${h},r);ctx.arcTo(0,${h},0,0,r);ctx.arcTo(0,0,${w},0,r);ctx.closePath();ctx.clip();` : ""}
+    ctx.drawImage(img, ${sx}, ${sy}, ${sw}, ${sh}, 0, 0, ${w}, ${h});
+    return c.toDataURL("${fmt}", ${quality});
+    `
+  );
+  return Buffer.from(dataUrl.split(",")[1], "base64");
+}
+
+/**
+ * Draw a source image, scaled to fit, centred on a solid-colour canvas.
+ * Used to place the full square lock-up on the 1200x630 social card.
+ */
+export async function composeCentered(
+  client,
+  { imageBase64, mime = "image/jpeg", width, height, bg = "#0d0d11", scale = 0.82, format = "png", quality = 0.95 }
+) {
+  const fmt = format === "webp" ? "image/webp" : format === "jpeg" ? "image/jpeg" : "image/png";
+  const dataUrl = await evaluate(
+    client,
+    `
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:${mime};base64,${imageBase64}"; });
+    const c = document.createElement("canvas");
+    c.width = ${width}; c.height = ${height};
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "${bg}"; ctx.fillRect(0,0,${width},${height});
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    const target = Math.min(${width}, ${height}) * ${scale};
+    const s = target / Math.max(img.width, img.height);
+    const dw = img.width * s, dh = img.height * s;
+    ctx.drawImage(img, (${width}-dw)/2, (${height}-dh)/2, dw, dh);
+    return c.toDataURL("${fmt}", ${quality});
+    `
+  );
+  return Buffer.from(dataUrl.split(",")[1], "base64");
+}
