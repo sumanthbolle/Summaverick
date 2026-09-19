@@ -56,6 +56,16 @@ describe("Homepage public contract", () => {
     expect(text("public/assets/favicon.svg")).not.toContain("Summaverick Group");
   });
 
+  it("ships favicon.ico at the three sizes docs/brand.md promises", () => {
+    // Pillow silently drops any requested size larger than the source image,
+    // so assert the directory rather than trusting the generator.
+    const ico = readFileSync(resolve(root, "public/assets/favicon.ico"));
+    const count = ico.readUInt16LE(4);
+    const sizes = Array.from({ length: count }, (_, i) => ico[6 + 16 * i] || 256);
+
+    expect(sizes.sort((a, b) => a - b)).toEqual([16, 32, 48]);
+  });
+
   it("states the offer, both audiences and mobile in the first screen", () => {
     const home = text("public/index.html");
 
