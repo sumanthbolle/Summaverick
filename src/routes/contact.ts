@@ -22,10 +22,13 @@ const MAX = { name: 120, email: 200, organisation: 160, intent: 60, message: 400
 const BURST = { limit: 3, window: 600 }; // 3 per 10 minutes
 const DAILY = { limit: 12, window: 86400 };
 
+/* Mirrors the choices in the homepage form. An unrecognised value is stored as
+   null rather than rejected, so an older cached page can still send a message. */
 const INTENTS = new Set([
-  "servicenow_application",
-  "system_integration",
-  "ai_tool",
+  "personal_assistant",
+  "mobile_agent",
+  "enterprise_agent",
+  "servicenow_solution",
   "not_sure",
 ]);
 
@@ -56,7 +59,7 @@ async function notifyTeam(
     `Name: ${lead.name || "(not given)"}`,
     `Email: ${lead.email}`,
     `Organisation: ${lead.organisation || "(not given)"}`,
-    `Needs help with: ${lead.intent || "(not given)"}`,
+    `What they are building: ${lead.intent || "(not given)"}`,
     "",
     lead.message || "(no message)",
   ];

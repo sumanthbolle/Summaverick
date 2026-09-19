@@ -45,12 +45,16 @@ const coreChecks = [
         "home is still the placeholder stub, not the product site"
       );
       assert(
-        text.includes("We turn product ambition into working software."),
-        "home missing Classic Studio product-engineering headline"
+        text.includes("AI agents for everyday life and work."),
+        "home missing the personal/enterprise agent headline"
       );
       assert(
-        text.includes("summaverick-uncontained-sum.svg"),
-        "home missing Uncontained Sum brand asset"
+        text.includes('class="brand-mark"'),
+        "home missing the Summaverick brand mark"
+      );
+      assert(
+        text.includes("SUMMAVERICK LLP"),
+        "home missing the registered company identity"
       );
     },
   },

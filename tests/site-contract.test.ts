@@ -25,23 +25,49 @@ describe("Homepage public contract", () => {
     const home = text("public/index.html");
     const css = text("public/assets/css/site.css");
 
-    expect(home).toContain("summaverick-uncontained-sum.svg");
+    // The mark is inline SVG so it takes the theme's ink in both appearances.
+    expect(home).toContain('class="brand-mark"');
+    expect(home).not.toContain("summaverick-uncontained-sum.svg");
     expect(home).not.toContain("sumanth-reveal-v1.png");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
-  it("states the offer, the specialties and the next step in the first screen", () => {
+  it("points every icon slot at the current mark", () => {
+    for (const page of ["public/index.html", "public/ask.html", "public/learn.html", "public/quiz.html"]) {
+      const html = text(page);
+      expect(html, `${page} favicon`).toContain('href="/assets/favicon.svg"');
+      expect(html, `${page} apple touch icon`).toContain('href="/assets/apple-touch-icon.png"');
+      expect(html, `${page} manifest`).toContain('href="/assets/site.webmanifest"');
+    }
+    for (const asset of [
+      "public/assets/favicon.svg",
+      "public/assets/favicon.ico",
+      "public/assets/apple-touch-icon.png",
+      "public/assets/android-chrome-192x192.png",
+      "public/assets/android-chrome-512x512.png",
+      "public/assets/site.webmanifest",
+      "public/assets/img/summaverick-mark.svg",
+      "public/assets/img/summaverick-logo.png",
+      "public/assets/img/summaverick-group-logo.webp",
+    ]) {
+      expect(existsSync(resolve(root, asset)), asset).toBe(true);
+    }
+    // The tab icon is the silhouette, never the wordmark composition.
+    expect(text("public/assets/favicon.svg")).not.toContain("Summaverick Group");
+  });
+
+  it("states the offer, both audiences and mobile in the first screen", () => {
     const home = text("public/index.html");
 
-    expect(home).toContain("Make everyday work easier for your team.");
-    expect(home).toContain("ServiceNow applications · Integrations · AI tools");
-    expect(home).toContain(
-      "We build ServiceNow applications, connect business systems, and"
-    );
-    expect(home).toContain(">Discuss your project<");
-    expect(home).toContain(">Explore what we build<");
+    expect(home).toContain("AI agents for everyday life and work.");
+    expect(home).toContain("Personal assistants and enterprise agents");
+    expect(home).toContain("from personal assistants on mobile to enterprise workflows");
+    // Standalone products and platform work are both explicit.
+    expect(home).toContain("We build standalone products and agents that work with ServiceNow");
+    expect(home).toContain(">Build with us<");
+    expect(home).toContain(">Explore the possibilities<");
     // The hero must not depend on the illustration or on any animation.
-    const hero = home.slice(home.indexOf('id="top"'), home.indexOf('id="build"'));
+    const hero = home.slice(home.indexOf('id="top"'), home.indexOf('id="stage"'));
     expect(hero).toContain("<h1");
     expect(hero).not.toContain("data-reveal");
   });
@@ -50,13 +76,15 @@ describe("Homepage public contract", () => {
     const home = text("public/index.html");
     for (const id of [
       "build",
-      "workflow",
+      "stage",
       "examples",
       "how-we-work",
+      "platforms",
       "resources",
       "about",
       "contact",
       // Anchors that existed before the sections were renamed.
+      "workflow",
       "work",
       "expertise",
       "company",
@@ -65,25 +93,55 @@ describe("Homepage public contract", () => {
     }
   });
 
-  it("labels the workflow illustration as an illustration and lets it be replayed", () => {
+  it("pairs a personal and an enterprise walk-through without auto-cycling", () => {
     const home = text("public/index.html");
     const css = text("public/assets/css/site.css");
-    const js = text("public/assets/js/workflow-demo.js");
+    const js = text("public/assets/js/agent-stage.js");
 
-    expect(home).toContain("Illustrative example");
-    expect(home).toContain("See how a request could move through a workflow.");
-    for (const label of ["Request received", "Information gathered", "Ready for review"]) {
-      expect(home, label).toContain(label);
+    expect(home).toContain("Illustrative experience");
+    expect(home).toContain('data-stage-tab="personal"');
+    expect(home).toContain('data-stage-tab="enterprise"');
+    // Five steps each: task, context, proposal, review, observable next step.
+    for (const view of ["personal", "enterprise"]) {
+      const start = home.indexOf(`data-stage-view="${view}"`);
+      const chunk = home.slice(start, home.indexOf("</ol>", start));
+      for (let step = 0; step < 5; step += 1) {
+        expect(chunk, `${view} step ${step}`).toContain(`data-stage-step="${step}"`);
+      }
     }
-    expect(home).toContain("data-flow-play");
-    expect(home).toContain("data-flow-prev");
-    expect(home).toContain("data-flow-next");
     // Play, Pause, Replay, and manual steps when motion is reduced.
+    expect(home).toContain("data-stage-play");
+    expect(home).toContain("data-stage-prev");
+    expect(home).toContain("data-stage-next");
     expect(js).toContain("Pause");
-    expect(js).toContain("Replay example");
+    expect(js).toContain("Replay");
     expect(js).toContain("prefers-reduced-motion: reduce");
+    // Playback waits at the review step instead of deciding for the visitor.
+    expect(js).toContain("waitForDecision");
     // Nothing on the page loops forever.
     expect(css).not.toContain("infinite");
+  });
+
+  it("cannot let an illustration be mistaken for a real action", () => {
+    const home = text("public/index.html");
+    const js = text("public/assets/js/agent-stage.js");
+
+    expect(home).toContain("sample data");
+    expect(home).toContain("Nothing here contacts a\n            merchant");
+    expect(home).toContain("Nothing was sent to a merchant.");
+    expect(home).toContain("No real record was changed.");
+    expect(js).toContain("data-stage-advance");
+  });
+
+  it("reads completely with scripting off", () => {
+    const home = text("public/index.html");
+    const css = text("public/assets/css/site.css");
+
+    // Tabs and playback controls only appear once the page knows JS is running.
+    expect(home).toContain('h.setAttribute("data-js", "on")');
+    expect(css).toContain(':root[data-js="on"] .stage__tabs { display: flex; }');
+    expect(css).toContain(':root[data-js="on"] .stage__controls { display: flex; }');
+    expect(css).toContain(".stage__tabs {\n  display: none;");
   });
 
   it("keeps entrance motion an enhancement rather than a requirement", () => {
@@ -125,19 +183,25 @@ describe("Homepage public contract", () => {
       "Your name",
       "Email",
       "Organization",
-      "What do you need help with?",
+      "What are you building?",
       "Tell us about it",
       "Send your message",
     ]) {
       expect(home, label).toContain(label);
     }
     for (const option of [
-      "ServiceNow application",
-      "System integration",
-      "AI tool",
+      "Personal assistant",
+      "Mobile agent experience",
+      "Enterprise agent",
+      "ServiceNow solution",
       "Not sure yet",
     ]) {
       expect(home, option).toContain(option);
+    }
+    // Every choice the form offers is one the server will store.
+    const accepted = text("src/routes/contact.ts");
+    for (const value of [...home.matchAll(/<option value="([^"]+)"/g)].map((m) => m[1] as string)) {
+      expect(accepted, `server rejects intent ${value}`).toContain(`"${value}"`);
     }
     // The honeypot stays, and so does the hidden field it relies on.
     expect(home).toContain('name="company_url"');
@@ -153,17 +217,47 @@ describe("Homepage public contract", () => {
     const home = text("public/index.html");
 
     expect(home).toContain(
-      "<title>Summaverick | ServiceNow applications, integrations &amp; AI</title>"
+      "<title>Summaverick | Personal &amp; Enterprise AI Agents</title>"
     );
     expect(home).toContain(
-      "Summaverick builds ServiceNow applications, connects business systems, and develops AI tools for everyday work."
+      "We develop personal assistants, mobile AI experiences, and enterprise agents, including standalone products and solutions for ServiceNow and other platforms."
     );
     expect(home).toContain(
-      "ServiceNow applications, integrations, and AI tools for everyday work."
+      "Personal assistants and enterprise agents, built for mobile, web, and business platforms."
     );
     // Claims the review flagged as unsupported must not come back.
     for (const claim of ["Store apps", "fine-tuning", "model training", "private deployment"]) {
       expect(home.toLowerCase(), claim).not.toContain(claim.toLowerCase());
+    }
+  });
+
+  it("names the registered entity without overstating it", () => {
+    const home = text("public/index.html");
+
+    // Brand and legal operator stay distinguishable.
+    expect(home).toContain("Summaverick Group is the public-facing brand of SUMMAVERICK LLP");
+    expect(home).toContain("© <span data-year>2026</span> SUMMAVERICK LLP. Summaverick Group · LLPIN ADC-1832.");
+    expect(home).toContain("ADC-1832");
+    expect(home).toContain("14 September 2026");
+    expect(home).toContain("Company details are based on the LLP agreement dated 14 September 2026.");
+
+    // Structured data carries the same two names and no invented identifiers.
+    const ld = JSON.parse(
+      home.slice(
+        home.indexOf("{", home.indexOf('type="application/ld+json"')),
+        home.lastIndexOf("}") + 1
+      )
+    );
+    expect(ld.name).toBe("Summaverick Group");
+    expect(ld.legalName).toBe("SUMMAVERICK LLP");
+    expect(ld.identifier.name).toBe("LLPIN");
+    expect(ld.address.streetAddress).toBeUndefined();
+    expect(ld["@type"]).toBe("Organization");
+
+    // The June concept keeps its own date, and nothing backdates the LLP.
+    expect(home).toContain("Hackathon concept · June 2026");
+    for (const claim of ["government-verified", "certificate of incorporation", "GSTIN", "CIN", "PAN"]) {
+      expect(home, claim).not.toMatch(new RegExp(`\\b${claim}\\b`, "i"));
     }
   });
 
@@ -220,7 +314,8 @@ describe("Homepage public contract", () => {
   it("keeps blog and interview routes in the shared studio library", () => {
     const chrome = text("public/assets/app.js");
 
-    expect(chrome).toContain("summaverick-uncontained-sum.svg");
+    expect(chrome).toContain("brand-mark");
+    expect(chrome).not.toContain("summaverick-uncontained-sum.svg");
   });
 
   it("ships the full writing library as static pages", () => {
