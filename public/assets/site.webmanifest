@@ -1,0 +1,15 @@
+{
+  "name": "Summaverick Group",
+  "short_name": "Summaverick",
+  "description": "Personal assistants and enterprise agents, built for mobile, web, and business platforms.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d11",
+  "theme_color": "#0d0d11",
+  "icons": [
+    { "src": "/assets/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/assets/android-chrome-192x192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/assets/android-chrome-512x512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "/assets/android-chrome-maskable-512x512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}

@@ -45,24 +45,35 @@ const coreChecks = [
         "home is still the placeholder stub, not the product site"
       );
       assert(
-        text.includes("Make everyday work easier for your team."),
-        "home missing the hero headline"
+        text.includes("AI agents for everyday life and work."),
+        "home missing the personal/enterprise agent headline"
       );
       assert(
-        text.includes("ServiceNow applications · Integrations · AI tools"),
+        text.includes("Personal assistants and enterprise agents"),
         "home missing the specialty line — the offer has to be in the first screen"
       );
-      // The three offers and the workflow steps are in the markup, so they read
+      // The three offers and both walk-throughs are in the markup, so they read
       // whether or not the motion script runs.
-      for (const offer of ["ServiceNow applications", "System integrations", "AI tools"]) {
+      for (const offer of ["Personal agents", "Mobile experiences", "Enterprise agents"]) {
         assert(text.includes(`<h3>${offer}</h3>`), `home missing the ${offer} offer`);
       }
-      for (const step of ["Request received", "Information gathered", "Ready for review"]) {
-        assert(text.includes(step), `home missing the workflow step "${step}"`);
+      for (const view of ["personal", "enterprise"]) {
+        assert(
+          text.includes(`data-stage-view="${view}"`),
+          `home missing the ${view} walk-through`
+        );
+      }
+      // Both sequences exist to hand the decision back to a person.
+      for (const step of ["Person decides", "Reviewer decides"]) {
+        assert(text.includes(step), `home missing the walk-through step "${step}"`);
       }
       assert(
-        text.includes("summaverick-uncontained-sum.svg"),
-        "home missing Uncontained Sum brand asset"
+        text.includes('class="brand-mark"'),
+        "home missing the Summaverick brand mark"
+      );
+      assert(
+        text.includes("SUMMAVERICK LLP"),
+        "home missing the registered company identity"
       );
     },
   },

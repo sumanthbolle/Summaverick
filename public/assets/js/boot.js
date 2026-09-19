@@ -1,14 +1,15 @@
-/* boot.js — homepage. Shared chrome, the workflow illustration, and the contact
- * form. Everything here is an enhancement: the page reads completely, and the
- * illustration's three steps stay visible, if this file never runs. */
+/* boot.js — homepage. Shared chrome, the paired Personal/Enterprise
+ * walk-through, and the contact form. Everything here is an enhancement: the
+ * page reads completely, and every step of both walk-throughs stays visible,
+ * if this file never runs. */
 
 import { initChrome } from "./chrome.js";
 import { initLeadForm } from "./lead-form.js";
-import { initWorkflowDemo } from "./workflow-demo.js";
+import { initAgentStage } from "./agent-stage.js";
 
 function boot() {
   initChrome();
-  initWorkflowDemo();
+  initAgentStage();
   initLeadForm();
 }
 

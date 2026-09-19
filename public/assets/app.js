@@ -136,16 +136,23 @@ export function mountChrome({ active } = {}) {
     header.className = "nav";
     header.dataset.ready = "1";
     const brand = el("a", { class: "brand", href: "/" });
-    brand.setAttribute("aria-label", "Summaverick home");
-    const mark = el("img", {
-      attrs: {
-        src: "/assets/img/summaverick-uncontained-sum.svg",
-        alt: "",
-        width: "24",
-        height: "24",
-        "aria-hidden": "true",
-      },
-    });
+    brand.setAttribute("aria-label", "Summaverick Group home");
+    // Inline so the mark takes the surrounding ink; master lives at
+    // public/assets/img/summaverick-mark.svg.
+    const mark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    mark.setAttribute("class", "brand-mark");
+    mark.setAttribute("viewBox", "12 12 78 84");
+    mark.setAttribute("width", "23");
+    mark.setAttribute("height", "25");
+    mark.setAttribute("aria-hidden", "true");
+    mark.setAttribute("focusable", "false");
+    const markPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    markPath.setAttribute("fill", "currentColor");
+    markPath.setAttribute(
+      "d",
+      "M90 12H38a26 26 0 0 0 0 52h24a6 6 0 0 1 0 12H22l-8 20h48a26 26 0 0 0 0-52H38a6 6 0 0 1 0-12h44Z"
+    );
+    mark.append(markPath);
     brand.append(mark, document.createTextNode("Summaverick"));
     const links = el("nav", { class: "nav-links", attrs: { "aria-label": "Primary" } });
     for (const l of LINKS) {

@@ -99,6 +99,13 @@ function snip(s, max = 200) {
 }
 
 // --- shared chrome (matches index.html / ask.html) --------------------------
+
+/* The brand mark is inline so it inherits the surrounding ink; an <img> would
+   resolve currentColor against its own document and come out black on the ink
+   footer. Master: public/assets/img/summaverick-mark.svg. */
+const BRAND_MARK = (w, h) =>
+  `<svg class="brand-mark" viewBox="12 12 78 84" width="${w}" height="${h}" aria-hidden="true" focusable="false"><path fill="currentColor" d="M90 12H38a26 26 0 0 0 0 52h24a6 6 0 0 1 0 12H22l-8 20h48a26 26 0 0 0 0-52H38a6 6 0 0 1 0-12h44Z"/></svg>`;
+
 function head({ title, description, canonical }) {
   return `<!doctype html>
 <html lang="en">
@@ -108,15 +115,20 @@ function head({ title, description, canonical }) {
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}" />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="icon" href="/assets/favicon.ico" sizes="any" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="48x48" />
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <link rel="manifest" href="/assets/site.webmanifest" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
+  <meta property="og:site_name" content="Summaverick Group" />
   <meta property="og:title" content="${esc(title)}" />
   <meta property="og:description" content="${esc(description)}" />
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:type" content="article" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="${ORIGIN}/assets/img/summaverick-logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="${ORIGIN}/assets/img/summaverick-logo.png" />
   <link rel="preload" href="/assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
   <script>
     (function () {
@@ -139,18 +151,19 @@ function header(active) {
   <a class="skip" href="#main">Skip to content</a>
 
   <header class="nav" id="nav">
-    <a class="nav-brand" href="/" aria-label="Summaverick — home">
-      <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="30" height="30" aria-hidden="true" />
+    <a class="nav-brand" href="/" aria-label="Summaverick Group — home">
+      ${BRAND_MARK(26, 28)}
       <span>Summaverick</span>
     </a>
     <nav class="nav-links" id="nav-links" aria-label="Primary">
       ${link("/#build", "", "What we build")}
       ${link("/#examples", "", "Examples")}
       ${link("/#how-we-work", "", "How we work")}
+      ${link("/#about", "", "About")}
       ${link("/learn", "learn", "Resources")}
     </nav>
     <div class="nav-actions">
-      <a class="btn btn-primary" href="/#contact">Discuss your project</a>
+      <a class="btn btn-primary" href="/#contact">Build with us</a>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark appearance">
         <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
         <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
@@ -166,17 +179,18 @@ function header(active) {
       <a href="/#build">What we build</a>
       <a href="/#examples">Examples</a>
       <a href="/#how-we-work">How we work</a>
+      <a href="/#platforms">Platforms</a>
+      <a href="/#about">About</a>
       <a href="/learn">Guides</a>
       <a href="/interviews">Interview questions</a>
       <a href="/ask">ServiceNow reference search</a>
-      <a href="/#about">About</a>
-      <a href="/#contact">Discuss your project</a>
+      <a href="/#contact">Build with us</a>
     </nav>
   </div>`;
 }
 
 function footer() {
-  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>ServiceNow applications, integrations, and AI tools for everyday work.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#build">What we build</a></li><li><a href="/#examples">Examples</a></li><li><a href="/#how-we-work">How we work</a></li><li><a href="/#about">About</a></li></ul></div><div><p class="footer-head">Resources</p><ul><li><a href="/learn">Guides</a></li><li><a href="/interviews">Interview questions</a></li><li><a href="/ask">ServiceNow reference search</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Discuss your project</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark">${BRAND_MARK(30, 32)}<span>Summaverick Group</span></div><p>Personal assistants and enterprise agents, built for mobile, web, and business platforms.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#build">What we build</a></li><li><a href="/#examples">Examples</a></li><li><a href="/#how-we-work">How we work</a></li><li><a href="/#about">About</a></li></ul></div><div><p class="footer-head">Resources</p><ul><li><a href="/learn">Guides</a></li><li><a href="/interviews">Interview questions</a></li><li><a href="/ask">ServiceNow reference search</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Build with us</a></li><li><a href="/#about">Company information</a></li><li><a href="/signin">Sign in</a></li></ul></div></div><div class="container footer-legal"><p>© <span data-year>2026</span> SUMMAVERICK LLP. Summaverick Group · LLPIN ADC-1832.</p></div></footer>
 
   <script type="module" src="/assets/js/boot.js"></script>
 </body>

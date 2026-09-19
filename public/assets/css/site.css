@@ -125,7 +125,10 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
   text-decoration: none;
 }
 .nav-brand:hover { color: var(--c-text); text-decoration: none; }
-.nav-brand img { width: 27px; height: 27px; }
+
+/* The mark is inline SVG so it takes the surrounding ink in both appearances
+   — an <img> cannot resolve currentColor. It never animates. */
+.brand-mark { flex: none; color: inherit; }
 
 .nav-links { display: flex; align-items: center; gap: var(--space-2); }
 .nav-links a {
@@ -269,11 +272,17 @@ body[data-nav-open] { overflow: hidden; }
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-snug);
 }
-.footer-brand__mark img { width: 30px; height: 30px; filter: invert(1); }
-.footer-brand > p { max-width: 28ch; }
-/* Inherits the footer's ink ramp. The page ramp's muted tone only clears AA on
-   the page ground, not on this one. */
-.footer-copy { margin-top: var(--space-5); }
+.footer-brand > p { max-width: 32ch; }
+
+/* The registered identity sits below the columns: present, and subordinate to
+   the product message above it. It inherits the footer's ink ramp: the page
+   ramp's muted tone only clears AA on the page ground, not on this one. */
+.footer-legal {
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--c-ink-line);
+}
+.footer-legal p { margin: 0; font-size: var(--step--1); }
 
 @media (max-width: 860px) { .footer-cols { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .footer-cols { grid-template-columns: 1fr; } }
@@ -361,9 +370,11 @@ body[data-nav-open] { overflow: hidden; }
 
 .hero,
 .offers,
-.flow,
+.stage,
 .examples,
 .process,
+.platforms,
+.control,
 .resources,
 .contact,
 .about { padding-block: clamp(2.5rem, 6vw, 6.5rem); }
@@ -372,9 +383,11 @@ body[data-nav-open] { overflow: hidden; }
 .section-head > p { margin: var(--space-4) 0 0; color: var(--c-text-dim); }
 
 .offers h2,
-.flow h2,
+.stage h2,
 .examples h2,
 .process h2,
+.platforms h2,
+.control h2,
 .resources h2,
 .contact h2,
 .about h2 {
@@ -524,67 +537,232 @@ body[data-nav-open] { overflow: hidden; }
 }
 .offer p { margin: var(--space-3) 0 0; color: var(--c-text-dim); }
 
-/* ---- Workflow illustration -------------------------------------------- */
-.flow { background: var(--c-bg-elev); }
-.flow__caption {
+/* ---- The paired Personal / Enterprise stage ----------------------------
+   Without scripting both views render, stacked and complete. The tabs and
+   the playback controls only appear once [data-js="on"] is set, because only
+   then can they do anything. */
+.stage { background: var(--c-bg-elev); }
+.stage__caption {
   max-width: 62ch;
   margin: var(--space-4) 0 0;
   color: var(--c-text-dim);
 }
-.flow__panel {
+.stage__panel {
   margin-top: var(--space-7);
   padding: var(--space-5);
   border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
   background: var(--c-surface);
 }
-.flow__steps {
+.stage__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+.stage__tabs {
+  display: none;
+  gap: var(--space-2);
+  padding: 4px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-pill);
+  background: var(--c-bg-elev);
+}
+.stage__tab {
+  min-height: var(--hit);
+  padding: 0.45em 1.2em;
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+  color: var(--c-text-dim);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.stage__tab[aria-selected="true"] {
+  color: var(--c-on-accent);
+  background: var(--c-accent-fill);
+}
+.stage__badge {
+  margin: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--c-text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+
+/* Both surfaces reserve the same height and the same two columns, so
+   switching view moves nothing and the phone never reads as the lesser of
+   the two. */
+.stage__views { display: grid; gap: var(--space-6); }
+.stage__view { min-height: 30rem; }
+.stage__view-title {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-snug);
+}
+.stage__view {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+/* Pre-paint only: without scripting there is no tab strip, so both views
+   stay on the page. Once the script runs it manages `hidden` instead. */
+:root[data-js="on"] .stage__view[data-stage-inactive] { display: none; }
+.stage__view:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--radius-md); }
+
+.device {
+  padding: var(--space-4);
+  border: 1px solid var(--c-line-strong);
+  background: var(--c-bg-elev);
+}
+.device--phone {
+  width: 100%;
+  max-width: 22rem;
+  margin-inline: auto;
+  border-radius: var(--radius-xl);
+}
+.device--desk { border-radius: var(--radius-lg); }
+
+/* The right-hand column says what each step is there to demonstrate. It is
+   static prose: it never animates, so it cannot fall out of step. */
+.stage__legend {
+  padding: var(--space-5);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg-elev);
+}
+.stage__legend h4 {
+  margin: 0 0 var(--space-4);
+  color: var(--c-text);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+.stage__legend ol {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: legend;
+}
+.stage__legend li {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  gap: var(--space-2);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  counter-increment: legend;
+}
+.stage__legend li::before {
+  content: counter(legend);
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+}
+
+.stage__steps {
+  display: grid;
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.flow__step {
-  padding: var(--space-5);
-  border: 1px solid var(--c-line);
+/* Emphasis, never a reveal: an unhighlighted step is fully legible. */
+.stage__step {
+  padding: var(--space-3);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--c-bg-elev);
-  transition: border-color 220ms var(--ease-out), background 220ms var(--ease-out);
+  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out);
 }
-/* The active state adds emphasis; it never takes readability away from the
-   other two steps. */
-.flow__step.is-active {
-  border-color: var(--c-accent);
+.stage__step.is-active {
+  border-color: var(--c-line-strong);
   background: var(--c-surface);
 }
-.flow__step.is-active .flow__num { color: var(--c-text); }
-.flow__num {
+.stage__who {
   margin: 0 0 var(--space-2);
   color: var(--c-text-mute);
   font-family: var(--font-mono);
   font-size: var(--step--1);
 }
-.flow__step h3 {
-  margin: 0;
-  font-size: var(--step-0);
-  letter-spacing: var(--tracking-snug);
-}
-.flow__step p:last-child { margin: var(--space-2) 0 0; color: var(--c-text-dim); font-size: var(--step--1); }
+.stage__step.is-active .stage__who { color: var(--c-text); }
 
-.flow__controls {
-  display: flex;
+.bubble {
+  padding: var(--space-4);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  font-size: var(--step--1);
+}
+.bubble p { margin: 0; color: var(--c-text-dim); }
+.bubble p + p { margin-top: var(--space-2); }
+.bubble__title {
+  color: var(--c-text) !important;
+  font-weight: var(--weight-medium);
+}
+.bubble__quote { color: var(--c-text) !important; }
+.bubble__meta { font-family: var(--font-mono); }
+.bubble__list { margin: 0; padding-left: 1.1em; color: var(--c-text-dim); }
+.bubble__list li + li { margin-top: var(--space-2); }
+.bubble--person { background: var(--c-bg-elev); }
+.bubble--record { border-color: var(--c-line-strong); }
+.bubble--decide { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bubble--track .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 0.6em;
+  border-radius: 50%;
+  background: var(--c-text-mute);
+}
+.btn-sm { min-height: var(--hit); padding: 0.45em 0.95em; font-size: var(--step--1); }
+
+/* A drawn stand-in for a screenshot, so nobody mistakes it for a real one. */
+.sample-shot {
+  display: grid;
+  gap: 4px;
+  margin-top: var(--space-3) !important;
+  padding: var(--space-3);
+  border: 1px dashed var(--c-line-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+}
+
+.stage__controls {
+  display: none;
   flex-wrap: wrap;
   gap: var(--space-3);
   margin-top: var(--space-5);
 }
-.flow__status { margin: var(--space-4) 0 0; color: var(--c-text-dim); font-size: var(--step--1); }
-.flow__status:empty { display: none; }
+.stage__status { margin: var(--space-4) 0 0; color: var(--c-text-dim); font-size: var(--step--1); }
+.stage__status:empty { display: none; }
+.stage__note {
+  max-width: 62ch;
+  margin: var(--space-4) 0 0;
+  color: var(--c-text-mute);
+  font-size: var(--step--1);
+}
+
+:root[data-js="on"] .stage__tabs { display: flex; }
+:root[data-js="on"] .stage__controls { display: flex; }
 
 /* ---- Examples ---------------------------------------------------------- */
+.examples__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
 .example {
-  max-width: 44rem;
   padding: var(--space-6);
   border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
@@ -663,6 +841,36 @@ body[data-nav-open] { overflow: hidden; }
 }
 .process__item p { max-width: 52ch; margin: 0; color: var(--c-text-dim); }
 
+/* ---- Platforms --------------------------------------------------------- */
+.platforms { background: var(--c-bg-elev); }
+.platforms__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.platform {
+  padding: var(--space-6);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+.platform h3 {
+  margin: 0;
+  font-size: var(--step-1);
+  letter-spacing: var(--tracking-snug);
+}
+.platform p { margin: var(--space-3) 0 0; max-width: 46ch; color: var(--c-text-dim); }
+
+/* ---- People and control ------------------------------------------------ */
+.control { border-top: 1px solid var(--c-line); }
+.control__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(1.5rem, 5vw, 4rem);
+  align-items: start;
+}
+.control p { max-width: 56ch; margin: 0; color: var(--c-text-dim); font-size: var(--step-0); }
+
 /* ---- Resources --------------------------------------------------------- */
 .resources { background: var(--c-bg-elev); }
 .resources__list {
@@ -731,29 +939,72 @@ body[data-nav-open] { overflow: hidden; }
   from { opacity: 0; }
 }
 
-/* ---- About ------------------------------------------------------------- */
-.about { border-top: 1px solid var(--c-line); }
+/* ---- About ------------------------------------------------------------
+   The one dark band on the page, because it is where the metallic brand
+   composition belongs. Ink ramp in both appearances, like the footer. */
+.about {
+  background: var(--c-ink);
+  color: var(--c-on-ink-dim);
+}
 .about__grid {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: clamp(1.5rem, 5vw, 4rem);
-  align-items: start;
+  gap: clamp(1.5rem, 5vw, 4.5rem);
+  align-items: center;
 }
-.about h2 { font-size: var(--step-2); }
-.about p { max-width: 58ch; margin: 0; color: var(--c-text-dim); }
+.about h2 { color: var(--c-on-ink); font-size: var(--step-2); }
+.about p { max-width: 58ch; margin: var(--space-5) 0 0; color: var(--c-on-ink-dim); }
+.about__brand { margin: 0; }
+.about__brand img {
+  width: 100%;
+  max-width: 24rem;
+  height: auto;
+  border-radius: var(--radius-lg);
+}
+
+.company-facts {
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--c-ink-line);
+}
+.company-facts h3 {
+  margin: 0 0 var(--space-4);
+  color: var(--c-on-ink);
+  font-size: var(--step-0);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-snug);
+}
+.company-facts dl { display: grid; gap: var(--space-3); margin: 0; }
+.company-facts dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+.company-facts dt { color: var(--c-on-ink-mute); font-size: var(--step--1); }
+.company-facts dd { margin: 0; color: var(--c-on-ink); font-size: var(--step--1); }
+.company-facts__source {
+  margin-top: var(--space-5) !important;
+  color: var(--c-on-ink-mute) !important;
+  font-size: var(--step--1);
+}
 
 /* ---- Breakpoints ------------------------------------------------------- */
 @media (max-width: 960px) {
-  .offers__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .offers__grid,
+  .examples__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
   .hero__grid,
   .contact__grid,
+  .control__grid,
+  .stage__view,
   .about__grid { grid-template-columns: 1fr; }
-  .flow__steps { grid-template-columns: 1fr; }
+  .about__brand img { max-width: 18rem; }
+  .platforms__grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .offers__grid { grid-template-columns: 1fr; }
+  .offers__grid,
+  .examples__grid { grid-template-columns: 1fr; }
   .process__item { grid-template-columns: 1fr; gap: var(--space-3); }
 }
 @media (max-width: 640px) {
@@ -762,10 +1013,18 @@ body[data-nav-open] { overflow: hidden; }
 }
 @media (max-width: 560px) {
   .studio-actions .btn { width: 100%; }
-  .flow__controls .btn { flex: 1 1 100%; }
+  .stage__controls .btn { flex: 1 1 100%; }
+  /* --hit is the dense desktop size. A finger needs the full target, and the
+     tabs and the in-illustration choices are the smallest controls here. */
+  .stage__tab, .btn-sm { min-height: var(--tap); }
+  .stage__panel { padding: var(--space-4); }
+  .stage__view { min-height: 0; }
+  .stage__badge { width: 100%; text-align: center; }
+  .device { padding: var(--space-3); }
   .hero-panel { padding: var(--space-4); }
   .hero-panel__ui { padding: var(--space-4); }
   .hero-panel__rows > div { grid-template-columns: 1fr; gap: 2px; }
+  .company-facts dl > div { grid-template-columns: 1fr; gap: 2px; }
 }
 
 /* ======================================================================== *
