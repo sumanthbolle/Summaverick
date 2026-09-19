@@ -271,6 +271,8 @@ body[data-nav-open] { overflow: hidden; }
 }
 .footer-brand__mark img { width: 30px; height: 30px; filter: invert(1); }
 .footer-brand > p { max-width: 28ch; }
+/* Inherits the footer's ink ramp. The page ramp's muted tone only clears AA on
+   the page ground, not on this one. */
 .footer-copy { margin-top: var(--space-5); }
 
 @media (max-width: 860px) { .footer-cols { grid-template-columns: 1fr 1fr; } }
@@ -286,6 +288,11 @@ body[data-nav-open] { overflow: hidden; }
 .field select,
 .field textarea {
   font: inherit;
+  /* A text input's default intrinsic width is wider than the column it sits
+     in, and a grid item will not shrink below it on its own. Without this the
+     two-column row pushes the form past the viewport around 1024px. */
+  width: 100%;
+  min-width: 0;
   min-height: var(--tap);
   padding: 0.6em 0.9em;
   border: 1px solid var(--c-line-strong);
@@ -295,6 +302,7 @@ body[data-nav-open] { overflow: hidden; }
 }
 .field textarea { min-height: 7.5rem; resize: vertical; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+.form-grid > * { min-width: 0; }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
 @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
