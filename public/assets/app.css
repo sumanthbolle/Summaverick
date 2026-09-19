@@ -664,7 +664,8 @@ label.lbl {
 }
 .library-page .nav { background: var(--glass); }
 .library-page .nav .brand { gap: 8px; text-transform: none; }
-.library-page .nav .brand img { width: 24px; height: 24px; flex: 0 0 auto; }
+.nav .brand { gap: 8px; }
+.nav .brand .brand-mark { flex: 0 0 auto; color: inherit; }
 .library-page .page { max-width: 1160px; padding-top: 0; }
 .library-intro {
   max-width: 760px;
