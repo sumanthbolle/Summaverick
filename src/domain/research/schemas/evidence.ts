@@ -11,6 +11,8 @@ export interface ServiceNowEvidence {
   sourceType: ServiceNowSourceType;
   title: string;
   content: string;
+  /** Readable excerpt for display: no front matter, no evidence wrapper. */
+  snippet?: string;
   sourceReference: string;
   canonicalUrl?: string;
   sdkVersion?: string;

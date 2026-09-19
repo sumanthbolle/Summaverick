@@ -80,6 +80,8 @@ export interface ServiceNowDocument {
 
 export interface ServiceNowDocsSearchInput {
   query: string;
+  /** Related phrasings that widen retrieval without outvoting the question. */
+  expansions?: string[];
   releaseFamily?: string;
   modules?: string[];
   productAreas?: string[];

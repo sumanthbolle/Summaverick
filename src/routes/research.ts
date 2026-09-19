@@ -22,7 +22,7 @@ import type { Ctx, Env, RouteDef, RouteMaker } from "../types";
 import { badRequest, json, newId, nowMs, notFound, ok, readJson, serverError } from "../lib/json";
 import { rateLimit, clientKey } from "../lib/ratelimit";
 import { createSseStream } from "../lib/sse";
-import { runResearchPipeline } from "../domain/research";
+import { runResearchPipeline, researchAnswerMode } from "../domain/research";
 import { classifyServiceNowIntent } from "../domain/research/retrieval/query-classifier";
 import { expandServiceNowQuery } from "../domain/research/retrieval/query-expander";
 import { scanForPromptInjection } from "../domain/research/security/prompt-injection";
@@ -188,13 +188,20 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
           }
 
           await sse.send("answer", {
+            // `mode` tells the UI what it is allowed to call this: prose from an
+            // answer model, documentation matches, or no close match at all.
+            mode: result.mode,
+            notice: result.notice,
             text: result.answer,
-            citations: t.evidence.slice(0, 6).map((e) => ({ title: e.title, url: e.url ?? null, sourceType: e.sourceType })),
+            sources: result.sources,
+            // What was actually checked. Linked sources are not a quality
+            // verdict, so answer quality is reported as not evaluated.
+            checks: result.checks,
             verification: t.verification,
             llmUsed: t.llm.used,
             llmModel: t.llm.model,
             // Why the model was not used (missing key, or an upstream/egress
-            // failure), so a fallback to the draft is explainable in the UI.
+            // failure), so the mode shown to the reader is explainable.
             llmError: t.llm.error ?? null,
             // Compact summary only — the full case list is large and the public
             // scoreboard (T9) reads eval_results from D1, not this payload.
@@ -232,6 +239,18 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
       return sse.response;
     }),
 
+    // ---- What this deployment can do, before a question is asked -------
+    // Only the mode and scope: never key names, provider details or config.
+    route("GET", "/api/research/mode", async (_req, ctx: Ctx) => {
+      return ok({
+        mode: researchAnswerMode({
+          answerModelConfigured: Boolean(ctx.env.PERPLEXITY_API_KEY),
+        }),
+        scope: "servicenow",
+        liveInstanceEnabled: false,
+      });
+    }),
+
     // ---- Non-streaming (programmatic) ----------------------------------
     route("POST", "/api/research", async (req, ctx: Ctx) => {
       const { query, err } = await readQuery(req, ctx);
@@ -242,12 +261,12 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
       if (!daily.allowed) return rateLimited(daily.resetAt);
 
       try {
-        const { answer, trace } = await runResearchPipeline({
+        const { answer, mode, notice, sources, checks, trace } = await runResearchPipeline({
           query: query!,
           env: ctx.env as unknown as Record<string, string | undefined>,
           perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
         });
-        return ok({ answer, trace });
+        return ok({ answer, mode, notice, sources, checks, trace });
       } catch (e) {
         console.error("research pipeline error", e);
         return serverError(e instanceof Error ? e.message : "research pipeline failed");

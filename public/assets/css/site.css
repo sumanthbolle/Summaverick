@@ -892,99 +892,131 @@ body[data-nav-open] { overflow: hidden; }
 
 @media (max-width: 640px) { .article-pager { grid-template-columns: 1fr; } .article-pager a:last-child { text-align: left; } }
 
-.agent-shell {
-  overflow: clip;
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-xl);
-  background: var(--c-surface);
-  box-shadow: var(--shadow-2);
+/* The mode of the deployment, stated before the first question. */
+.ask-mode {
+  max-width: 60ch;
+  margin: var(--space-5) 0 0;
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--c-line-strong);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
 }
-.ask-results { margin-top: var(--space-6); }
 
-/* The trace is the agent showing its work: one row per stage, then the
-   answer. Each state carries a glyph as well as a colour. */
-.trace { display: grid; gap: var(--space-3); padding: var(--space-4); }
-.trace-step {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-3);
-  align-items: start;
+.ask-results { margin-top: var(--space-7); }
+.ask-status { margin: 0; color: var(--c-text-dim); font-size: var(--step--1); }
+.ask-status:empty { display: none; }
+
+.ask-notice {
+  margin: 0 0 var(--space-4);
+  color: var(--c-text-dim);
   font-family: var(--font-mono);
   font-size: var(--step--1);
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity var(--dur-base) var(--ease-out),
-              transform var(--dur-base) var(--ease-out);
 }
-.trace-step.show { opacity: 1; transform: none; }
-.trace-step .tick {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
-  border-radius: 50%;
-  background: var(--c-ok-soft);
-  color: var(--c-ok);
-  font-size: 11px;
+/* Prose from an answer model. Anything else is plain explanatory text, so a
+   documentation match can never be mistaken for an answered question. */
+.ask-answer {
+  padding: var(--space-5);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
 }
-.trace-step[data-kind="block"] .tick { background: var(--c-bad-soft); color: var(--c-bad); }
-.trace-step[data-kind="active"] .tick { background: var(--c-accent-soft); color: var(--c-accent); }
-.trace-step[data-kind="muted"] { opacity: 0.6; }
-.trace-step[data-kind="muted"] .tick { background: var(--c-bg-elev); color: var(--c-text-mute); }
-.trace-step .k { color: var(--c-text); font-weight: var(--weight-medium); }
-.trace-step .v { color: var(--c-text-dim); }
+.ask-answer p { margin: 0; white-space: pre-wrap; }
+.ask-explain { max-width: 62ch; margin: 0; color: var(--c-text-dim); }
 
-.trace-answer {
-  margin: var(--space-2) var(--space-4);
-  padding: var(--space-4);
+.ask-sources-head {
+  margin: var(--space-6) 0 var(--space-4);
+  font-size: var(--step-1);
+  letter-spacing: var(--tracking-snug);
+}
+.ask-sources { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.src {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-5);
   border: 1px solid var(--c-line);
-  border-radius: var(--radius-md);
-  background: var(--c-surface-2);
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity var(--dur-base) var(--ease-out),
-              transform var(--dur-base) var(--ease-out);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+  transition: border-color var(--dur-fast) var(--ease-out);
 }
-.trace-answer.show { opacity: 1; transform: none; }
-.trace-answer .a-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
+.src:hover { border-color: var(--c-line-strong); }
+.src-index {
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
 }
-.trace-answer .a-text { white-space: pre-wrap; }
-.trace-answer .a-cites {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-.a-badge {
+.src-title {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-pill);
+  min-height: var(--hit);
+  color: var(--c-text);
+  font-size: var(--step-0);
+  font-weight: var(--weight-medium);
+}
+.src-snippet { margin: var(--space-2) 0 0; color: var(--c-text-dim); }
+.src-meta {
+  margin: var(--space-2) 0 0;
+  color: var(--c-text-mute);
   font-family: var(--font-mono);
-  font-size: 0.72em;
+  font-size: var(--step--1);
+}
+
+/* What was checked, in the words of the check. No single "verified" badge. */
+.ask-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+}
+
+.ask-trace { margin-top: var(--space-5); }
+.ask-trace summary {
+  min-height: var(--hit);
   color: var(--c-text-dim);
+  font-size: var(--step--1);
+  cursor: pointer;
 }
-.a-badge[data-ok="true"] { background: var(--c-ok-soft); color: var(--c-ok); border-color: transparent; }
-.a-badge[data-ok="false"] { background: var(--c-bad-soft); color: var(--c-bad); border-color: transparent; }
-.cite {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--c-accent-soft);
-  color: var(--c-accent);
+.ask-trace ol {
+  margin: var(--space-4) 0 0;
+  padding-left: 1.4em;
+  color: var(--c-text-dim);
   font-family: var(--font-mono);
-  font-size: 0.72em;
+  font-size: var(--step--1);
 }
+.ask-trace li + li { margin-top: var(--space-2); }
+.ask-trace .k { color: var(--c-text); }
+
+.ask-problem {
+  padding: var(--space-5);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-2);
+}
+.ask-problem p { margin: 0; color: var(--c-text-dim); }
+.ask-problem__head {
+  margin-bottom: var(--space-2) !important;
+  color: var(--c-text) !important;
+  font-weight: var(--weight-medium);
+}
+.ask-problem + p { margin-top: var(--space-4); }
+
+.ask-next { margin-top: var(--space-6); color: var(--c-text-dim); }
+
+.ask-scope {
+  max-width: 62ch;
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--c-line);
+}
+.ask-scope h2 { margin: 0; font-size: var(--step-0); }
+.ask-scope ul { margin: var(--space-4) 0 0; padding-left: 1.2em; color: var(--c-text-dim); }
+.ask-scope li { font-size: var(--step--1); }
+.ask-scope li + li { margin-top: var(--space-2); }
 
 /* ---- Reduced motion ---------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
@@ -994,5 +1026,4 @@ body[data-nav-open] { overflow: hidden; }
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
-  .trace-step, .trace-answer { opacity: 1; transform: none; }
 }

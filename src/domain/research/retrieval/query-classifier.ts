@@ -47,6 +47,27 @@ const MODULE_KEYWORDS: Record<string, string[]> = {
     "transform map",
     "update set",
   ],
+  platform_security: [
+    "acl",
+    "access control",
+    "contextual security",
+    "cross-scope",
+    "elevated privilege",
+    "security rule",
+  ],
+  // Server- and client-side scripting questions belong with the API reference,
+  // which is a separate documentation publication from the platform guides.
+  scripting: [
+    "gliderecord",
+    "glideajax",
+    "glidesystem",
+    "glide record",
+    "script include",
+    "business rule",
+    "client script",
+    "scripted rest",
+    "server script",
+  ],
 };
 
 const DOMAIN_MARKERS = [
@@ -73,6 +94,28 @@ const DOMAIN_MARKERS = [
   "sys_",
   "sysid",
   "sys_id",
+  // Terms a ServiceNow practitioner uses without naming the platform. Without
+  // these, questions like "how do ACLs evaluate on a table" were turned away as
+  // out of scope even though they are squarely in it.
+  "acl",
+  "access control list",
+  "glide",
+  "flow designer",
+  "virtual agent",
+  "now assist",
+  "ui policy",
+  "ui action",
+  "client script",
+  "catalog item",
+  "service catalog",
+  "csdm",
+  "cmdb_ci",
+  "app engine",
+  "integrationhub",
+  "ui builder",
+  "service portal",
+  "incident table",
+  "change request",
 ];
 
 const RELEASE_FAMILIES = [
@@ -236,8 +279,12 @@ export function classifyServiceNowIntent(query: string): ServiceNowIntentResult 
     intent === "implementation_design" ||
     /\b(this (file|project|repo)|\.now\.ts|keys\.ts)\b/.test(q);
 
+  // Product documentation is additive: even an SDK question benefits from the
+  // platform docs, and the SDK explain layer is only available where a Fluent
+  // project is checked out.
   const requiresProductDocs =
     !requiresSdkDocs ||
+    intent === "fluent_sdk" ||
     intent === "product_concept" ||
     intent === "configuration_guidance" ||
     intent === "release_comparison" ||
