@@ -1,0 +1,30 @@
+{
+  "_comment": "Single source of truth for Summaverick brand identity. Edit these values, then run `pnpm brand` (regenerates logo/icon/OG artwork AND rewrites every page's mark, contact link and brand text). See BRAND.md.",
+
+  "name": "Summaverick",
+  "fullName": "Summaverick Group",
+  "legalName": "SUMMAVERICK LLP",
+  "tagline": "Personal assistants and enterprise agents, built for mobile, web, and business platforms.",
+  "ogTagline": "Personal assistants and enterprise agents.",
+
+  "inquiryEmail": "inquiry@summaverick.com",
+  "contactHref": "mailto:inquiry@summaverick.com",
+
+  "colors": {
+    "ink": "#0d0d11",
+    "onInk": "#f4f4f7",
+    "metalStops": ["#fdfdff", "#c9ccd4", "#8b8f99", "#c3c6cf", "#6f727b"]
+  },
+
+  "assets": {
+    "faviconSvg": "/assets/favicon.svg",
+    "faviconIco": "/assets/favicon.ico",
+    "appleTouch": "/assets/apple-touch-icon.png",
+    "androidChrome192": "/assets/android-chrome-192x192.png",
+    "androidChrome512": "/assets/android-chrome-512x512.png",
+    "androidChromeMaskable": "/assets/android-chrome-maskable-512x512.png",
+    "markSvg": "/assets/img/summaverick-mark.svg",
+    "wordmarkPng": "/assets/img/summaverick-logo.png",
+    "squareLogoJpg": "/assets/img/summaverick-group-logo.jpg"
+  }
+}

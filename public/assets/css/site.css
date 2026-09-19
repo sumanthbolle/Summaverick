@@ -913,6 +913,8 @@ body[data-nav-open] { overflow: hidden; }
 }
 .contact__grid > div > p { max-width: 42ch; margin: var(--space-5) 0 0; color: var(--c-text-dim); }
 .contact__note { font-size: var(--step--1); }
+.contact__email { font-size: var(--step--1); }
+.contact__email a { color: var(--c-text); font-weight: var(--weight-medium); }
 .contact-form {
   display: grid;
   gap: var(--space-4);
