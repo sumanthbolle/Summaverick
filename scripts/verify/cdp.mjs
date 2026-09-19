@@ -5,15 +5,27 @@
  */
 import { spawn } from "node:child_process";
 
-export async function launch({ headless = true, width = 1440, height = 900, port = 9222 } = {}) {
+export async function launch({
+  headless = true,
+  width = 1440,
+  height = 900,
+  port = 9222,
+  left = 0,
+  top = 0,
+} = {}) {
   const args = [
     `--remote-debugging-port=${port}`,
     "--no-first-run",
     "--no-default-browser-check",
-    "--disable-features=Translate",
+    // OutdatedBuildDetector puts a "Can't update Chrome" bubble over the page,
+    // which would sit in the middle of any recording made here.
+    "--disable-features=Translate,OutdatedBuildDetector",
+    "--disable-component-update",
+    "--no-service-autorun",
+    "--disable-search-engine-choice-screen",
     "--user-data-dir=/tmp/cdp-profile-" + port,
     `--window-size=${width},${height}`,
-    "--window-position=0,0",
+    `--window-position=${left},${top}`,
   ];
   if (headless) args.push("--headless=new", "--hide-scrollbars");
   const proc = spawn("google-chrome", [...args, "about:blank"], {
