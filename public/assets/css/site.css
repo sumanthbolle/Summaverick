@@ -21,6 +21,11 @@ body {
 
 img, svg { display: block; max-width: 100%; }
 
+/* Any author `display` beats the UA rule for [hidden], so a `hidden` button
+   carrying .btn would still render. Scripts here hide with the attribute, so
+   it has to win. */
+[hidden] { display: none !important; }
+
 /* Links are ink, told apart by an underline rather than a hue — the same
    treatment reads in both appearances. UI chrome opts out individually. */
 a {
@@ -211,7 +216,6 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
   border-top: 1px solid var(--c-line);
   overflow: auto;
 }
-.nav-panel[hidden] { display: none; }
 .nav-panel nav { display: grid; max-width: 28rem; }
 .nav-panel a {
   display: flex;
