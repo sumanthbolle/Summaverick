@@ -20,7 +20,8 @@
     "seed:content:local": "node scripts/seed-content.ts --local",
     "seed:content:remote": "node scripts/seed-content.ts --remote",
     "build:library": "node scripts/build-library.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "verify:ui": "node scripts/verify/homepage.mjs && node scripts/verify/responsive.mjs && node scripts/verify/journeys.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.1.1"
