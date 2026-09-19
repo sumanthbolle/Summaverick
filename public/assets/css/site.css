@@ -1452,6 +1452,25 @@ body[data-nav-open] { overflow: hidden; }
 }
 @keyframes sv-shimmer { to { background-position: 220% center; } }
 
+/* ---- Spectrum accent ---------------------------------------------------
+   Multicolour gradient text for a single key phrase — the "Apple
+   Intelligence" move. Add class="text-spectrum" to any word or span; it wins
+   over the metal heading paint and slowly drifts through the spectrum. Reserve
+   it for one highlight at a time, and only on large text (it is decorative). */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-spectrum {
+    background-image: var(--grad-spectrum);
+    background-size: 220% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .text-spectrum { animation: sv-shimmer 6s linear infinite; }
+  }
+}
+
 /* ---- Cinematic homepage hero ------------------------------------------- */
 .hero {
   position: relative;

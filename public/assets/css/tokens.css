@@ -131,6 +131,13 @@
     #9a9ea6 0%, #ffffff 24%, #e2e4e9 44%,
     #ffffff 58%, #9a9ea6 82%, #ffffff 100%
   );
+  /* The one place colour is allowed: an "Apple Intelligence"-style spectrum,
+     for a single key phrase — never a whole headline. */
+  --grad-spectrum: linear-gradient(
+    100deg,
+    #5a9bff 0%, #a06bff 20%, #ff6bcb 40%,
+    #ff9a5a 58%, #ffd36b 72%, #5a9bff 100%
+  );
   /* A single neutral spotlight, not coloured blobs. */
   --cine-spot: rgba(255, 255, 255, 0.12);
   --cine-spot-soft: rgba(255, 255, 255, 0.06);
