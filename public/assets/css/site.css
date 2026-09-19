@@ -21,8 +21,9 @@ body {
 
 img, svg { display: block; max-width: 100%; }
 
-/* A class that sets `display` outranks the UA rule for [hidden], which is how
-   a hidden .btn stayed on screen. Settle it once, for every element. */
+/* Any author `display` beats the UA rule for [hidden], so a `hidden` button
+   carrying .btn would still render. Scripts here hide with the attribute, so
+   it has to win. */
 [hidden] { display: none !important; }
 
 /* Links are ink, told apart by an underline rather than a hue — the same
@@ -272,10 +273,10 @@ body[data-nav-open] { overflow: hidden; }
   letter-spacing: var(--tracking-snug);
 }
 .footer-brand > p { max-width: 32ch; }
-.footer-copy { margin-top: var(--space-5); }
 
 /* The registered identity sits below the columns: present, and subordinate to
-   the product message above it. */
+   the product message above it. It inherits the footer's ink ramp: the page
+   ramp's muted tone only clears AA on the page ground, not on this one. */
 .footer-legal {
   margin-top: var(--space-7);
   padding-top: var(--space-5);
@@ -296,6 +297,11 @@ body[data-nav-open] { overflow: hidden; }
 .field select,
 .field textarea {
   font: inherit;
+  /* A text input's default intrinsic width is wider than the column it sits
+     in, and a grid item will not shrink below it on its own. Without this the
+     two-column row pushes the form past the viewport around 1024px. */
+  width: 100%;
+  min-width: 0;
   min-height: var(--tap);
   padding: 0.6em 0.9em;
   border: 1px solid var(--c-line-strong);
@@ -305,6 +311,7 @@ body[data-nav-open] { overflow: hidden; }
 }
 .field textarea { min-height: 7.5rem; resize: vertical; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+.form-grid > * { min-width: 0; }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
 @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }

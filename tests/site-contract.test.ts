@@ -174,7 +174,13 @@ describe("Homepage public contract", () => {
     expect(stage).not.toMatch(/data-stage-view="[^"]+"[^>]*\shidden/);
     expect(css).toContain(':root[data-js="on"] .stage__view[data-stage-inactive]');
 
-    // A class that sets display must not be able to outrank [hidden].
+    // The retry button ships hidden and is shown only when it applies. It also
+    // carries .btn, whose `display` outranks the browser's rule for [hidden],
+    // so the sheet has to override it.
+    const retry = home.slice(home.indexOf("data-lead-retry"));
+    expect(retry.slice(0, retry.indexOf(">")), "retry should ship hidden").toContain(
+      "hidden"
+    );
     expect(css).toContain("[hidden] { display: none !important; }");
   });
 

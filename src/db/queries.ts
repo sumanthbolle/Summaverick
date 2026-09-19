@@ -821,15 +821,22 @@ export async function getMetalSeries(
  * existing one when the idempotency key has been seen before, so a retry after
  * an uncertain response does not create a second copy.
  */
+export async function findLeadByIdempotencyKey(
+  db: D1Database,
+  key: string
+): Promise<{ id: string; notified: number } | null> {
+  return await db
+    .prepare(`SELECT id, notified FROM leads WHERE idempotency_key = ?`)
+    .bind(key)
+    .first<{ id: string; notified: number }>();
+}
+
 export async function insertLead(
   db: D1Database,
   lead: LeadRow
 ): Promise<{ id: string; duplicate: boolean }> {
   if (lead.idempotency_key) {
-    const existing = await db
-      .prepare(`SELECT id FROM leads WHERE idempotency_key = ?`)
-      .bind(lead.idempotency_key)
-      .first<{ id: string }>();
+    const existing = await findLeadByIdempotencyKey(db, lead.idempotency_key);
     if (existing) return { id: existing.id, duplicate: true };
   }
   await db
