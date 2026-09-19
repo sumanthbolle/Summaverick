@@ -1,0 +1,39 @@
+{
+  "_comment": "Single source of truth for the Summaverick brand. The logo is the founder-supplied metallic render (summaverick-group-logo.jpg); every other image is derived from it by cropping/resizing — the artwork is never redrawn. Edit values here, then run `pnpm brand`. See BRAND.md.",
+
+  "name": "Summaverick",
+  "fullName": "Summaverick Group",
+  "legalName": "SUMMAVERICK LLP",
+  "tagline": "Personal assistants and enterprise agents, built for mobile, web, and business platforms.",
+
+  "inquiryEmail": "inquiry@summaverick.com",
+  "contactHref": "mailto:inquiry@summaverick.com",
+
+  "colors": {
+    "ink": "#0d0d11"
+  },
+
+  "source": {
+    "_note": "masterImage is the full lock-up (S + wordmark). markCrop is the square, in master-image pixels, that isolates just the metallic S for the icon and the header/footer marks. Re-measure only if you replace the master render.",
+    "masterImage": "assets/img/summaverick-group-logo.jpg",
+    "markCrop": { "x": 312, "y": 288, "size": 620 }
+  },
+
+  "marks": {
+    "_note": "Rendered pixel size of the header/footer <img> badge. Height matches width (square).",
+    "navSize": 28,
+    "footerSize": 30
+  },
+
+  "assets": {
+    "faviconSvg": "/assets/favicon.svg",
+    "faviconIco": "/assets/favicon.ico",
+    "appleTouch": "/assets/apple-touch-icon.png",
+    "androidChrome192": "/assets/android-chrome-192x192.png",
+    "androidChrome512": "/assets/android-chrome-512x512.png",
+    "androidChromeMaskable": "/assets/android-chrome-maskable-512x512.png",
+    "markPng": "/assets/img/summaverick-mark.png",
+    "socialPng": "/assets/img/summaverick-logo.png",
+    "squareLogoJpg": "/assets/img/summaverick-group-logo.jpg"
+  }
+}
