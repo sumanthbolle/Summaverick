@@ -45,6 +45,7 @@ describe("Homepage public contract", () => {
       "public/assets/apple-touch-icon.png",
       "public/assets/android-chrome-192x192.png",
       "public/assets/android-chrome-512x512.png",
+      "public/assets/android-chrome-maskable-512x512.png",
       "public/assets/site.webmanifest",
       "public/assets/img/summaverick-mark.svg",
       "public/assets/img/summaverick-logo.png",
@@ -64,6 +65,20 @@ describe("Homepage public contract", () => {
     const sizes = Array.from({ length: count }, (_, i) => ico[6 + 16 * i] || 256);
 
     expect(sizes.sort((a, b) => a - b)).toEqual([16, 32, 48]);
+  });
+
+  it("gives the maskable icon its own padded file", () => {
+    const manifest = JSON.parse(text("public/assets/site.webmanifest"));
+    const maskable = manifest.icons.filter((icon: { purpose?: string }) =>
+      (icon.purpose ?? "").split(" ").includes("maskable"));
+
+    expect(maskable).toHaveLength(1);
+    // A launcher may clip the rounded tile to a circle, which cuts the S's
+    // tails, so the maskable entry must not reuse the plain icon.
+    expect(maskable[0].src).toBe("/assets/android-chrome-maskable-512x512.png");
+    for (const icon of manifest.icons) {
+      expect(existsSync(resolve(root, `public${icon.src}`)), icon.src).toBe(true);
+    }
   });
 
   it("states the offer, both audiences and mobile in the first screen", () => {
