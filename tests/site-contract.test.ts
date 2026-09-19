@@ -86,6 +86,22 @@ describe("Homepage public contract", () => {
     expect(css).not.toContain("infinite");
   });
 
+  it("actually hides the elements scripts hide with the hidden attribute", () => {
+    const home = text("public/index.html");
+    const css = text("public/assets/css/site.css");
+
+    // The manual step controls and the retry button ship hidden and are shown
+    // only when they apply. They also carry .btn, whose `display` outranks the
+    // browser's rule for [hidden], so the sheet has to override it.
+    for (const marker of ["data-flow-prev", "data-flow-next", "data-lead-retry"]) {
+      const tag = home.slice(home.indexOf(marker));
+      expect(tag.slice(0, tag.indexOf(">")), `${marker} should ship hidden`).toContain(
+        "hidden"
+      );
+    }
+    expect(css).toContain("[hidden] { display: none !important; }");
+  });
+
   it("keeps entrance motion an enhancement rather than a requirement", () => {
     const css = text("public/assets/css/site.css");
     const chrome = text("public/assets/js/chrome.js");

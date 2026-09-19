@@ -45,9 +45,21 @@ const coreChecks = [
         "home is still the placeholder stub, not the product site"
       );
       assert(
-        text.includes("We turn product ambition into working software."),
-        "home missing Classic Studio product-engineering headline"
+        text.includes("Make everyday work easier for your team."),
+        "home missing the hero headline"
       );
+      assert(
+        text.includes("ServiceNow applications · Integrations · AI tools"),
+        "home missing the specialty line — the offer has to be in the first screen"
+      );
+      // The three offers and the workflow steps are in the markup, so they read
+      // whether or not the motion script runs.
+      for (const offer of ["ServiceNow applications", "System integrations", "AI tools"]) {
+        assert(text.includes(`<h3>${offer}</h3>`), `home missing the ${offer} offer`);
+      }
+      for (const step of ["Request received", "Information gathered", "Ready for review"]) {
+        assert(text.includes(step), `home missing the workflow step "${step}"`);
+      }
       assert(
         text.includes("summaverick-uncontained-sum.svg"),
         "home missing Uncontained Sum brand asset"

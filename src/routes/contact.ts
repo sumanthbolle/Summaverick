@@ -16,7 +16,11 @@
 import type { Ctx, Env, RouteDef, RouteMaker } from "../types";
 import { badRequest, json, newId, nowMs, readJson } from "../lib/json";
 import { clientKey, rateLimit } from "../lib/ratelimit";
-import { insertLead, markLeadNotified } from "../db/queries";
+import {
+  findLeadByIdempotencyKey,
+  insertLead,
+  markLeadNotified,
+} from "../db/queries";
 
 const MAX = { name: 120, email: 200, organisation: 160, intent: 60, message: 4000 };
 const BURST = { limit: 3, window: 600 }; // 3 per 10 minutes
@@ -105,6 +109,27 @@ export function contactRoutes(route: RouteMaker): RouteDef[] {
         );
       }
 
+      // A retry of a message that is already stored is answered from the row
+      // itself, before the rate limiter. Otherwise a visitor retrying an
+      // unconfirmed submission would be told to try again when the message had
+      // in fact been received.
+      const idempotencyKey = text(body.idempotency_key, 80) || null;
+      if (idempotencyKey) {
+        const seen = await findLeadByIdempotencyKey(ctx.env.DB, idempotencyKey);
+        if (seen) {
+          return json(
+            {
+              ok: true,
+              id: seen.id,
+              stored: true,
+              notified: seen.notified === 1,
+              duplicate: true,
+            },
+            { status: 201 }
+          );
+        }
+      }
+
       const key = clientKey(req, ctx.session.deviceId);
       const burst = await rateLimit(ctx.env, `lead:b:${key}`, BURST.limit, BURST.window);
       const daily = await rateLimit(ctx.env, `lead:d:${key}`, DAILY.limit, DAILY.window);
@@ -123,7 +148,7 @@ export function contactRoutes(route: RouteMaker): RouteDef[] {
 
       const lead = {
         id: newId("lead"),
-        idempotency_key: text(body.idempotency_key, 80) || null,
+        idempotency_key: idempotencyKey,
         name: text(body.name, MAX.name) || null,
         email,
         organisation: text(body.organisation, MAX.organisation) || null,
