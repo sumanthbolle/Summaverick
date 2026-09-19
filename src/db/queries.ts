@@ -9,6 +9,7 @@ import type {
   AttemptRow,
   ContentRow,
   CredentialRow,
+  LeadRow,
   MagicLinkRow,
   MetalsDailyRow,
   ProgressRow,
@@ -809,6 +810,54 @@ export async function getMetalSeries(
     .bind(base, quote, sinceDay)
     .all<MetalsDailyRow>();
   return r.results ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Contact messages
+// ---------------------------------------------------------------------------
+
+/**
+ * Store one contact message. Returns the id that now holds this submission: the
+ * existing one when the idempotency key has been seen before, so a retry after
+ * an uncertain response does not create a second copy.
+ */
+export async function insertLead(
+  db: D1Database,
+  lead: LeadRow
+): Promise<{ id: string; duplicate: boolean }> {
+  if (lead.idempotency_key) {
+    const existing = await db
+      .prepare(`SELECT id FROM leads WHERE idempotency_key = ?`)
+      .bind(lead.idempotency_key)
+      .first<{ id: string }>();
+    if (existing) return { id: existing.id, duplicate: true };
+  }
+  await db
+    .prepare(
+      `INSERT INTO leads
+         (id, idempotency_key, name, email, organisation, intent, message, notified, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      lead.id,
+      lead.idempotency_key,
+      lead.name,
+      lead.email,
+      lead.organisation,
+      lead.intent,
+      lead.message,
+      lead.notified,
+      lead.created_at
+    )
+    .run();
+  return { id: lead.id, duplicate: false };
+}
+
+export async function markLeadNotified(
+  db: D1Database,
+  id: string
+): Promise<void> {
+  await db.prepare(`UPDATE leads SET notified = 1 WHERE id = ?`).bind(id).run();
 }
 
 // ---------------------------------------------------------------------------

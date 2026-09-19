@@ -144,13 +144,13 @@ function header(active) {
       <span>Summaverick</span>
     </a>
     <nav class="nav-links" id="nav-links" aria-label="Primary">
-      ${link("/#expertise", "", "How we work")}
-      ${link("/#work", "", "Work")}
-      ${link("/#company", "", "About")}
-      ${link("/learn", "learn", "Writing")}
+      ${link("/#build", "", "What we build")}
+      ${link("/#examples", "", "Examples")}
+      ${link("/#how-we-work", "", "How we work")}
+      ${link("/learn", "learn", "Resources")}
     </nav>
     <div class="nav-actions">
-      <a class="btn btn-primary" href="/#contact">Contact</a>
+      <a class="btn btn-primary" href="/#contact">Discuss your project</a>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark appearance">
         <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
         <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
@@ -163,19 +163,20 @@ function header(active) {
 
   <div class="nav-panel" id="nav-panel" hidden>
     <nav aria-label="Mobile">
-      <a href="/#expertise">How we work</a>
-      <a href="/#work">Work</a>
-      <a href="/#company">About</a>
-      <a href="/learn">Writing</a>
+      <a href="/#build">What we build</a>
+      <a href="/#examples">Examples</a>
+      <a href="/#how-we-work">How we work</a>
+      <a href="/learn">Guides</a>
       <a href="/interviews">Interview questions</a>
-      <a href="/ask">Research agent</a>
-      <a href="/#contact">Contact</a>
+      <a href="/ask">ServiceNow reference search</a>
+      <a href="/#about">About</a>
+      <a href="/#contact">Discuss your project</a>
     </nav>
   </div>`;
 }
 
 function footer() {
-  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#expertise">How we work</a></li><li><a href="/#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>ServiceNow applications, integrations, and AI tools for everyday work.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#build">What we build</a></li><li><a href="/#examples">Examples</a></li><li><a href="/#how-we-work">How we work</a></li><li><a href="/#about">About</a></li></ul></div><div><p class="footer-head">Resources</p><ul><li><a href="/learn">Guides</a></li><li><a href="/interviews">Interview questions</a></li><li><a href="/ask">ServiceNow reference search</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Discuss your project</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
 
   <script type="module" src="/assets/js/boot.js"></script>
 </body>
@@ -421,14 +422,14 @@ function main() {
       stats: [
         { n: String(essays.length), label: "Essays and guides" },
         { n: String(topicCount(essays)), label: "Topics" },
-        { n: "57", label: "Interview questions" },
+        { n: String(qas.length), label: "Interview questions" },
       ],
       placeholder: "Search essays — try “Fluent” or “CSDM”…",
       filters: essayFilters,
       cards: essays,
       canonical: `${ORIGIN}/learn`,
       description: "Essays and guides on ServiceNow, AI systems, architecture, and career — the Summaverick writing library.",
-      crumb: "Looking for interview prep? There are 57 answered questions next door.",
+      crumb: `Looking for interview prep? There are ${qas.length} answered questions next door.`,
     }),
     "utf8"
   );
@@ -442,14 +443,14 @@ function main() {
       stats: [
         { n: String(qas.length), label: "Answered questions" },
         { n: String(topicCount(qas)), label: "Topics" },
-        { n: "52", label: "Essays and guides" },
+        { n: String(essays.length), label: "Essays and guides" },
       ],
       placeholder: "Search questions — try “ACL” or “GlideRecord”…",
       filters: qaFilters,
       cards: qas,
       canonical: `${ORIGIN}/interviews`,
       description: "ServiceNow interview questions with senior-level answers — the Summaverick interview library.",
-      crumb: "Want the longer version? The essay library holds 52 pieces behind these answers.",
+      crumb: `Want the longer version? The essay library holds ${essays.length} pieces behind these answers.`,
     }),
     "utf8"
   );

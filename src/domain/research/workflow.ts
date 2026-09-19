@@ -19,7 +19,11 @@ import { ServiceNowPolicy } from "./policy";
 import { routeServiceNowQuery } from "./router";
 import { DefaultSdkExplainProvider } from "./providers/sdk-explain-provider";
 import { DefaultServiceNowInstanceQueryProvider } from "./providers/sdk-query-provider";
-import { HttpServiceNowDocsProvider } from "./providers/servicenow-docs-provider";
+import {
+  HttpServiceNowDocsProvider,
+  extractSnippet,
+  readableBody,
+} from "./providers/servicenow-docs-provider";
 import { LocalFluentRepositoryProvider } from "./providers/repository-provider";
 import { explainSdkTopic } from "./tools/explain-sdk-topic";
 import { searchProductDocs } from "./tools/search-product-docs";
@@ -149,7 +153,8 @@ export class ServiceNowDomainPack {
       const docsEvidence = await searchProductDocs({
         provider: this.docs,
         input: {
-          query: expansions.slice(0, 3).join(" "),
+          query,
+          expansions: expansions.slice(1, 4),
           releaseFamily: route.plan.releaseFamily,
           modules: route.intent.modules,
           limit: 4,
@@ -255,13 +260,16 @@ function synthesizeDraftAnswer(input: {
     claim: summarizeEvidenceClaim(e),
   }));
 
+  // The draft is a retrieval summary, not a written answer: it says what was
+  // found and from where. Prose is only produced when an answer model runs
+  // (see pipeline.ts), so nothing here can read as an answered question.
   const directAnswer =
     top.length === 0
       ? "Insufficient ServiceNow evidence was retrieved for a confirmed answer."
-      : `Based on ${describeSources(top)}, here is the evidence-backed answer for: ${input.query}`;
+      : `Retrieved ${top.length} ${describeSources(top)} source(s) for: ${input.query}`;
 
   const explanation = top
-    .map((e, i) => `[${i + 1}] ${e.title}: ${stripEvidenceWrapper(e.content).slice(0, 400)}`)
+    .map((e, i) => `[${i + 1}] ${e.title} — ${sourceExcerpt(e)}`)
     .join("\n\n");
 
   return {
@@ -289,11 +297,22 @@ function summarizeEvidenceClaim(e: ServiceNowEvidence): string {
   return `${e.title} supports the response for ${e.sourceType}`;
 }
 
-function stripEvidenceWrapper(content: string): string {
+export function stripEvidenceWrapper(content: string): string {
   return content
     .replace(/BEGIN_UNTRUSTED_SERVICENOW_EVIDENCE\n?/g, "")
     .replace(/\n?END_UNTRUSTED_SERVICENOW_EVIDENCE/g, "")
     .trim();
+}
+
+/**
+ * Display excerpt for one piece of evidence. Providers that produce prose set
+ * `snippet`; anything else is cleaned here so front matter and index markup
+ * never reach a reader.
+ */
+export function sourceExcerpt(evidence: ServiceNowEvidence, maxLength = 320): string {
+  if (evidence.snippet) return evidence.snippet;
+  const body = readableBody(stripEvidenceWrapper(evidence.content));
+  return extractSnippet(body, [], maxLength);
 }
 
 export function createResearchContext(

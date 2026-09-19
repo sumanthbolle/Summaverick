@@ -12,6 +12,7 @@
 import {
   ServiceNowDomainPack,
   createResearchContext,
+  sourceExcerpt,
 } from "./workflow";
 import {
   loadServiceNowDomainConfigFromEnv,
@@ -105,9 +106,54 @@ export interface ResearchTrace {
   events: { name: string; timestamp: string }[];
 }
 
+/**
+ * What the visitor is actually looking at. The UI must never present
+ * `source_results` as an answered question, and the mode is known before the
+ * question is asked (see `researchAnswerMode`).
+ */
+export type ResearchAnswerMode =
+  | "model_answer"
+  | "source_results"
+  | "insufficient_evidence"
+  | "out_of_domain";
+
+export interface ResearchSource {
+  title: string;
+  url: string | null;
+  sourceType: ServiceNowSourceType;
+  /** Readable excerpt — never front matter or index markup. */
+  snippet: string;
+}
+
+/**
+ * The checks this run actually performed, stated separately. Linked sources say
+ * nothing about whether an answer is correct, relevant, or complete, so answer
+ * quality is reported as not evaluated rather than "verified".
+ */
+export interface ResearchChecks {
+  sourcesFound: number;
+  claimsLinkedToSource: number;
+  claimsTotal: number;
+  citationRequirementMet: boolean;
+  promptInjectionPatternInSources: boolean;
+  answerQualityEvaluated: false;
+}
+
 export interface ResearchPipelineResult {
   answer: string;
+  mode: ResearchAnswerMode;
+  /** Plain-language explanation of the mode, shown above the result. */
+  notice: string | null;
+  sources: ResearchSource[];
+  checks: ResearchChecks;
   trace: ResearchTrace;
+}
+
+/** The mode a deployment can offer, resolvable without running a query. */
+export function researchAnswerMode(options: {
+  answerModelConfigured: boolean;
+}): "model_answer" | "source_results" {
+  return options.answerModelConfigured ? "model_answer" : "source_results";
 }
 
 const LAYER_LABELS: Record<string, { label: string; sourceType: ServiceNowSourceType }> = {
@@ -163,9 +209,20 @@ export async function runResearchPipeline(options: {
   // ---- Not a ServiceNow question: return early with an honest trace ----
   if (!result.routed) {
     const notInDomain =
-      "This research agent is scoped to the ServiceNow platform (Fluent SDK, product documentation, and — when authorized — read-only instance metadata). Your question did not match the ServiceNow domain, so no retrieval layers were engaged.";
+      "This research agent only covers the ServiceNow platform: the Fluent SDK, the product documentation, and — when authorized — read-only instance metadata. This question did not match that scope, so nothing was retrieved.";
     return {
       answer: notInDomain,
+      mode: "out_of_domain",
+      notice: "Outside the ServiceNow scope of this tool.",
+      sources: [],
+      checks: {
+        sourcesFound: 0,
+        claimsLinkedToSource: 0,
+        claimsTotal: 0,
+        citationRequirementMet: false,
+        promptInjectionPatternInSources: false,
+        answerQualityEvaluated: false,
+      },
       trace: {
         routed: false,
         query,
@@ -281,18 +338,16 @@ export async function runResearchPipeline(options: {
     },
   ];
 
-  // ---- Compose the final answer (Perplexity if configured, else the draft) ----
+  // ---- Compose the result (model prose when configured, sources otherwise) ----
   const systemPrompt = result.systemPromptAddon || getPromptBundle(cls.intent);
   let llmUsed = false;
   let llmError: string | undefined;
-  let finalAnswer =
-    [answer?.directAnswer, answer?.explanation].filter(Boolean).join("\n\n") ||
-    INSUFFICIENT_EVIDENCE_MESSAGE;
+  let prose = "";
 
   if (options.perplexityApiKey && !insufficient && ranked.length > 0) {
     const model = options.perplexityModel ?? "sonar";
     try {
-      const prose = await callPerplexity({
+      const written = await callPerplexity({
         apiKey: options.perplexityApiKey,
         model,
         systemPrompt,
@@ -302,8 +357,8 @@ export async function runResearchPipeline(options: {
           .map((e, i) => `[${i + 1}] (${e.sourceType}) ${e.title}\n${e.content}`)
           .join("\n\n"),
       });
-      if (prose.trim()) {
-        finalAnswer = prose.trim();
+      if (written.trim()) {
+        prose = written.trim();
         llmUsed = true;
       }
     } catch (err) {
@@ -311,8 +366,45 @@ export async function runResearchPipeline(options: {
     }
   }
 
+  const sources: ResearchSource[] = ranked.slice(0, 4).map((e) => ({
+    title: e.title,
+    url: e.canonicalUrl ?? null,
+    sourceType: e.sourceType,
+    snippet: sourceExcerpt(e),
+  }));
+
+  const mode: ResearchAnswerMode = llmUsed
+    ? "model_answer"
+    : insufficient || sources.length === 0
+      ? "insufficient_evidence"
+      : "source_results";
+
+  const { answer: finalAnswer, notice } = describeResult({
+    mode,
+    prose,
+    sources,
+    llmError,
+  });
+
+  const checks: ResearchChecks = {
+    sourcesFound: sources.length,
+    claimsLinkedToSource: result.verification?.citationCount ?? 0,
+    claimsTotal: result.verification?.claims.length ?? 0,
+    citationRequirementMet:
+      !config.citations.required ||
+      (result.verification?.citationCount ?? 0) >= config.citations.minimumEvidenceCount,
+    promptInjectionPatternInSources: Boolean(
+      result.verification?.promptInjectionDetected
+    ),
+    answerQualityEvaluated: false,
+  };
+
   return {
     answer: finalAnswer,
+    mode,
+    notice,
+    sources,
+    checks,
     trace: {
       routed: true,
       query,
@@ -365,6 +457,42 @@ export async function runResearchPipeline(options: {
       events,
     },
   };
+}
+
+/**
+ * The text and the mode notice for a finished run. Only `model_answer` returns
+ * prose; every other mode states what happened instead of implying an answer.
+ */
+function describeResult(input: {
+  mode: ResearchAnswerMode;
+  prose: string;
+  sources: ResearchSource[];
+  llmError?: string;
+}): { answer: string; notice: string | null } {
+  switch (input.mode) {
+    case "model_answer":
+      return { answer: input.prose, notice: null };
+    case "source_results": {
+      const count = input.sources.length;
+      const reason = input.llmError
+        ? "The answer model could not be reached for this run"
+        : "This deployment has no answer model enabled";
+      return {
+        answer:
+          `${reason}, so nothing was written for you. ` +
+          `${count} ServiceNow documentation page${count === 1 ? "" : "s"} matched this question; ` +
+          "each one is listed below with an excerpt and a link to read it in full.",
+        notice: `Documentation search: ${count} matching page${count === 1 ? "" : "s"}, no written answer.`,
+      };
+    }
+    default:
+      return {
+        answer:
+          "No ServiceNow documentation page matched this question closely enough to quote. " +
+          "Naming the table, API, or feature you are asking about usually helps.",
+        notice: "No close documentation match.",
+      };
+  }
 }
 
 function toClassification(cls: {

@@ -240,7 +240,22 @@ async function run(query) {
       method: "POST",
       body: JSON.stringify({ query }),
     });
-    $("answer").textContent = data.answer || "(no answer)";
+    // `mode` says what this text is: prose from an answer model, a list of
+    // documentation matches, or no close match. Never label it "answer" blindly.
+    const answer = $("answer");
+    answer.textContent = "";
+    if (data.notice) answer.append(el("p", { class: "muted", text: data.notice }));
+    answer.append(el("div", { text: data.answer || "(nothing returned)" }));
+    for (const src of data.sources || []) {
+      const row = el("p", { class: "muted" });
+      row.append(
+        src.url
+          ? el("a", { href: src.url, text: src.title })
+          : el("span", { text: src.title })
+      );
+      if (src.snippet) row.append(el("span", { text: ` — ${src.snippet}` }));
+      answer.append(row);
+    }
     renderTrace(data.trace);
     $("result").hidden = false;
   } catch (e) {

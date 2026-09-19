@@ -169,6 +169,18 @@ export interface PublishRunRow {
   stats_json: string | null;
 }
 
+export interface LeadRow {
+  id: string;
+  idempotency_key: string | null;
+  name: string | null;
+  email: string;
+  organisation: string | null;
+  intent: string | null;
+  message: string | null;
+  notified: number; // 0 | 1
+  created_at: number;
+}
+
 export interface MetalsDailyRow {
   day: string; // YYYY-MM-DD (UTC)
   base: string; // e.g. XAU

@@ -44,7 +44,14 @@ export { DefaultServiceNowInstanceQueryProvider } from "./providers/sdk-query-pr
 export {
   HttpServiceNowDocsProvider,
   parseLlmsIndex,
+  parseDocIndexEntries,
+  selectPublications,
+  rankPages,
+  isTableOfContents,
+  readableBody,
+  extractSnippet,
 } from "./providers/servicenow-docs-provider";
+export type { DocsPageEntry } from "./providers/servicenow-docs-provider";
 export {
   LocalFluentRepositoryProvider,
   detectFluentDefinitions,
@@ -71,5 +78,11 @@ export { getPromptBundle } from "./prompts/index";
 export { checkFluentDeletionSafety } from "./tools/inspect-fluent-project";
 export { getEvalScores, runEvalSuite } from "./evals/eval-runner";
 export type { EvalScores, EvalCaseResult } from "./evals/eval-runner";
-export { runResearchPipeline } from "./pipeline";
-export type { ResearchTrace, ResearchPipelineResult } from "./pipeline";
+export { runResearchPipeline, researchAnswerMode } from "./pipeline";
+export type {
+  ResearchTrace,
+  ResearchPipelineResult,
+  ResearchAnswerMode,
+  ResearchSource,
+  ResearchChecks,
+} from "./pipeline";

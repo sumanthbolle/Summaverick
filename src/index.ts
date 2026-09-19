@@ -15,6 +15,7 @@ import { upscRoutes } from "./routes/upsc";
 import { adminRoutes } from "./routes/admin";
 import { researchRoutes } from "./routes/research";
 import { advocateRoutes } from "./routes/advocate";
+import { contactRoutes } from "./routes/contact";
 import { runScheduled } from "./scheduled";
 
 /** Pretty paths → static HTML files in /public. */
@@ -50,6 +51,7 @@ const ROUTES: RouteDef[] = [
   ...adminRoutes(route),
   ...researchRoutes(route),
   ...advocateRoutes(route),
+  ...contactRoutes(route),
 ];
 
 /** Match a path against a pattern, capturing :params. */
