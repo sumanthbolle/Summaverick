@@ -142,6 +142,15 @@ describe("Homepage public contract", () => {
     expect(css).toContain(':root[data-js="on"] .stage__tabs { display: flex; }');
     expect(css).toContain(':root[data-js="on"] .stage__controls { display: flex; }');
     expect(css).toContain(".stage__tabs {\n  display: none;");
+
+    // The second view is never hidden by markup alone, or scripting-off
+    // visitors would lose it behind a tab strip they cannot see.
+    const stage = home.slice(home.indexOf('id="stage"'), home.indexOf('id="build"'));
+    expect(stage).not.toMatch(/data-stage-view="[^"]+"[^>]*\shidden/);
+    expect(css).toContain(':root[data-js="on"] .stage__view[data-stage-inactive]');
+
+    // A class that sets display must not be able to outrank [hidden].
+    expect(css).toContain("[hidden] { display: none !important; }");
   });
 
   it("keeps entrance motion an enhancement rather than a requirement", () => {

@@ -21,6 +21,10 @@ body {
 
 img, svg { display: block; max-width: 100%; }
 
+/* A class that sets `display` outranks the UA rule for [hidden], which is how
+   a hidden .btn stayed on screen. Settle it once, for every element. */
+[hidden] { display: none !important; }
+
 /* Links are ink, told apart by an underline rather than a hue — the same
    treatment reads in both appearances. UI chrome opts out individually. */
 a {
@@ -214,7 +218,6 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
   border-top: 1px solid var(--c-line);
   overflow: auto;
 }
-.nav-panel[hidden] { display: none; }
 .nav-panel nav { display: grid; max-width: 28rem; }
 .nav-panel a {
   display: flex;
@@ -588,16 +591,27 @@ body[data-nav-open] { overflow: hidden; }
   font-size: var(--step--1);
 }
 
-/* Both surfaces reserve the same height, so switching moves nothing and the
-   phone never reads as the lesser of the two. */
+/* Both surfaces reserve the same height and the same two columns, so
+   switching view moves nothing and the phone never reads as the lesser of
+   the two. */
 .stage__views { display: grid; gap: var(--space-6); }
 .stage__view { min-height: 30rem; }
 .stage__view-title {
-  margin: 0 0 var(--space-4);
+  grid-column: 1 / -1;
+  margin: 0;
   font-size: var(--step-0);
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-snug);
 }
+.stage__view {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+/* Pre-paint only: without scripting there is no tab strip, so both views
+   stay on the page. Once the script runs it manages `hidden` instead. */
+:root[data-js="on"] .stage__view[data-stage-inactive] { display: none; }
 .stage__view:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--radius-md); }
 
 .device {
@@ -606,12 +620,47 @@ body[data-nav-open] { overflow: hidden; }
   background: var(--c-bg-elev);
 }
 .device--phone {
+  width: 100%;
   max-width: 22rem;
+  margin-inline: auto;
   border-radius: var(--radius-xl);
 }
-.device--desk {
-  max-width: 34rem;
+.device--desk { border-radius: var(--radius-lg); }
+
+/* The right-hand column says what each step is there to demonstrate. It is
+   static prose: it never animates, so it cannot fall out of step. */
+.stage__legend {
+  padding: var(--space-5);
+  border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
+  background: var(--c-bg-elev);
+}
+.stage__legend h4 {
+  margin: 0 0 var(--space-4);
+  color: var(--c-text);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+.stage__legend ol {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: legend;
+}
+.stage__legend li {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  gap: var(--space-2);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  counter-increment: legend;
+}
+.stage__legend li::before {
+  content: counter(legend);
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
 }
 
 .stage__steps {
@@ -941,6 +990,7 @@ body[data-nav-open] { overflow: hidden; }
   .hero__grid,
   .contact__grid,
   .control__grid,
+  .stage__view,
   .about__grid { grid-template-columns: 1fr; }
   .about__brand img { max-width: 18rem; }
   .platforms__grid { grid-template-columns: 1fr; }
@@ -959,6 +1009,7 @@ body[data-nav-open] { overflow: hidden; }
   .stage__controls .btn { flex: 1 1 100%; }
   .stage__panel { padding: var(--space-4); }
   .stage__view { min-height: 0; }
+  .stage__badge { width: 100%; text-align: center; }
   .device { padding: var(--space-3); }
   .hero-panel { padding: var(--space-4); }
   .hero-panel__ui { padding: var(--space-4); }

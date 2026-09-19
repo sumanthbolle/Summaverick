@@ -146,7 +146,7 @@ export function initAgentStage() {
     if (reduced.matches) show(0, { announce: false });
   };
 
-  const select = (id, { focus = false } = {}) => {
+  const select = (id, { focus = false, announce = true } = {}) => {
     if (!views.some((v) => v.dataset.stageView === id)) return;
     current = id;
     tabs.forEach((tab) => {
@@ -156,9 +156,13 @@ export function initAgentStage() {
       if (on && focus) tab.focus();
     });
     views.forEach((v) => {
-      v.hidden = v.dataset.stageView !== id;
+      const off = v.dataset.stageView !== id;
+      // `hidden` is what assistive tech reads; the data attribute is the
+      // pre-paint stand-in the stylesheet uses before this file runs.
+      v.hidden = off;
+      v.toggleAttribute("data-stage-inactive", off);
     });
-    reset({ announce: true });
+    reset({ announce });
   };
 
   /* ---- controls --------------------------------------------------------- */
@@ -220,6 +224,9 @@ export function initAgentStage() {
   for (const link of $$('[data-stage-jump]')) {
     link.addEventListener("click", () => select(link.dataset.stageJump));
   }
+
+  /* ---- initial state ----------------------------------------------------- */
+  select(current, { announce: false });
 
   /* ---- reduced motion and visibility ------------------------------------ */
   const applyMotionMode = () => {
