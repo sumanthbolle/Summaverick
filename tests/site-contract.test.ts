@@ -20,19 +20,151 @@ describe("migrated library source", () => {
   });
 });
 
-describe("Classic Studio public contract", () => {
+describe("Homepage public contract", () => {
   it("ships the approved brand assets and accessible motion fallback", () => {
     const home = text("public/index.html");
     const css = text("public/assets/css/site.css");
 
     expect(home).toContain("summaverick-uncontained-sum.svg");
     expect(home).not.toContain("sumanth-reveal-v1.png");
-    expect(home).toContain("We build software people are glad to use.");
-    expect(home).toContain('id="expertise"');
-    expect(home).toContain('id="work"');
-    expect(home).toContain('id="contact"');
-    expect(css).toContain(".studio-hero");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
+  it("states the offer, the specialties and the next step in the first screen", () => {
+    const home = text("public/index.html");
+
+    expect(home).toContain("Make everyday work easier for your team.");
+    expect(home).toContain("ServiceNow applications · Integrations · AI tools");
+    expect(home).toContain(
+      "We build ServiceNow applications, connect business systems, and"
+    );
+    expect(home).toContain(">Discuss your project<");
+    expect(home).toContain(">Explore what we build<");
+    // The hero must not depend on the illustration or on any animation.
+    const hero = home.slice(home.indexOf('id="top"'), home.indexOf('id="build"'));
+    expect(hero).toContain("<h1");
+    expect(hero).not.toContain("data-reveal");
+  });
+
+  it("keeps the renamed sections reachable under their old anchors", () => {
+    const home = text("public/index.html");
+    for (const id of [
+      "build",
+      "workflow",
+      "examples",
+      "how-we-work",
+      "resources",
+      "about",
+      "contact",
+      // Anchors that existed before the sections were renamed.
+      "work",
+      "expertise",
+      "company",
+    ]) {
+      expect(home, `#${id} is missing`).toContain(`id="${id}"`);
+    }
+  });
+
+  it("labels the workflow illustration as an illustration and lets it be replayed", () => {
+    const home = text("public/index.html");
+    const css = text("public/assets/css/site.css");
+    const js = text("public/assets/js/workflow-demo.js");
+
+    expect(home).toContain("Illustrative example");
+    expect(home).toContain("See how a request could move through a workflow.");
+    for (const label of ["Request received", "Information gathered", "Ready for review"]) {
+      expect(home, label).toContain(label);
+    }
+    expect(home).toContain("data-flow-play");
+    expect(home).toContain("data-flow-prev");
+    expect(home).toContain("data-flow-next");
+    // Play, Pause, Replay, and manual steps when motion is reduced.
+    expect(js).toContain("Pause");
+    expect(js).toContain("Replay example");
+    expect(js).toContain("prefers-reduced-motion: reduce");
+    // Nothing on the page loops forever.
+    expect(css).not.toContain("infinite");
+  });
+
+  it("keeps entrance motion an enhancement rather than a requirement", () => {
+    const css = text("public/assets/css/site.css");
+    const chrome = text("public/assets/js/chrome.js");
+
+    // The hidden pre-animation states only apply once the script has run AND
+    // the visitor has not asked for reduced motion.
+    expect(css).toContain(':root[data-motion="on"] [data-reveal]');
+    expect(css).toContain(':root[data-motion="on"] .hero-panel');
+    expect(chrome).toContain('setAttribute("data-motion", "on")');
+    expect(chrome).toContain('removeAttribute("data-motion")');
+  });
+
+  it("describes the research example in the mode the deployment actually runs", () => {
+    const home = text("public/index.html");
+    const ask = text("public/ask.html");
+
+    expect(home).toContain("ServiceNow reference search");
+    expect(home).toContain("Internal demo");
+    expect(home).toContain("Search documentation");
+    // No claim of a live answer service on the homepage.
+    expect(home).not.toContain("Useful live answers");
+    // And the tool itself states its mode before a question is asked.
+    expect(ask).toContain("data-ask-mode");
+  });
+
+  it("never shows a blanket verification badge on the research result", () => {
+    const js = text("public/assets/js/ask.js");
+    expect(js).toContain("answer quality not evaluated");
+    expect(js).not.toMatch(/citation\(s\).*verified/);
+  });
+
+  it("wires the contact form to the server and matches its responses", () => {
+    const home = text("public/index.html");
+    const form = text("public/assets/js/lead-form.js");
+
+    for (const label of [
+      "Your name",
+      "Email",
+      "Organization",
+      "What do you need help with?",
+      "Tell us about it",
+      "Send your message",
+    ]) {
+      expect(home, label).toContain(label);
+    }
+    for (const option of [
+      "ServiceNow application",
+      "System integration",
+      "AI tool",
+      "Not sure yet",
+    ]) {
+      expect(home, option).toContain(option);
+    }
+    // The honeypot stays, and so does the hidden field it relies on.
+    expect(home).toContain('name="company_url"');
+
+    expect(form).toContain("/api/contact");
+    expect(form).toContain("Thanks—your message has been received.");
+    expect(form).toContain("Your message wasn't sent.");
+    expect(form).toContain("We couldn't confirm whether your message was received.");
+    expect(form).toContain("idempotency_key");
+  });
+
+  it("aligns page metadata and the footer with the stated offer", () => {
+    const home = text("public/index.html");
+
+    expect(home).toContain(
+      "<title>Summaverick | ServiceNow applications, integrations &amp; AI</title>"
+    );
+    expect(home).toContain(
+      "Summaverick builds ServiceNow applications, connects business systems, and develops AI tools for everyday work."
+    );
+    expect(home).toContain(
+      "ServiceNow applications, integrations, and AI tools for everyday work."
+    );
+    // Claims the review flagged as unsupported must not come back.
+    for (const claim of ["Store apps", "fine-tuning", "model training", "private deployment"]) {
+      expect(home.toLowerCase(), claim).not.toContain(claim.toLowerCase());
+    }
   });
 
   it("only links to homepage sections that exist", () => {

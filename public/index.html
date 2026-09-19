@@ -3,15 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Summaverick — software people are glad to use</title>
-  <meta name="description" content="Summaverick is a small product team. Strategy, design, engineering, and AI in one place, and the people you talk to first are the people who build it." />
+  <title>Summaverick | ServiceNow applications, integrations &amp; AI</title>
+  <meta name="description" content="Summaverick builds ServiceNow applications, connects business systems, and develops AI tools for everyday work. Explore the approach and discuss your project." />
+  <link rel="canonical" href="https://summaverick.com/" />
 
   <link rel="icon" href="/assets/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
-  <meta property="og:title" content="Summaverick — software people are glad to use" />
-  <meta property="og:description" content="A small product team. Strategy, design, engineering, and AI in one place, and the people you talk to first are the people who build it." />
+  <meta property="og:title" content="Summaverick | ServiceNow applications, integrations &amp; AI" />
+  <meta property="og:description" content="Summaverick builds ServiceNow applications, connects business systems, and develops AI tools for everyday work. Explore the approach and discuss your project." />
+  <meta property="og:url" content="https://summaverick.com/" />
+  <meta property="og:type" content="website" />
   <meta property="og:image" content="/assets/img/summaverick-logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="/assets/img/summaverick-logo.png" />
@@ -37,13 +40,13 @@
       <span>Summaverick</span>
     </a>
     <nav class="nav-links" id="nav-links" aria-label="Primary">
-      <a href="#expertise">How we work</a>
-      <a href="#work">Work</a>
-      <a href="#company">About</a>
-      <a href="/learn">Writing</a>
+      <a href="#build">What we build</a>
+      <a href="#examples">Examples</a>
+      <a href="#how-we-work">How we work</a>
+      <a href="/learn">Resources</a>
     </nav>
     <div class="nav-actions">
-      <a class="btn btn-primary" href="#contact">Contact</a>
+      <a class="btn btn-primary" href="#contact">Discuss your project</a>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark appearance">
         <svg class="theme-icon theme-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
         <svg class="theme-icon theme-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
@@ -56,108 +59,344 @@
 
   <div class="nav-panel" id="nav-panel" hidden>
     <nav aria-label="Mobile">
-      <a href="#expertise">How we work</a>
-      <a href="#work">Work</a>
-      <a href="#company">About</a>
-      <a href="/learn">Writing</a>
+      <a href="#build">What we build</a>
+      <a href="#examples">Examples</a>
+      <a href="#how-we-work">How we work</a>
+      <a href="/learn">Guides</a>
       <a href="/interviews">Interview questions</a>
-      <a href="/ask">Research agent</a>
-      <a href="#contact">Contact</a>
+      <a href="/ask">ServiceNow reference search</a>
+      <a href="#about">About</a>
+      <a href="#contact">Discuss your project</a>
     </nav>
   </div>
 
   <main id="main">
-    <section class="studio-hero" id="top" aria-labelledby="hero-title">
-      <div class="container studio-hero__inner">
-        <p class="studio-kicker">A small product team</p>
-        <h1 id="hero-title">We build software people are glad to use.</h1>
-        <p class="studio-lead">Strategy, design, engineering, and AI in one team. The people you talk to on the first call are the people who build it and ship it.</p>
-        <div class="studio-actions">
-          <a class="btn btn-primary btn-lg" href="#contact">Get in touch</a>
-          <a class="btn btn-quiet btn-lg" href="#work">See the work</a>
+    <!-- ---- Hero: the offer, readable before any motion runs ------------- -->
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="container hero__grid">
+        <div class="hero__copy">
+          <p class="studio-kicker">ServiceNow applications · Integrations · AI tools</p>
+          <h1 id="hero-title">Make everyday work easier for your team.</h1>
+          <p class="studio-lead">
+            We build ServiceNow applications, connect business systems, and
+            develop AI tools for everyday tasks—from handling requests to
+            finding information.
+          </p>
+          <div class="studio-actions">
+            <a class="btn btn-primary btn-lg" href="#contact">Discuss your project</a>
+            <a class="btn btn-quiet btn-lg" href="#build">Explore what we build</a>
+          </div>
         </div>
-        <p class="studio-hero__aside">You can also <a href="/ask">try the research agent</a> or <a href="/learn">read the library</a>.</p>
+
+        <!-- An illustration, labelled as one: no client screenshot is approved
+             for publication yet. Reserves its own height so nothing shifts. -->
+        <figure class="hero-panel" data-hero-panel>
+          <figcaption class="hero-panel__label">Illustration</figcaption>
+          <div class="hero-panel__ui">
+            <p class="hero-panel__title">Request a replacement laptop</p>
+            <dl class="hero-panel__rows">
+              <div><dt>Who it is for</dt><dd>New joiner, finance team</dd></div>
+              <div><dt>What is needed</dt><dd>Laptop, standard build</dd></div>
+              <div><dt>Approver</dt><dd>Team manager</dd></div>
+            </dl>
+            <p class="hero-panel__foot">Next step: manager review</p>
+          </div>
+          <p class="hero-panel__note">
+            The kind of screen we build: a clear request, the details it needs,
+            and an obvious next step.
+          </p>
+        </figure>
       </div>
     </section>
 
-    <section class="studio-statement" aria-labelledby="statement-title">
-      <div class="container" data-reveal>
-        <p class="studio-kicker">One team, start to finish</p>
-        <h2 id="statement-title">Founders get momentum. Bigger teams get rigour. <span>Everyone gets people who stay through the hard part.</span></h2>
-      </div>
-    </section>
-
-    <section class="studio-practice" id="expertise" aria-labelledby="practice-title">
+    <!-- ---- What we build ----------------------------------------------- -->
+    <section class="offers" id="build" aria-labelledby="offers-title">
       <div class="container">
-        <p class="studio-kicker">How we work</p>
-        <h2 id="practice-title" data-reveal>Three steps, and the same people all the way through.</h2>
-        <div class="studio-practice__list">
-          <article class="studio-practice__item" data-reveal>
-            <span>01</span><h3>Listen</h3><p>We start with your problem, not our process. A few honest conversations to work out what is worth building, and what you can safely skip.</p>
+        <div class="section-head" data-reveal>
+          <h2 id="offers-title">What would help your team work better?</h2>
+          <p>
+            A clearer way to handle requests. Information that stays up to date
+            across systems. Help finding the right answer. These are the kinds of
+            problems we build for.
+          </p>
+        </div>
+        <div class="offers__grid" data-reveal-group>
+          <article class="offer" data-reveal>
+            <h3>ServiceNow applications</h3>
+            <p>
+              Give people a clear way to submit requests, review information, and
+              complete their work. We build applications and workflows around the
+              process your team needs.
+            </p>
           </article>
-          <article class="studio-practice__item" data-reveal style="--d:90ms">
-            <span>02</span><h3>Build</h3><p>One team designs and engineers together, so there is something you can click on early, and again every week after that.</p>
+          <article class="offer" data-reveal style="--d:30ms">
+            <h3>System integrations</h3>
+            <p>
+              Connect the tools your team uses. We build integrations to move
+              information between systems and make updates easier to follow.
+            </p>
           </article>
-          <article class="studio-practice__item" data-reveal style="--d:180ms">
-            <span>03</span><h3>Keep improving</h3><p>We watch how people use it, clear away what slows them down, and add intelligence only where it earns its place.</p>
+          <article class="offer" data-reveal style="--d:60ms">
+            <h3>AI tools</h3>
+            <p>
+              Help people find information, summarize it, or prepare a next step.
+              We develop AI tools for a defined task, with a clear place for
+              people to review the result.
+            </p>
           </article>
         </div>
+        <p class="section-action"><a href="#contact">Tell us what you need <span aria-hidden="true">›</span></a></p>
       </div>
     </section>
 
-    <section class="studio-work" id="work" aria-labelledby="work-title">
+    <!-- ---- Workflow illustration ---------------------------------------
+         Explicitly illustrative. All three steps read the same with motion
+         off, with scripting off, and after the animation finishes. -->
+    <section class="flow" id="workflow" aria-labelledby="flow-title">
       <div class="container">
-        <div class="studio-section-head">
-          <div data-reveal><p class="studio-kicker">What we have built</p><h2 id="work-title">Systems you can try yourself.</h2></div>
-          <p>Rather than a wall of client logos, here is working software, with the reasoning behind it left in the open.</p>
-        </div>
-        <div class="studio-work__list">
-          <article class="studio-work__item" data-reveal>
-            <div class="studio-work__visual studio-work__visual--research" aria-hidden="true"><div class="trace-loop"><span>Read the question</span><span>Search the docs</span><span>Check the sources</span><span>Answer with citations</span></div></div>
-            <div><p class="studio-kicker">Answers you can check</p><h3>A research agent that shows its sources</h3><p>Ask a question and watch it work: where it looked, what it declined to trust, and the source behind every line of the answer.</p><a href="/ask">Try the research agent <span aria-hidden="true">›</span></a></div>
-          </article>
-          <article class="studio-work__item" data-reveal style="--d:120ms">
-            <div class="studio-work__visual studio-work__visual--platform" aria-hidden="true"><span></span><span></span><span></span><i></i></div>
-            <div><p class="studio-kicker">Platform engineering</p><h3>ServiceNow systems people adopt</h3><p>Code-first applications, workflows, and integrations, written up in plain language for the builders who live with them.</p><a href="/learn">Read the library <span aria-hidden="true">›</span></a></div>
-          </article>
+        <p class="studio-kicker">Illustrative example</p>
+        <h2 id="flow-title" data-reveal>See how a request could move through a workflow.</h2>
+        <p class="flow__caption" data-reveal>
+          An illustrative example: a request arrives, the relevant information is
+          brought together, and a person reviews the next step.
+        </p>
+
+        <div class="flow__panel" data-flow>
+          <ol class="flow__steps">
+            <li class="flow__step" data-flow-step="0">
+              <p class="flow__num">Step 1</p>
+              <h3>Request received</h3>
+              <p>Someone asks for something in a form built around their task.</p>
+            </li>
+            <li class="flow__step" data-flow-step="1">
+              <p class="flow__num">Step 2</p>
+              <h3>Information gathered</h3>
+              <p>The details needed to decide are pulled together from the systems that hold them.</p>
+            </li>
+            <li class="flow__step" data-flow-step="2">
+              <p class="flow__num">Step 3</p>
+              <h3>Ready for review</h3>
+              <p>A person sees the request, the context, and the next step they can approve or change.</p>
+            </li>
+          </ol>
+
+          <div class="flow__controls">
+            <button class="btn" type="button" data-flow-play>Play example</button>
+            <button class="btn btn-quiet" type="button" data-flow-prev hidden>Previous step</button>
+            <button class="btn btn-quiet" type="button" data-flow-next hidden>Next step</button>
+          </div>
+          <p class="flow__status" data-flow-status role="status" aria-live="polite"></p>
         </div>
       </div>
     </section>
 
-    <section class="studio-depth" id="company" aria-labelledby="depth-title">
+    <!-- ---- Examples ----------------------------------------------------
+         One example, because one is what exists. The status label says what
+         it is, and the copy matches the mode the deployment actually runs. -->
+    <section class="examples" id="examples" aria-labelledby="examples-title">
+      <span class="anchor-alias" id="work" aria-hidden="true"></span>
       <div class="container">
-        <p class="studio-kicker">Where we go deep</p>
-        <h2 id="depth-title" data-reveal>Wide range, a few sharp edges.</h2>
-        <div class="studio-depth__grid">
-          <article data-reveal><h3>AI systems</h3><p>Agents, retrieval, evaluation, and guardrails, designed around how people work rather than around the demo.</p></article>
-          <article data-reveal style="--d:120ms"><h3>Enterprise platforms</h3><p>ServiceNow and the operations around it, built with software discipline and a plan for getting people on board.</p></article>
+        <div class="section-head" data-reveal>
+          <h2 id="examples-title">Explore an example.</h2>
+          <p>
+            Something you can open and try, rather than a description of it.
+            Each example says what it is.
+          </p>
+        </div>
+
+        <article class="example" data-reveal>
+          <p class="example__status">Internal demo</p>
+          <h3>ServiceNow reference search</h3>
+          <p>
+            Find documentation related to a ServiceNow question and open the
+            sources to read more.
+          </p>
+          <p class="example__action"><a href="/ask">Search documentation <span aria-hidden="true">›</span></a></p>
+          <details class="disclosure">
+            <summary>What this example does</summary>
+            <div class="disclosure__body">
+              <p>
+                It searches the public ServiceNow product documentation, picks the
+                pages that match the words in your question, and shows each one
+                with an excerpt and a link. Results are ranked by keyword
+                matching, so a listed page matched the question — reading the
+                source is still how you confirm the answer.
+              </p>
+              <p>
+                It only covers ServiceNow. Written answers appear only where an
+                answer model is enabled on the deployment, and the tool says
+                which of the two you are looking at before you ask.
+              </p>
+            </div>
+          </details>
+        </article>
+      </div>
+    </section>
+
+    <!-- ---- How we work -------------------------------------------------- -->
+    <section class="process" id="how-we-work" aria-labelledby="process-title">
+      <span class="anchor-alias" id="expertise" aria-hidden="true"></span>
+      <div class="container">
+        <h2 id="process-title" data-reveal>Start with the work people need to do.</h2>
+        <div class="process__list">
+          <article class="process__item" data-reveal>
+            <span>01</span>
+            <h3>Understand the task</h3>
+            <p>We begin with the people using the process: what they need to do, where they get stuck, and what a useful result would look like.</p>
+          </article>
+          <article class="process__item" data-reveal style="--d:30ms">
+            <span>02</span>
+            <h3>Build and review</h3>
+            <p>We turn that understanding into a working version and review it with you, so feedback can shape the next step.</p>
+          </article>
+          <article class="process__item" data-reveal style="--d:60ms">
+            <span>03</span>
+            <h3>Prepare for everyday use</h3>
+            <p>We work through the details needed for day-to-day use, including testing, documentation, and handover.</p>
+          </article>
         </div>
       </div>
     </section>
 
-    <section class="studio-library" id="library" aria-labelledby="library-title">
-      <div class="container studio-library__grid">
-        <div data-reveal><p class="studio-kicker">What we have learned</p><h2 id="library-title">We write down what we learn.</h2></div>
-        <div><p>Every essay and interview from the old library is here, easier to find and calmer to read.</p><div class="studio-library__counts"><a href="/learn"><strong>52</strong><span>Essays and guides</span></a><a href="/interviews"><strong>57</strong><span>Interview questions, answered</span></a></div></div>
+    <!-- ---- Resources ---------------------------------------------------- -->
+    <section class="resources" id="resources" aria-labelledby="resources-title">
+      <div class="container">
+        <div class="section-head" data-reveal>
+          <h2 id="resources-title">Practical guides for people building on ServiceNow.</h2>
+          <p>
+            Explore guides on ServiceNow, AI, and application development, plus
+            questions to help you prepare for technical interviews.
+          </p>
+        </div>
+        <ul class="resources__list" data-reveal>
+          <li>
+            <a href="/article/app-engine-beginner-guide">ServiceNow App Engine Explained: Build Enterprise Apps Without Reinventing the Platform</a>
+            <span>ServiceNow</span>
+          </li>
+          <li>
+            <a href="/article/tech-integration-architecture">From Kubernetes CronJobs to ServiceNow Flows: Mastering Error Handling in Distributed Integrations</a>
+            <span>Architecture</span>
+          </li>
+          <li>
+            <a href="/article/ai-agents-servicenow-beginner">AI Agents in ServiceNow: What They Are, How They Work, and When to Use Them</a>
+            <span>AI</span>
+          </li>
+        </ul>
+        <p class="section-action">
+          <a href="/learn">Browse the guides <span aria-hidden="true">›</span></a>
+          <a href="/interviews">Practice interview questions <span aria-hidden="true">›</span></a>
+        </p>
       </div>
     </section>
 
-    <section class="studio-contact" id="contact" aria-labelledby="contact-title">
-      <div class="container studio-contact__grid">
-        <div data-reveal><p class="studio-kicker">Get in touch</p><h2 id="contact-title">Tell us what you want to build.</h2><p>Describe what you are trying to change. A person reads every message and replies. There is no sales sequence.</p></div>
+    <!-- ---- Contact ------------------------------------------------------ -->
+    <section class="contact" id="contact" aria-labelledby="contact-title">
+      <div class="container contact__grid">
+        <div data-reveal>
+          <h2 id="contact-title">What would you like to make easier?</h2>
+          <p>
+            Tell us what your team is trying to do and what is getting in the way.
+            You don't need a finished brief to start a conversation.
+          </p>
+          <p class="contact__note">
+            Your message is saved to our inbox for the team to read. We will not
+            promise a response time we cannot keep.
+          </p>
+        </div>
+
         <form class="contact-form" data-lead-form novalidate>
-          <div class="form-grid"><div class="field"><label for="lead-name">Your name</label><input id="lead-name" name="name" type="text" autocomplete="name" placeholder="Priya Sharma" /></div><div class="field"><label for="lead-email">Email</label><input id="lead-email" name="email" type="email" autocomplete="email" placeholder="name@example.com" required /></div></div>
-          <div class="field"><label for="lead-org">Where you work <span class="field-hint">(optional)</span></label><input id="lead-org" name="organisation" type="text" autocomplete="organization" /></div>
-          <div class="field"><label for="lead-intent">What would you like to build?</label><select id="lead-intent" name="intent"><option value="shape">Work out what to build</option><option value="build">Build something new</option><option value="ai">Design an AI system</option><option value="enterprise">Improve a platform we already have</option><option value="servicenow">Build on ServiceNow</option><option value="other">Something else</option></select></div>
-          <div class="field"><label for="lead-message">Tell us a little about it</label><textarea id="lead-message" name="message" placeholder="What are you trying to ship, and what is in the way?"></textarea></div>
-          <div class="field hp" aria-hidden="true"><label for="lead-company-url">Company URL</label><input id="lead-company-url" name="company_url" type="text" tabindex="-1" autocomplete="off" /></div>
-          <div><button class="btn btn-primary btn-lg" type="submit">Send message</button></div><p class="small text-mute" data-lead-status role="status"></p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="lead-name">Your name</label>
+              <input id="lead-name" name="name" type="text" autocomplete="name" />
+            </div>
+            <div class="field">
+              <label for="lead-email">Email</label>
+              <input id="lead-email" name="email" type="email" autocomplete="email" required aria-describedby="lead-email-error" />
+              <p class="field-error" id="lead-email-error" data-error-for="email"></p>
+            </div>
+          </div>
+          <div class="field">
+            <label for="lead-org">Organization <span class="field-hint">(optional)</span></label>
+            <input id="lead-org" name="organisation" type="text" autocomplete="organization" />
+          </div>
+          <div class="field">
+            <label for="lead-intent">What do you need help with?</label>
+            <select id="lead-intent" name="intent">
+              <option value="servicenow_application">ServiceNow application</option>
+              <option value="system_integration">System integration</option>
+              <option value="ai_tool">AI tool</option>
+              <option value="not_sure">Not sure yet</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="lead-message">Tell us about it</label>
+            <textarea id="lead-message" name="message" placeholder="What are people trying to do today, and what would you like to change?" aria-describedby="lead-message-error"></textarea>
+            <p class="field-error" id="lead-message-error" data-error-for="message"></p>
+          </div>
+          <div class="field hp" aria-hidden="true">
+            <label for="lead-company-url">Company URL</label>
+            <input id="lead-company-url" name="company_url" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <div class="contact-form__submit">
+            <button class="btn btn-primary btn-lg" type="submit" data-lead-submit>Send your message</button>
+            <button class="btn" type="button" data-lead-retry hidden>Try sending again</button>
+          </div>
+          <p class="lead-status" data-lead-status role="status" aria-live="polite"></p>
         </form>
+      </div>
+    </section>
+
+    <!-- ---- About -------------------------------------------------------- -->
+    <section class="about" id="about" aria-labelledby="about-title">
+      <span class="anchor-alias" id="company" aria-hidden="true"></span>
+      <div class="container about__grid" data-reveal>
+        <h2 id="about-title">About Summaverick</h2>
+        <p>
+          Summaverick builds ServiceNow applications, integrations, and AI tools.
+          Our focus is the work people need to get done and the software that
+          supports it.
+        </p>
       </div>
     </section>
   </main>
 
-  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark"><img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" /><span>Summaverick</span></div><p>A small product team building software that is good to use.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="#expertise">How we work</a></li><li><a href="#work">Work</a></li><li><a href="/learn">Writing</a></li></ul></div><div><p class="footer-head">Try</p><ul><li><a href="/ask">Research agent</a></li><li><a href="/learn">Learning library</a></li><li><a href="/interviews">Interview questions</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="#contact">Contact</a></li><li><a href="/signin">Sign in</a></li></ul><p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p></div></div></footer>
+  <footer class="footer">
+    <div class="container footer-cols">
+      <div class="footer-brand">
+        <div class="footer-brand__mark">
+          <img src="/assets/img/summaverick-uncontained-sum.svg" alt="" width="38" height="38" aria-hidden="true" />
+          <span>Summaverick</span>
+        </div>
+        <p>ServiceNow applications, integrations, and AI tools for everyday work.</p>
+      </div>
+      <div>
+        <p class="footer-head">Explore</p>
+        <ul>
+          <li><a href="#build">What we build</a></li>
+          <li><a href="#examples">Examples</a></li>
+          <li><a href="#how-we-work">How we work</a></li>
+          <li><a href="#about">About</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-head">Resources</p>
+        <ul>
+          <li><a href="/learn">Guides</a></li>
+          <li><a href="/interviews">Interview questions</a></li>
+          <li><a href="/ask">ServiceNow reference search</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-head">Company</p>
+        <ul>
+          <li><a href="#contact">Discuss your project</a></li>
+          <li><a href="/signin">Sign in</a></li>
+        </ul>
+        <p class="small text-mute footer-copy">© <span data-year></span> Summaverick</p>
+      </div>
+    </div>
+  </footer>
 
   <script type="module" src="/assets/js/boot.js"></script>
 </body>

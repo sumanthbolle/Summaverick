@@ -48,17 +48,23 @@ function initTheme() {
   paint();
 }
 
-/* One quiet rise as marked elements enter the viewport, played once. The
- * CSS keeps everything visible when motion is reduced or this never runs. */
+/* One quiet rise as marked elements enter the viewport, played once.
+ *
+ * The pre-animation state lives behind [data-motion="on"], set here, so the
+ * page is complete when this file never runs, when motion is reduced, and when
+ * the visitor turns reduced motion on mid-visit — that last case also clears
+ * the attribute, which stops anything still in flight. */
 function initReveals() {
-  if (
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
-    !("IntersectionObserver" in window)
-  ) {
-    return;
-  }
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  reduced.addEventListener?.("change", () => {
+    if (reduced.matches) document.documentElement.removeAttribute("data-motion");
+  });
+
+  if (reduced.matches || !("IntersectionObserver" in window)) return;
+
   const targets = $$("[data-reveal]");
   if (!targets.length) return;
+  document.documentElement.setAttribute("data-motion", "on");
   const show = (t) => {
     t.classList.add("is-in");
     io.unobserve(t);
@@ -85,6 +91,19 @@ function initReveals() {
   }, 1200);
 }
 
+/* The hero illustration settles into place once the page is ready. The copy,
+ * the specialties and the buttons never wait on it. */
+function initHeroPanel() {
+  const panel = $("[data-hero-panel]");
+  if (!panel) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    panel.classList.add("is-ready");
+    return;
+  }
+  document.documentElement.setAttribute("data-motion", "on");
+  requestAnimationFrame(() => panel.classList.add("is-ready"));
+}
+
 export function initChrome() {
   const nav = $("#nav");
   const onScroll = () => {
@@ -96,6 +115,7 @@ export function initChrome() {
 
   initTheme();
   initReveals();
+  initHeroPanel();
 
   const yr = $("[data-year]");
   if (yr) yr.textContent = String(new Date().getFullYear());
