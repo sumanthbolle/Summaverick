@@ -1680,3 +1680,28 @@ body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary:hover
   0%   { transform: translateY(-6px); }
   100% { transform: translateY(6px); }
 }
+
+/* ---- Brushed-metal wordmark -------------------------------------------
+   "Summaverick" in the nav and footer takes the same metal paint as the
+   headings, context-aware: dark metal on the solid light bar, light metal on
+   the footer ink and on the homepage's transparent-over-hero bar. A slow
+   shimmer gives it life; reduced motion stills it. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .nav-brand span,
+  .footer-brand__mark span {
+    background-image: var(--grad-head);
+    background-size: 220% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .footer-brand__mark span { background-image: var(--grad-head-ink); }
+  body[data-home] .nav:not([data-scrolled="true"]) .nav-brand span {
+    background-image: var(--grad-head-ink);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .nav-brand span,
+    .footer-brand__mark span { animation: sv-shimmer 9s linear infinite; }
+  }
+}
