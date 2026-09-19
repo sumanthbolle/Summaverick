@@ -37,7 +37,7 @@
   <link rel="stylesheet" href="/assets/css/type.css" />
   <link rel="stylesheet" href="/assets/css/site.css" />
 </head>
-<body>
+<body data-home>
   <a class="skip" href="#main">Skip to content</a>
 
   <header class="nav" id="nav">
@@ -84,7 +84,7 @@
       <div class="container hero__grid">
         <div class="hero__copy">
           <p class="studio-kicker">Personal assistants and enterprise agents</p>
-          <h1 id="hero-title">AI agents for everyday life and work.</h1>
+          <h1 id="hero-title"><span class="text-spectrum">AI agents</span> for everyday life and work.</h1>
           <p class="studio-lead">
             We design and develop agents that help people get things
             done—from personal assistants on mobile to enterprise workflows.
@@ -293,7 +293,7 @@
     <section class="offers" id="build" aria-labelledby="offers-title">
       <div class="container">
         <div class="section-head" data-reveal>
-          <h2 id="offers-title">Built around the person using it.</h2>
+          <h2 id="offers-title">Built around the <span class="text-spectrum">person</span> using it.</h2>
           <p>
             Someone following up on a refund needs different help from a team
             handling service requests. We design the agent, its interface, and
@@ -490,15 +490,18 @@
     <section class="about" id="about" aria-labelledby="about-title">
       <span class="anchor-alias" id="company" aria-hidden="true"></span>
       <div class="container about__grid">
-        <figure class="about__brand" data-reveal>
-          <picture>
-            <source srcset="/assets/img/summaverick-group-logo.webp" type="image/webp" />
-            <img src="/assets/img/summaverick-group-logo.jpg" width="520" height="520" loading="lazy" decoding="async"
-                 alt="The Summaverick Group logo: a folded metallic S above the words Summaverick Group." />
-          </picture>
+        <figure class="about__brand showcase-3d" data-reveal data-tilt>
+          <span class="showcase-3d__glow" aria-hidden="true"></span>
+          <span class="showcase-3d__stage" data-tilt-stage>
+            <picture>
+              <source srcset="/assets/img/summaverick-group-logo.webp" type="image/webp" />
+              <img src="/assets/img/summaverick-group-logo.jpg" width="520" height="520" loading="lazy" decoding="async"
+                   alt="The Summaverick Group logo: a folded metallic S above the words Summaverick Group." />
+            </picture>
+          </span>
         </figure>
         <div class="about__copy">
-          <h2 id="about-title" data-reveal>Why we build these products.</h2>
+          <h2 id="about-title" data-reveal>Why we build these <span class="text-spectrum">products</span>.</h2>
           <p data-reveal>
             We started with an interest in the everyday tasks people struggle to
             get through. Our early hackathon concept explored an assistant for

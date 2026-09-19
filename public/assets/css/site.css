@@ -1415,3 +1415,230 @@ body[data-nav-open] { overflow: hidden; }
     transition-duration: 1ms !important;
   }
 }
+
+/* ========================================================================
+   Cinematic layer (Apple-style)
+   Brushed-metal headline paints site-wide, a true-black cinematic homepage
+   hero lit by a neutral spotlight, and a pointer/scroll-reactive 3D brand
+   showcase. Restraint over colour — the Apple read.
+   Everything degrades: with scripting off the page is complete and still, and
+   under prefers-reduced-motion nothing animates.
+   ===================================================================== */
+
+/* ---- Gradient headline text (all H1/H2) --------------------------------
+   background-clip:text only where supported; elsewhere headings keep their
+   solid ink. Large text, so the metal ramp clears the contrast bar. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  h1, .h1, h2 {
+    background-image: var(--grad-head);
+    background-size: 100% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* Headings on an ink band read with the light-metal paint in both themes. */
+  .about h2 { background-image: var(--grad-head-ink); }
+
+  /* The homepage hero headline: the vivid iridescent shimmer. */
+  .hero h1 {
+    background-image: var(--grad-hero);
+    background-size: 220% auto;
+    background-position: 0% center;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero h1 { animation: sv-shimmer 7s linear infinite; }
+  }
+}
+@keyframes sv-shimmer { to { background-position: 220% center; } }
+
+/* ---- Spectrum accent ---------------------------------------------------
+   Multicolour gradient text for a single key phrase — the "Apple
+   Intelligence" move. Add class="text-spectrum" to any word or span; it wins
+   over the metal heading paint and slowly drifts through the spectrum. Reserve
+   it for one highlight at a time, and only on large text (it is decorative). */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-spectrum {
+    background-image: var(--grad-spectrum);
+    background-size: 220% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* The hero and About sit on ink in both themes, so their accent always
+     takes the bright tuning regardless of the page ramp. */
+  .hero .text-spectrum,
+  .about .text-spectrum { background-image: var(--grad-spectrum-bright); }
+  @media (prefers-reduced-motion: no-preference) {
+    .text-spectrum { animation: sv-shimmer 6s linear infinite; }
+  }
+}
+
+/* ---- Cinematic homepage hero ------------------------------------------- */
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--cine-ground);
+  color: var(--c-on-ink-dim);
+}
+/* A neutral spotlight, not coloured light: a soft top-lit glow and a gentle
+   pool behind the product card — the restraint that reads as Apple. */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: -30% -15% -15% -15%;
+  z-index: -1;
+  background:
+    radial-gradient(55% 45% at 50% 0%, var(--cine-spot), transparent 68%),
+    radial-gradient(40% 42% at 78% 30%, var(--cine-spot-soft), transparent 70%);
+  filter: blur(20px);
+  opacity: 0.9;
+}
+/* A faint vignette settles the edges into black. */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(120% 95% at 50% 30%, transparent 45%, rgba(0, 0, 0, 0.6) 100%);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero::before { animation: sv-glow 12s ease-in-out infinite alternate; }
+}
+@keyframes sv-glow {
+  0%   { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Hero copy reads light on the cinematic ground. */
+.hero .studio-kicker { color: var(--c-on-ink-mute); }
+.hero .studio-lead   { color: var(--c-on-ink-dim); }
+
+/* The hero sits on ink in both themes, so its controls take the ink treatment
+   rather than the page ramp: a bright pill and a light quiet link. */
+.hero .btn-primary {
+  --btn-bg: var(--c-on-ink);
+  --btn-fg: var(--c-ink);
+  border-color: transparent;
+}
+.hero .btn-primary:hover { --btn-bg: #ffffff; color: var(--c-ink); }
+.hero .btn-quiet { color: var(--c-on-ink-dim); }
+.hero .btn-quiet:hover { color: var(--c-on-ink); }
+
+/* The illustration card becomes glass on the dark hero, in both themes. */
+.hero .hero-panel {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  color: var(--c-on-ink-dim);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  backdrop-filter: blur(10px) saturate(130%);
+}
+.hero .hero-panel__label {
+  color: var(--c-on-ink-dim);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.hero .hero-panel__ui {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.hero .hero-panel__title { color: var(--c-on-ink); }
+.hero .hero-panel__rows > div { border-color: rgba(255, 255, 255, 0.1); }
+.hero .hero-panel__rows dt,
+.hero .hero-panel__rows dd,
+.hero .hero-panel__foot,
+.hero .hero-panel__note { color: var(--c-on-ink-dim); }
+
+/* ---- 3D brand showcase (About section) ---------------------------------
+   The metallic mark sits in a perspective scene and tilts to the pointer and
+   the scroll position. JS sets --rx/--ry (pointer) and --sy (scroll baseline);
+   with no JS or reduced motion it rests flat. */
+.showcase-3d { position: relative; perspective: 1200px; }
+.showcase-3d__glow {
+  position: absolute;
+  inset: 4%;
+  z-index: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.14), transparent 72%);
+  filter: blur(48px);
+  opacity: 0.7;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .showcase-3d__glow { animation: sv-pulse 7s ease-in-out infinite alternate; }
+}
+@keyframes sv-pulse { to { opacity: 0.85; transform: scale(1.08); } }
+.showcase-3d__stage {
+  display: block;
+  position: relative;
+  z-index: 1;
+  transform: rotateX(var(--rx, 0deg)) rotateY(calc(var(--ry, 0deg) + var(--sy, 0deg)));
+  transform-style: preserve-3d;
+  transition: transform 220ms var(--ease-out);
+  will-change: transform;
+}
+.about__brand.showcase-3d img {
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.6);
+}
+
+/* ---- Transparent nav over the cinematic hero (homepage) ----------------
+   At the top of the homepage the bar is glass over the black hero with light
+   controls; once scrolled past the hero it becomes the normal solid bar. The
+   swap rides the existing data-scrolled flag and the nav's own transitions. */
+body[data-home] .nav {
+  transition: background var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
+}
+body[data-home] .nav:not([data-scrolled="true"]) {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom-color: transparent;
+}
+body[data-home] .nav:not([data-scrolled="true"]) .nav-brand,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-brand:hover { color: #f4f4f7; }
+body[data-home] .nav:not([data-scrolled="true"]) .nav-links a { color: rgba(244, 244, 247, 0.72); }
+body[data-home] .nav:not([data-scrolled="true"]) .nav-links a:hover,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-links a[aria-current="page"] { color: #ffffff; }
+body[data-home] .nav:not([data-scrolled="true"]) .theme-toggle,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle {
+  color: #f4f4f7;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+}
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars::before,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars::after { background: #f4f4f7; }
+body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary {
+  --btn-bg: rgba(255, 255, 255, 0.12);
+  --btn-fg: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary:hover {
+  --btn-bg: rgba(255, 255, 255, 0.2);
+}
+
+/* ---- A more dramatic first screen ------------------------------------- */
+.hero {
+  padding-top: clamp(7rem, 13vw, 11rem);
+  padding-bottom: clamp(3.5rem, 8vw, 7rem);
+}
+.hero h1 {
+  font-size: clamp(2.5rem, 5.2vw, 4.9rem);
+  line-height: 1.03;
+  letter-spacing: -0.035em;
+}
+
+/* ---- Idle float on the 3D brand mark ---------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .about__brand.showcase-3d img { animation: sv-float 7s ease-in-out infinite alternate; }
+}
+@keyframes sv-float {
+  0%   { transform: translateY(-6px); }
+  100% { transform: translateY(6px); }
+}

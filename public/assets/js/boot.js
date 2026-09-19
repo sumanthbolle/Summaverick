@@ -6,11 +6,13 @@
 import { initChrome } from "./chrome.js";
 import { initLeadForm } from "./lead-form.js";
 import { initAgentStage } from "./agent-stage.js";
+import { initMotion } from "./motion.js";
 
 function boot() {
   initChrome();
   initAgentStage();
   initLeadForm();
+  initMotion();
 }
 
 if (document.readyState === "loading") {

@@ -119,6 +119,38 @@
 
   --focus-ring: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-text);
 
+  /* ---- Cinematic layer (Apple-style) ----------------------------------
+     Restraint over colour: deep true-black grounds, a neutral spotlight,
+     brushed-metal type. --grad-head reads on the page ground (dark metal on
+     the light ramp); --grad-head-ink always reads on an ink band; --grad-hero
+     is the titanium sheen that sweeps across the homepage headline. */
+  --grad-head: linear-gradient(180deg, #2a2b31 0%, #3f4048 48%, #5a5c65 100%);
+  --grad-head-ink: linear-gradient(180deg, #ffffff 0%, #dfe1e6 52%, #a9adb6 100%);
+  --grad-hero: linear-gradient(
+    100deg,
+    #9a9ea6 0%, #ffffff 24%, #e2e4e9 44%,
+    #ffffff 58%, #9a9ea6 82%, #ffffff 100%
+  );
+  /* The one place colour is allowed: an "Apple Intelligence"-style spectrum,
+     for a single key phrase — never a whole headline. Two tunings: -bright for
+     dark grounds, -deep so it still clears contrast on the light ramp.
+     --grad-spectrum resolves to whichever suits the current theme. */
+  --grad-spectrum-bright: linear-gradient(
+    100deg,
+    #5a9bff 0%, #a06bff 20%, #ff6bcb 40%,
+    #ff9a5a 58%, #ffd36b 72%, #5a9bff 100%
+  );
+  --grad-spectrum-deep: linear-gradient(
+    100deg,
+    #2f6bff 0%, #7a3cff 22%, #d21f8a 44%,
+    #e0631f 64%, #b0830a 82%, #2f6bff 100%
+  );
+  --grad-spectrum: var(--grad-spectrum-deep);
+  /* A single neutral spotlight, not coloured blobs. */
+  --cine-spot: rgba(255, 255, 255, 0.12);
+  --cine-spot-soft: rgba(255, 255, 255, 0.06);
+  --cine-ground: radial-gradient(125% 100% at 50% -15%, #1b1b1e 0%, #0a0a0b 46%, #000000 100%);
+
   color-scheme: light;
 }
 
@@ -149,6 +181,10 @@
 
     --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.55);
 
+    /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
+    --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
+    --grad-spectrum: var(--grad-spectrum-bright);
+
     color-scheme: dark;
   }
 }
@@ -178,6 +214,10 @@
   --c-bad-soft:    rgba(255, 96, 105, 0.16);
 
   --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.55);
+
+  /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
+  --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
+  --grad-spectrum: var(--grad-spectrum-bright);
 
   color-scheme: dark;
 }
