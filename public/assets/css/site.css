@@ -1466,13 +1466,51 @@ body[data-nav-open] { overflow: hidden; }
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
+  /* Colour variants — one accent hue per section. Use with .text-spectrum. */
+  .text-spectrum--cyan    { background-image: var(--grad-cyan); }
+  .text-spectrum--warm    { background-image: var(--grad-warm); }
+  .text-spectrum--emerald { background-image: var(--grad-emerald); }
+
   /* The hero and About sit on ink in both themes, so their accent always
      takes the bright tuning regardless of the page ramp. */
   .hero .text-spectrum,
   .about .text-spectrum { background-image: var(--grad-spectrum-bright); }
+  .hero .text-spectrum--cyan,    .about .text-spectrum--cyan    { background-image: var(--grad-cyan-bright); }
+  .hero .text-spectrum--warm,    .about .text-spectrum--warm    { background-image: var(--grad-warm-bright); }
+  .hero .text-spectrum--emerald, .about .text-spectrum--emerald { background-image: var(--grad-emerald-bright); }
+
   @media (prefers-reduced-motion: no-preference) {
+    /* Default animation theme: a slow specular sweep. */
     .text-spectrum { animation: sv-shimmer 6s linear infinite; }
+    /* "Flow" theme: the sweep plus a continuous hue cycle, for the liveliest
+       accent (the AI shimmer). Add .text-spectrum--flow alongside .text-spectrum. */
+    .text-spectrum--flow { animation: sv-shimmer 6s linear infinite, sv-hue 11s linear infinite; }
   }
+}
+@keyframes sv-hue { to { filter: hue-rotate(360deg); } }
+
+/* ---- Shine sweep on the primary call-to-action -------------------------
+   A light streak crosses the button on hover — a small premium flourish.
+   Invisible where the pill is already white (e.g. the hero), which is fine. */
+.btn-primary { position: relative; overflow: hidden; isolation: isolate; }
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -60%;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn-primary:hover::after { animation: sv-shine 0.85s var(--ease-out); }
+}
+@keyframes sv-shine {
+  0%   { left: -60%; opacity: 0; }
+  15%  { opacity: 1; }
+  100% { left: 130%; opacity: 0; }
 }
 
 /* ---- Cinematic homepage hero ------------------------------------------- */

@@ -146,6 +146,18 @@
     #e0631f 64%, #b0830a 82%, #2f6bff 100%
   );
   --grad-spectrum: var(--grad-spectrum-deep);
+
+  /* Colour variants — each a -bright (dark grounds) and -deep (light ramp)
+     tuning, resolving per theme. One accent hue per section. */
+  --grad-cyan-bright: linear-gradient(100deg, #6fe0ff 0%, #4f9bff 34%, #8a6bff 68%, #6fe0ff 100%);
+  --grad-cyan-deep:   linear-gradient(100deg, #0a8fb8 0%, #1f6bd2 34%, #6b3cff 68%, #0a8fb8 100%);
+  --grad-cyan: var(--grad-cyan-deep);
+  --grad-warm-bright: linear-gradient(100deg, #ffd36b 0%, #ff9a5a 34%, #ff6bcb 68%, #ffd36b 100%);
+  --grad-warm-deep:   linear-gradient(100deg, #b8830a 0%, #e0631f 34%, #d21f8a 68%, #b8830a 100%);
+  --grad-warm: var(--grad-warm-deep);
+  --grad-emerald-bright: linear-gradient(100deg, #5affc0 0%, #34d1b0 34%, #3aa0ff 68%, #5affc0 100%);
+  --grad-emerald-deep:   linear-gradient(100deg, #0a9d66 0%, #0e8f8a 34%, #1f6bd2 68%, #0a9d66 100%);
+  --grad-emerald: var(--grad-emerald-deep);
   /* A single neutral spotlight, not coloured blobs. */
   --cine-spot: rgba(255, 255, 255, 0.12);
   --cine-spot-soft: rgba(255, 255, 255, 0.06);
@@ -184,6 +196,9 @@
     /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
     --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
     --grad-spectrum: var(--grad-spectrum-bright);
+    --grad-cyan: var(--grad-cyan-bright);
+    --grad-warm: var(--grad-warm-bright);
+    --grad-emerald: var(--grad-emerald-bright);
 
     color-scheme: dark;
   }
@@ -218,6 +233,9 @@
   /* Cinematic layer — heading gradient flips to light metal on the dark ramp. */
   --grad-head: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
   --grad-spectrum: var(--grad-spectrum-bright);
+  --grad-cyan: var(--grad-cyan-bright);
+  --grad-warm: var(--grad-warm-bright);
+  --grad-emerald: var(--grad-emerald-bright);
 
   color-scheme: dark;
 }
