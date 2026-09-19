@@ -1582,3 +1582,63 @@ body[data-nav-open] { overflow: hidden; }
 .about__brand.showcase-3d img {
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.6);
 }
+
+/* ---- Transparent nav over the cinematic hero (homepage) ----------------
+   At the top of the homepage the bar is glass over the black hero with light
+   controls; once scrolled past the hero it becomes the normal solid bar. The
+   swap rides the existing data-scrolled flag and the nav's own transitions. */
+body[data-home] .nav {
+  transition: background var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
+}
+body[data-home] .nav:not([data-scrolled="true"]) {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom-color: transparent;
+}
+body[data-home] .nav:not([data-scrolled="true"]) .nav-brand,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-brand:hover { color: #f4f4f7; }
+body[data-home] .nav:not([data-scrolled="true"]) .nav-links a { color: rgba(244, 244, 247, 0.72); }
+body[data-home] .nav:not([data-scrolled="true"]) .nav-links a:hover,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-links a[aria-current="page"] { color: #ffffff; }
+body[data-home] .nav:not([data-scrolled="true"]) .theme-toggle,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle {
+  color: #f4f4f7;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+}
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars::before,
+body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars::after { background: #f4f4f7; }
+body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary {
+  --btn-bg: rgba(255, 255, 255, 0.12);
+  --btn-fg: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary:hover {
+  --btn-bg: rgba(255, 255, 255, 0.2);
+}
+
+/* ---- A more dramatic first screen ------------------------------------- */
+.hero {
+  padding-top: clamp(7rem, 13vw, 11rem);
+  padding-bottom: clamp(3.5rem, 8vw, 7rem);
+}
+.hero h1 {
+  font-size: clamp(2.5rem, 5.2vw, 4.9rem);
+  line-height: 1.03;
+  letter-spacing: -0.035em;
+}
+
+/* ---- Idle float on the 3D brand mark ---------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .about__brand.showcase-3d img { animation: sv-float 7s ease-in-out infinite alternate; }
+}
+@keyframes sv-float {
+  0%   { transform: translateY(-6px); }
+  100% { transform: translateY(6px); }
+}
