@@ -7,12 +7,14 @@ import { initChrome } from "./chrome.js";
 import { initLeadForm } from "./lead-form.js";
 import { initAgentStage } from "./agent-stage.js";
 import { initMotion } from "./motion.js";
+import { initGreeting } from "./greeting.js";
 
 function boot() {
   initChrome();
   initAgentStage();
   initLeadForm();
   initMotion();
+  initGreeting();
 }
 
 if (document.readyState === "loading") {
