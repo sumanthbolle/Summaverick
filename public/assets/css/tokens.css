@@ -126,10 +126,12 @@
      is the titanium sheen that sweeps across the homepage headline. */
   --grad-head: linear-gradient(180deg, #2a2b31 0%, #3f4048 48%, #5a5c65 100%);
   --grad-head-ink: linear-gradient(180deg, #ffffff 0%, #dfe1e6 52%, #a9adb6 100%);
+  /* The titanium sheen that sweeps the hero headline — dark metal on the light
+     ramp, light metal on the dark ramp (flipped in the dark blocks below). */
   --grad-hero: linear-gradient(
     100deg,
-    #9a9ea6 0%, #ffffff 24%, #e2e4e9 44%,
-    #ffffff 58%, #9a9ea6 82%, #ffffff 100%
+    #5a5c65 0%, #1d1d1f 24%, #3a3b42 44%,
+    #1d1d1f 58%, #5a5c65 82%, #1d1d1f 100%
   );
   /* The one place colour is allowed: an "Apple Intelligence"-style spectrum,
      for a single key phrase — never a whole headline. Two tunings: -bright for
@@ -158,10 +160,12 @@
   --grad-emerald-bright: linear-gradient(100deg, #5affc0 0%, #34d1b0 34%, #3aa0ff 68%, #5affc0 100%);
   --grad-emerald-deep:   linear-gradient(100deg, #0a9d66 0%, #0e8f8a 34%, #1f6bd2 68%, #0a9d66 100%);
   --grad-emerald: var(--grad-emerald-deep);
-  /* A single neutral spotlight, not coloured blobs. */
-  --cine-spot: rgba(255, 255, 255, 0.12);
-  --cine-spot-soft: rgba(255, 255, 255, 0.06);
-  --cine-ground: radial-gradient(125% 100% at 50% -15%, #1b1b1e 0%, #0a0a0b 46%, #000000 100%);
+  /* Hero ground + spotlight, per theme. Light is apple-white with a whisper of
+     cool/warm bloom; the dark blocks below make it the true-black cinematic. */
+  --cine-ground: radial-gradient(125% 100% at 50% -10%, #ffffff 0%, #f6f7f9 55%, #eef0f4 100%);
+  --cine-spot: rgba(90, 120, 255, 0.10);
+  --cine-spot-soft: rgba(255, 150, 90, 0.07);
+  --cine-vignette: transparent;
 
   color-scheme: light;
 }
@@ -199,6 +203,13 @@
     --grad-cyan: var(--grad-cyan-bright);
     --grad-warm: var(--grad-warm-bright);
     --grad-emerald: var(--grad-emerald-bright);
+    /* Cinematic hero flips to the true-black ground, light titanium sheen,
+       neutral spotlight and a dark vignette. */
+    --grad-hero: linear-gradient(100deg, #9a9ea6 0%, #ffffff 24%, #e2e4e9 44%, #ffffff 58%, #9a9ea6 82%, #ffffff 100%);
+    --cine-ground: radial-gradient(125% 100% at 50% -15%, #1b1b1e 0%, #0a0a0b 46%, #000000 100%);
+    --cine-spot: rgba(255, 255, 255, 0.12);
+    --cine-spot-soft: rgba(255, 255, 255, 0.06);
+    --cine-vignette: rgba(0, 0, 0, 0.6);
 
     color-scheme: dark;
   }
@@ -236,6 +247,11 @@
   --grad-cyan: var(--grad-cyan-bright);
   --grad-warm: var(--grad-warm-bright);
   --grad-emerald: var(--grad-emerald-bright);
+  --grad-hero: linear-gradient(100deg, #9a9ea6 0%, #ffffff 24%, #e2e4e9 44%, #ffffff 58%, #9a9ea6 82%, #ffffff 100%);
+  --cine-ground: radial-gradient(125% 100% at 50% -15%, #1b1b1e 0%, #0a0a0b 46%, #000000 100%);
+  --cine-spot: rgba(255, 255, 255, 0.12);
+  --cine-spot-soft: rgba(255, 255, 255, 0.06);
+  --cine-vignette: rgba(0, 0, 0, 0.6);
 
   color-scheme: dark;
 }

@@ -246,11 +246,18 @@ body[data-nav-open] { overflow: hidden; }
 }
 
 /* ---- Footer ------------------------------------------------------------
-   Ink in both appearances, so it uses the ink ramp rather than the page one. */
+   The footer follows the theme like the rest of the page. Its rules were
+   written against the ink ramp, so we remap that ramp to the page ramp here
+   once — every --c-on-ink* below then reads correctly in both appearances. */
 .footer {
   padding-block: var(--space-8) var(--space-7);
-  background: var(--c-ink);
+  background: var(--c-bg-elev);
   color: var(--c-on-ink-mute);
+  border-top: 1px solid var(--c-line);
+  --c-on-ink: var(--c-text);
+  --c-on-ink-dim: var(--c-text-dim);
+  --c-on-ink-mute: var(--c-text-mute);
+  --c-ink-line: var(--c-line);
 }
 .footer-cols {
   display: grid;
@@ -950,10 +957,15 @@ body[data-nav-open] { overflow: hidden; }
 
 /* ---- About ------------------------------------------------------------
    The one dark band on the page, because it is where the metallic brand
-   composition belongs. Ink ramp in both appearances, like the footer. */
+   composition belongs. Follows the theme like the rest of the page; the ink
+   ramp its rules use is remapped to the page ramp here. */
 .about {
-  background: var(--c-ink);
+  background: var(--c-bg-elev);
   color: var(--c-on-ink-dim);
+  --c-on-ink: var(--c-text);
+  --c-on-ink-dim: var(--c-text-dim);
+  --c-on-ink-mute: var(--c-text-mute);
+  --c-ink-line: var(--c-line);
 }
 .about__grid {
   display: grid;
@@ -1437,10 +1449,7 @@ body[data-nav-open] { overflow: hidden; }
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
-  /* Headings on an ink band read with the light-metal paint in both themes. */
-  .about h2 { background-image: var(--grad-head-ink); }
-
-  /* The homepage hero headline: the vivid iridescent shimmer. */
+  /* The homepage hero headline: the titanium sheen (theme-aware). */
   .hero h1 {
     background-image: var(--grad-hero);
     background-size: 220% auto;
@@ -1471,13 +1480,8 @@ body[data-nav-open] { overflow: hidden; }
   .text-spectrum--warm    { background-image: var(--grad-warm); }
   .text-spectrum--emerald { background-image: var(--grad-emerald); }
 
-  /* The hero and About sit on ink in both themes, so their accent always
-     takes the bright tuning regardless of the page ramp. */
-  .hero .text-spectrum,
-  .about .text-spectrum { background-image: var(--grad-spectrum-bright); }
-  .hero .text-spectrum--cyan,    .about .text-spectrum--cyan    { background-image: var(--grad-cyan-bright); }
-  .hero .text-spectrum--warm,    .about .text-spectrum--warm    { background-image: var(--grad-warm-bright); }
-  .hero .text-spectrum--emerald, .about .text-spectrum--emerald { background-image: var(--grad-emerald-bright); }
+  /* Hero and About now follow the theme, so their accents use the theme-aware
+     tuning like everywhere else — no override needed. */
 
   @media (prefers-reduced-motion: no-preference) {
     /* Default animation theme: a slow specular sweep. */
@@ -1519,10 +1523,10 @@ body[data-nav-open] { overflow: hidden; }
   isolation: isolate;
   overflow: hidden;
   background: var(--cine-ground);
-  color: var(--c-on-ink-dim);
+  color: var(--c-text-dim);
 }
-/* A neutral spotlight, not coloured light: a soft top-lit glow and a gentle
-   pool behind the product card — the restraint that reads as Apple. */
+/* A whisper of bloom behind the copy — a faint cool/warm tint on the apple-
+   white ground, a soft neutral spotlight on the dark one. */
 .hero::before {
   content: "";
   position: absolute;
@@ -1534,13 +1538,13 @@ body[data-nav-open] { overflow: hidden; }
   filter: blur(20px);
   opacity: 0.9;
 }
-/* A faint vignette settles the edges into black. */
+/* Edge vignette — off on the light ground, settling into black on the dark. */
 .hero::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(120% 95% at 50% 30%, transparent 45%, rgba(0, 0, 0, 0.6) 100%);
+  background: radial-gradient(120% 95% at 50% 30%, transparent 45%, var(--cine-vignette) 100%);
   pointer-events: none;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -1551,44 +1555,9 @@ body[data-nav-open] { overflow: hidden; }
   100% { opacity: 1; }
 }
 
-/* Hero copy reads light on the cinematic ground. */
-.hero .studio-kicker { color: var(--c-on-ink-mute); }
-.hero .studio-lead   { color: var(--c-on-ink-dim); }
-
-/* The hero sits on ink in both themes, so its controls take the ink treatment
-   rather than the page ramp: a bright pill and a light quiet link. */
-.hero .btn-primary {
-  --btn-bg: var(--c-on-ink);
-  --btn-fg: var(--c-ink);
-  border-color: transparent;
-}
-.hero .btn-primary:hover { --btn-bg: #ffffff; color: var(--c-ink); }
-.hero .btn-quiet { color: var(--c-on-ink-dim); }
-.hero .btn-quiet:hover { color: var(--c-on-ink); }
-
-/* The illustration card becomes glass on the dark hero, in both themes. */
-.hero .hero-panel {
-  background: rgba(255, 255, 255, 0.045);
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
-  color: var(--c-on-ink-dim);
-  -webkit-backdrop-filter: blur(10px) saturate(130%);
-  backdrop-filter: blur(10px) saturate(130%);
-}
-.hero .hero-panel__label {
-  color: var(--c-on-ink-dim);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-.hero .hero-panel__ui {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-.hero .hero-panel__title { color: var(--c-on-ink); }
-.hero .hero-panel__rows > div { border-color: rgba(255, 255, 255, 0.1); }
-.hero .hero-panel__rows dt,
-.hero .hero-panel__rows dd,
-.hero .hero-panel__foot,
-.hero .hero-panel__note { color: var(--c-on-ink-dim); }
+/* Hero copy follows the theme; the controls and the illustration card keep
+   their default (theme-aware) treatment now that the ground is not forced. */
+.hero .studio-lead { color: var(--c-text-dim); }
 
 /* ---- 3D brand showcase (About section) ---------------------------------
    The metallic mark sits in a perspective scene and tilts to the pointer and
@@ -1635,31 +1604,8 @@ body[data-home] .nav:not([data-scrolled="true"]) {
   backdrop-filter: none;
   border-bottom-color: transparent;
 }
-body[data-home] .nav:not([data-scrolled="true"]) .nav-brand,
-body[data-home] .nav:not([data-scrolled="true"]) .nav-brand:hover { color: #f4f4f7; }
-body[data-home] .nav:not([data-scrolled="true"]) .nav-links a { color: rgba(244, 244, 247, 0.72); }
-body[data-home] .nav:not([data-scrolled="true"]) .nav-links a:hover,
-body[data-home] .nav:not([data-scrolled="true"]) .nav-links a[aria-current="page"] { color: #ffffff; }
-body[data-home] .nav:not([data-scrolled="true"]) .theme-toggle,
-body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle {
-  color: #f4f4f7;
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.06);
-}
-body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars,
-body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars::before,
-body[data-home] .nav:not([data-scrolled="true"]) .nav-toggle-bars::after { background: #f4f4f7; }
-body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary {
-  --btn-bg: rgba(255, 255, 255, 0.12);
-  --btn-fg: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: none;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary:hover {
-  --btn-bg: rgba(255, 255, 255, 0.2);
-}
+/* The bar's controls keep their theme colours over the hero — dark on the
+   apple-white ground, light on the dark one — so nothing is forced. */
 
 /* ---- A more dramatic first screen ------------------------------------- */
 .hero {
@@ -1696,10 +1642,6 @@ body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary:hover
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
-  .footer-brand__mark span { background-image: var(--grad-head-ink); }
-  body[data-home] .nav:not([data-scrolled="true"]) .nav-brand span {
-    background-image: var(--grad-head-ink);
-  }
   @media (prefers-reduced-motion: no-preference) {
     .nav-brand span,
     .footer-brand__mark span { animation: sv-shimmer 9s linear infinite; }
@@ -1709,7 +1651,7 @@ body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary:hover
 /* ---- The "hello" greeting (homepage hero) ------------------------------
    One word cross-fades through languages, each in a different accent colour.
    The row reserves its height so the swap never shifts the layout, and the
-   word inherits the spectrum paint (bright, since it sits on the hero ink). */
+   word inherits the theme-aware spectrum paint. */
 .hello {
   margin: 0 0 var(--space-4);
   min-height: 1.2em;
