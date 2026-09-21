@@ -1705,3 +1705,23 @@ body[data-home] .nav:not([data-scrolled="true"]) .nav-actions .btn-primary:hover
     .footer-brand__mark span { animation: sv-shimmer 9s linear infinite; }
   }
 }
+
+/* ---- The "hello" greeting (homepage hero) ------------------------------
+   One word cross-fades through languages, each in a different accent colour.
+   The row reserves its height so the swap never shifts the layout, and the
+   word inherits the spectrum paint (bright, since it sits on the hero ink). */
+.hello {
+  margin: 0 0 var(--space-4);
+  min-height: 1.2em;
+  font-size: clamp(2rem, 4.6vw, 3.4rem);
+  font-weight: var(--weight-semibold);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.hello__word {
+  display: inline-block;
+  transition: opacity 0.42s var(--ease-out),
+              transform 0.42s var(--ease-out),
+              filter 0.42s var(--ease-out);
+  will-change: opacity, transform, filter;
+}
