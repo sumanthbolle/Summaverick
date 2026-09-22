@@ -1449,15 +1449,8 @@ body[data-nav-open] { overflow: hidden; }
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
-  /* The homepage hero headline: the titanium sheen (theme-aware). */
-  .hero h1 {
-    background-image: var(--grad-hero);
-    background-size: 220% auto;
-    background-position: 0% center;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .hero h1 { animation: sv-shimmer 7s linear infinite; }
-  }
+  /* The homepage hero headline is neutral; the colour lives in the glass
+     wordmark below, so no titanium sheen here. */
 }
 @keyframes sv-shimmer { to { background-position: 220% center; } }
 
@@ -1666,4 +1659,212 @@ body[data-home] .nav:not([data-scrolled="true"]) {
               transform 0.42s var(--ease-out),
               filter 0.42s var(--ease-out);
   will-change: opacity, transform, filter;
+}
+
+/* ========================================================================
+   Glass wordmark (homepage hero "Summaverick")
+   Layered live Geist text: a continuous spectrum, a fine reflective rim,
+   lower violet shading, a lower rim, one moving reflection, and focal glints
+   on the S and the a. A one-time crystal assembly plays when the hero enters
+   view; at rest it is still, resolved coloured glass. Reduced motion / no-JS
+   show the resolved word immediately (default state = rest).
+   ===================================================================== */
+
+/* Neutral headline; "Meet" on line one, the glass wordmark on the next. */
+.hero-headline {
+  max-width: none;
+  margin: 0;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.hero-headline__lead,
+.hero-headline__mark { display: block; }
+.hero-headline__lead,
+.hero-headline__dot {
+  background: none;
+  -webkit-text-fill-color: var(--c-text);
+  color: var(--c-text);
+}
+.hero-headline__dot { -webkit-text-fill-color: var(--c-text-mute); color: var(--c-text-mute); }
+
+/* ---- The wordmark stack ------------------------------------------------ */
+.glassmark {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+  isolation: isolate;
+  -webkit-text-fill-color: initial; /* opt out of the h1 transparent fill */
+}
+.glassmark__base,
+.glassmark__layer,
+.glassmark__frag {
+  font: inherit;
+  letter-spacing: inherit;
+  white-space: nowrap;
+}
+/* The absolute layers sit exactly over the base — identical text + metrics. */
+.glassmark__layer,
+.glassmark__frag {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Base — the continuous spectrum, and the resting/accessible word. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .glassmark__base {
+    position: relative;
+    z-index: 1;
+    background-image: var(--glass-spectrum);
+    background-size: 100% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* Lower interior: a little violet shading and a fine lower rim. */
+  .glassmark__shade {
+    z-index: 2;
+    background-image: linear-gradient(
+      180deg,
+      transparent 55%,
+      rgba(120, 90, 220, 0.22) 82%,
+      rgba(255, 255, 255, 0.55) 97%,
+      transparent 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    mix-blend-mode: screen;
+  }
+  /* Upper edge: a soft, thin white rim (~0.6 of a 100-unit glyph). */
+  .glassmark__rim {
+    z-index: 3;
+    background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(255, 255, 255, 0.32) 6%,
+      transparent 13%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    mix-blend-mode: screen;
+  }
+  /* One restrained reflection band, still (rest) → moves during the reveal. */
+  .glassmark__reflect {
+    z-index: 4;
+    background-image: linear-gradient(
+      105deg,
+      transparent 44%,
+      rgba(255, 255, 255, 0.6) 50%,
+      transparent 56%);
+    background-size: 260% 100%;
+    background-position: 150% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    mix-blend-mode: screen;
+    opacity: 0;
+  }
+  /* Assembly shards — full-word copies clipped to diagonal bands, so the
+     spectrum stays continuous. Hidden at rest; shown only while playing. */
+  .glassmark__frag {
+    z-index: 5;
+    background-image: var(--glass-spectrum);
+    background-size: 100% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    opacity: 0;
+  }
+  .glassmark__frag[data-frag="0"] { clip-path: polygon(0 0, 100% 0, 100% 46%, 0 38%); }
+  .glassmark__frag[data-frag="1"] { clip-path: polygon(0 34%, 100% 42%, 100% 74%, 0 66%); }
+  .glassmark__frag[data-frag="2"] { clip-path: polygon(0 62%, 100% 70%, 100% 100%, 0 100%); }
+}
+
+/* Focal reflections on the S and the a — soft resting catch-lights, as
+   positioned overlays (wrapping the letters would break the shared clip).
+   They brighten briefly during the reveal. Positions are tuned to the word. */
+.glassmark__glint {
+  position: absolute;
+  top: 0;
+  width: 0.66em;
+  height: 0.62em;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: var(--glint-rest, 0.4);
+  z-index: 6;
+  filter: blur(2px);
+}
+.glassmark__glint--s {
+  left: 0.02em;
+  background: radial-gradient(58% 58% at 50% 42%, rgba(214, 246, 255, 0.95), rgba(214, 246, 255, 0) 70%);
+}
+.glassmark__glint--a {
+  left: 2.92em;
+  background: radial-gradient(58% 58% at 50% 42%, rgba(242, 216, 255, 0.95), rgba(242, 216, 255, 0) 70%);
+}
+
+/* ---- The one-time reveal ---------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* While playing: base fades in as the shards converge and fade out. */
+  .glassmark.is-playing .glassmark__base { animation: gm-base-in 2.4s var(--ease-out) both; }
+  .glassmark.is-playing .glassmark__shade,
+  .glassmark.is-playing .glassmark__rim { animation: gm-soft-in 2.4s var(--ease-out) both; }
+  .glassmark.is-playing .glassmark__frag { animation: gm-frag 2.5s var(--ease-out) both; }
+  .glassmark.is-playing .glassmark__frag[data-frag="0"] { animation-delay: 0s;    --fx: -0.22em; --fy: -0.15em; --fr: -6deg; }
+  .glassmark.is-playing .glassmark__frag[data-frag="1"] { animation-delay: 0.12s; --fx:  0.20em; --fy:  0.18em; --fr:  7deg; }
+  .glassmark.is-playing .glassmark__frag[data-frag="2"] { animation-delay: 0.24s; --fx: -0.12em; --fy:  0.24em; --fr: -5deg; }
+  .glassmark.is-playing .glassmark__reflect { animation: gm-reflect 1.6s ease-in-out 1.4s both; }
+  .glassmark.is-playing .glassmark__glint--s { animation: gm-glint 0.9s ease-out 1.7s both; }
+  .glassmark.is-playing .glassmark__glint--a { animation: gm-glint 0.9s ease-out 2.1s both; }
+}
+@keyframes gm-base-in {
+  0%, 46% { opacity: 0; }
+  74%, 100% { opacity: 1; }
+}
+@keyframes gm-soft-in {
+  0%, 52% { opacity: 0; }
+  80%, 100% { opacity: 1; }
+}
+@keyframes gm-frag {
+  0%   { opacity: 0; transform: translate(var(--fx), var(--fy)) rotate(var(--fr)); filter: blur(3px); }
+  16%  { opacity: 0.92; filter: blur(1.4px); }
+  58%  { opacity: 0.95; transform: translate(0, 0) rotate(0); filter: blur(0); }
+  80%  { opacity: 0.6; transform: translate(0, 0) rotate(0); }
+  100% { opacity: 0; transform: translate(0, 0) rotate(0); }
+}
+@keyframes gm-reflect {
+  0%   { background-position: 150% 0; opacity: 0; }
+  18%  { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { background-position: -60% 0; opacity: 0; }
+}
+@keyframes gm-glint {
+  0%   { opacity: var(--glint-rest, 0.35); }
+  45%  { opacity: 1; }
+  100% { opacity: var(--glint-rest, 0.35); }
+}
+
+/* Local-review replay control (only injected when ?preview is present). */
+.glassmark-replay {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 200;
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+  letter-spacing: normal;
+  padding: 0.4em 0.9em;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  -webkit-text-fill-color: currentColor;
 }

@@ -160,6 +160,13 @@
   --grad-emerald-bright: linear-gradient(100deg, #5affc0 0%, #34d1b0 34%, #3aa0ff 68%, #5affc0 100%);
   --grad-emerald-deep:   linear-gradient(100deg, #0a9d66 0%, #0e8f8a 34%, #1f6bd2 68%, #0a9d66 100%);
   --grad-emerald: var(--grad-emerald-deep);
+
+  /* The glass wordmark spectrum (hero "Summaverick"). Continuous across the
+     whole word; the light tuning here, the dark tuning in the dark blocks. */
+  --glass-spectrum: linear-gradient(100deg,
+    #397DDE 0%, #599FDA 10%, #7F61D4 25%, #A374D8 42%, #D45E9F 53%,
+    #D1856C 68%, #B28A45 80%, #4A9EAE 91%, #397DDE 100%);
+
   /* Hero ground + spotlight, per theme. Light is apple-white with a whisper of
      cool/warm bloom; the dark blocks below make it the true-black cinematic. */
   --cine-ground: radial-gradient(125% 100% at 50% -10%, #ffffff 0%, #f6f7f9 55%, #eef0f4 100%);
@@ -210,6 +217,7 @@
     --cine-spot: rgba(255, 255, 255, 0.12);
     --cine-spot-soft: rgba(255, 255, 255, 0.06);
     --cine-vignette: rgba(0, 0, 0, 0.6);
+    --glass-spectrum: linear-gradient(100deg, #73CAFF 0%, #B4E9FF 10%, #A795F1 25%, #E6BDF9 42%, #F391C9 53%, #FFD0B6 68%, #EED29B 80%, #A0E1E8 91%, #73CAFF 100%);
 
     color-scheme: dark;
   }
@@ -252,6 +260,7 @@
   --cine-spot: rgba(255, 255, 255, 0.12);
   --cine-spot-soft: rgba(255, 255, 255, 0.06);
   --cine-vignette: rgba(0, 0, 0, 0.6);
+  --glass-spectrum: linear-gradient(100deg, #73CAFF 0%, #B4E9FF 10%, #A795F1 25%, #E6BDF9 42%, #F391C9 53%, #FFD0B6 68%, #EED29B 80%, #A0E1E8 91%, #73CAFF 100%);
 
   color-scheme: dark;
 }
