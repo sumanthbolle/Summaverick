@@ -1782,9 +1782,13 @@ body[data-home] .nav:not([data-scrolled="true"]) {
     color: transparent;
     opacity: 0;
   }
-  .glassmark__frag[data-frag="0"] { clip-path: polygon(0 0, 100% 0, 100% 46%, 0 38%); }
-  .glassmark__frag[data-frag="1"] { clip-path: polygon(0 34%, 100% 42%, 100% 74%, 0 66%); }
-  .glassmark__frag[data-frag="2"] { clip-path: polygon(0 62%, 100% 70%, 100% 100%, 0 100%); }
+  /* Five angled facets that tile the word edge-to-edge (shared seams, no gaps),
+     slanted so they read as crystal shards rather than horizontal stripes. */
+  .glassmark__frag[data-frag="0"] { clip-path: polygon(0 0, 22% 0, 16% 100%, 0 100%); }
+  .glassmark__frag[data-frag="1"] { clip-path: polygon(22% 0, 44% 0, 38% 100%, 16% 100%); }
+  .glassmark__frag[data-frag="2"] { clip-path: polygon(44% 0, 63% 0, 58% 100%, 38% 100%); }
+  .glassmark__frag[data-frag="3"] { clip-path: polygon(63% 0, 82% 0, 77% 100%, 58% 100%); }
+  .glassmark__frag[data-frag="4"] { clip-path: polygon(82% 0, 100% 0, 100% 100%, 77% 100%); }
 }
 
 /* Focal reflections on the S and the a — soft resting catch-lights, as
@@ -1825,18 +1829,22 @@ body[data-home] .nav:not([data-scrolled="true"]) {
 
 /* ---- The one-time reveal ---------------------------------------------- */
 @media (prefers-reduced-motion: no-preference) {
-  /* While playing: base fades in as the shards converge and fade out. */
-  .glassmark.is-playing .glassmark__base { animation: gm-base-in 2.4s var(--ease-out) both; }
+  /* Facets crystallize from the centre outward, lock into focus, then the
+     identical resolved base cross-fades up beneath them — because the shards
+     are perfectly aligned by then, the hand-off is seamless (no ghost word). */
+  .glassmark.is-playing .glassmark__base { animation: gm-base-in 2.1s var(--ease-out) both; }
   .glassmark.is-playing .glassmark__shade,
-  .glassmark.is-playing .glassmark__rim { animation: gm-soft-in 2.4s var(--ease-out) both; }
-  .glassmark.is-playing .glassmark__frag { animation: gm-frag 2.5s var(--ease-out) both; }
-  .glassmark.is-playing .glassmark__frag[data-frag="0"] { animation-delay: 0s;    --fx: -0.22em; --fy: -0.15em; --fr: -6deg; }
-  .glassmark.is-playing .glassmark__frag[data-frag="1"] { animation-delay: 0.12s; --fx:  0.20em; --fy:  0.18em; --fr:  7deg; }
-  .glassmark.is-playing .glassmark__frag[data-frag="2"] { animation-delay: 0.24s; --fx: -0.12em; --fy:  0.24em; --fr: -5deg; }
-  .glassmark.is-playing .glassmark__reflect { animation: gm-reflect 1.6s ease-in-out 1.4s both; }
-  .glassmark.is-playing .glassmark__flash { animation: gm-flash 1.2s ease-out 1.55s both; }
-  .glassmark.is-playing .glassmark__glint--s { animation: gm-glint 0.9s ease-out 1.7s both; }
-  .glassmark.is-playing .glassmark__glint--a { animation: gm-glint 0.9s ease-out 2.1s both; }
+  .glassmark.is-playing .glassmark__rim { animation: gm-soft-in 2.1s var(--ease-out) both; }
+  .glassmark.is-playing .glassmark__frag { animation: gm-frag 2.1s cubic-bezier(0.16, 0.84, 0.28, 1) both; }
+  .glassmark.is-playing .glassmark__frag[data-frag="2"] { animation-delay: 0s;    --fx:  0;      --fy: -0.30em; --fr: -4deg; --fs: 1.07; }
+  .glassmark.is-playing .glassmark__frag[data-frag="1"] { animation-delay: 0.06s; --fx: -0.26em; --fy:  0.26em; --fr:  6deg; --fs: 1.05; }
+  .glassmark.is-playing .glassmark__frag[data-frag="3"] { animation-delay: 0.06s; --fx:  0.26em; --fy:  0.24em; --fr:  6deg; --fs: 1.05; }
+  .glassmark.is-playing .glassmark__frag[data-frag="0"] { animation-delay: 0.12s; --fx: -0.52em; --fy: -0.22em; --fr: -9deg; --fs: 1.06; }
+  .glassmark.is-playing .glassmark__frag[data-frag="4"] { animation-delay: 0.12s; --fx:  0.52em; --fy: -0.20em; --fr:  9deg; --fs: 1.06; }
+  .glassmark.is-playing .glassmark__reflect { animation: gm-reflect 1.4s ease-in-out 0.7s both; }
+  .glassmark.is-playing .glassmark__flash { animation: gm-flash 1.0s ease-out 0.95s both; }
+  .glassmark.is-playing .glassmark__glint--s { animation: gm-glint 0.8s ease-out 1.25s both; }
+  .glassmark.is-playing .glassmark__glint--a { animation: gm-glint 0.8s ease-out 1.45s both; }
 }
 @keyframes gm-flash {
   0%   { opacity: 0; transform: scale(0.96); }
@@ -1845,24 +1853,24 @@ body[data-home] .nav:not([data-scrolled="true"]) {
   100% { opacity: 0; transform: scale(1.04); }
 }
 @keyframes gm-base-in {
-  0%, 46% { opacity: 0; }
-  74%, 100% { opacity: 1; }
+  0%, 55% { opacity: 0; }
+  76%, 100% { opacity: 1; }
 }
 @keyframes gm-soft-in {
-  0%, 52% { opacity: 0; }
-  80%, 100% { opacity: 1; }
+  0%, 58% { opacity: 0; }
+  82%, 100% { opacity: 1; }
 }
 @keyframes gm-frag {
-  0%   { opacity: 0; transform: translate(var(--fx), var(--fy)) rotate(var(--fr)); filter: blur(3px); }
-  16%  { opacity: 0.92; filter: blur(1.4px); }
-  58%  { opacity: 0.95; transform: translate(0, 0) rotate(0); filter: blur(0); }
-  80%  { opacity: 0.6; transform: translate(0, 0) rotate(0); }
-  100% { opacity: 0; transform: translate(0, 0) rotate(0); }
+  0%   { opacity: 0; transform: translate(var(--fx), var(--fy)) rotate(var(--fr)) scale(var(--fs)); filter: blur(4px); }
+  14%  { opacity: 1; filter: blur(2px); }
+  60%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); filter: blur(0); }
+  74%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translate(0, 0) rotate(0) scale(1); filter: blur(0); }
 }
 @keyframes gm-reflect {
   0%   { background-position: 150% 0; opacity: 0; }
-  18%  { opacity: 1; }
-  82%  { opacity: 1; }
+  22%  { opacity: 1; }
+  78%  { opacity: 1; }
   100% { background-position: -60% 0; opacity: 0; }
 }
 @keyframes gm-glint {
