@@ -1752,14 +1752,15 @@ body[data-home] .nav:not([data-scrolled="true"]) {
     color: transparent;
     mix-blend-mode: screen;
   }
-  /* One restrained reflection band, still (rest) → moves during the reveal. */
+  /* A warm specular streak that sweeps the surface during the reveal. */
   .glassmark__reflect {
     z-index: 4;
     background-image: linear-gradient(
       105deg,
-      transparent 44%,
-      rgba(255, 255, 255, 0.6) 50%,
-      transparent 56%);
+      transparent 43%,
+      rgba(255, 244, 222, 0.85) 49%,
+      rgba(255, 206, 138, 0.55) 53%,
+      transparent 60%);
     background-size: 260% 100%;
     background-position: 150% 0;
     -webkit-background-clip: text;
@@ -1809,6 +1810,19 @@ body[data-home] .nav:not([data-scrolled="true"]) {
   background: radial-gradient(58% 58% at 50% 42%, rgba(242, 216, 255, 0.95), rgba(242, 216, 255, 0) 70%);
 }
 
+/* The warm specular flash — a brief warm bloom that peaks as the crystal
+   resolves, then fades. A positioned overlay (not clipped to the glyphs). */
+.glassmark__flash {
+  position: absolute;
+  inset: -35% -12%;
+  z-index: 6;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+  filter: blur(7px);
+  background: radial-gradient(58% 130% at 42% 34%, rgba(255, 242, 220, 0.92), rgba(255, 198, 122, 0.45) 46%, transparent 74%);
+}
+
 /* ---- The one-time reveal ---------------------------------------------- */
 @media (prefers-reduced-motion: no-preference) {
   /* While playing: base fades in as the shards converge and fade out. */
@@ -1820,8 +1834,15 @@ body[data-home] .nav:not([data-scrolled="true"]) {
   .glassmark.is-playing .glassmark__frag[data-frag="1"] { animation-delay: 0.12s; --fx:  0.20em; --fy:  0.18em; --fr:  7deg; }
   .glassmark.is-playing .glassmark__frag[data-frag="2"] { animation-delay: 0.24s; --fx: -0.12em; --fy:  0.24em; --fr: -5deg; }
   .glassmark.is-playing .glassmark__reflect { animation: gm-reflect 1.6s ease-in-out 1.4s both; }
+  .glassmark.is-playing .glassmark__flash { animation: gm-flash 1.2s ease-out 1.55s both; }
   .glassmark.is-playing .glassmark__glint--s { animation: gm-glint 0.9s ease-out 1.7s both; }
   .glassmark.is-playing .glassmark__glint--a { animation: gm-glint 0.9s ease-out 2.1s both; }
+}
+@keyframes gm-flash {
+  0%   { opacity: 0; transform: scale(0.96); }
+  34%  { opacity: 1; }
+  55%  { opacity: 0.5; }
+  100% { opacity: 0; transform: scale(1.04); }
 }
 @keyframes gm-base-in {
   0%, 46% { opacity: 0; }
