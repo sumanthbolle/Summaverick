@@ -9,6 +9,7 @@ import { initAgentStage } from "./agent-stage.js";
 import { initMotion } from "./motion.js";
 import { initGreeting } from "./greeting.js";
 import { initGlassmark } from "./glassmark.js";
+import { initExamples } from "./examples.js";
 
 function boot() {
   initChrome();
@@ -17,6 +18,7 @@ function boot() {
   initMotion();
   initGreeting();
   initGlassmark();
+  initExamples();
 }
 
 if (document.readyState === "loading") {

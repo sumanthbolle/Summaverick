@@ -357,69 +357,58 @@
           <article class="example example--build" data-reveal>
             <p class="example__status">Meta · WhatsApp · Instagram</p>
             <h3>Customer agents on the channels people already use.</h3>
-            <div class="ex-viz ex-viz--chat" aria-hidden="true">
+            <div class="ex-viz ex-viz--chat" data-ex-anim aria-hidden="true">
               <div class="ex-viz__chips"><span>WhatsApp</span><span>Messenger</span><span>Instagram</span></div>
-              <p class="ex-bubble ex-bubble--in">Where's my order #4821?</p>
-              <p class="ex-bubble ex-bubble--agent">Shipped this morning — arrives Thursday. Want the tracking link?</p>
+              <div class="ex-chat">
+                <p class="ex-bubble ex-bubble--in" data-ex-el="ask">Where's my order #4821?</p>
+                <div class="ex-agent-slot">
+                  <span class="ex-typing" data-ex-el="typing"><i></i><i></i><i></i></span>
+                  <p class="ex-bubble ex-bubble--agent" data-ex-el="reply">Shipped this morning — arrives Thursday. Want the tracking link?</p>
+                </div>
+              </div>
             </div>
-            <p>
-              An agent inside WhatsApp Business, Messenger, or Instagram that
-              answers product questions, checks an order, and books or
-              reschedules — and hands anything sensitive to a person before it
-              is sent.
-            </p>
+            <p>An agent inside WhatsApp Business, Messenger, or Instagram — answering, checking an order, booking — and handing anything sensitive to a person.</p>
           </article>
 
           <article class="example example--build" data-reveal style="--d:30ms">
             <p class="example__status">ServiceNow · Enterprise ITSM</p>
             <h3>Enterprise agents that move a request to its next step.</h3>
-            <div class="ex-viz ex-viz--flow" aria-hidden="true">
-              <div class="ex-node">
-                <span class="ex-node__id">REQ0010482</span>
-                <span class="ex-node__sub">Replacement laptop · P3</span>
-              </div>
-              <span class="ex-arrow" aria-hidden="true">→</span>
-              <div class="ex-node ex-node--accent">
-                <span class="ex-node__id">Propose: standard build</span>
-                <span class="ex-node__sub">Reviewer: team manager</span>
-              </div>
+            <div class="ex-viz ex-viz--flow" data-ex-anim aria-hidden="true">
+              <ol class="ex-steps">
+                <li class="ex-step" data-ex-step="1"><span class="ex-step__tick"></span><span>Reads REQ0010482 · P3</span></li>
+                <li class="ex-step" data-ex-step="2"><span class="ex-step__tick"></span><span>Gathers context — stock, cost centre, role</span></li>
+                <li class="ex-step" data-ex-step="3"><span class="ex-step__tick"></span><span>Proposes: approve the standard build</span></li>
+                <li class="ex-step ex-step--approve" data-ex-step="4"><span class="ex-step__tick"></span><span>Sent to the manager to approve</span></li>
+              </ol>
             </div>
-            <p>
-              The agent reads the record, gathers context from connected
-              systems, proposes one concrete action, and leaves the approval
-              with the assignee — the same shape as the walk-through above.
-            </p>
+            <p>Reads the record, gathers context, proposes one action — and leaves the approval with a person.</p>
           </article>
 
           <article class="example example--build" data-reveal style="--d:60ms">
             <p class="example__status">Model Context Protocol</p>
             <h3>MCP integrations that connect your tools to any agent.</h3>
-            <div class="ex-viz ex-viz--mcp" aria-hidden="true">
+            <div class="ex-viz ex-viz--mcp" data-ex-anim aria-hidden="true">
               <div class="ex-mcp__agent">Agent</div>
-              <div class="ex-mcp__bus"><span>MCP</span></div>
+              <div class="ex-mcp__bus">
+                <span class="ex-mcp__pulse" data-ex-el="pulse"></span>
+                <span class="ex-mcp__label">MCP</span>
+              </div>
               <div class="ex-mcp__tools">
-                <span>Database</span><span>Internal API</span><span>Docs</span>
+                <span data-ex-tool="1">Database</span><span data-ex-tool="2">Internal API</span><span data-ex-tool="3">Docs</span>
               </div>
             </div>
-            <p>
-              We build MCP servers that expose your systems — a database, an
-              internal API, a ticketing tool — as typed, permissioned tools an
-              agent can call, with the limits set exactly where you need them.
-            </p>
+            <p>MCP servers that expose your systems as typed, permissioned tools an agent can call — limits set where you need them.</p>
           </article>
 
           <article class="example example--build" data-reveal style="--d:90ms">
             <p class="example__status">Internal demo · you can open it</p>
             <h3>ServiceNow reference search.</h3>
-            <div class="ex-viz ex-viz--search" aria-hidden="true">
-              <p class="ex-search__box">How do I configure an SLA?<span class="ex-search__go">Search</span></p>
-              <p class="ex-search__result"><span class="ex-search__dot"></span>Configure SLA definitions — docs.servicenow.com</p>
-              <p class="ex-search__result"><span class="ex-search__dot"></span>SLA conditions and timers — product docs</p>
+            <div class="ex-viz ex-viz--search" data-ex-anim aria-hidden="true">
+              <p class="ex-search__box"><span class="ex-search__q">How do I configure an SLA?</span><span class="ex-search__caret" data-ex-el="caret"></span><span class="ex-search__go">Search</span></p>
+              <p class="ex-search__result" data-ex-res="1"><span class="ex-search__dot"></span>Configure SLA definitions — docs.servicenow.com</p>
+              <p class="ex-search__result" data-ex-res="2"><span class="ex-search__dot"></span>SLA conditions and timers — product docs</p>
             </div>
-            <p>
-              Find documentation related to a ServiceNow question and open the
-              sources to read more.
-            </p>
+            <p>Find documentation for a ServiceNow question and open the sources — one you can try right now.</p>
             <p class="example__action"><a href="/ask">Open the search <span aria-hidden="true">›</span></a></p>
             <details class="disclosure">
               <summary>What this demo does</summary>
