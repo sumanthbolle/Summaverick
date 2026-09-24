@@ -353,6 +353,91 @@
           </p>
         </div>
 
+        <!-- Cinematic centerpiece: the agent orchestrating every channel and
+             tool. Decorative (aria-hidden); the cards below carry the meaning.
+             Plays only in view; resolves to a still diagram with motion off. -->
+        <div class="orchestra" data-reveal data-ex-anim aria-hidden="true">
+          <svg class="orchestra__svg" viewBox="0 0 820 470" preserveAspectRatio="xMidYMid meet" role="img">
+            <defs>
+              <radialGradient id="orchCoreGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#9cc0ff" stop-opacity="0.95"/>
+                <stop offset="42%" stop-color="#7f61d4" stop-opacity="0.40"/>
+                <stop offset="100%" stop-color="#7f61d4" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="orchRing" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#6fe0ff"/>
+                <stop offset="48%" stop-color="#a374d8"/>
+                <stop offset="100%" stop-color="#f391c9"/>
+              </linearGradient>
+              <linearGradient id="orchWire" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#6fe0ff" stop-opacity="0.06"/>
+                <stop offset="50%" stop-color="#8aa0ff" stop-opacity="0.42"/>
+                <stop offset="100%" stop-color="#a374d8" stop-opacity="0.06"/>
+              </linearGradient>
+              <radialGradient id="orchCoreInner" cx="50%" cy="42%" r="60%">
+                <stop offset="0%" stop-color="#9cc0ff" stop-opacity="0.22"/>
+                <stop offset="55%" stop-color="#7f61d4" stop-opacity="0.10"/>
+                <stop offset="100%" stop-color="#0b0b11" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <path class="orch-wire" d="M150,110 C 262,124 322,156 384,208"/>
+            <path class="orch-wire" d="M672,110 C 560,124 500,156 436,208"/>
+            <path class="orch-wire" d="M96,306 C 214,304 300,282 370,252"/>
+            <path class="orch-wire" d="M726,306 C 608,304 522,282 450,252"/>
+            <path class="orch-wire" d="M410,410 C 410,362 410,322 410,278"/>
+            <circle class="orch-glow" cx="410" cy="234" r="90" fill="url(#orchCoreGlow)"/>
+            <circle class="orch-pulse" cx="410" cy="234" r="44"/>
+            <circle class="orch-pulse orch-pulse--2" cx="410" cy="234" r="44"/>
+            <circle class="orch-dash" cx="410" cy="234" r="58"/>
+            <circle class="orch-corering" cx="410" cy="234" r="44"/>
+            <circle class="orch-disc" cx="410" cy="234" r="38"/>
+            <circle cx="410" cy="234" r="38" fill="url(#orchCoreInner)"/>
+            <text class="orch-corelabel" x="410" y="231" text-anchor="middle">Agent</text>
+            <text class="orch-coresub" x="410" y="250" text-anchor="middle">orchestrating</text>
+            <g>
+              <rect class="orch-plate" x="92" y="92" width="116" height="36" rx="18"/>
+              <circle cx="116" cy="110" r="4" fill="#25d366"/>
+              <text class="orch-nodelabel" x="132" y="115">WhatsApp</text>
+            </g>
+            <g>
+              <rect class="orch-plate" x="598" y="92" width="140" height="36" rx="18"/>
+              <circle cx="622" cy="110" r="4" fill="#62d84e"/>
+              <text class="orch-nodelabel" x="638" y="115">ServiceNow</text>
+            </g>
+            <g>
+              <rect class="orch-plate" x="34" y="288" width="124" height="36" rx="18"/>
+              <circle cx="58" cy="306" r="4" fill="#8a6bff"/>
+              <text class="orch-nodelabel" x="74" y="311">MCP · Tools</text>
+            </g>
+            <g>
+              <rect class="orch-plate" x="664" y="288" width="120" height="36" rx="18"/>
+              <circle cx="688" cy="306" r="4" fill="#6fe0ff"/>
+              <text class="orch-nodelabel" x="704" y="311">Your Docs</text>
+            </g>
+            <g>
+              <rect class="orch-plate" x="336" y="392" width="148" height="36" rx="18"/>
+              <circle cx="360" cy="410" r="4" fill="#f391c9"/>
+              <text class="orch-nodelabel" x="376" y="415">Slack · Teams</text>
+            </g>
+            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M150,110 C 262,124 322,156 384,208')"/>
+            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M150,110 C 262,124 322,156 384,208')"/>
+            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M672,110 C 560,124 500,156 436,208')"/>
+            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M672,110 C 560,124 500,156 436,208')"/>
+            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M96,306 C 214,304 300,282 370,252')"/>
+            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M96,306 C 214,304 300,282 370,252')"/>
+            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M726,306 C 608,304 522,282 450,252')"/>
+            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M726,306 C 608,304 522,282 450,252')"/>
+            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M410,410 C 410,362 410,322 410,278')"/>
+            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M410,410 C 410,362 410,322 410,278')"/>
+          </svg>
+          <p class="orchestra__caption">
+            <span data-orch-cap="0">Answering customers on WhatsApp, Messenger &amp; Instagram — in ~2 seconds</span>
+            <span data-orch-cap="1">Turning ServiceNow triage into one confident click</span>
+            <span data-orch-cap="2">Calling your tools through one governed MCP</span>
+            <span data-orch-cap="3">Answering from your own docs — always with the source</span>
+          </p>
+        </div>
+
         <div class="examples__grid examples__grid--build">
           <article class="example example--build" data-reveal>
             <p class="example__status">Meta · WhatsApp · Instagram</p>

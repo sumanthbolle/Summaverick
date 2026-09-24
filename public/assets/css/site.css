@@ -1050,6 +1050,110 @@ body[data-nav-open] { overflow: hidden; }
 .ex-bubble--agent { box-shadow: 0 4px 14px rgba(15, 15, 20, 0.10); }
 .ex-viz--flow, .ex-viz--search { justify-content: flex-start; }
 
+/* ---- The cinematic centerpiece: the agent orchestrator ----------------
+   A dark, self-contained stage (both themes) so the spectrum glows read.
+   Decorative; it resolves to a still diagram when motion is off. */
+.orchestra {
+  position: relative;
+  margin: var(--space-7) 0 var(--space-8);
+  padding: 8px 8px 0;
+  border-radius: 24px;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 34%, #171722 0%, #0c0c12 55%, #08080c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 40px 120px -48px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.orchestra::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 75%);
+  opacity: 0.5;
+}
+.orchestra__svg { display: block; width: 100%; height: auto; }
+.orch-wire { stroke: url(#orchWire); stroke-width: 1.5; fill: none; }
+.orch-plate { fill: rgba(255, 255, 255, 0.045); stroke: rgba(255, 255, 255, 0.14); stroke-width: 1; }
+.orch-nodelabel { fill: #e8e8f2; font-size: 15px; font-weight: 600; letter-spacing: 0.2px; }
+.orch-disc { fill: #0b0b11; stroke: rgba(255, 255, 255, 0.16); stroke-width: 1; }
+.orch-corering { fill: none; stroke: url(#orchRing); stroke-width: 2.2; }
+.orch-dash { fill: none; stroke: url(#orchRing); stroke-width: 1; stroke-dasharray: 2 7; opacity: 0.55; transform-box: fill-box; transform-origin: center; }
+.orch-glow { transform-box: fill-box; transform-origin: center; opacity: 0.6; }
+.orch-pulse { fill: none; stroke: url(#orchRing); stroke-width: 1.6; opacity: 0; }
+.orch-corelabel { fill: #fff; font-size: 19px; font-weight: 700; letter-spacing: 0.3px; }
+.orch-coresub { fill: #9aa0c0; font-size: 10.5px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+.orch-pkt { fill: #dcecff; opacity: 0; filter: drop-shadow(0 0 5px rgba(150, 190, 255, 0.95)); }
+.orch-pkt--out { fill: #ffd9ef; filter: drop-shadow(0 0 5px rgba(255, 150, 210, 0.9)); }
+.orchestra__caption {
+  position: relative;
+  height: 66px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.orchestra__caption span {
+  position: absolute;
+  max-width: 84%;
+  font-size: clamp(15px, 1.5vw, 19px);
+  font-weight: 500;
+  line-height: 1.4;
+  color: #eef0ff;
+  opacity: 0;
+}
+.orchestra__caption span::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 9px;
+  vertical-align: middle;
+  background: linear-gradient(120deg, #6fe0ff, #a374d8);
+}
+.orchestra__caption span[data-orch-cap="0"] { opacity: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .orchestra.is-live .orch-glow { animation: orch-breathe 4.4s ease-in-out infinite; }
+  .orchestra.is-live .orch-pulse { animation: orch-pulse 3.2s ease-out infinite; }
+  .orchestra.is-live .orch-pulse--2 { animation-delay: 1.6s; }
+  .orchestra.is-live .orch-dash { animation: orch-rotate 30s linear infinite; }
+  .orchestra.is-live .orch-corering { animation: orch-ringpulse 3.2s ease-in-out infinite; }
+  .orchestra.is-live .orch-pkt--in { animation: orch-pkt-in 2.4s linear infinite; }
+  .orchestra.is-live .orch-pkt--out { animation: orch-pkt-out 2.6s linear infinite; }
+  .orchestra.is-live .orch-pkt:nth-of-type(1) { animation-duration: 2.2s; animation-delay: -0.2s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(2) { animation-duration: 2.6s; animation-delay: -1.4s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(3) { animation-duration: 2.5s; animation-delay: -0.7s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(4) { animation-duration: 2.8s; animation-delay: -1.9s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(5) { animation-duration: 2.3s; animation-delay: -1.1s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(6) { animation-duration: 2.7s; animation-delay: -0.4s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(7) { animation-duration: 2.4s; animation-delay: -1.7s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(8) { animation-duration: 2.9s; animation-delay: -0.9s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(9) { animation-duration: 2.1s; animation-delay: -1.3s; }
+  .orchestra.is-live .orch-pkt:nth-of-type(10) { animation-duration: 2.6s; animation-delay: -0.5s; }
+  .orchestra.is-live .orchestra__caption span { animation-duration: 12s; animation-iteration-count: infinite; animation-timing-function: ease; }
+  .orchestra.is-live .orchestra__caption span[data-orch-cap="0"] { animation-name: orch-cap0; }
+  .orchestra.is-live .orchestra__caption span[data-orch-cap="1"] { animation-name: orch-cap1; }
+  .orchestra.is-live .orchestra__caption span[data-orch-cap="2"] { animation-name: orch-cap2; }
+  .orchestra.is-live .orchestra__caption span[data-orch-cap="3"] { animation-name: orch-cap3; }
+}
+@keyframes orch-breathe { 0%, 100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 0.92; transform: scale(1.07); } }
+@keyframes orch-pulse { 0% { r: 44; opacity: 0.55; stroke-width: 1.6; } 100% { r: 104; opacity: 0; stroke-width: 0.4; } }
+@keyframes orch-ringpulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 3.2; } }
+@keyframes orch-rotate { to { transform: rotate(360deg); } }
+@keyframes orch-pkt-in { 0% { offset-distance: 0%; opacity: 0; } 10% { opacity: 1; } 86% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+@keyframes orch-pkt-out { 0% { offset-distance: 100%; opacity: 0; } 10% { opacity: 1; } 86% { opacity: 1; } 100% { offset-distance: 0%; opacity: 0; } }
+@keyframes orch-cap0 { 0%, 2% { opacity: 0; } 6% { opacity: 1; } 24% { opacity: 1; } 28% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes orch-cap1 { 0%, 28% { opacity: 0; } 31% { opacity: 1; } 49% { opacity: 1; } 53% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes orch-cap2 { 0%, 53% { opacity: 0; } 56% { opacity: 1; } 74% { opacity: 1; } 78% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes orch-cap3 { 0%, 78% { opacity: 0; } 81% { opacity: 1; } 97% { opacity: 1; } 100% { opacity: 0; } }
+
 /* ---- The looping "how it works" playback (only while in view) ---------- */
 @media (prefers-reduced-motion: no-preference) {
   .example--build:hover .ex-viz { border-color: var(--c-line-strong); }
