@@ -335,74 +335,94 @@
       </div>
     </section>
 
-    <!-- ---- Product examples ---------------------------------------------
-         Three cards, three different kinds of thing: a concept, an
-         illustration, and something you can actually open. Each says which. -->
+    <!-- ---- What we build ------------------------------------------------
+         Concrete kinds of agent we design and build, each with a small
+         illustration of the shape of the work. Every card reads as plain
+         text with no styling, and the labels stay honest: these are the
+         kinds of build we offer, plus one tool you can open right now. -->
     <section class="examples" id="examples" aria-labelledby="examples-title">
       <span class="anchor-alias" id="work" aria-hidden="true"></span>
       <div class="container">
         <div class="section-head" data-reveal>
-          <h2 id="examples-title">A closer look at what an <span class="text-spectrum text-spectrum--cyan">agent</span> could do.</h2>
+          <h2 id="examples-title">Agents we build, where the <span class="text-spectrum text-spectrum--cyan">work</span> already happens.</h2>
           <p>
-            One idea we explored, one interface we drew, and one tool you can
-            open right now. The label on each card says which of the three you
-            are looking at.
+            Customer agents on the channels people message you on, enterprise
+            agents inside the systems your teams already run, and the
+            integrations that connect an agent to your own tools. Below are the
+            kinds of build we design — and one demo you can open right now.
           </p>
         </div>
 
-        <div class="examples__grid">
-          <article class="example" data-reveal>
-            <p class="example__status">Hackathon concept · June 2026</p>
-            <h3>Help with the follow-ups people put off.</h3>
+        <div class="examples__grid examples__grid--build">
+          <article class="example example--build" data-reveal>
+            <p class="example__status">Meta · WhatsApp · Instagram</p>
+            <h3>Customer agents on the channels people already use.</h3>
+            <div class="ex-viz ex-viz--chat" aria-hidden="true">
+              <div class="ex-viz__chips"><span>WhatsApp</span><span>Messenger</span><span>Instagram</span></div>
+              <p class="ex-bubble ex-bubble--in">Where's my order #4821?</p>
+              <p class="ex-bubble ex-bubble--agent">Shipped this morning — arrives Thursday. Want the tracking link?</p>
+            </div>
             <p>
-              Our AdultingGPT hackathon concept explored how an assistant could
-              use a screenshot or voice note to understand an everyday problem,
-              prepare a response, and keep track of the follow-up.
+              An agent inside WhatsApp Business, Messenger, or Instagram that
+              answers product questions, checks an order, and books or
+              reschedules — and hands anything sensitive to a person before it
+              is sent.
             </p>
-            <details class="disclosure">
-              <summary>What the concept actually covers</summary>
-              <div class="disclosure__body">
-                <p>
-                  A submission deck written for an India Agentic AI open
-                  hackathon in June 2026, before Summaverick was formed. It
-                  describes reading a screenshot, an email, or a voice note to
-                  work out what a refund, subscription, or shared-payment
-                  problem needs; asking for anything missing; drafting a message
-                  for the person to approve; and tracking what happens next.
-                </p>
-                <p>
-                  It is a plan, not a product. Nothing in it has been released,
-                  no money has been recovered through it, and it does not
-                  represent a partnership with any tool vendor named in the
-                  deck. The personal walk-through above is our own illustration
-                  of the same idea, not a screenshot of built software.
-                </p>
+          </article>
+
+          <article class="example example--build" data-reveal style="--d:30ms">
+            <p class="example__status">ServiceNow · Enterprise ITSM</p>
+            <h3>Enterprise agents that move a request to its next step.</h3>
+            <div class="ex-viz ex-viz--flow" aria-hidden="true">
+              <div class="ex-node">
+                <span class="ex-node__id">REQ0010482</span>
+                <span class="ex-node__sub">Replacement laptop · P3</span>
               </div>
-            </details>
-          </article>
-
-          <article class="example" data-reveal style="--d:30ms">
-            <p class="example__status">Interactive illustration</p>
-            <h3>Help a service request reach its next step.</h3>
+              <span class="ex-arrow" aria-hidden="true">→</span>
+              <div class="ex-node ex-node--accent">
+                <span class="ex-node__id">Propose: standard build</span>
+                <span class="ex-node__sub">Reviewer: team manager</span>
+              </div>
+            </div>
             <p>
-              An example of an agent gathering relevant information, preparing
-              an update, and passing an action to the right person for review.
-            </p>
-            <p class="example__action">
-              <a href="#stage" data-stage-jump="enterprise">Play the example <span aria-hidden="true">›</span></a>
+              The agent reads the record, gathers context from connected
+              systems, proposes one concrete action, and leaves the approval
+              with the assignee — the same shape as the walk-through above.
             </p>
           </article>
 
-          <article class="example" data-reveal style="--d:60ms">
-            <p class="example__status">Internal demo</p>
-            <h3>ServiceNow reference search</h3>
+          <article class="example example--build" data-reveal style="--d:60ms">
+            <p class="example__status">Model Context Protocol</p>
+            <h3>MCP integrations that connect your tools to any agent.</h3>
+            <div class="ex-viz ex-viz--mcp" aria-hidden="true">
+              <div class="ex-mcp__agent">Agent</div>
+              <div class="ex-mcp__bus"><span>MCP</span></div>
+              <div class="ex-mcp__tools">
+                <span>Database</span><span>Internal API</span><span>Docs</span>
+              </div>
+            </div>
+            <p>
+              We build MCP servers that expose your systems — a database, an
+              internal API, a ticketing tool — as typed, permissioned tools an
+              agent can call, with the limits set exactly where you need them.
+            </p>
+          </article>
+
+          <article class="example example--build" data-reveal style="--d:90ms">
+            <p class="example__status">Internal demo · you can open it</p>
+            <h3>ServiceNow reference search.</h3>
+            <div class="ex-viz ex-viz--search" aria-hidden="true">
+              <p class="ex-search__box">How do I configure an SLA?<span class="ex-search__go">Search</span></p>
+              <p class="ex-search__result"><span class="ex-search__dot"></span>Configure SLA definitions — docs.servicenow.com</p>
+              <p class="ex-search__result"><span class="ex-search__dot"></span>SLA conditions and timers — product docs</p>
+            </div>
             <p>
               Find documentation related to a ServiceNow question and open the
               sources to read more.
             </p>
-            <p class="example__action"><a href="/ask">Search documentation <span aria-hidden="true">›</span></a></p>
+            <p class="example__action"><a href="/ask">Open the search <span aria-hidden="true">›</span></a></p>
             <details class="disclosure">
-              <summary>What this example does</summary>
+              <summary>What this demo does</summary>
               <div class="disclosure__body">
                 <p>
                   It searches the public ServiceNow product documentation, picks
@@ -420,6 +440,10 @@
             </details>
           </article>
         </div>
+
+        <p class="section-action" data-reveal>
+          <a href="mailto:inquiry@summaverick.com" data-brand="contact">Also: Slack and Teams ops agents, voice intake, retrieval over your own docs — tell us about your use case <span aria-hidden="true">›</span></a>
+        </p>
       </div>
     </section>
 
