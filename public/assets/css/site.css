@@ -1012,37 +1012,85 @@ body[data-nav-open] { overflow: hidden; }
   background: var(--grad-cyan);
 }
 
+/* The value payoff each demo resolves on — a concrete outcome, not a step. */
+.ex-payoff {
+  margin: 2px 0 0;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--c-accent-soft);
+  color: var(--c-text);
+  font-size: 0.72rem;
+  font-weight: var(--weight-medium);
+  line-height: 1.25;
+}
+.ex-payoff__tick {
+  position: relative;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--c-accent-fill);
+}
+.ex-payoff__tick::after {
+  content: "";
+  position: absolute;
+  left: 5.5px;
+  top: 3.5px;
+  width: 3px;
+  height: 6px;
+  border: solid var(--c-on-accent);
+  border-width: 0 1.6px 1.6px 0;
+  transform: rotate(45deg);
+}
+/* A little depth on the "live" surfaces so the motion reads as a real UI. */
+.ex-bubble--agent { box-shadow: 0 4px 14px rgba(15, 15, 20, 0.10); }
+.ex-viz--flow, .ex-viz--search { justify-content: flex-start; }
+
 /* ---- The looping "how it works" playback (only while in view) ---------- */
 @media (prefers-reduced-motion: no-preference) {
   .example--build:hover .ex-viz { border-color: var(--c-line-strong); }
 
+  /* A premium, settled easing shared by the reveal moments. */
+  .ex-viz.is-live [data-ex-el],
+  .ex-viz.is-live .ex-step,
+  .ex-viz.is-live [data-ex-tool],
+  .ex-viz.is-live [data-ex-res] { animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+
   /* Meta chat */
-  .ex-viz--chat.is-live [data-ex-el="ask"]   { animation: ex-ask 6.5s ease-in-out infinite; }
+  .ex-viz--chat.is-live [data-ex-el="ask"]   { animation: ex-ask 6.5s infinite; }
   .ex-viz--chat.is-live [data-ex-el="typing"]{ animation: ex-type 6.5s ease-in-out infinite; }
-  .ex-viz--chat.is-live [data-ex-el="reply"] { animation: ex-reply 6.5s ease-in-out infinite; }
+  .ex-viz--chat.is-live [data-ex-el="reply"] { animation: ex-reply 6.5s infinite; }
+  .ex-viz--chat.is-live [data-ex-el="payoff"]{ animation: ex-payoff 6.5s infinite; }
   .ex-viz--chat.is-live .ex-typing i         { animation: ex-dot 1s ease-in-out infinite; }
   .ex-viz--chat.is-live .ex-typing i:nth-child(2) { animation-delay: 0.15s; }
   .ex-viz--chat.is-live .ex-typing i:nth-child(3) { animation-delay: 0.3s; }
 
-  /* ServiceNow steps — reveal in sequence, then reset */
+  /* ServiceNow steps — reveal in sequence, then the outcome */
   .ex-viz--flow.is-live .ex-step { opacity: 0.3; }
-  .ex-viz--flow.is-live .ex-step[data-ex-step="1"] { animation: ex-s1 6s ease infinite; }
-  .ex-viz--flow.is-live .ex-step[data-ex-step="2"] { animation: ex-s2 6s ease infinite; }
-  .ex-viz--flow.is-live .ex-step[data-ex-step="3"] { animation: ex-s3 6s ease infinite; }
-  .ex-viz--flow.is-live .ex-step[data-ex-step="4"] { animation: ex-s4 6s ease infinite; }
+  .ex-viz--flow.is-live .ex-step[data-ex-step="1"] { animation: ex-s1 6s infinite; }
+  .ex-viz--flow.is-live .ex-step[data-ex-step="2"] { animation: ex-s2 6s infinite; }
+  .ex-viz--flow.is-live .ex-step[data-ex-step="3"] { animation: ex-s3 6s infinite; }
+  .ex-viz--flow.is-live .ex-step[data-ex-step="4"] { animation: ex-s4 6s infinite; }
+  .ex-viz--flow.is-live [data-ex-el="payoff"] { animation: ex-payoff 6s infinite; }
 
   /* MCP — a pulse sweeps the bus and each tool lights in turn */
   .ex-viz--mcp.is-live [data-ex-el="pulse"] { animation: ex-pulse 4.5s ease-in-out infinite; }
-  .ex-viz--mcp.is-live [data-ex-tool="1"] { animation: ex-tool1 4.5s ease infinite; }
-  .ex-viz--mcp.is-live [data-ex-tool="2"] { animation: ex-tool2 4.5s ease infinite; }
-  .ex-viz--mcp.is-live [data-ex-tool="3"] { animation: ex-tool3 4.5s ease infinite; }
+  .ex-viz--mcp.is-live [data-ex-tool="1"] { animation: ex-tool1 4.5s infinite; }
+  .ex-viz--mcp.is-live [data-ex-tool="2"] { animation: ex-tool2 4.5s infinite; }
+  .ex-viz--mcp.is-live [data-ex-tool="3"] { animation: ex-tool3 4.5s infinite; }
+  .ex-viz--mcp.is-live [data-ex-el="payoff"] { animation: ex-payoff 4.5s infinite; }
 
-  /* Search — query types, button pulses, results land */
+  /* Search — query types, button pulses, results land, source cited */
   .ex-viz--search.is-live .ex-search__q     { animation: ex-q 5.5s ease infinite; }
   .ex-viz--search.is-live .ex-search__caret { display: inline-block; animation: ex-caret 5.5s steps(1) infinite; }
   .ex-viz--search.is-live .ex-search__go    { animation: ex-go 5.5s ease infinite; }
-  .ex-viz--search.is-live [data-ex-res="1"] { animation: ex-r1 5.5s ease infinite; }
-  .ex-viz--search.is-live [data-ex-res="2"] { animation: ex-r2 5.5s ease infinite; }
+  .ex-viz--search.is-live [data-ex-res="1"] { animation: ex-r1 5.5s infinite; }
+  .ex-viz--search.is-live [data-ex-res="2"] { animation: ex-r2 5.5s infinite; }
+  .ex-viz--search.is-live [data-ex-el="payoff"] { animation: ex-payoff 5.5s infinite; }
 }
 
 @keyframes ex-ask {
@@ -1095,19 +1143,19 @@ body[data-nav-open] { overflow: hidden; }
   100% { left: 16%; opacity: 0; }
 }
 @keyframes ex-tool1 {
-  0%, 6% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; }
-  12%, 22% { border-color: var(--c-accent); color: var(--c-text); transform: translateY(-1px); }
-  30%, 100% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; }
+  0%, 6% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; box-shadow: none; }
+  12%, 22% { border-color: var(--c-accent); color: var(--c-text); transform: translateY(-2px); box-shadow: 0 5px 14px rgba(79, 155, 255, 0.24); }
+  30%, 100% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; box-shadow: none; }
 }
 @keyframes ex-tool2 {
-  0%, 28% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; }
-  34%, 44% { border-color: var(--c-accent); color: var(--c-text); transform: translateY(-1px); }
-  52%, 100% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; }
+  0%, 28% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; box-shadow: none; }
+  34%, 44% { border-color: var(--c-accent); color: var(--c-text); transform: translateY(-2px); box-shadow: 0 5px 14px rgba(79, 155, 255, 0.24); }
+  52%, 100% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; box-shadow: none; }
 }
 @keyframes ex-tool3 {
-  0%, 50% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; }
-  56%, 66% { border-color: var(--c-accent); color: var(--c-text); transform: translateY(-1px); }
-  74%, 100% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; }
+  0%, 50% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; box-shadow: none; }
+  56%, 66% { border-color: var(--c-accent); color: var(--c-text); transform: translateY(-2px); box-shadow: 0 5px 14px rgba(79, 155, 255, 0.24); }
+  74%, 100% { border-color: var(--c-line); color: var(--c-text-dim); transform: none; box-shadow: none; }
 }
 @keyframes ex-q {
   0%, 4% { clip-path: inset(0 100% 0 0); }
@@ -1135,6 +1183,14 @@ body[data-nav-open] { overflow: hidden; }
   0%, 58% { opacity: 0; transform: translateY(4px); }
   66%, 92% { opacity: 1; transform: none; }
   98%, 100% { opacity: 0; }
+}
+/* The outcome resolves last, with a small confident overshoot and glow. */
+@keyframes ex-payoff {
+  0%, 68% { opacity: 0; transform: translateY(8px) scale(0.9); box-shadow: none; }
+  77% { opacity: 1; transform: translateY(0) scale(1.05); box-shadow: 0 8px 22px rgba(79, 155, 255, 0.30); }
+  84% { transform: translateY(0) scale(1); box-shadow: 0 4px 14px rgba(79, 155, 255, 0.16); }
+  92% { opacity: 1; box-shadow: none; }
+  98%, 100% { opacity: 0; transform: translateY(0) scale(1); box-shadow: none; }
 }
 
 .disclosure {
