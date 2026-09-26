@@ -335,192 +335,186 @@
       </div>
     </section>
 
-    <!-- ---- What we build ------------------------------------------------
-         Concrete kinds of agent we design and build, each with a small
-         illustration of the shape of the work. Every card reads as plain
-         text with no styling, and the labels stay honest: these are the
-         kinds of build we offer, plus one tool you can open right now. -->
+    <!-- ---- What we build: shown, not described --------------------------
+         One demo player, four plain-language stories. Each plays in three
+         beats (the request, the assistant at work, the result) and ends on
+         a before/after comparison of the time it takes. Without scripting,
+         all four stories read top to bottom as ordinary content; the tabs,
+         autoplay and motion are added by examples.js. Sample data only. -->
     <section class="examples" id="examples" aria-labelledby="examples-title">
       <span class="anchor-alias" id="work" aria-hidden="true"></span>
       <div class="container">
         <div class="section-head" data-reveal>
-          <h2 id="examples-title">Agents we build, where the <span class="text-spectrum text-spectrum--cyan">work</span> already happens.</h2>
+          <h2 id="examples-title">Watch an assistant do the <span class="text-spectrum text-spectrum--cyan">work</span>.</h2>
           <p>
-            Customer agents on the channels people message you on, enterprise
-            agents inside the systems your teams already run, and the
-            integrations that connect an agent to your own tools. Below are the
-            kinds of build we design — and one demo you can open right now.
+            We build AI assistants that take care of everyday work inside the
+            tools your business already uses — and hand the important
+            decisions to a person. Pick an example and watch one at work.
           </p>
         </div>
 
-        <!-- Cinematic centerpiece: the agent orchestrating every channel and
-             tool. Decorative (aria-hidden); the cards below carry the meaning.
-             Plays only in view; resolves to a still diagram with motion off. -->
-        <div class="orchestra" data-reveal data-ex-anim aria-hidden="true">
-          <svg class="orchestra__svg" viewBox="0 0 820 470" preserveAspectRatio="xMidYMid meet" role="img">
-            <defs>
-              <radialGradient id="orchCoreGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#9cc0ff" stop-opacity="0.95"/>
-                <stop offset="42%" stop-color="#7f61d4" stop-opacity="0.40"/>
-                <stop offset="100%" stop-color="#7f61d4" stop-opacity="0"/>
-              </radialGradient>
-              <linearGradient id="orchRing" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#6fe0ff"/>
-                <stop offset="48%" stop-color="#a374d8"/>
-                <stop offset="100%" stop-color="#f391c9"/>
-              </linearGradient>
-              <linearGradient id="orchWire" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#6fe0ff" stop-opacity="0.06"/>
-                <stop offset="50%" stop-color="#8aa0ff" stop-opacity="0.42"/>
-                <stop offset="100%" stop-color="#a374d8" stop-opacity="0.06"/>
-              </linearGradient>
-              <radialGradient id="orchCoreInner" cx="50%" cy="42%" r="60%">
-                <stop offset="0%" stop-color="#9cc0ff" stop-opacity="0.22"/>
-                <stop offset="55%" stop-color="#7f61d4" stop-opacity="0.10"/>
-                <stop offset="100%" stop-color="#0b0b11" stop-opacity="0"/>
-              </radialGradient>
-            </defs>
-            <path class="orch-wire" d="M150,110 C 262,124 322,156 384,208"/>
-            <path class="orch-wire" d="M672,110 C 560,124 500,156 436,208"/>
-            <path class="orch-wire" d="M96,306 C 214,304 300,282 370,252"/>
-            <path class="orch-wire" d="M726,306 C 608,304 522,282 450,252"/>
-            <path class="orch-wire" d="M410,410 C 410,362 410,322 410,278"/>
-            <circle class="orch-glow" cx="410" cy="234" r="90" fill="url(#orchCoreGlow)"/>
-            <circle class="orch-pulse" cx="410" cy="234" r="44"/>
-            <circle class="orch-pulse orch-pulse--2" cx="410" cy="234" r="44"/>
-            <circle class="orch-dash" cx="410" cy="234" r="58"/>
-            <circle class="orch-corering" cx="410" cy="234" r="44"/>
-            <circle class="orch-disc" cx="410" cy="234" r="38"/>
-            <circle cx="410" cy="234" r="38" fill="url(#orchCoreInner)"/>
-            <text class="orch-corelabel" x="410" y="231" text-anchor="middle">Agent</text>
-            <text class="orch-coresub" x="410" y="250" text-anchor="middle">orchestrating</text>
-            <g>
-              <rect class="orch-plate" x="92" y="92" width="116" height="36" rx="18"/>
-              <circle cx="116" cy="110" r="4" fill="#25d366"/>
-              <text class="orch-nodelabel" x="132" y="115">WhatsApp</text>
-            </g>
-            <g>
-              <rect class="orch-plate" x="598" y="92" width="140" height="36" rx="18"/>
-              <circle cx="622" cy="110" r="4" fill="#62d84e"/>
-              <text class="orch-nodelabel" x="638" y="115">ServiceNow</text>
-            </g>
-            <g>
-              <rect class="orch-plate" x="34" y="288" width="124" height="36" rx="18"/>
-              <circle cx="58" cy="306" r="4" fill="#8a6bff"/>
-              <text class="orch-nodelabel" x="74" y="311">MCP · Tools</text>
-            </g>
-            <g>
-              <rect class="orch-plate" x="664" y="288" width="120" height="36" rx="18"/>
-              <circle cx="688" cy="306" r="4" fill="#6fe0ff"/>
-              <text class="orch-nodelabel" x="704" y="311">Your Docs</text>
-            </g>
-            <g>
-              <rect class="orch-plate" x="336" y="392" width="148" height="36" rx="18"/>
-              <circle cx="360" cy="410" r="4" fill="#f391c9"/>
-              <text class="orch-nodelabel" x="376" y="415">Slack · Teams</text>
-            </g>
-            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M150,110 C 262,124 322,156 384,208')"/>
-            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M150,110 C 262,124 322,156 384,208')"/>
-            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M672,110 C 560,124 500,156 436,208')"/>
-            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M672,110 C 560,124 500,156 436,208')"/>
-            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M96,306 C 214,304 300,282 370,252')"/>
-            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M96,306 C 214,304 300,282 370,252')"/>
-            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M726,306 C 608,304 522,282 450,252')"/>
-            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M726,306 C 608,304 522,282 450,252')"/>
-            <circle class="orch-pkt orch-pkt--in"  r="3.4" style="offset-path:path('M410,410 C 410,362 410,322 410,278')"/>
-            <circle class="orch-pkt orch-pkt--out" r="2.8" style="offset-path:path('M410,410 C 410,362 410,322 410,278')"/>
-          </svg>
-          <p class="orchestra__caption">
-            <span data-orch-cap="0">Answering customers on WhatsApp, Messenger &amp; Instagram — in ~2 seconds</span>
-            <span data-orch-cap="1">Turning ServiceNow triage into one confident click</span>
-            <span data-orch-cap="2">Calling your tools through one governed MCP</span>
-            <span data-orch-cap="3">Answering from your own docs — always with the source</span>
-          </p>
-        </div>
+        <div class="demo" data-demo data-reveal>
+          <div class="demo__tabs" role="tablist" aria-label="Examples of what we build">
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-1" aria-controls="demo-panel-1" aria-selected="true" data-demo-tab>
+              <strong>Customer questions</strong><span>WhatsApp · Instagram</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-2" aria-controls="demo-panel-2" aria-selected="false" tabindex="-1" data-demo-tab>
+              <strong>Employee requests</strong><span>ServiceNow</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-3" aria-controls="demo-panel-3" aria-selected="false" tabindex="-1" data-demo-tab>
+              <strong>Company knowledge</strong><span>Your documents</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-4" aria-controls="demo-panel-4" aria-selected="false" tabindex="-1" data-demo-tab>
+              <strong>Your own systems</strong><span>Databases &amp; apps</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+          </div>
 
-        <div class="examples__grid examples__grid--build">
-          <article class="example example--build" data-reveal>
-            <p class="example__status">Meta · WhatsApp · Instagram</p>
-            <h3>Answer every customer in seconds — on the channels they already use.</h3>
-            <div class="ex-viz ex-viz--chat" data-ex-anim aria-hidden="true">
-              <div class="ex-viz__chips"><span>WhatsApp</span><span>Messenger</span><span>Instagram</span></div>
-              <div class="ex-chat">
-                <p class="ex-bubble ex-bubble--in" data-ex-el="ask">Where's my order #4821?</p>
-                <div class="ex-agent-slot">
-                  <span class="ex-typing" data-ex-el="typing"><i></i><i></i><i></i></span>
-                  <p class="ex-bubble ex-bubble--agent" data-ex-el="reply">Shipped this morning — arrives Thursday. Want the tracking link?</p>
+          <!-- 1 · Customer questions -->
+          <div class="demo__panel" id="demo-panel-1" role="tabpanel" aria-labelledby="demo-tab-1" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#25d366"></span><b>WhatsApp</b><span>· Your online store</span><span class="demo__clock">11:42 pm</span></div>
+              <div class="demo__screen">
+                <p class="mk-bubble" data-step="1">Hi! Where's my order #4821?</p>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant checks your store system</p>
+                  <ul class="mk-checks"><li>Found order #4821</li><li>Shipped this morning</li><li>Arrives Thursday</li></ul>
+                </div>
+                <p class="mk-bubble mk-bubble--me" data-step="3">It shipped this morning and arrives on Thursday. Here's your tracking link →</p>
+                <p class="mk-meta mk-meta--me" data-step="3">Answered by your assistant · 2 seconds</p>
+              </div>
+            </div>
+            <div class="demo__story">
+              <h3>Answer customers on WhatsApp — day or night.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">A customer messages your store at 11:42 pm.</li>
+                <li data-say="2">The assistant looks up their order in your system.</li>
+                <li data-say="3">They get a clear answer in seconds.</li>
+              </ol>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to reply</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>Next morning</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>About 2 seconds</b></p><i class="demo__fill" style="--w:3%"></i></div>
+                <p class="demo__note">Anything unusual is handed to your team.</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
+            </div>
+          </div>
+
+          <!-- 2 · Employee requests -->
+          <div class="demo__panel" id="demo-panel-2" role="tabpanel" aria-labelledby="demo-tab-2" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#62d84e"></span><b>ServiceNow</b><span>· IT requests</span><span class="demo__clock">9:05 am</span></div>
+              <div class="demo__screen">
+                <div class="mk-card mk-req" data-step="1">
+                  <span class="mk-avatar">PR</span>
+                  <div><p class="mk-req__title">Priya in Finance needs a new laptop</p><p class="mk-meta">New request · just now</p></div>
+                </div>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant checks the details</p>
+                  <ul class="mk-checks"><li>A standard laptop fits her role</li><li>6 in stock</li><li>Within the Finance budget</li></ul>
+                </div>
+                <div class="mk-card mk-approve" data-step="3">
+                  <p class="mk-approve__q">Approve a standard laptop for Priya?</p>
+                  <p class="mk-approve__row"><span class="mk-btn">Approve</span><span class="mk-btn mk-btn--quiet">Change</span></p>
+                  <p class="mk-done mk-later"><span class="mk-tick"></span>Approved by her manager — laptop ordered</p>
                 </div>
               </div>
-              <p class="ex-payoff" data-ex-el="payoff"><span class="ex-payoff__tick" aria-hidden="true"></span><span>Resolved in one reply · first response in ~2s</span></p>
             </div>
-            <p>Answers, checks an order, books — 24/7 across WhatsApp Business, Messenger and Instagram — and hands anything sensitive to a person before it is sent.</p>
-          </article>
-
-          <article class="example example--build" data-reveal style="--d:30ms">
-            <p class="example__status">ServiceNow · Enterprise ITSM</p>
-            <h3>Turn hours of request triage into one confident click.</h3>
-            <div class="ex-viz ex-viz--flow" data-ex-anim aria-hidden="true">
-              <ol class="ex-steps">
-                <li class="ex-step" data-ex-step="1"><span class="ex-step__tick"></span><span>Reads REQ0010482 · P3</span></li>
-                <li class="ex-step" data-ex-step="2"><span class="ex-step__tick"></span><span>Gathers context — stock, cost centre, role</span></li>
-                <li class="ex-step" data-ex-step="3"><span class="ex-step__tick"></span><span>Proposes: approve the standard build</span></li>
-                <li class="ex-step ex-step--approve" data-ex-step="4"><span class="ex-step__tick"></span><span>Sent to the manager to approve</span></li>
+            <div class="demo__story">
+              <h3>Handle employee requests in ServiceNow.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">An employee asks for a new laptop.</li>
+                <li data-say="2">The assistant checks the policy, the stock and the budget.</li>
+                <li data-say="3">Their manager approves it with one click.</li>
               </ol>
-              <p class="ex-payoff" data-ex-el="payoff"><span class="ex-payoff__tick" aria-hidden="true"></span><span>One decision left for a person · ~25 min of triage skipped</span></p>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to sort it out</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>2–3 days of emails</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>A few minutes</b></p><i class="demo__fill" style="--w:6%"></i></div>
+                <p class="demo__note">A person still makes the decision.</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
             </div>
-            <p>Reads the record, gathers the context a person would, and proposes one action — leaving the approval, and the accountability, with a person.</p>
-          </article>
+          </div>
 
-          <article class="example example--build" data-reveal style="--d:60ms">
-            <p class="example__status">Model Context Protocol</p>
-            <h3>Connect once. Every tool an agent needs, governed.</h3>
-            <div class="ex-viz ex-viz--mcp" data-ex-anim aria-hidden="true">
-              <div class="ex-mcp__agent">Agent</div>
-              <div class="ex-mcp__bus">
-                <span class="ex-mcp__pulse" data-ex-el="pulse"></span>
-                <span class="ex-mcp__label">MCP</span>
+          <!-- 3 · Company knowledge -->
+          <div class="demo__panel" id="demo-panel-3" role="tabpanel" aria-labelledby="demo-tab-3" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#6fa8ff"></span><b>Company docs</b><span>· Ask a question</span><span class="demo__clock">2:18 pm</span></div>
+              <div class="demo__screen">
+                <p class="mk-bubble" data-step="1">What's our refund policy for damaged items?</p>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant reads your documents</p>
+                  <p class="mk-docs"><span class="mk-doc mk-doc--hit">Refund policy.pdf</span><span class="mk-doc">Support handbook</span><span class="mk-doc">Shipping FAQ</span></p>
+                </div>
+                <div class="mk-card mk-answer" data-step="3">
+                  <p>Customers get a full refund within 30 days — they just need to send a photo of the damage.</p>
+                  <p class="mk-source"><span class="mk-doc mk-doc--src">Source: Refund policy.pdf · page 2</span></p>
+                </div>
               </div>
-              <div class="ex-mcp__tools">
-                <span data-ex-tool="1">Database</span><span data-ex-tool="2">Internal API</span><span data-ex-tool="3">Docs</span>
-              </div>
-              <p class="ex-payoff" data-ex-el="payoff"><span class="ex-payoff__tick" aria-hidden="true"></span><span>Typed · permissioned · every call audited</span></p>
             </div>
-            <p>We build the MCP server that exposes your systems as typed, permissioned tools — so one integration serves every agent, with the limits set where you need them.</p>
-          </article>
+            <div class="demo__story">
+              <h3>Find answers in your own documents.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">Someone on your team asks about a policy.</li>
+                <li data-say="2">The assistant reads your own documents.</li>
+                <li data-say="3">They get the answer — and the page it came from.</li>
+              </ol>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to find the answer</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>15 minutes of searching</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>A few seconds</b></p><i class="demo__fill" style="--w:4%"></i></div>
+                <p class="demo__note">Every answer shows its source, so it can be checked.</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
+            </div>
+          </div>
 
-          <article class="example example--build" data-reveal style="--d:90ms">
-            <p class="example__status">Internal demo · you can open it</p>
-            <h3>Answers grounded in your docs — always with the source.</h3>
-            <div class="ex-viz ex-viz--search" data-ex-anim aria-hidden="true">
-              <p class="ex-search__box"><span class="ex-search__q">How do I configure an SLA?</span><span class="ex-search__caret" data-ex-el="caret"></span><span class="ex-search__go">Search</span></p>
-              <p class="ex-search__result" data-ex-res="1"><span class="ex-search__dot"></span>Configure SLA definitions — docs.servicenow.com</p>
-              <p class="ex-search__result" data-ex-res="2"><span class="ex-search__dot"></span>SLA conditions and timers — product docs</p>
-              <p class="ex-payoff" data-ex-el="payoff"><span class="ex-payoff__tick" aria-hidden="true"></span><span>Every answer cites its source · verify in one click</span></p>
-            </div>
-            <p>Ask in plain language, get the matching documentation with an excerpt and a link — a working demo you can open right now.</p>
-            <p class="example__action"><a href="/ask">Open the search <span aria-hidden="true">›</span></a></p>
-            <details class="disclosure">
-              <summary>What this demo does</summary>
-              <div class="disclosure__body">
-                <p>
-                  It searches the public ServiceNow product documentation, picks
-                  the pages that match the words in your question, and shows
-                  each one with an excerpt and a link. Results are ranked by
-                  keyword matching, so a listed page matched the question —
-                  reading the source is still how you confirm the answer.
-                </p>
-                <p>
-                  It only covers ServiceNow. Written answers appear only where
-                  an answer model is enabled on the deployment, and the tool
-                  says which of the two you are looking at before you ask.
-                </p>
+          <!-- 4 · Your own systems -->
+          <div class="demo__panel" id="demo-panel-4" role="tabpanel" aria-labelledby="demo-tab-4" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#a374d8"></span><b>Your business</b><span>· Ask anything</span><span class="demo__clock">4:30 pm</span></div>
+              <div class="demo__screen">
+                <p class="mk-bubble" data-step="1">How many orders shipped late this week?</p>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant uses your software</p>
+                  <ul class="mk-checks mk-checks--conn"><li>Orders database <em>read-only</em></li><li>Shipping tracker <em>read-only</em></li></ul>
+                </div>
+                <div class="mk-card mk-answer" data-step="3">
+                  <p><strong>12 orders</strong> shipped late this week — 9 of them with the same courier.</p>
+                  <ul class="mk-mini">
+                    <li style="--v:100%"><span>Courier A</span><i></i><b>9</b></li>
+                    <li style="--v:22%"><span>Courier B</span><i></i><b>2</b></li>
+                    <li style="--v:11%"><span>Courier C</span><i></i><b>1</b></li>
+                  </ul>
+                </div>
               </div>
-            </details>
-          </article>
+            </div>
+            <div class="demo__story">
+              <h3>Let an assistant use your own software, safely.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">You ask a question in plain English.</li>
+                <li data-say="2">The assistant looks it up — only with the access you allow.</li>
+                <li data-say="3">You get the answer without building a report.</li>
+              </ol>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to get the number</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>An hour of pulling reports</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>One question</b></p><i class="demo__fill" style="--w:5%"></i></div>
+                <p class="demo__note">We set up this safe connection for you (it's called MCP).</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
+            </div>
+          </div>
+
+          <p class="demo__disclaimer">Illustrative examples with sample data. Times show the typical difference we aim for, not a guarantee.</p>
         </div>
 
         <p class="section-action" data-reveal>
-          <a href="mailto:inquiry@summaverick.com" data-brand="contact">Also: Slack and Teams ops agents, voice intake, retrieval over your own docs — tell us about your use case <span aria-hidden="true">›</span></a>
+          <a href="/ask">Try a real one: search the ServiceNow documentation <span aria-hidden="true">›</span></a>
+        </p>
+        <p class="section-action demo__more" data-reveal>
+          <a href="mailto:inquiry@summaverick.com" data-brand="contact">Also: assistants for Slack and Teams, voice calls, and more — tell us about your use case <span aria-hidden="true">›</span></a>
         </p>
       </div>
     </section>
