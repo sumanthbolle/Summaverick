@@ -84,7 +84,10 @@
       <div class="container hero__grid">
         <div class="hero__copy">
           <p class="hello" aria-hidden="true"><span class="hello__word text-spectrum" data-hello>Hello</span></p>
-          <h1 id="hero-title">Meet <span class="text-spectrum text-spectrum--flow">Summaverick</span>.</h1>
+          <h1 id="hero-title" class="hero-headline">
+            <span class="hero-headline__lead">Meet</span>
+            <span class="hero-headline__mark"><span class="glassmark" data-glassmark><span class="glassmark__base">Summaverick</span><span class="glassmark__layer glassmark__shade" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__rim" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__reflect" aria-hidden="true">Summaverick</span><span class="glassmark__flash" aria-hidden="true"></span><span class="glassmark__frag" data-frag="0" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="1" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="2" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="3" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="4" aria-hidden="true">Summaverick</span><span class="glassmark__glint glassmark__glint--s" aria-hidden="true"></span><span class="glassmark__glint glassmark__glint--a" aria-hidden="true"></span></span><span class="hero-headline__dot" aria-hidden="true">.</span></span>
+          </h1>
           <p class="studio-lead">
             A software studio for AI agents. We design and build them end to
             end—a personal assistant on someone's phone, a mobile experience,
@@ -332,91 +335,187 @@
       </div>
     </section>
 
-    <!-- ---- Product examples ---------------------------------------------
-         Three cards, three different kinds of thing: a concept, an
-         illustration, and something you can actually open. Each says which. -->
+    <!-- ---- What we build: shown, not described --------------------------
+         One demo player, four plain-language stories. Each plays in three
+         beats (the request, the assistant at work, the result) and ends on
+         a before/after comparison of the time it takes. Without scripting,
+         all four stories read top to bottom as ordinary content; the tabs,
+         autoplay and motion are added by examples.js. Sample data only. -->
     <section class="examples" id="examples" aria-labelledby="examples-title">
       <span class="anchor-alias" id="work" aria-hidden="true"></span>
       <div class="container">
         <div class="section-head" data-reveal>
-          <h2 id="examples-title">A closer look at what an <span class="text-spectrum text-spectrum--cyan">agent</span> could do.</h2>
+          <h2 id="examples-title">Watch an assistant do the <span class="text-spectrum text-spectrum--cyan">work</span>.</h2>
           <p>
-            One idea we explored, one interface we drew, and one tool you can
-            open right now. The label on each card says which of the three you
-            are looking at.
+            We build AI assistants that take care of everyday work inside the
+            tools your business already uses — and hand the important
+            decisions to a person. Pick an example and watch one at work.
           </p>
         </div>
 
-        <div class="examples__grid">
-          <article class="example" data-reveal>
-            <p class="example__status">Hackathon concept · June 2026</p>
-            <h3>Help with the follow-ups people put off.</h3>
-            <p>
-              Our AdultingGPT hackathon concept explored how an assistant could
-              use a screenshot or voice note to understand an everyday problem,
-              prepare a response, and keep track of the follow-up.
-            </p>
-            <details class="disclosure">
-              <summary>What the concept actually covers</summary>
-              <div class="disclosure__body">
-                <p>
-                  A submission deck written for an India Agentic AI open
-                  hackathon in June 2026, before Summaverick was formed. It
-                  describes reading a screenshot, an email, or a voice note to
-                  work out what a refund, subscription, or shared-payment
-                  problem needs; asking for anything missing; drafting a message
-                  for the person to approve; and tracking what happens next.
-                </p>
-                <p>
-                  It is a plan, not a product. Nothing in it has been released,
-                  no money has been recovered through it, and it does not
-                  represent a partnership with any tool vendor named in the
-                  deck. The personal walk-through above is our own illustration
-                  of the same idea, not a screenshot of built software.
-                </p>
-              </div>
-            </details>
-          </article>
+        <div class="demo" data-demo data-reveal>
+          <div class="demo__tabs" role="tablist" aria-label="Examples of what we build">
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-1" aria-controls="demo-panel-1" aria-selected="true" data-demo-tab>
+              <strong>Customer questions</strong><span>WhatsApp · Instagram</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-2" aria-controls="demo-panel-2" aria-selected="false" tabindex="-1" data-demo-tab>
+              <strong>Employee requests</strong><span>ServiceNow</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-3" aria-controls="demo-panel-3" aria-selected="false" tabindex="-1" data-demo-tab>
+              <strong>Company knowledge</strong><span>Your documents</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+            <button class="demo__tab" type="button" role="tab" id="demo-tab-4" aria-controls="demo-panel-4" aria-selected="false" tabindex="-1" data-demo-tab>
+              <strong>Your own systems</strong><span>Databases &amp; apps</span><i class="demo__bar" aria-hidden="true"></i>
+            </button>
+          </div>
 
-          <article class="example" data-reveal style="--d:30ms">
-            <p class="example__status">Interactive illustration</p>
-            <h3>Help a service request reach its next step.</h3>
-            <p>
-              An example of an agent gathering relevant information, preparing
-              an update, and passing an action to the right person for review.
-            </p>
-            <p class="example__action">
-              <a href="#stage" data-stage-jump="enterprise">Play the example <span aria-hidden="true">›</span></a>
-            </p>
-          </article>
-
-          <article class="example" data-reveal style="--d:60ms">
-            <p class="example__status">Internal demo</p>
-            <h3>ServiceNow reference search</h3>
-            <p>
-              Find documentation related to a ServiceNow question and open the
-              sources to read more.
-            </p>
-            <p class="example__action"><a href="/ask">Search documentation <span aria-hidden="true">›</span></a></p>
-            <details class="disclosure">
-              <summary>What this example does</summary>
-              <div class="disclosure__body">
-                <p>
-                  It searches the public ServiceNow product documentation, picks
-                  the pages that match the words in your question, and shows
-                  each one with an excerpt and a link. Results are ranked by
-                  keyword matching, so a listed page matched the question —
-                  reading the source is still how you confirm the answer.
-                </p>
-                <p>
-                  It only covers ServiceNow. Written answers appear only where
-                  an answer model is enabled on the deployment, and the tool
-                  says which of the two you are looking at before you ask.
-                </p>
+          <!-- 1 · Customer questions -->
+          <div class="demo__panel" id="demo-panel-1" role="tabpanel" aria-labelledby="demo-tab-1" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#25d366"></span><b>WhatsApp</b><span>· Your online store</span><span class="demo__clock">11:42 pm</span></div>
+              <div class="demo__screen">
+                <p class="mk-bubble" data-step="1">Hi! Where's my order #4821?</p>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant checks your store system</p>
+                  <ul class="mk-checks"><li>Found order #4821</li><li>Shipped this morning</li><li>Arrives Thursday</li></ul>
+                </div>
+                <p class="mk-bubble mk-bubble--me" data-step="3">It shipped this morning and arrives on Thursday. Here's your tracking link →</p>
+                <p class="mk-meta mk-meta--me" data-step="3">Answered by your assistant · 2 seconds</p>
               </div>
-            </details>
-          </article>
+            </div>
+            <div class="demo__story">
+              <h3>Answer customers on WhatsApp — day or night.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">A customer messages your store at 11:42 pm.</li>
+                <li data-say="2">The assistant looks up their order in your system.</li>
+                <li data-say="3">They get a clear answer in seconds.</li>
+              </ol>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to reply</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>Next morning</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>About 2 seconds</b></p><i class="demo__fill" style="--w:3%"></i></div>
+                <p class="demo__note">Anything unusual is handed to your team.</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
+            </div>
+          </div>
+
+          <!-- 2 · Employee requests -->
+          <div class="demo__panel" id="demo-panel-2" role="tabpanel" aria-labelledby="demo-tab-2" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#62d84e"></span><b>ServiceNow</b><span>· IT requests</span><span class="demo__clock">9:05 am</span></div>
+              <div class="demo__screen">
+                <div class="mk-card mk-req" data-step="1">
+                  <span class="mk-avatar">PR</span>
+                  <div><p class="mk-req__title">Priya in Finance needs a new laptop</p><p class="mk-meta">New request · just now</p></div>
+                </div>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant checks the details</p>
+                  <ul class="mk-checks"><li>A standard laptop fits her role</li><li>6 in stock</li><li>Within the Finance budget</li></ul>
+                </div>
+                <div class="mk-card mk-approve" data-step="3">
+                  <p class="mk-approve__q">Approve a standard laptop for Priya?</p>
+                  <p class="mk-approve__row"><span class="mk-btn">Approve</span><span class="mk-btn mk-btn--quiet">Change</span></p>
+                  <p class="mk-done mk-later"><span class="mk-tick"></span>Approved by her manager — laptop ordered</p>
+                </div>
+              </div>
+            </div>
+            <div class="demo__story">
+              <h3>Handle employee requests in ServiceNow.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">An employee asks for a new laptop.</li>
+                <li data-say="2">The assistant checks the policy, the stock and the budget.</li>
+                <li data-say="3">Their manager approves it with one click.</li>
+              </ol>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to sort it out</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>2–3 days of emails</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>A few minutes</b></p><i class="demo__fill" style="--w:6%"></i></div>
+                <p class="demo__note">A person still makes the decision.</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
+            </div>
+          </div>
+
+          <!-- 3 · Company knowledge -->
+          <div class="demo__panel" id="demo-panel-3" role="tabpanel" aria-labelledby="demo-tab-3" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#6fa8ff"></span><b>Company docs</b><span>· Ask a question</span><span class="demo__clock">2:18 pm</span></div>
+              <div class="demo__screen">
+                <p class="mk-bubble" data-step="1">What's our refund policy for damaged items?</p>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant reads your documents</p>
+                  <p class="mk-docs"><span class="mk-doc mk-doc--hit">Refund policy.pdf</span><span class="mk-doc">Support handbook</span><span class="mk-doc">Shipping FAQ</span></p>
+                </div>
+                <div class="mk-card mk-answer" data-step="3">
+                  <p>Customers get a full refund within 30 days — they just need to send a photo of the damage.</p>
+                  <p class="mk-source"><span class="mk-doc mk-doc--src">Source: Refund policy.pdf · page 2</span></p>
+                </div>
+              </div>
+            </div>
+            <div class="demo__story">
+              <h3>Find answers in your own documents.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">Someone on your team asks about a policy.</li>
+                <li data-say="2">The assistant reads your own documents.</li>
+                <li data-say="3">They get the answer — and the page it came from.</li>
+              </ol>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to find the answer</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>15 minutes of searching</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>A few seconds</b></p><i class="demo__fill" style="--w:4%"></i></div>
+                <p class="demo__note">Every answer shows its source, so it can be checked.</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
+            </div>
+          </div>
+
+          <!-- 4 · Your own systems -->
+          <div class="demo__panel" id="demo-panel-4" role="tabpanel" aria-labelledby="demo-tab-4" tabindex="0" data-demo-panel>
+            <div class="demo__stage" aria-hidden="true">
+              <div class="demo__chrome"><span class="demo__app" style="--app:#a374d8"></span><b>Your business</b><span>· Ask anything</span><span class="demo__clock">4:30 pm</span></div>
+              <div class="demo__screen">
+                <p class="mk-bubble" data-step="1">How many orders shipped late this week?</p>
+                <div class="mk-card mk-work" data-step="2">
+                  <p class="mk-work__title"><span class="mk-spin"></span>Assistant uses your software</p>
+                  <ul class="mk-checks mk-checks--conn"><li>Orders database <em>read-only</em></li><li>Shipping tracker <em>read-only</em></li></ul>
+                </div>
+                <div class="mk-card mk-answer" data-step="3">
+                  <p><strong>12 orders</strong> shipped late this week — 9 of them with the same courier.</p>
+                  <ul class="mk-mini">
+                    <li style="--v:100%"><span>Courier A</span><i></i><b>9</b></li>
+                    <li style="--v:22%"><span>Courier B</span><i></i><b>2</b></li>
+                    <li style="--v:11%"><span>Courier C</span><i></i><b>1</b></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="demo__story">
+              <h3>Let an assistant use your own software, safely.</h3>
+              <ol class="demo__steps">
+                <li data-say="1">You ask a question in plain English.</li>
+                <li data-say="2">The assistant looks it up — only with the access you allow.</li>
+                <li data-say="3">You get the answer without building a report.</li>
+              </ol>
+              <div class="demo__compare">
+                <p class="demo__compare-title">Time to get the number</p>
+                <div class="demo__row"><p><span>Without an assistant</span><b>An hour of pulling reports</b></p><i class="demo__fill" style="--w:100%"></i></div>
+                <div class="demo__row demo__row--with"><p><span>With your assistant</span><b>One question</b></p><i class="demo__fill" style="--w:5%"></i></div>
+                <p class="demo__note">We set up this safe connection for you (it's called MCP).</p>
+              </div>
+              <button class="demo__replay" type="button" data-demo-replay>Replay</button>
+            </div>
+          </div>
+
+          <p class="demo__disclaimer">Illustrative examples with sample data. Times show the typical difference we aim for, not a guarantee.</p>
         </div>
+
+        <p class="section-action" data-reveal>
+          <a href="/ask">Try a real one: search the ServiceNow documentation <span aria-hidden="true">›</span></a>
+        </p>
+        <p class="section-action demo__more" data-reveal>
+          <a href="mailto:inquiry@summaverick.com" data-brand="contact">Also: assistants for Slack and Teams, voice calls, and more — tell us about your use case <span aria-hidden="true">›</span></a>
+        </p>
       </div>
     </section>
 

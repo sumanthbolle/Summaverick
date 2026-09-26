@@ -426,10 +426,8 @@ body[data-nav-open] { overflow: hidden; }
   min-height: var(--tap);
   font-weight: var(--weight-medium);
 }
-.section-action a span,
-.example__action a span { margin-left: 0.35em; transition: transform 160ms var(--ease-out); }
-.section-action a:hover span,
-.example__action a:hover span { transform: translateX(3px); }
+.section-action a span { margin-left: 0.35em; transition: transform 160ms var(--ease-out); }
+.section-action a:hover span { transform: translateX(3px); }
 
 /* ---- Hero --------------------------------------------------------------
    Copy first in the document, so it also comes first on a narrow screen. */
@@ -769,43 +767,397 @@ body[data-nav-open] { overflow: hidden; }
 :root[data-js="on"] .stage__tabs { display: flex; }
 :root[data-js="on"] .stage__controls { display: flex; }
 
-/* ---- Examples ---------------------------------------------------------- */
-.examples__grid {
+/* ---- Examples: the demo player -----------------------------------------
+   Four plain-language stories. Without scripting every panel shows in full,
+   stacked. examples.js adds .is-enhanced, the tabs and step-by-step playback,
+   driving each panel through data-at="0…4": 1 the request, 2 the assistant
+   at work, 3 the result, 4 the before/after comparison. The stage mock-up is
+   decorative (aria-hidden); the story column beside it says it in words. */
+.demo { margin-top: var(--space-7); }
+.demo__tabs { display: none; }
+.demo.is-enhanced .demo__tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-5);
-  align-items: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
-.example {
+.demo__tab {
+  position: relative;
+  overflow: hidden;
+  min-height: var(--tap);
+  padding: 14px 16px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--c-text-dim);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+}
+.demo__tab:hover { border-color: var(--c-line-strong); }
+.demo__tab strong { display: block; color: var(--c-text); font-size: 0.95rem; font-weight: var(--weight-semibold); }
+.demo__tab span { display: block; margin-top: 2px; font-size: 0.78rem; }
+.demo__tab[aria-selected="true"] { background: var(--c-surface-2); border-color: var(--c-line-strong); }
+.demo__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--grad-cyan);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.demo__tab.is-running .demo__bar { animation: demo-progress var(--dur, 12s) linear forwards; }
+.demo__tab.is-done .demo__bar { transform: scaleX(1); }
+@keyframes demo-progress { to { transform: scaleX(1); } }
+
+.demo__panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.demo:not(.is-enhanced) .demo__panel + .demo__panel { margin-top: var(--space-6); }
+.demo__panel[hidden] { display: none; }
+/* One height for every story, so nothing below shifts as they change. */
+.demo.is-enhanced .demo__panel { min-height: 520px; }
+.demo__panel:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--radius-lg); }
+
+/* The stage: a small app window where the story plays out. */
+.demo__stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-2);
+  overflow: hidden;
+  box-shadow: 0 30px 60px -44px rgba(15, 15, 20, 0.4);
+}
+.demo__chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--c-line);
+  background: var(--c-surface);
+  font-size: 0.8rem;
+  color: var(--c-text-mute);
+}
+.demo__chrome b { color: var(--c-text); font-weight: var(--weight-medium); }
+.demo__app { width: 10px; height: 10px; margin-right: 2px; border-radius: 50%; background: var(--app); }
+.demo__clock { margin-left: auto; font-variant-numeric: tabular-nums; }
+.demo__screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 22px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.mk-bubble {
+  align-self: flex-start;
+  max-width: 82%;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 18px 18px 18px 6px;
+  background: var(--c-surface);
+  color: var(--c-text);
+}
+.mk-bubble--me {
+  align-self: flex-end;
+  border-color: transparent;
+  border-radius: 18px 18px 6px 18px;
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+  box-shadow: 0 10px 22px -12px rgba(15, 15, 20, 0.5);
+}
+.mk-meta { margin: 0; font-size: 0.74rem; color: var(--c-text-mute); }
+.mk-meta--me { align-self: flex-end; margin-top: -6px; }
+.mk-card {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+.mk-work__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--c-text-dim);
+}
+
+/* A done-tick. When the assistant starts working it spins as a ring, then
+   settles back into the tick once the last check has landed (~1.5s). */
+.mk-spin,
+.mk-tick {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--grad-cyan);
+}
+.mk-spin { border: 2px solid transparent; }
+.mk-spin::after,
+.mk-tick::after {
+  content: "";
+  position: absolute;
+  left: 6.5px;
+  top: 3.5px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.mk-spin::after { left: 4.5px; top: 1.5px; }
+.demo__panel[data-at="2"] .mk-spin { animation: mk-work 1.5s linear both; }
+.demo__panel[data-at="2"] .mk-spin::after { animation: mk-work-tick 1.5s linear both; }
+@keyframes mk-work {
+  0% { transform: rotate(0deg); background: transparent; border-color: var(--c-text) var(--c-line-strong) var(--c-line-strong); }
+  92% { transform: rotate(660deg); background: transparent; border-color: var(--c-text) var(--c-line-strong) var(--c-line-strong); }
+  100% { transform: rotate(720deg); border-color: transparent; }
+}
+@keyframes mk-work-tick { 0%, 94% { opacity: 0; } 100% { opacity: 1; } }
+
+.mk-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mk-checks li { position: relative; padding-left: 28px; color: var(--c-text); }
+.mk-checks li::before,
+.mk-checks li::after { content: ""; position: absolute; top: 50%; }
+.mk-checks li::before { left: 0; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: var(--grad-cyan); }
+.mk-checks li::after {
+  left: 6.5px;
+  width: 4px;
+  height: 8px;
+  margin-top: -6px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.mk-checks em {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--c-accent-soft);
+  color: var(--c-text-dim);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.mk-req { display: flex; align-items: center; gap: 12px; }
+.mk-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--c-accent-soft);
+  color: var(--c-text);
+  font-size: 0.8rem;
+  font-weight: var(--weight-semibold);
+}
+.mk-req__title,
+.mk-approve__q { margin: 0; font-weight: var(--weight-medium); color: var(--c-text); }
+.mk-approve__q { margin-bottom: 10px; }
+.mk-approve__row { display: flex; gap: 8px; margin: 0; }
+.mk-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+}
+.mk-btn--quiet { background: transparent; color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+.mk-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 0.86rem;
+  font-weight: var(--weight-medium);
+  color: var(--c-text);
+}
+
+.mk-docs,
+.mk-source { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.mk-source { margin-top: 10px; }
+.mk-doc {
+  padding: 4px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface-2);
+  color: var(--c-text-dim);
+  font-size: 0.76rem;
+}
+.mk-doc--hit,
+.mk-doc--src {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--c-surface), var(--c-surface)) padding-box,
+    var(--grad-cyan) border-box;
+  color: var(--c-text);
+}
+.mk-answer p { margin: 0; color: var(--c-text); }
+.mk-answer .mk-source { margin-top: 10px; }
+.mk-mini { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.mk-mini li {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--c-text-dim);
+}
+.mk-mini i { display: block; width: var(--v); height: 8px; border-radius: 4px; background: var(--grad-cyan); }
+.mk-mini b { color: var(--c-text); text-align: right; }
+
+/* The story column: the same three beats in words, then the difference. */
+.demo__story {
+  display: flex;
+  flex-direction: column;
   padding: var(--space-6);
   border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
   background: var(--c-surface);
-  transition: border-color 160ms var(--ease-out);
 }
-.example:hover { border-color: var(--c-line-strong); }
-.example__status {
-  display: inline-block;
-  margin: 0 0 var(--space-4);
-  padding: 2px 8px;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--radius-pill);
+.demo__story h3 { margin: 0 0 var(--space-4); font-size: var(--step-1); letter-spacing: var(--tracking-snug); }
+.demo__steps { list-style: none; margin: 0 0 var(--space-6); padding: 0; display: grid; gap: 12px; counter-reset: demo; }
+.demo__steps li {
+  counter-increment: demo;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  color: var(--c-text);
+  line-height: 1.45;
+}
+.demo__steps li::before {
+  content: counter(demo);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
+  font-size: 0.78rem;
+  font-weight: var(--weight-semibold);
   color: var(--c-text-dim);
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
+  transition: background-color 250ms var(--ease-out), color 250ms var(--ease-out);
 }
-.example h3 {
-  margin: 0;
-  font-size: var(--step-1);
-  letter-spacing: var(--tracking-snug);
+.demo__compare { margin-top: auto; padding-top: var(--space-5); border-top: 1px solid var(--c-line); }
+.demo__compare-title {
+  margin: 0 0 12px;
+  font-size: 0.72rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-text-mute);
 }
-.example > p { margin: var(--space-3) 0 0; color: var(--c-text-dim); }
-.example__action { margin: var(--space-4) 0 0 !important; }
-.example__action a {
+.demo__row { margin: 0 0 12px; }
+.demo__row p { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 6px; font-size: 0.84rem; color: var(--c-text-dim); }
+.demo__row b { color: var(--c-text); font-weight: var(--weight-semibold); text-align: right; }
+.demo__fill { display: block; width: var(--w); min-width: 10px; height: 10px; border-radius: 5px; background: var(--c-line-strong); }
+.demo__row--with .demo__fill { background: var(--grad-cyan); }
+.demo__note { margin: 4px 0 0; font-size: 0.8rem; color: var(--c-text-dim); }
+.demo__replay { display: none; }
+.demo.is-enhanced .demo__replay {
   display: inline-flex;
   align-items: center;
-  min-height: var(--tap);
+  align-self: flex-start;
+  min-height: 36px;
+  margin-top: var(--space-4);
+  padding: 0 16px;
+  font: inherit;
+  font-size: 0.82rem;
   font-weight: var(--weight-medium);
+  color: var(--c-text);
+  background: transparent;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.demo.is-enhanced .demo__replay:hover { background: var(--c-surface-2); }
+.demo__disclaimer { margin: var(--space-4) 0 0; font-size: 0.78rem; color: var(--c-text-mute); }
+.demo__more { margin-top: var(--space-3); }
+
+/* Playback. The story fades in beat by beat; the comparison bars grow last. */
+.demo.is-enhanced [data-step] {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  transition: opacity 450ms var(--ease-out), transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.demo.is-enhanced [data-step].is-shown { opacity: 1; transform: none; }
+.demo.is-enhanced .mk-checks li,
+.demo.is-enhanced .mk-docs .mk-doc,
+.demo.is-enhanced .mk-mini li {
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 350ms var(--ease-out), transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.demo.is-enhanced .is-shown .mk-checks li,
+.demo.is-enhanced .is-shown .mk-docs .mk-doc,
+.demo.is-enhanced .is-shown .mk-mini li { opacity: 1; transform: none; }
+.demo.is-enhanced .is-shown :is(.mk-checks li, .mk-docs .mk-doc, .mk-mini li):nth-child(1) { transition-delay: 200ms; }
+.demo.is-enhanced .is-shown :is(.mk-checks li, .mk-docs .mk-doc, .mk-mini li):nth-child(2) { transition-delay: 650ms; }
+.demo.is-enhanced .is-shown :is(.mk-checks li, .mk-docs .mk-doc, .mk-mini li):nth-child(3) { transition-delay: 1100ms; }
+.demo.is-enhanced .mk-later { opacity: 0; transform: translateY(4px); transition: opacity 400ms ease 1100ms, transform 500ms ease 1100ms; }
+.demo.is-enhanced .is-shown .mk-later { opacity: 1; transform: none; }
+.demo.is-enhanced .is-shown .mk-btn:first-child { animation: mk-press 450ms ease 650ms both; }
+@keyframes mk-press { 50% { transform: scale(0.9); } }
+
+.demo.is-enhanced .demo__steps li { opacity: 0.4; transition: opacity 300ms var(--ease-out); }
+.demo.is-enhanced .demo__steps li.is-shown { opacity: 1; }
+.demo.is-enhanced .demo__steps li.is-shown::before { background: var(--c-accent-soft); color: var(--c-text); }
+.demo.is-enhanced .demo__steps li.is-current::before { background: var(--c-accent-fill); color: var(--c-on-accent); }
+
+.demo.is-enhanced .demo__fill { width: 0; min-width: 0; transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1); }
+.demo.is-enhanced .demo__row--with .demo__fill { transition-delay: 400ms; }
+.demo.is-enhanced [data-at="4"] .demo__fill { width: var(--w); min-width: 10px; }
+.demo.is-enhanced .demo__row b,
+.demo.is-enhanced .demo__note { opacity: 0; transition: opacity 400ms ease; }
+.demo.is-enhanced [data-at="4"] .demo__row b { opacity: 1; transition-delay: 500ms; }
+.demo.is-enhanced [data-at="4"] .demo__row--with b { transition-delay: 900ms; }
+.demo.is-enhanced [data-at="4"] .demo__note { opacity: 1; transition-delay: 1300ms; }
+
+/* Rewinding to the start of a story happens in one frame, not in reverse. */
+.demo__panel.is-instant,
+.demo__panel.is-instant *,
+.demo__panel.is-instant *::before { transition: none !important; animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .demo *,
+  .demo *::before,
+  .demo *::after { transition: none !important; animation: none !important; }
+  .demo__bar { display: none; }
+}
+@media (max-width: 960px) {
+  .demo.is-enhanced .demo__tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .demo__panel { grid-template-columns: 1fr; }
+  .demo.is-enhanced .demo__panel { min-height: 0; }
+  .demo__stage { min-height: 440px; }
+}
+@media (max-width: 480px) {
+  .demo__screen { padding: 16px; }
+  .demo__story { padding: var(--space-5); }
+  .demo__tab { padding: 12px; }
+  .demo__tab span { display: none; }
 }
 
 .disclosure {
@@ -1011,8 +1363,7 @@ body[data-nav-open] { overflow: hidden; }
 
 /* ---- Breakpoints ------------------------------------------------------- */
 @media (max-width: 960px) {
-  .offers__grid,
-  .examples__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .offers__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
   .hero__grid,
@@ -1024,8 +1375,7 @@ body[data-nav-open] { overflow: hidden; }
   .platforms__grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .offers__grid,
-  .examples__grid { grid-template-columns: 1fr; }
+  .offers__grid { grid-template-columns: 1fr; }
   .process__item { grid-template-columns: 1fr; gap: var(--space-3); }
 }
 @media (max-width: 640px) {
@@ -1449,15 +1799,8 @@ body[data-nav-open] { overflow: hidden; }
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
-  /* The homepage hero headline: the titanium sheen (theme-aware). */
-  .hero h1 {
-    background-image: var(--grad-hero);
-    background-size: 220% auto;
-    background-position: 0% center;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .hero h1 { animation: sv-shimmer 7s linear infinite; }
-  }
+  /* The homepage hero headline is neutral; the colour lives in the glass
+     wordmark below, so no titanium sheen here. */
 }
 @keyframes sv-shimmer { to { background-position: 220% center; } }
 
@@ -1666,4 +2009,265 @@ body[data-home] .nav:not([data-scrolled="true"]) {
               transform 0.42s var(--ease-out),
               filter 0.42s var(--ease-out);
   will-change: opacity, transform, filter;
+}
+
+/* ========================================================================
+   Glass wordmark (homepage hero "Summaverick")
+   Layered live Geist text: a continuous spectrum, a fine reflective rim,
+   lower violet shading, a lower rim, one moving reflection, and focal glints
+   on the S and the a. A one-time crystal assembly plays when the hero enters
+   view; at rest it is still, resolved coloured glass. Reduced motion / no-JS
+   show the resolved word immediately (default state = rest).
+   ===================================================================== */
+
+/* Neutral headline; "Meet" on line one, the glass wordmark on the next. */
+.hero-headline {
+  max-width: none;
+  margin: 0;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.hero-headline__lead,
+.hero-headline__mark { display: block; }
+.hero-headline__lead,
+.hero-headline__dot {
+  background: none;
+  -webkit-text-fill-color: var(--c-text);
+  color: var(--c-text);
+}
+.hero-headline__dot { -webkit-text-fill-color: var(--c-text-mute); color: var(--c-text-mute); }
+
+/* ---- The wordmark stack ------------------------------------------------ */
+.glassmark {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+  isolation: isolate;
+  -webkit-text-fill-color: initial; /* opt out of the h1 transparent fill */
+}
+.glassmark__base,
+.glassmark__layer,
+.glassmark__frag {
+  font: inherit;
+  letter-spacing: inherit;
+  white-space: nowrap;
+}
+/* The absolute layers sit exactly over the base — identical text + metrics. */
+.glassmark__layer,
+.glassmark__frag {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Base — the continuous spectrum, and the resting/accessible word. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .glassmark__base {
+    position: relative;
+    z-index: 1;
+    background-image: var(--glass-spectrum);
+    background-size: 100% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* Lower interior: a little violet shading and a fine lower rim. */
+  .glassmark__shade {
+    z-index: 2;
+    background-image: linear-gradient(
+      180deg,
+      transparent 55%,
+      rgba(120, 90, 220, 0.22) 82%,
+      rgba(255, 255, 255, 0.55) 97%,
+      transparent 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    mix-blend-mode: screen;
+  }
+  /* Upper edge: a soft, thin white rim (~0.6 of a 100-unit glyph). */
+  .glassmark__rim {
+    z-index: 3;
+    background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(255, 255, 255, 0.32) 6%,
+      transparent 13%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    mix-blend-mode: screen;
+  }
+  /* A warm specular streak that sweeps the surface during the reveal. */
+  .glassmark__reflect {
+    z-index: 4;
+    background-image: linear-gradient(
+      105deg,
+      transparent 43%,
+      rgba(255, 244, 222, 0.85) 49%,
+      rgba(255, 206, 138, 0.55) 53%,
+      transparent 60%);
+    background-size: 260% 100%;
+    background-position: 150% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    mix-blend-mode: screen;
+    opacity: 0;
+  }
+  /* Assembly shards — full-word copies clipped to diagonal bands, so the
+     spectrum stays continuous. Hidden at rest; shown only while playing. */
+  .glassmark__frag {
+    z-index: 5;
+    background-image: var(--glass-spectrum);
+    background-size: 100% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    opacity: 0;
+  }
+  /* Five angled facets that tile the word edge-to-edge (shared seams, no gaps),
+     slanted so they read as crystal shards rather than horizontal stripes. */
+  .glassmark__frag[data-frag="0"] { clip-path: polygon(0 0, 22% 0, 16% 100%, 0 100%); }
+  .glassmark__frag[data-frag="1"] { clip-path: polygon(22% 0, 44% 0, 38% 100%, 16% 100%); }
+  .glassmark__frag[data-frag="2"] { clip-path: polygon(44% 0, 63% 0, 58% 100%, 38% 100%); }
+  .glassmark__frag[data-frag="3"] { clip-path: polygon(63% 0, 82% 0, 77% 100%, 58% 100%); }
+  .glassmark__frag[data-frag="4"] { clip-path: polygon(82% 0, 100% 0, 100% 100%, 77% 100%); }
+}
+
+/* Focal reflections on the S and the a — soft resting catch-lights, as
+   positioned overlays (wrapping the letters would break the shared clip).
+   They brighten briefly during the reveal. Positions are tuned to the word. */
+.glassmark__glint {
+  position: absolute;
+  top: 0;
+  width: 0.66em;
+  height: 0.62em;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: var(--glint-rest, 0.4);
+  z-index: 6;
+  filter: blur(2px);
+}
+.glassmark__glint--s {
+  left: 0.02em;
+  background: radial-gradient(58% 58% at 50% 42%, rgba(214, 246, 255, 0.95), rgba(214, 246, 255, 0) 70%);
+}
+.glassmark__glint--a {
+  left: 2.92em;
+  background: radial-gradient(58% 58% at 50% 42%, rgba(242, 216, 255, 0.95), rgba(242, 216, 255, 0) 70%);
+}
+
+/* The warm specular flash — a brief warm bloom that peaks as the crystal
+   resolves, then fades. A positioned overlay (not clipped to the glyphs). */
+.glassmark__flash {
+  position: absolute;
+  inset: -46% -14%;
+  z-index: 7;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+  filter: blur(5px);
+  background:
+    /* short anamorphic streak */
+    radial-gradient(40% 6% at 48% 46%, rgba(255, 252, 244, 0.92), rgba(255, 216, 154, 0.5) 46%, transparent 72%),
+    /* warm amber bloom core */
+    radial-gradient(52% 100% at 46% 42%, rgba(255, 238, 206, 0.92), rgba(255, 178, 96, 0.58) 42%, transparent 70%);
+}
+/* A crisp horizontal light spike through the flash for a defined specular hit. */
+.glassmark__flash::before {
+  content: "";
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: 46%;
+  height: 3px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 28%, rgba(255, 238, 205, 0.98) 50%, rgba(255, 255, 255, 0.95) 72%, transparent);
+  filter: blur(1px);
+}
+
+/* ---- The one-time reveal ---------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* Facets crystallize from the centre outward, lock into focus, then the
+     identical resolved base cross-fades up beneath them — because the shards
+     are perfectly aligned by then, the hand-off is seamless (no ghost word). */
+  .glassmark.is-playing .glassmark__base { animation: gm-base-in 2.1s var(--ease-out) both; }
+  .glassmark.is-playing .glassmark__shade,
+  .glassmark.is-playing .glassmark__rim { animation: gm-soft-in 2.1s var(--ease-out) both; }
+  .glassmark.is-playing .glassmark__frag { animation: gm-frag 2.1s cubic-bezier(0.16, 0.84, 0.28, 1) both; }
+  .glassmark.is-playing .glassmark__frag[data-frag="2"] { animation-delay: 0s;    --fx:  0;      --fy: -0.30em; --fr: -4deg; --fs: 1.07; }
+  .glassmark.is-playing .glassmark__frag[data-frag="1"] { animation-delay: 0.06s; --fx: -0.26em; --fy:  0.26em; --fr:  6deg; --fs: 1.05; }
+  .glassmark.is-playing .glassmark__frag[data-frag="3"] { animation-delay: 0.06s; --fx:  0.26em; --fy:  0.24em; --fr:  6deg; --fs: 1.05; }
+  .glassmark.is-playing .glassmark__frag[data-frag="0"] { animation-delay: 0.12s; --fx: -0.52em; --fy: -0.22em; --fr: -9deg; --fs: 1.06; }
+  .glassmark.is-playing .glassmark__frag[data-frag="4"] { animation-delay: 0.12s; --fx:  0.52em; --fy: -0.20em; --fr:  9deg; --fs: 1.06; }
+  .glassmark.is-playing .glassmark__reflect { animation: gm-reflect 1.4s ease-in-out 0.7s both; }
+  .glassmark.is-playing { animation: gm-pop 1.1s ease-out 1.0s both; }
+  .glassmark.is-playing .glassmark__flash { animation: gm-flash 1.1s ease-out 1.0s both; }
+  .glassmark.is-playing .glassmark__glint--s { animation: gm-glint 0.8s ease-out 1.25s both; }
+  .glassmark.is-playing .glassmark__glint--a { animation: gm-glint 0.8s ease-out 1.45s both; }
+}
+@keyframes gm-flash {
+  0%   { opacity: 0; transform: scale(0.86); }
+  20%  { opacity: 1; transform: scale(1.03); }
+  42%  { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(1.16); }
+}
+/* A brief warm brightness flare across the whole wordmark as the light hits. */
+@keyframes gm-pop {
+  0%   { filter: brightness(1) saturate(1); }
+  22%  { filter: brightness(1.18) saturate(1.12); }
+  46%  { filter: brightness(1.05) saturate(1.04); }
+  100% { filter: brightness(1) saturate(1); }
+}
+@keyframes gm-base-in {
+  0%, 55% { opacity: 0; }
+  76%, 100% { opacity: 1; }
+}
+@keyframes gm-soft-in {
+  0%, 58% { opacity: 0; }
+  82%, 100% { opacity: 1; }
+}
+@keyframes gm-frag {
+  0%   { opacity: 0; transform: translate(var(--fx), var(--fy)) rotate(var(--fr)) scale(var(--fs)); filter: blur(4px); }
+  14%  { opacity: 1; filter: blur(2px); }
+  60%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); filter: blur(0); }
+  74%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: translate(0, 0) rotate(0) scale(1); filter: blur(0); }
+}
+@keyframes gm-reflect {
+  0%   { background-position: 150% 0; opacity: 0; }
+  22%  { opacity: 1; }
+  78%  { opacity: 1; }
+  100% { background-position: -60% 0; opacity: 0; }
+}
+@keyframes gm-glint {
+  0%   { opacity: var(--glint-rest, 0.35); }
+  45%  { opacity: 1; }
+  100% { opacity: var(--glint-rest, 0.35); }
+}
+
+/* Local-review replay control (only injected when ?preview is present). */
+.glassmark-replay {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 200;
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+  letter-spacing: normal;
+  padding: 0.4em 0.9em;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  -webkit-text-fill-color: currentColor;
 }
