@@ -1,0 +1,37 @@
+{
+  "name": "@summaverick/research-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Summaverick research-agent domain packs, including ServiceNow domain intelligence",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./servicenow": {
+      "types": "./dist/domains/servicenow/index.d.ts",
+      "import": "./dist/domains/servicenow/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "SERVICENOW_LIVE_INTEGRATION=1 vitest run --config vitest.integration.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  },
+  "optionalDependencies": {
+    "@servicenow/sdk": "^4.9.0"
+  }
+}

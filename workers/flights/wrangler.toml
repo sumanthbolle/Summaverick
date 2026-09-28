@@ -1,0 +1,15 @@
+# Cloudflare Worker for SkyFare (/flights) and Summaverick (/, /trending, /servicenow).
+# This is the versioned source of truth for the deployed Worker.
+name = "wandering-haze-b394"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Non-secret vars (safe to set here or in the dashboard):
+[vars]
+AMADEUS_ENV = "test"   # "test" (free quota) or "production"
+
+# Secrets (set with `wrangler secret put ...`, never commit values):
+#   PERPLEXITY_API_KEY     — https://www.perplexity.ai/settings/api (chat + AI fallback fares)
+#   ALLOWED_ORIGIN         — e.g. https://sumanthbolle.com
+#   AMADEUS_CLIENT_ID      — Amadeus Self-Service (primary /flights inventory)
+#   AMADEUS_CLIENT_SECRET  — Amadeus Self-Service secret
