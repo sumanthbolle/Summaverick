@@ -73,7 +73,7 @@ Pretty URLs (also served as `*.html`):
 | `/` | Company home — Store apps, implementations, AI, product work, fine-tuning |
 | `/quiz` | ServiceNow quiz |
 | `/learn` · `/interviews` · `/article/:slug` | Library |
-| `/research` | Summaverick Research for ServiceNow — streamed, cited answers (`/ask` redirects here) |
+| `/research` | Summaverick Research for ServiceNow — chat assistant with streamed, cited answers and follow-ups (`/ask` redirects here) |
 | `/flights` | SkyFare |
 | `/metals` | Gold & silver |
 | `/upsc` | Evidence-gated UPSC feed |

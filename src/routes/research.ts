@@ -26,6 +26,9 @@ import {
   getEvalScores,
   runResearchPipeline,
   researchAnswerMode,
+  normalizeHistory,
+  retrievalQueryFor,
+  type ChatTurn,
   type ResearchRetrieved,
 } from "../domain/research";
 import { classifyServiceNowIntent } from "../domain/research/retrieval/query-classifier";
@@ -91,21 +94,24 @@ function rateLimited(resetAt: number): Response {
   );
 }
 
-async function readQuery(req: Request, ctx: Ctx): Promise<{ query?: string; err?: Response }> {
-  const body = await readJson<{ query?: unknown }>(req);
+async function readQuery(
+  req: Request,
+  ctx: Ctx
+): Promise<{ query?: string; history?: ChatTurn[]; err?: Response }> {
+  const body = await readJson<{ query?: unknown; history?: unknown }>(req);
   const raw =
     typeof body?.query === "string" ? body.query : ctx.url.searchParams.get("q") ?? "";
   const query = raw.trim();
   if (!query) return { err: badRequest("a non-empty `query` string is required") };
   if (query.length > MAX_QUERY) return { err: badRequest(`query is too long (max ${MAX_QUERY} chars)`) };
-  return { query };
+  return { query, history: normalizeHistory(body?.history) };
 }
 
 export function researchRoutes(route: RouteMaker): RouteDef[] {
   return [
     // ---- Streamed live trace -------------------------------------------
     route("POST", "/api/research/stream", async (req, ctx: Ctx) => {
-      const { query, err } = await readQuery(req, ctx);
+      const { query, history = [], err } = await readQuery(req, ctx);
       if (err) return err;
 
       const key = clientKey(req, ctx.session.deviceId);
@@ -115,6 +121,9 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
       if (!burst.allowed) return rateLimited(burst.resetAt);
 
       const q = query!;
+      // Follow-ups are searched with the question they follow; the reader's
+      // own words are what the model answers and what the run records.
+      const searchText = retrievalQueryFor(q, history);
       const started = nowMs();
       const id = newId("run");
       const sse = createSseStream();
@@ -123,13 +132,13 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
         try {
           await sse.send("stage", { key: "accepted", label: "request accepted", detail: `run ${id.replace(/^run_/, "").slice(0, 8)}`, kind: "ok" });
 
-          const cls = classifyServiceNowIntent(q);
+          const cls = classifyServiceNowIntent(searchText);
           await sse.send("stage", {
             key: "classify", label: "classify",
             detail: `intent → ${cls.intent} · confidence ${cls.confidence}`, kind: "ok",
           });
 
-          const expansions = expandServiceNowQuery(q);
+          const expansions = expandServiceNowQuery(searchText);
           await sse.send("stage", {
             key: "expand", label: "expand",
             detail: `+${Math.max(0, expansions.length - 1)} query variants`, kind: "ok",
@@ -194,7 +203,9 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
           };
 
           const result = await runResearchPipeline({
-            query: q,
+            query: searchText,
+            question: q,
+            history,
             env: ctx.env as unknown as Record<string, string | undefined>,
             perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
             perplexityModel: ctx.env.RESEARCH_MODEL,

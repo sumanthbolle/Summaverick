@@ -5,7 +5,7 @@
  *
  * Supported: paragraphs, ### headings, ordered and unordered lists, fenced
  * code blocks, `inline code`, **bold**, *italic*, [text](https://…) links, and
- * [n] citations, which link to #src-n when n names a listed source.
+ * [n] citations, which link to #<idPrefix>n when n names a listed source.
  *
  * Safe to call on a partial stream: an unclosed code fence renders as a code
  * block that is still being written.
@@ -13,7 +13,8 @@
 
 import { el } from "./dom.js";
 
-export function renderMarkdown(text, { sourceCount = 0 } = {}) {
+export function renderMarkdown(text, { sourceCount = 0, idPrefix = "src-" } = {}) {
+  const ctx = { sourceCount, idPrefix };
   const frag = document.createDocumentFragment();
   const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
   let i = 0;
@@ -40,7 +41,7 @@ export function renderMarkdown(text, { sourceCount = 0 } = {}) {
     const heading = line.match(/^\s*(#{1,6})\s+(.*)$/);
     if (heading) {
       const tag = heading[1].length <= 2 ? "h3" : "h4";
-      frag.append(el(tag, { class: "md-h" }, inline(heading[2], sourceCount)));
+      frag.append(el(tag, { class: "md-h" }, inline(heading[2], ctx)));
       i++;
       continue;
     }
@@ -60,7 +61,7 @@ export function renderMarkdown(text, { sourceCount = 0 } = {}) {
           item += " " + lines[i].trim();
           i++;
         }
-        list.append(el("li", {}, inline(item, sourceCount)));
+        list.append(el("li", {}, inline(item, ctx)));
       }
       frag.append(list);
       continue;
@@ -80,7 +81,7 @@ export function renderMarkdown(text, { sourceCount = 0 } = {}) {
       para.push(lines[i].trim());
       i++;
     }
-    frag.append(el("p", {}, inline(para.join(" "), sourceCount)));
+    frag.append(el("p", {}, inline(para.join(" "), ctx)));
   }
 
   return frag;
@@ -88,7 +89,7 @@ export function renderMarkdown(text, { sourceCount = 0 } = {}) {
 
 const INLINE = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[(\d{1,2})\](?!\())|(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))|(\*[^*\s][^*]*\*)/g;
 
-function inline(text, sourceCount) {
+function inline(text, ctx) {
   const out = [];
   let last = 0;
   for (const m of text.matchAll(INLINE)) {
@@ -96,14 +97,14 @@ function inline(text, sourceCount) {
     if (m[1]) {
       out.push(el("code", { text: m[1].slice(1, -1) }));
     } else if (m[2]) {
-      out.push(el("strong", {}, inline(m[2].slice(2, -2), sourceCount)));
+      out.push(el("strong", {}, inline(m[2].slice(2, -2), ctx)));
     } else if (m[3]) {
       const n = Number(m[4]);
-      out.push(citation(n, sourceCount));
+      out.push(citation(n, ctx));
     } else if (m[5]) {
       out.push(el("a", { href: m[7], rel: "noopener", target: "_blank", text: m[6] }));
     } else if (m[8]) {
-      out.push(el("em", {}, inline(m[8].slice(1, -1), sourceCount)));
+      out.push(el("em", {}, inline(m[8].slice(1, -1), ctx)));
     }
     last = m.index + m[0].length;
   }
@@ -111,11 +112,11 @@ function inline(text, sourceCount) {
   return out;
 }
 
-function citation(n, sourceCount) {
+function citation(n, { sourceCount, idPrefix }) {
   if (n >= 1 && n <= sourceCount) {
     return el("a", {
       class: "cite",
-      href: `#src-${n}`,
+      href: `#${idPrefix}${n}`,
       "aria-label": `Source ${n}`,
       dataset: { cite: String(n) },
       text: String(n),

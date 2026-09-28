@@ -2,6 +2,23 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-09-28 — /research is a chat assistant; Research is in the main menu
+
+**Decision.** `/research` works like Perplexity, ChatGPT or Claude: a start
+screen with a centred composer and suggestions, then a conversation thread
+with the composer docked at the bottom, follow-up questions, Stop, Retry,
+Copy, Share and New chat. Research is a primary menu item on every page with
+the company header (and in the article generator).
+
+**Follow-ups.** The browser sends the last few turns as `history`
+(`src/domain/research/conversation.ts` shape-checks it, keeps three pairs,
+caps lengths and drops any pair whose question trips the injection scan). A
+follow-up that does not name ServiceNow things on its own is searched together
+with the previous question; the model sees the thread but may still cite only
+the sources retrieved for the current turn. The thread is kept in
+sessionStorage for the tab; nothing about a conversation is stored server-side
+beyond the individual runs.
+
 ## 2026-09-28 — One research product at /research, written answers streamed with citations
 
 **Decision.** `/research` is the single ServiceNow research product, on the
