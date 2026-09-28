@@ -21,8 +21,6 @@ import { runScheduled } from "./scheduled";
 /** Pretty paths → static HTML files in /public. */
 const PAGES: Record<string, string> = {
   "/": "/index.html",
-  "/ask": "/ask.html",
-  "/ask-summaverick": "/ask.html",
   "/quiz": "/quiz.html",
   "/research": "/research.html",
   "/learn": "/learn.html",
@@ -34,6 +32,14 @@ const PAGES: Record<string, string> = {
   "/advocate": "/advocate.html",
   "/signin": "/signin.html",
   "/tools": "/tools.html",
+};
+
+/** Retired paths → their permanent home. The query string is kept, so an old
+ *  /ask?q=… link still arrives with its question. */
+const REDIRECTS: Record<string, string> = {
+  "/ask": "/research",
+  "/ask.html": "/research",
+  "/ask-summaverick": "/research",
 };
 
 function route(method: string, pattern: string, handler: Handler): RouteDef {
@@ -98,6 +104,10 @@ export default {
 
     if (!isApi) {
       const path = url.pathname.replace(/\/+$/, "") || "/";
+      const moved = REDIRECTS[path];
+      if (moved) {
+        return Response.redirect(new URL(moved + url.search, url.origin).toString(), 301);
+      }
       if (path.startsWith("/article/") && path.length > "/article/".length) {
         // The library builder pre-renders every essay and interview to
         // /article/<slug>.html. Serve the static page when it exists so an

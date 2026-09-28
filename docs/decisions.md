@@ -2,6 +2,33 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-09-28 — One research product at /research, written answers streamed with citations
+
+**Decision.** `/research` is the single ServiceNow research product, on the
+company design system. `/ask`, `/ask.html` and `/ask-summaverick` 301 to it
+with the query string kept. The old `/research` page (legacy `app.css` chrome)
+and `/ask` are gone.
+
+**What changed.**
+- The answer model is on wherever `PERPLEXITY_API_KEY` is set (production).
+  The answer streams to the page as it is written (`delta` events), after the
+  layers, the evidence gate and the numbered sources (`sources` event), so a
+  reader can open the sources before the answer finishes.
+- The model is asked for `[n]` citations against the numbered sources and runs
+  with `disable_search`, so a number can only point at a retrieved page. If an
+  account rejects that flag the call is retried without it. `checks` now
+  reports how many sources the answer cites and any number that matches no
+  source; an answer with no citations carries a notice saying so.
+- Answers render from Markdown into DOM nodes (`lib/markdown.js`); nothing
+  from the model is assigned as HTML, and only http(s) links are built.
+- Every finished run is saved with its result, so `/research?run=<id>` replays
+  it. `GET /api/research/evals` serves the eval scoreboard shown on the page.
+- `RESEARCH_MODEL` optionally overrides the Perplexity model (default `sonar`).
+
+**Unchanged.** Rate limits, the injection gate before any model call, the
+read-only policy, the instance layer off by default, and the rule that answer
+quality is reported as not evaluated rather than "verified".
+
 ## 2026-08-31 — Company homepage, not a scroll-scene personal site
 
 **Decision.** Replace the five-scene GSAP/Lenis homepage with a conventional
