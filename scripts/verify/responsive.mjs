@@ -10,7 +10,7 @@ import { evaluate, goto, launch, pressTab, setReducedMotion, sleep } from "./cdp
 
 const ORIGIN = process.argv[2] ?? "http://localhost:8788";
 const WIDTHS = [360, 390, 768, 1024, 1440];
-const PAGES = ["/", "/ask", "/learn"];
+const PAGES = ["/", "/research", "/learn"];
 
 const results = [];
 const check = (name, pass, detail = "") => {
@@ -218,8 +218,8 @@ try {
   for (const [path, theme] of [
     ["/", "light"],
     ["/", "dark"],
-    ["/ask", "light"],
-    ["/ask", "dark"],
+    ["/research", "light"],
+    ["/research", "dark"],
   ]) {
     await goto(client, `${ORIGIN}${path}`);
     // Several surfaces transition their background. getComputedStyle reports the

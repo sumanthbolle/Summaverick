@@ -78,11 +78,12 @@ export { getPromptBundle } from "./prompts/index";
 export { checkFluentDeletionSafety } from "./tools/inspect-fluent-project";
 export { getEvalScores, runEvalSuite } from "./evals/eval-runner";
 export type { EvalScores, EvalCaseResult } from "./evals/eval-runner";
-export { runResearchPipeline, researchAnswerMode } from "./pipeline";
+export { runResearchPipeline, researchAnswerMode, countCitations, readCompletionStream } from "./pipeline";
 export type {
   ResearchTrace,
   ResearchPipelineResult,
   ResearchAnswerMode,
   ResearchSource,
   ResearchChecks,
+  ResearchRetrieved,
 } from "./pipeline";

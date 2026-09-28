@@ -183,14 +183,14 @@ function header(active) {
       <a href="/#about">About</a>
       <a href="/learn">Guides</a>
       <a href="/interviews">Interview questions</a>
-      <a href="/ask">ServiceNow reference search</a>
+      <a href="/research">ServiceNow research</a>
       <a href="/#contact">Build with us</a>
     </nav>
   </div>`;
 }
 
 function footer() {
-  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark">${BRAND_MARK(30, 32)}<span>Summaverick Group</span></div><p>Personal assistants and enterprise agents, built for mobile, web, and business platforms.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#build">What we build</a></li><li><a href="/#examples">Examples</a></li><li><a href="/#how-we-work">How we work</a></li><li><a href="/#about">About</a></li></ul></div><div><p class="footer-head">Resources</p><ul><li><a href="/learn">Guides</a></li><li><a href="/interviews">Interview questions</a></li><li><a href="/ask">ServiceNow reference search</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Build with us</a></li><li><a href="/#about">Company information</a></li><li><a href="/signin">Sign in</a></li></ul></div></div><div class="container footer-legal"><p>© <span data-year>2026</span> SUMMAVERICK LLP. Summaverick Group · LLPIN ADC-1832.</p></div></footer>
+  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark">${BRAND_MARK(30, 32)}<span>Summaverick Group</span></div><p>Personal assistants and enterprise agents, built for mobile, web, and business platforms.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#build">What we build</a></li><li><a href="/#examples">Examples</a></li><li><a href="/#how-we-work">How we work</a></li><li><a href="/#about">About</a></li></ul></div><div><p class="footer-head">Resources</p><ul><li><a href="/learn">Guides</a></li><li><a href="/interviews">Interview questions</a></li><li><a href="/research">ServiceNow research</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Build with us</a></li><li><a href="/#about">Company information</a></li><li><a href="/signin">Sign in</a></li></ul></div></div><div class="container footer-legal"><p>© <span data-year>2026</span> SUMMAVERICK LLP. Summaverick Group · LLPIN ADC-1832.</p></div></footer>
 
   <script type="module" src="/assets/js/boot.js"></script>
 </body>
@@ -469,7 +469,7 @@ function main() {
     "utf8"
   );
 
-  const urls = ["/", "/ask", "/learn", "/interviews", "/quiz", "/tools", "/search", "/flights", "/metals", "/upsc", "/advocate", "/signin"]
+  const urls = ["/", "/research", "/learn", "/interviews", "/quiz", "/tools", "/search", "/flights", "/metals", "/upsc", "/advocate", "/signin"]
     .concat(essays.map((e) => `/article/${e.slug}`))
     .concat(qas.map((q) => `/article/${q.slug}`));
   writeFileSync(join(ROOT, "public", "sitemap.xml"), sitemapXml(urls), "utf8");

@@ -71,10 +71,9 @@ Pretty URLs (also served as `*.html`):
 | Path | Product |
 |---|---|
 | `/` | Company home — Store apps, implementations, AI, product work, fine-tuning |
-| `/ask` | Research agent (full page) |
 | `/quiz` | ServiceNow quiz |
 | `/learn` · `/interviews` · `/article/:slug` | Library |
-| `/research` | ServiceNow research agent |
+| `/research` | Summaverick Research for ServiceNow — streamed, cited answers (`/ask` redirects here) |
 | `/flights` | SkyFare |
 | `/metals` | Gold & silver |
 | `/upsc` | Evidence-gated UPSC feed |

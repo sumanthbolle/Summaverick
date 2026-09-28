@@ -33,7 +33,7 @@ describe("Homepage public contract", () => {
   });
 
   it("points every icon slot at the current mark", () => {
-    for (const page of ["public/index.html", "public/ask.html", "public/learn.html", "public/quiz.html"]) {
+    for (const page of ["public/index.html", "public/research.html", "public/learn.html", "public/quiz.html"]) {
       const html = text(page);
       expect(html, `${page} favicon`).toContain('href="/assets/favicon.svg"');
       expect(html, `${page} apple touch icon`).toContain('href="/assets/apple-touch-icon.png"');
@@ -198,21 +198,38 @@ describe("Homepage public contract", () => {
 
   it("describes the research example in the mode the deployment actually runs", () => {
     const home = text("public/index.html");
-    const ask = text("public/ask.html");
+    const research = text("public/research.html");
 
-    expect(home).toContain("ServiceNow reference search");
-    expect(home).toContain("Internal demo");
-    expect(home).toContain("Search documentation");
+    // The homepage points at the one research product, not a retired page.
+    expect(home).toContain('href="/research"');
+    expect(home).not.toContain('href="/ask"');
     // No claim of a live answer service on the homepage.
     expect(home).not.toContain("Useful live answers");
     // And the tool itself states its mode before a question is asked.
-    expect(ask).toContain("data-ask-mode");
+    expect(research).toContain("data-ask-mode");
   });
 
   it("never shows a blanket verification badge on the research result", () => {
-    const js = text("public/assets/js/ask.js");
+    const js = text("public/assets/js/research.js");
     expect(js).toContain("answer quality not evaluated");
     expect(js).not.toMatch(/citation\(s\).*verified/);
+    expect(text("public/research.html")).not.toMatch(/\bverified\b/i);
+  });
+
+  it("renders model text without assigning HTML", () => {
+    const md = text("public/assets/js/lib/markdown.js");
+    const js = text("public/assets/js/research.js");
+    for (const [name, src] of [["markdown.js", md], ["research.js", js]] as const) {
+      expect(src, name).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|html:/);
+    }
+    // Only http(s) links are ever built from model text.
+    expect(md).toContain("https?:\\/\\/");
+  });
+
+  it("retires /ask in favour of /research", () => {
+    const worker = text("src/index.ts");
+    expect(worker).toContain('"/ask": "/research"');
+    expect(existsSync(resolve(root, "public/ask.html"))).toBe(false);
   });
 
   it("wires the contact form to the server and matches its responses", () => {
@@ -308,7 +325,7 @@ describe("Homepage public contract", () => {
     );
 
     const articleSample = "public/article/ai-agents-servicenow-beginner.html";
-    for (const page of ["public/index.html", "public/ask.html", "public/learn.html", "public/interviews.html", articleSample]) {
+    for (const page of ["public/index.html", "public/research.html", "public/learn.html", "public/interviews.html", articleSample]) {
       const anchors = [...text(page).matchAll(/href="\/?#([^"]+)"/g)].map(
         (m) => m[1] as string
       );
@@ -344,7 +361,7 @@ describe("Homepage public contract", () => {
     expect(tokens).toContain(':root[data-theme="dark"]');
     expect(tokens).toContain(':root[data-theme="light"]');
 
-    for (const page of ["public/index.html", "public/ask.html", "public/learn.html"]) {
+    for (const page of ["public/index.html", "public/research.html", "public/learn.html"]) {
       const html = text(page);
       expect(html, `${page} has no appearance toggle`).toContain('id="theme-toggle"');
       expect(html, `${page} flashes before paint`).toContain("sv-theme");

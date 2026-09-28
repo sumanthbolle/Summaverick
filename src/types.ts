@@ -19,6 +19,8 @@ export interface Env {
 
   // Secrets (wrangler secret put)
   PERPLEXITY_API_KEY?: string;
+  /** Optional Perplexity model for research answers (default "sonar"). */
+  RESEARCH_MODEL?: string;
   UPSC_PUBLISH_TOKEN?: string;
   SESSION_SECRET?: string;
   AMADEUS_CLIENT_ID?: string;

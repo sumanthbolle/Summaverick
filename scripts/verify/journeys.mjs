@@ -159,7 +159,7 @@ try {
   );
 
   // ---- Research tool: the mode is stated before anything is asked ---------
-  await goto(client, `${ORIGIN}/ask`);
+  await goto(client, `${ORIGIN}/research`);
   await sleep(1200);
   const askIntro = await evaluate(
     client,
@@ -184,7 +184,7 @@ try {
 
   // ---- Research tool: every advertised sample returns something useful -----
   for (const [i, sample] of askIntro.samples.entries()) {
-    await goto(client, `${ORIGIN}/ask`);
+    await goto(client, `${ORIGIN}/research`);
     await sleep(900);
     await evaluate(
       client,
@@ -205,7 +205,7 @@ try {
   }
 
   // ---- Research tool: an out-of-scope question says so --------------------
-  await goto(client, `${ORIGIN}/ask`);
+  await goto(client, `${ORIGIN}/research`);
   await sleep(900);
   await evaluate(
     client,
@@ -222,19 +222,18 @@ try {
     `mode=${offTopic.mode} text="${offTopic.text.slice(0, 160).replace(/\s+/g, " ")}"`
   );
 
-  // ---- Research tool: the question survives and the trace is optional -----
+  // ---- Research tool: the question survives and the run panel is there ----
   const afterAnswer = await evaluate(
     client,
     `const input = document.querySelector("[data-ask-input]");
-     const trace = document.querySelector("[data-ask-answer] details");
+     const run = document.querySelector("[data-rs-run]");
      return { questionKept: (input.value || "").length > 0,
-              traceIsDisclosure: !!trace, traceClosedByDefault: trace ? !trace.open : null };`
+              runIsDisclosure: !!run && run.tagName === "DETAILS",
+              steps: document.querySelectorAll("[data-rs-steps] li").length };`
   );
   check(
-    "research: the question stays in the box and the developer trace is collapsed",
-    afterAnswer.questionKept === true &&
-      afterAnswer.traceIsDisclosure === true &&
-      afterAnswer.traceClosedByDefault === true,
+    "research: the question stays in the box and the run steps sit in a disclosure",
+    afterAnswer.questionKept === true && afterAnswer.runIsDisclosure === true && afterAnswer.steps > 0,
     JSON.stringify(afterAnswer)
   );
 } finally {
@@ -253,7 +252,7 @@ async function waitForAnswer(client, timeoutMs) {
        const status = document.querySelector("[data-ask-status]");
        return {
          text: ((answer ? answer.textContent : "") + " " + (status ? status.textContent : "")).replace(/\\s+/g, " ").trim(),
-         sources: document.querySelectorAll("[data-ask-answer] .src").length,
+         sources: document.querySelectorAll("[data-rs-sources] .src").length,
          mode: document.querySelector("[data-ask-answer] .ask-answer") ? "model_answer" : "source_results",
          busy: document.querySelector("[data-ask-run]").disabled === true,
        };`

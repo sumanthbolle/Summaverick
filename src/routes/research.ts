@@ -22,7 +22,12 @@ import type { Ctx, Env, RouteDef, RouteMaker } from "../types";
 import { badRequest, json, newId, nowMs, notFound, ok, readJson, serverError } from "../lib/json";
 import { rateLimit, clientKey } from "../lib/ratelimit";
 import { createSseStream } from "../lib/sse";
-import { runResearchPipeline, researchAnswerMode } from "../domain/research";
+import {
+  getEvalScores,
+  runResearchPipeline,
+  researchAnswerMode,
+  type ResearchRetrieved,
+} from "../domain/research";
 import { classifyServiceNowIntent } from "../domain/research/retrieval/query-classifier";
 import { expandServiceNowQuery } from "../domain/research/retrieval/query-expander";
 import { scanForPromptInjection } from "../domain/research/security/prompt-injection";
@@ -116,7 +121,7 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
 
       const pump = (async () => {
         try {
-          await sse.send("stage", { key: "accepted", label: "request accepted", detail: `run ${id}`, kind: "ok" });
+          await sse.send("stage", { key: "accepted", label: "request accepted", detail: `run ${id.replace(/^run_/, "").slice(0, 8)}`, kind: "ok" });
 
           const cls = classifyServiceNowIntent(q);
           await sse.send("stage", {
@@ -149,19 +154,15 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
           }
           await sse.send("stage", { key: "injection", label: "injection check", detail: "clean", kind: "ok" });
 
-          await sse.send("stage", { key: "retrieve", label: "retrieve", detail: "consulting the retrieval layers…", kind: "active" });
+          await sse.send("stage", { key: "retrieve", label: "retrieve", detail: "SDK reference · product docs · instance if enabled", kind: "active" });
 
-          const result = await runResearchPipeline({
-            query: q,
-            env: ctx.env as unknown as Record<string, string | undefined>,
-            perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
-          });
-          const t = result.trace;
-
-          if (t.routed) {
-            const totalCandidates = t.layers.reduce((n, l) => n + l.candidateCount, 0);
-            for (const layer of t.layers) {
-              const locked = layer.sourceType === "live_instance" && !t.security.liveInstanceEnabled;
+          // Layers, ranking and verification are shown as soon as retrieval is
+          // done, with the sources, so the reader can open them while the answer
+          // is still being written.
+          const onRetrieved = async (r: ResearchRetrieved) => {
+            const totalCandidates = r.layers.reduce((n, l) => n + l.candidateCount, 0);
+            for (const layer of r.layers) {
+              const locked = layer.sourceType === "live_instance" && !r.liveInstanceEnabled;
               if (!layer.planned && layer.candidateCount === 0 && !locked) continue;
               await sse.send("stage", {
                 key: "layer", label: layer.layer,
@@ -173,21 +174,40 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
             }
             await sse.send("stage", {
               key: "dedup", label: "dedup + rank",
-              detail: `${t.candidateDocumentCount} ranked of ${totalCandidates} candidate(s)`, kind: "ok",
+              detail: `${r.candidateDocumentCount} ranked of ${totalCandidates} candidate(s)`, kind: "ok",
             });
-            if (t.verification) {
-              const v = t.verification;
+            if (r.verification) {
+              const v = r.verification;
               await sse.send("stage", {
-                key: "verify", label: "verify",
+                key: "verify", label: "evidence gate",
                 detail: `${v.citationCount} citation(s) · ${v.unsupportedClaimCount} unsupported claim(s)`,
                 kind: v.ok ? "ok" : "block",
               });
             }
-          } else {
+            await sse.send("sources", { sources: r.sources, composing: r.composing });
+            if (r.composing) {
+              await sse.send("stage", {
+                key: "compose", label: "write answer",
+                detail: `from ${r.sources.length} source(s), citing each by number`, kind: "active",
+              });
+            }
+          };
+
+          const result = await runResearchPipeline({
+            query: q,
+            env: ctx.env as unknown as Record<string, string | undefined>,
+            perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
+            perplexityModel: ctx.env.RESEARCH_MODEL,
+            onRetrieved,
+            onDelta: (text) => sse.send("delta", { text }),
+          });
+          const t = result.trace;
+
+          if (!t.routed) {
             await sse.send("stage", { key: "route", label: "domain routing", detail: "outside the ServiceNow domain — no layers engaged", kind: "muted" });
           }
 
-          await sse.send("answer", {
+          const answerPayload = {
             // `mode` tells the UI what it is allowed to call this: prose from an
             // answer model, documentation matches, or no close match at all.
             mode: result.mode,
@@ -211,14 +231,17 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
               passRate: t.evalScores.passRate,
               adversarialBlockRate: t.evalScores.adversarialBlockRate,
             },
-          });
+            latencyMs: nowMs() - started,
+          };
+          await sse.send("answer", answerPayload);
 
           persistRun(ctx.env, ctx.exec, {
             id, deviceId: ctx.session.deviceId, query: q, intent: t.classification.intent,
             layersJson: JSON.stringify(t.layers), citations: t.verification?.citationCount ?? 0,
             verified: t.verification?.ok ? 1 : 0, injectionFlagged: 0,
             latencyMs: nowMs() - started, traceKey: `traces/${id}.json`,
-            traceJson: JSON.stringify(t), status: "done", createdAt: started, finishedAt: nowMs(),
+            // The shareable run page reads `result` back from this object.
+            traceJson: JSON.stringify({ ...t, result: answerPayload }), status: "done", createdAt: started, finishedAt: nowMs(),
           });
           await sse.send("done", { id, status: "done" });
         } catch (e) {
@@ -251,6 +274,23 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
       });
     }),
 
+    // ---- Eval scoreboard ------------------------------------------------
+    // Pass rates of the bundled regression and adversarial suites, run against
+    // the deployed classifier and security gates. Case detail stays server-side.
+    route("GET", "/api/research/evals", async () => {
+      const s = getEvalScores();
+      return ok({
+        total: s.total,
+        passed: s.passed,
+        passRate: s.passRate,
+        intentAccuracy: s.intentAccuracy,
+        intentEvaluated: s.intentEvaluated,
+        adversarialBlockRate: s.adversarialBlockRate,
+        adversarialTotal: s.adversarialTotal,
+        byCategory: s.byCategory,
+      });
+    }),
+
     // ---- Non-streaming (programmatic) ----------------------------------
     route("POST", "/api/research", async (req, ctx: Ctx) => {
       const { query, err } = await readQuery(req, ctx);
@@ -265,6 +305,7 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
           query: query!,
           env: ctx.env as unknown as Record<string, string | undefined>,
           perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
+          perplexityModel: ctx.env.RESEARCH_MODEL,
         });
         return ok({ answer, mode, notice, sources, checks, trace });
       } catch (e) {
