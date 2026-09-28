@@ -226,6 +226,14 @@ describe("Homepage public contract", () => {
     expect(md).toContain("https?:\\/\\/");
   });
 
+  it("lists Research in the primary menu on every page with the company header", () => {
+    for (const page of ["public/index.html", "public/research.html", "public/learn.html", "public/interviews.html"]) {
+      const nav = text(page).match(/<nav class="nav-links"[\s\S]*?<\/nav>/)?.[0] ?? "";
+      expect(nav, page).toMatch(/href="\/research"/);
+    }
+    expect(text("scripts/build-library.mjs")).toContain('link("/research", "research", "Research")');
+  });
+
   it("retires /ask in favour of /research", () => {
     const worker = text("src/index.ts");
     expect(worker).toContain('"/ask": "/research"');

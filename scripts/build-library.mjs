@@ -160,6 +160,7 @@ function header(active) {
       ${link("/#examples", "", "Examples")}
       ${link("/#how-we-work", "", "How we work")}
       ${link("/#about", "", "About")}
+      ${link("/research", "research", "Research")}
       ${link("/learn", "learn", "Resources")}
     </nav>
     <div class="nav-actions">

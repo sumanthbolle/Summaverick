@@ -4,18 +4,22 @@
  * preview and the Ask Summaverick page.
  *
  *   await streamResearch(query, {
- *     stage(d), blocked(d), answer(d), error(d), done(d), rateLimited(msg)
- *   });
+ *     stage(d), sources(d), delta(d), blocked(d), answer(d), error(d), done(d), rateLimited(msg)
+ *   }, { history, signal });
+ *
+ * `history` is the earlier turns ([{ role, content }]) for a follow-up;
+ * `signal` aborts the request (the Stop button).
  *
  * Resolves true when the stream ran (including a 429, handled via rateLimited).
  * Throws when the endpoint is unreachable or returns a non-streaming error, so
  * the caller can fall back (e.g. to a captured trace on static hosting).
  */
-export async function streamResearch(query, on = {}) {
+export async function streamResearch(query, on = {}, { history, signal } = {}) {
   const res = await fetch("/api/research/stream", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify(history && history.length ? { query, history } : { query }),
+    signal,
   });
 
   if (!res.ok || !res.body) {

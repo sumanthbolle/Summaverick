@@ -24,6 +24,7 @@ import { INSUFFICIENT_EVIDENCE_MESSAGE } from "./schemas/research-answer";
 import { getEvalScores, type EvalScores } from "./evals/eval-runner";
 import type { ServiceNowSourceType } from "./schemas/evidence";
 import type { ClaimVerdict } from "./answer-verifier";
+import type { ChatTurn } from "./conversation";
 
 export interface TraceLayer {
   /** Human label, e.g. "Layer 2 · Product docs". */
@@ -210,6 +211,11 @@ export async function runResearchPipeline(options: {
   /** Receives answer text as the model writes it. Presence switches the model
    *  call to streaming; the full text is still returned in the result. */
   onDelta?: (text: string) => void | Promise<void>;
+  /** The question exactly as the reader asked it, when `query` is a retrieval
+   *  query built from the conversation. Defaults to `query`. */
+  question?: string;
+  /** Earlier turns of the conversation, already normalized. */
+  history?: ChatTurn[];
 }): Promise<ResearchPipelineResult> {
   const query = options.query.trim();
   const config =
@@ -404,7 +410,8 @@ export async function runResearchPipeline(options: {
         apiKey: options.perplexityApiKey!,
         model,
         systemPrompt,
-        query,
+        query: options.question?.trim() || query,
+        history: options.history ?? [],
         evidence: ranked
           .slice(0, MAX_SOURCES)
           .map((e, i) => `[${i + 1}] (${e.sourceType}) ${e.title}\n${e.content}`)
@@ -605,6 +612,7 @@ async function callPerplexity(input: {
   systemPrompt: string;
   query: string;
   evidence: string;
+  history: ChatTurn[];
   onDelta?: (text: string) => void | Promise<void>;
 }): Promise<string> {
   const stream = Boolean(input.onDelta);
@@ -612,6 +620,9 @@ async function callPerplexity(input: {
     model: input.model,
     messages: [
       { role: "system", content: input.systemPrompt },
+      // Earlier turns give the model the thread; the evidence below is still
+      // the only thing it may cite.
+      ...input.history.map((t) => ({ role: t.role, content: t.content })),
       {
         role: "user",
         content: `Question: ${input.query}\n\n${ANSWER_INSTRUCTIONS}\n\nEvidence:\n${input.evidence}`,

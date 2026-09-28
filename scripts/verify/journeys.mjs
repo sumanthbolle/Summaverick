@@ -166,7 +166,7 @@ try {
     `const mode = document.querySelector("[data-ask-mode]");
      return {
        mode: mode ? mode.textContent.replace(/\\s+/g, " ").trim() : null,
-       samples: [...document.querySelectorAll("[data-ask-chips] .chip")].map(b => b.textContent.trim()),
+       samples: [...document.querySelectorAll("[data-ask-chips] .suggest")].map(b => b.querySelector(".suggest__q").textContent.trim()),
        scopeMentionsServiceNow: /servicenow/i.test(document.body.textContent),
        hasVerifiedBadge: /\\bverified\\b/i.test(document.body.textContent),
      };`
@@ -188,7 +188,7 @@ try {
     await sleep(900);
     await evaluate(
       client,
-      `document.querySelectorAll("[data-ask-chips] .chip")[${i}].click(); return 1;`
+      `document.querySelectorAll("[data-ask-chips] .suggest")[${i}].click(); return 1;`
     );
     const outcome = await waitForAnswer(client, 75000);
     const useful =
@@ -222,18 +222,17 @@ try {
     `mode=${offTopic.mode} text="${offTopic.text.slice(0, 160).replace(/\s+/g, " ")}"`
   );
 
-  // ---- Research tool: the question survives and the run panel is there ----
+  // ---- Research chat: the thread keeps the question and the steps --------
   const afterAnswer = await evaluate(
     client,
-    `const input = document.querySelector("[data-ask-input]");
-     const run = document.querySelector("[data-rs-run]");
-     return { questionKept: (input.value || "").length > 0,
-              runIsDisclosure: !!run && run.tagName === "DETAILS",
-              steps: document.querySelectorAll("[data-rs-steps] li").length };`
+    `const turn = [...document.querySelectorAll("[data-chat-thread] .turn")].pop();
+     return { questionShown: !!turn && turn.querySelector(".bubble").textContent.length > 0,
+              stepsAreDisclosure: !!turn && turn.querySelector(".ai-steps").tagName === "DETAILS",
+              composerDocked: document.body.classList.contains("is-chatting") };`
   );
   check(
-    "research: the question stays in the box and the run steps sit in a disclosure",
-    afterAnswer.questionKept === true && afterAnswer.runIsDisclosure === true && afterAnswer.steps > 0,
+    "research: the question stays in the thread, steps sit in a disclosure, composer is docked",
+    afterAnswer.questionShown === true && afterAnswer.stepsAreDisclosure === true && afterAnswer.composerDocked === true,
     JSON.stringify(afterAnswer)
   );
 } finally {
@@ -243,31 +242,24 @@ try {
 
 async function waitForAnswer(client, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
+  const read = `const turn = [...document.querySelectorAll("[data-chat-thread] .turn")].pop();
+     const answer = turn ? turn.querySelector(".ai-answer") : null;
+     return {
+       text: (answer ? answer.textContent : "").replace(/\\s+/g, " ").trim(),
+       sources: turn ? turn.querySelectorAll(".src-card, .ai-answer .src").length : 0,
+       mode: turn && turn.querySelector(".src-card") ? "model_answer" : "source_results",
+       busy: document.querySelector("[data-chat]").dataset.busy === "true",
+     };`;
   let last = { text: "", sources: 0, mode: null, settled: false };
   while (Date.now() < deadline) {
     await sleep(1200);
-    last = await evaluate(
-      client,
-      `const answer = document.querySelector("[data-ask-answer]");
-       const status = document.querySelector("[data-ask-status]");
-       return {
-         text: ((answer ? answer.textContent : "") + " " + (status ? status.textContent : "")).replace(/\\s+/g, " ").trim(),
-         sources: document.querySelectorAll("[data-rs-sources] .src").length,
-         mode: document.querySelector("[data-ask-answer] .ask-answer") ? "model_answer" : "source_results",
-         busy: document.querySelector("[data-ask-run]").disabled === true,
-       };`
-    );
+    last = await evaluate(client, read);
     if (!last.busy && last.text.length > 20) {
       // Give a streaming response a moment to stop growing.
       await sleep(1500);
-      const again = await evaluate(
-        client,
-        `const answer = document.querySelector("[data-ask-answer]");
-         const status = document.querySelector("[data-ask-status]");
-         return ((answer ? answer.textContent : "") + " " + (status ? status.textContent : "")).replace(/\\s+/g, " ").trim();`
-      );
-      if (again === last.text) return { ...last, settled: true };
-      last.text = again;
+      const again = await evaluate(client, read);
+      if (again.text === last.text) return { ...last, settled: true };
+      last = again;
     }
   }
   return { ...last, settled: false };

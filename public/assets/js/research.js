@@ -1,16 +1,20 @@
 /*
- * Summaverick Research for ServiceNow. Submits to /api/research/stream and
- * renders the run as it happens:
+ * Summaverick Research for ServiceNow — a chat assistant over the ServiceNow
+ * documentation. Each question streams from /api/research/stream:
  *
- *   stage    a step in the run panel (classify, layers, gate, write…)
+ *   stage    a research step (classify, layers, gate, write…)
  *   sources  the numbered sources, shown before the answer finishes
  *   delta    answer text as the model writes it
  *   answer   the final result, its mode, and the checks that ran
- *   done     the run id, which becomes a shareable ?run= link
+ *   done     the run id, which makes the answer shareable as ?run=<id>
+ *
+ * Follow-ups send the earlier turns as `history`, so the thread reads like any
+ * chat assistant while every answer is still written only from the sources
+ * retrieved for it.
  *
  * Modes, and what the page is allowed to call each one:
  *
- *   model_answer          prose from an answer model, sources underneath
+ *   model_answer          prose from an answer model, sources above it
  *   source_results        matching documentation pages — never called an answer
  *   insufficient_evidence no page matched closely enough to quote
  *   out_of_domain         outside the ServiceNow scope of the tool
@@ -24,411 +28,454 @@ import { streamResearch } from "./lib/agent-stream.js";
 import { renderMarkdown } from "./lib/markdown.js";
 import { initChrome } from "./chrome.js";
 
-const CHIPS = [
-  "How do I use GlideRecord to query the incident table?",
-  "How do I define a Business Rule with the Fluent SDK?",
-  "What is the CMDB and how do CI relationships work?",
-  "How do ACLs evaluate on a table?",
+const SUGGESTIONS = [
+  { title: "Query the incident table", q: "How do I use GlideRecord to query the incident table?" },
+  { title: "Business Rules in Fluent", q: "How do I define a Business Rule with the Fluent SDK?" },
+  { title: "CMDB relationships", q: "What is the CMDB and how do CI relationships work?" },
+  { title: "How ACLs evaluate", q: "How do ACLs evaluate on a table?" },
 ];
 
 const MODE_TEXT = {
   source_results:
     "This deployment returns matching ServiceNow documentation pages with an excerpt and a link. It does not write answers.",
   model_answer:
-    "Answers are written from the ServiceNow documentation retrieved for your question, and every claim is numbered to its source so you can check it.",
+    "Answers are written from the ServiceNow documentation retrieved for each question, and every claim is numbered to its source.",
 };
 
+const STORE_KEY = "sv-research-chat";
 const STATE_GLYPH = { ok: "✓", block: "✕", muted: "–", active: "" };
 
 function initResearch() {
+  const root = $("[data-chat]");
   const form = $("[data-ask-form]");
   const input = $("[data-ask-input]");
-  const chipsWrap = $("[data-ask-chips]");
-  const results = $("[data-ask-results]");
-  const statusLine = $("[data-ask-status]");
-  const output = $("[data-ask-answer]");
-  const sourcesWrap = $("[data-rs-sources]");
-  const questionHead = $("[data-rs-question]");
-  const runButton = $("[data-ask-run]");
+  const sendButton = $("[data-ask-run]");
+  const thread = $("[data-chat-thread]");
+  const bar = $("[data-chat-bar]");
+  const suggest = $("[data-ask-chips]");
   const modeLine = $("[data-ask-mode]");
-  const stepsList = $("[data-rs-steps]");
-  const checksList = $("[data-rs-checks]");
-  const runMeta = $("[data-rs-runmeta]");
-  const runBox = $("[data-rs-run]");
-  if (!form || !input || !results || !output) return;
+  if (!root || !form || !input || !thread) return;
 
-  let lastQuestion = "";
-  let runId = null;
-  let busy = false;
+  /** @type {{question: string, payload: any, runId: string|null, steps: any[]}[]} */
+  let turns = [];
+  let controller = null;
+  // Bumped by "New chat", so a run still finishing from the old thread does not
+  // touch the new one.
+  let generation = 0;
 
-  // The run panel sits beside the answer on wide screens and below it on narrow
-  // ones, where it starts collapsed so the answer comes first.
-  const narrow = window.matchMedia("(max-width: 60rem)");
-  const syncRunBox = () => { if (runBox) runBox.open = !narrow.matches; };
-  syncRunBox();
-  narrow.addEventListener?.("change", syncRunBox);
+  /* ---- Layout: start screen vs conversation ------------------------------ */
 
-  async function showMode() {
-    if (!modeLine) return;
+  const setChatting = (on) => {
+    document.body.classList.toggle("is-chatting", on);
+    thread.hidden = !on;
+    if (bar) bar.hidden = !on;
+    input.placeholder = on ? "Ask a follow-up…" : "Ask anything about ServiceNow…";
+  };
+
+  const setBusy = (busy) => {
+    root.dataset.busy = busy ? "true" : "false";
+    if (sendButton) {
+      sendButton.setAttribute("aria-label", busy ? "Stop" : "Send");
+      sendButton.dataset.mode = busy ? "stop" : "send";
+    }
+  };
+
+  // The box grows with the question, up to a limit.
+  const autosize = () => {
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 200)}px`;
+  };
+  input.addEventListener("input", autosize);
+
+  /* ---- Persistence (this tab only) --------------------------------------- */
+
+  const save = () => {
     try {
-      const res = await fetch("/api/research/mode");
-      if (!res.ok) return;
-      const data = await res.json();
-      const text = MODE_TEXT[data.mode];
-      if (text) modeLine.textContent = text;
+      sessionStorage.setItem(
+        STORE_KEY,
+        JSON.stringify(turns.filter((t) => t.payload).slice(-12))
+      );
+    } catch (e) {}
+  };
+  const restore = () => {
+    try {
+      const raw = sessionStorage.getItem(STORE_KEY);
+      return raw ? JSON.parse(raw) : [];
     } catch (e) {
-      /* Keep the conservative wording already in the HTML. */
-    }
-  }
-
-  const setBusy = (next) => {
-    busy = next;
-    if (!runButton) return;
-    runButton.disabled = next;
-    runButton.textContent = next ? "Researching…" : "Research";
-  };
-
-  const say = (text) => {
-    if (statusLine) statusLine.textContent = text;
-  };
-
-  /* ---- Run panel ------------------------------------------------------- */
-
-  const resetRun = () => {
-    stepsList?.replaceChildren();
-    checksList?.replaceChildren();
-    if (runMeta) runMeta.textContent = "";
-  };
-
-  const addStep = (d) => {
-    if (!stepsList) return;
-    // A new step settles whichever one was still running.
-    for (const li of stepsList.querySelectorAll('[data-state="active"]')) {
-      li.dataset.state = "ok";
-      li.querySelector(".rs-step__icon").textContent = STATE_GLYPH.ok;
-    }
-    const state = d.kind || "ok";
-    stepsList.append(
-      el("li", { class: "rs-step", dataset: { state } }, [
-        el("span", { class: "rs-step__icon", "aria-hidden": "true", text: STATE_GLYPH[state] ?? "" }),
-        el("span", { class: "rs-step__label", text: d.label }),
-        d.detail ? el("span", { class: "rs-step__detail", text: d.detail }) : null,
-      ])
-    );
-  };
-
-  const settleSteps = () => {
-    for (const li of stepsList?.querySelectorAll('[data-state="active"]') ?? []) {
-      li.dataset.state = "ok";
-      li.querySelector(".rs-step__icon").textContent = STATE_GLYPH.ok;
+      return [];
     }
   };
 
-  const renderChecks = (payload) => {
-    if (!checksList) return;
-    const c = payload.checks;
-    const mode = payload.mode;
-    if (!c) return;
-    const items = [];
-    items.push(`${c.sourcesFound} source${c.sourcesFound === 1 ? "" : "s"} found`);
-    if (mode === "model_answer") {
-      items.push(`${c.answerCitations ?? 0} of ${c.sourcesFound} sources cited in the answer`);
-      if (c.answerCitationsUnresolved) {
-        items.push(`${c.answerCitationsUnresolved} citation number(s) match no source`);
-      }
-      items.push(`${c.claimsLinkedToSource} of ${c.claimsTotal} evidence claims linked to a source`);
-      items.push("answer quality not evaluated");
-    } else if (mode === "source_results") {
-      items.push("no written answer to check");
-    }
-    items.push(
-      c.promptInjectionPatternInSources
-        ? "a retrieved page contained instruction-like text; it was treated as data"
-        : "no instruction-like text in retrieved pages"
-    );
-    items.push("read-only: nothing was written to any instance");
-    checksList.replaceChildren(...items.map((text) => el("li", { text })));
-  };
+  /* ---- Scrolling ---------------------------------------------------------- */
 
-  const setRunMeta = (payload) => {
-    if (!runMeta) return;
-    const parts = [];
-    if (payload?.latencyMs) parts.push(`${(payload.latencyMs / 1000).toFixed(1)}s`);
-    if (runId) parts.push(runId.replace(/^run_/, "").slice(0, 8));
-    runMeta.textContent = parts.join(" · ");
-  };
+  const nearBottom = () =>
+    window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160;
+  const scrollToEnd = () =>
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
 
-  /* ---- Sources --------------------------------------------------------- */
+  /* ---- One turn ------------------------------------------------------------ */
 
-  const sourceCard = (source, index) => {
-    const n = index + 1;
-    const heading = source.url
-      ? el("a", { class: "src-title", href: source.url, rel: "noopener", target: "_blank", text: source.title })
-      : el("span", { class: "src-title", text: source.title });
-    return el("li", { class: "src", id: `src-${n}` }, [
-      el("span", { class: "src-index", text: String(n) }),
-      el("div", {}, [
-        heading,
-        source.snippet ? el("p", { class: "src-snippet", text: plainText(source.snippet) }) : null,
-        el("p", { class: "src-meta", text: sourceLabel(source) }),
+  function buildTurn(index, question) {
+    const prefix = `t${index}-src-`;
+    const steps = el("ol", { class: "ai-steps__list" });
+    const stepsSummary = el("span", { class: "ai-steps__label", text: "Researching…" });
+    const stepsBox = el("details", { class: "ai-steps" }, [
+      el("summary", {}, [el("span", { class: "ai-steps__icon", "aria-hidden": "true" }), stepsSummary]),
+      steps,
+    ]);
+    const sources = el("div", { class: "ai-sources" });
+    const answer = el("div", { class: "ai-answer md" });
+    const notice = el("p", { class: "ai-notice", hidden: "" });
+    const foot = el("div", { class: "ai-foot" });
+    const checks = el("ul", { class: "ai-checks" });
+    const node = el("article", { class: "turn", dataset: { turn: String(index) } }, [
+      el("div", { class: "turn-user" }, [el("p", { class: "bubble", text: question })]),
+      el("div", { class: "turn-ai" }, [
+        el("div", { class: "ai-head" }, [
+          el("img", { class: "brand-mark", src: "/assets/img/summaverick-mark.png", width: "24", height: "24", alt: "" }),
+          el("span", { text: "Summaverick" }),
+        ]),
+        stepsBox,
+        sources,
+        notice,
+        answer,
+        foot,
+        checks,
       ]),
     ]);
-  };
 
-  let sourceCount = 0;
-  const renderSources = (sources, heading) => {
-    sourceCount = sources.length;
-    if (!sourcesWrap) return;
-    if (!sources.length) { sourcesWrap.replaceChildren(); return; }
-    sourcesWrap.replaceChildren(
-      el("h3", { class: "ask-sources-head", text: heading }),
-      el("ol", { class: "ask-sources" }, sources.map(sourceCard))
+    // Citations jump to their source card and mark it.
+    answer.addEventListener("click", (e) => {
+      const a = e.target.closest?.("a.cite");
+      if (!a) return;
+      const card = node.querySelector(`#${prefix}${a.dataset.cite}`);
+      if (!card) return;
+      e.preventDefault();
+      card.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "nearest", inline: "center" });
+      card.classList.remove("src-card--flash");
+      void card.offsetWidth;
+      card.classList.add("src-card--flash");
+    });
+
+    return { node, prefix, steps, stepsBox, stepsSummary, sources, answer, notice, foot, checks };
+  }
+
+  function addStep(view, d) {
+    for (const li of view.steps.querySelectorAll('[data-state="active"]')) {
+      li.dataset.state = "ok";
+      li.firstChild.textContent = STATE_GLYPH.ok;
+    }
+    const state = d.kind || "ok";
+    view.steps.append(
+      el("li", { class: "ai-step", dataset: { state } }, [
+        el("span", { class: "ai-step__icon", "aria-hidden": "true", text: STATE_GLYPH[state] ?? "" }),
+        el("span", { class: "ai-step__label", text: d.label }),
+        d.detail ? el("span", { class: "ai-step__detail", text: d.detail }) : null,
+      ])
     );
-  };
+    if (state === "active") view.stepsSummary.textContent = `${capitalize(d.label)}…`;
+  }
 
-  // Clicking a citation scrolls to its source and marks it briefly.
-  output.addEventListener("click", (e) => {
-    const a = e.target.closest?.("a.cite");
-    if (!a) return;
-    const target = document.getElementById(`src-${a.dataset.cite}`);
-    if (!target) return;
-    e.preventDefault();
-    target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
-    target.classList.remove("src--flash");
-    void target.offsetWidth;
-    target.classList.add("src--flash");
-  });
-
-  /* ---- Answer ---------------------------------------------------------- */
-
-  let streamed = "";
-  let answerBox = null;
-  let frame = 0;
-
-  const paintStream = () => {
-    frame = 0;
-    if (!answerBox) return;
-    answerBox.replaceChildren(renderMarkdown(streamed, { sourceCount }));
-  };
-
-  const onDelta = (d) => {
-    if (!answerBox) {
-      answerBox = el("div", { class: "ask-answer md is-streaming", "aria-busy": "true" });
-      output.replaceChildren(answerBox);
-      say("");
+  function finishSteps(view, label) {
+    for (const li of view.steps.querySelectorAll('[data-state="active"]')) {
+      li.dataset.state = "ok";
+      li.firstChild.textContent = STATE_GLYPH.ok;
     }
-    streamed += d.text || "";
-    if (!frame) frame = requestAnimationFrame(paintStream);
-  };
+    view.stepsBox.dataset.done = "true";
+    view.stepsSummary.textContent = label;
+  }
 
-  const actions = (payload) => {
-    const copyAnswer = el("button", {
-      class: "btn btn-sm",
-      type: "button",
-      text: "Copy answer",
-      onclick: async (e) => {
-        const text = answerWithSources(payload);
-        await copy(text, e.currentTarget, "Copied");
-      },
-    });
-    const copyLink = runId
-      ? el("button", {
-          class: "btn btn-sm",
-          type: "button",
-          text: "Copy link to this run",
-          onclick: async (e) => {
-            await copy(runUrl(runId), e.currentTarget, "Link copied");
-          },
+  function renderSourceCards(view, list) {
+    if (!list.length) { view.sources.replaceChildren(); return; }
+    view.sources.replaceChildren(
+      el("p", { class: "ai-label", text: `Sources · ${list.length}` }),
+      el(
+        "ol",
+        { class: "src-cards" },
+        list.map((s, i) => {
+          const n = i + 1;
+          const inner = [
+            el("span", { class: "src-card__meta" }, [
+              el("span", { class: "src-card__n", text: String(n) }),
+              el("span", { text: hostOf(s.url) || kindOf(s) }),
+            ]),
+            el("span", { class: "src-card__title", text: s.title }),
+          ];
+          const body = s.url
+            ? el("a", { class: "src-card__link", href: s.url, rel: "noopener", target: "_blank", title: plainText(s.snippet || s.title) }, inner)
+            : el("div", { class: "src-card__link", title: plainText(s.snippet || s.title) }, inner);
+          return el("li", { class: "src-card", id: `${view.prefix}${n}` }, [body]);
         })
-      : null;
-    const again = el("button", {
-      class: "btn btn-sm btn-quiet",
-      type: "button",
-      text: "Ask another question",
-      onclick: () => {
-        input.value = "";
-        input.focus();
-        form.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
-      },
-    });
-    return el("div", { class: "rs-actions", "data-rs-actions": "" }, [
-      payload.mode === "model_answer" ? copyAnswer : null,
-      copyLink,
-      again,
-    ]);
-  };
+      )
+    );
+  }
 
-  let lastPayload = null;
-  const renderAnswer = (payload) => {
-    lastPayload = payload;
-    if (frame) { cancelAnimationFrame(frame); frame = 0; }
+  function renderDocList(view, list) {
+    // For documentation-only results the pages are the result, so show them
+    // in full, with their excerpts, in place of an answer.
+    view.answer.classList.remove("md");
+    view.answer.replaceChildren(
+      el(
+        "ol",
+        { class: "ask-sources" },
+        list.map((s, i) =>
+          el("li", { class: "src" }, [
+            el("span", { class: "src-index", text: String(i + 1) }),
+            el("div", {}, [
+              s.url
+                ? el("a", { class: "src-title", href: s.url, rel: "noopener", target: "_blank", text: s.title })
+                : el("span", { class: "src-title", text: s.title }),
+              s.snippet ? el("p", { class: "src-snippet", text: plainText(s.snippet) }) : null,
+              el("p", { class: "src-meta", text: `${kindOf(s)}${s.url ? ` · ${hostOf(s.url)}` : ""}` }),
+            ]),
+          ])
+        )
+      )
+    );
+  }
+
+  function checksFor(payload) {
+    const c = payload.checks;
+    if (!c) return [];
+    const items = [`${c.sourcesFound} source${c.sourcesFound === 1 ? "" : "s"} found`];
+    if (payload.mode === "model_answer") {
+      items.push(`${c.answerCitations ?? 0} of ${c.sourcesFound} cited in the answer`);
+      if (c.answerCitationsUnresolved) items.push(`${c.answerCitationsUnresolved} citation number(s) match no source`);
+      items.push("answer quality not evaluated");
+    } else if (payload.mode === "source_results") {
+      items.push("no written answer to check");
+    }
+    if (c.promptInjectionPatternInSources) items.push("instruction-like text in a source was treated as data");
+    items.push("read-only");
+    return items;
+  }
+
+  function renderFinal(view, turn) {
+    const payload = turn.payload;
     const mode = payload.mode || (payload.llmUsed ? "model_answer" : "source_results");
+    payload.mode = mode;
     const sources = payload.sources || [];
-    renderSources(sources, mode === "model_answer" ? "Sources" : "Matching documentation");
 
-    const blocks = [];
-    if (payload.notice) blocks.push(el("p", { class: "ask-notice", text: payload.notice }));
+    renderSourceCards(view, mode === "model_answer" ? sources : []);
+    if (payload.notice) {
+      view.notice.hidden = false;
+      view.notice.textContent = payload.notice;
+    }
 
+    view.answer.classList.remove("is-streaming");
+    view.answer.removeAttribute("aria-busy");
     if (mode === "model_answer") {
-      const box = el("div", { class: "ask-answer md" });
-      box.append(renderMarkdown(payload.text, { sourceCount: sources.length }));
-      blocks.push(box);
+      view.answer.classList.add("md");
+      view.answer.replaceChildren(renderMarkdown(payload.text, { sourceCount: sources.length, idPrefix: view.prefix }));
+    } else if (mode === "source_results" && sources.length) {
+      const lead = el("p", { class: "ai-explain", text: payload.text });
+      renderDocList(view, sources);
+      view.answer.prepend(lead);
     } else {
-      blocks.push(el("p", { class: "ask-explain", text: payload.text }));
-    }
-    blocks.push(actions(payload));
-    if (sources.length) {
-      blocks.push(
-        el("p", { class: "ask-next" }, [
-          "Want this on your own runbooks, knowledge base or instance? ",
-          el("a", { href: "#rs-deploy", text: "See deployment options" }),
-          ".",
-        ])
-      );
+      view.answer.replaceChildren(el("p", { class: "ai-explain", text: payload.text }));
     }
 
-    output.replaceChildren(...blocks.filter(Boolean));
-    answerBox = null;
-    streamed = "";
-    renderChecks({ ...payload, mode });
-    setRunMeta(payload);
-  };
+    const stepCount = view.steps.children.length;
+    const stepText = stepCount ? ` · ${stepCount} steps` : "";
+    finishSteps(
+      view,
+      sources.length
+        ? `Researched ${sources.length} source${sources.length === 1 ? "" : "s"}${stepText}`
+        : `Checked the question${stepText}`
+    );
+    view.stepsBox.hidden = !stepCount;
+    view.checks.replaceChildren(...checksFor(payload).map((t) => el("li", { text: t })));
+    view.foot.replaceChildren(actionsFor(turn, mode));
+  }
 
-  const renderProblem = (heading, detail, options = {}) => {
-    if (frame) { cancelAnimationFrame(frame); frame = 0; }
-    // If the answer was partly written when the run broke off, keep what
-    // arrived and say plainly that it is incomplete.
-    const partial = streamed.trim()
-      ? el("div", { class: "ask-answer md" }, [renderMarkdown(streamed, { sourceCount })])
-      : null;
-    answerBox = null;
-    streamed = "";
-    const blocks = [
-      partial,
-      partial ? el("p", { class: "ask-notice", text: "The answer above stopped before it was finished." }) : null,
+  function actionsFor(turn, mode) {
+    const isLast = turns[turns.length - 1] === turn;
+    const buttons = [];
+    if (mode === "model_answer") {
+      buttons.push(iconButton("Copy", ICON.copy, async (btn) => copy(answerWithSources(turn.payload), btn, "Copied")));
+    }
+    if (turn.runId) {
+      buttons.push(iconButton("Share", ICON.link, async (btn) => copy(runUrl(turn.runId), btn, "Link copied")));
+    }
+    if (isLast) {
+      buttons.push(iconButton("Retry", ICON.retry, () => retryLast()));
+    }
+    const meta = turn.payload?.latencyMs ? el("span", { class: "ai-time", text: `${(turn.payload.latencyMs / 1000).toFixed(1)}s` }) : null;
+    return el("div", { class: "ai-actions" }, [...buttons, meta]);
+  }
+
+  function refreshActions() {
+    thread.querySelectorAll(".turn").forEach((node, i) => {
+      const turn = turns[i];
+      const foot = node.querySelector(".ai-foot");
+      if (!foot) return;
+      if (turn?.payload) foot.replaceChildren(actionsFor(turn, turn.payload.mode));
+      else if (i < turns.length - 1) foot.replaceChildren(); // only the latest failed turn keeps Retry
+    });
+  }
+
+  function renderProblem(view, heading, detail, partialText) {
+    view.answer.classList.remove("is-streaming");
+    view.answer.removeAttribute("aria-busy");
+    const blocks = [];
+    if (partialText && partialText.trim()) {
+      const kept = el("div", { class: "md" }, [renderMarkdown(partialText, { sourceCount: view.sources.querySelectorAll(".src-card").length, idPrefix: view.prefix })]);
+      blocks.push(kept, el("p", { class: "ai-notice", text: "This answer stopped before it was finished." }));
+    }
+    blocks.push(
       el("div", { class: "ask-problem" }, [
         el("p", { class: "ask-problem__head", text: heading }),
         el("p", { text: detail }),
-      ]),
-    ];
-    if (options.retry) {
-      blocks.push(
-        el("p", {}, [
-          el("button", {
-            class: "btn",
-            type: "button",
-            text: "Try that question again",
-            onclick: () => ask(lastQuestion),
-          }),
-        ])
-      );
+      ])
+    );
+    view.answer.replaceChildren(...blocks);
+    finishSteps(view, "Stopped");
+  }
+
+  /* ---- Asking ------------------------------------------------------------- */
+
+  function historyBefore(index) {
+    const out = [];
+    for (const t of turns.slice(0, index)) {
+      if (!t.payload) continue;
+      out.push({ role: "user", content: t.question });
+      out.push({ role: "assistant", content: t.payload.text || "" });
     }
-    output.replaceChildren(...blocks.filter(Boolean));
-    settleSteps();
-  };
+    return out.slice(-6);
+  }
 
-  /* ---- Run ------------------------------------------------------------- */
+  async function ask(raw) {
+    const question = (raw || "").trim();
+    if (!question) return;
+    if (controller) return;
 
-  const begin = (question) => {
-    lastQuestion = question;
-    input.value = question; // the question stays put, whatever happens next
-    results.hidden = false;
-    if (questionHead) questionHead.textContent = question;
-    output.replaceChildren();
-    sourcesWrap?.replaceChildren();
-    resetRun();
-    runId = null;
-    sourceCount = 0;
-    streamed = "";
-    answerBox = null;
-  };
+    setChatting(true);
+    input.value = "";
+    autosize();
 
-  async function ask(query) {
-    const question = (query || "").trim();
-    if (!question || busy) return;
-    begin(question);
-    say("Classifying the question and reading the documentation…");
+    const index = turns.length;
+    const turn = { question, payload: null, runId: null };
+    turns.push(turn);
+    const view = buildTurn(index, question);
+    thread.append(view.node);
+    refreshActions();
+    view.node.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+
+    controller = new AbortController();
+    const gen = generation;
     setBusy(true);
-    setUrl({ q: question });
 
-    let answered = false;
+    let streamed = "";
+    let frame = 0;
+    let settled = false;
+    let sourceCount = 0;
+
+    const paint = () => {
+      frame = 0;
+      const follow = nearBottom();
+      view.answer.replaceChildren(renderMarkdown(streamed, { sourceCount, idPrefix: view.prefix }));
+      if (follow) scrollToEnd();
+    };
 
     try {
-      await streamResearch(question, {
-        stage: (d) => {
-          addStep(d);
-          if (d.key === "retrieve") say("Reading the documentation pages that matched…");
-          if (d.key === "compose") say("Writing the answer from these sources…");
+      await streamResearch(
+        question,
+        {
+          stage: (d) => addStep(view, d),
+          sources: (d) => {
+            sourceCount = (d.sources || []).length;
+            if (d.composing) renderSourceCards(view, d.sources || []);
+          },
+          delta: (d) => {
+            if (!streamed) {
+              view.answer.classList.add("md", "is-streaming");
+              view.answer.setAttribute("aria-busy", "true");
+            }
+            streamed += d.text || "";
+            if (!frame) frame = requestAnimationFrame(paint);
+          },
+          blocked: (d) => {
+            settled = true;
+            renderProblem(
+              view,
+              "That question was turned away before any model call.",
+              d.reason || "It matched a pattern used to try to change the tool's instructions. Rephrase it as a plain ServiceNow question."
+            );
+          },
+          answer: (d) => {
+            settled = true;
+            if (frame) { cancelAnimationFrame(frame); frame = 0; }
+            turn.payload = d;
+            renderFinal(view, turn);
+            save();
+          },
+          done: (d) => {
+            if (d.id && d.status === "done" && turn.payload) {
+              turn.runId = d.id;
+              refreshActions();
+              save();
+            }
+          },
+          error: (d) => {
+            settled = true;
+            renderProblem(view, "The research run did not finish.", d.message || "Something failed partway through. Try again.", streamed);
+          },
+          rateLimited: (message) => {
+            settled = true;
+            renderProblem(view, "Too many questions in a short time.", message || "Wait a moment and try again.");
+          },
         },
-        sources: (d) => {
-          renderSources(d.sources || [], d.composing ? "Sources" : "Matching documentation");
-        },
-        delta: onDelta,
-        blocked: (d) => {
-          answered = true;
-          say("");
-          renderProblem(
-            "That question was turned away before any model call.",
-            d.reason ||
-              "It matched a pattern used to try to change the tool's instructions. Rephrase it as a plain ServiceNow question."
-          );
-        },
-        answer: (d) => {
-          answered = true;
-          say("");
-          settleSteps();
-          renderAnswer(d);
-        },
-        done: (d) => {
-          if (d.id && d.status === "done") {
-            runId = d.id;
-            setUrl({ run: d.id });
-            setRunMeta(lastPayload);
-            // The copy-link button needs the id, which arrives after the answer.
-            const bar = output.querySelector("[data-rs-actions]");
-            if (bar && lastPayload) bar.replaceWith(actions(lastPayload));
-          }
-        },
-        error: (d) => {
-          answered = true;
-          say("");
-          renderProblem(
-            "The research run did not finish.",
-            d.message || "Something failed partway through. Your question is still in the box.",
-            { retry: true }
-          );
-        },
-        rateLimited: (message) => {
-          answered = true;
-          say("");
-          renderProblem(
-            "Too many questions in a short time.",
-            message || "Wait a moment and try again. Your question is still in the box.",
-            { retry: true }
-          );
-        },
-      });
-      if (!answered) {
-        say("");
-        renderProblem(
-          "The run ended without a result.",
-          "Nothing came back from the run. Your question is still in the box.",
-          { retry: true }
-        );
+        { history: historyBefore(index), signal: controller.signal }
+      );
+      if (!settled) {
+        renderProblem(view, "The run ended without a result.", "Nothing came back from the run. Try the question again.", streamed);
       }
     } catch (err) {
-      say("");
-      renderProblem(
-        "The research service is unreachable.",
-        "The request could not be completed from here. Your question is still in the box.",
-        { retry: true }
-      );
+      if (frame) { cancelAnimationFrame(frame); frame = 0; }
+      if (err?.name === "AbortError") {
+        renderProblem(view, "Stopped.", "You stopped this answer. Ask again or change the question.", streamed);
+      } else {
+        renderProblem(view, "The research service is unreachable.", "The request could not be completed from here. Try again in a moment.", streamed);
+      }
     } finally {
-      setBusy(false);
+      if (gen === generation) {
+        controller = null;
+        setBusy(false);
+        if (!turn.payload) {
+          // Put the question back and offer a retry on the failed turn.
+          input.value = input.value || question;
+          autosize();
+          view.foot.replaceChildren(el("div", { class: "ai-actions" }, [iconButton("Retry", ICON.retry, () => retryLast())]));
+        }
+        input.focus({ preventScroll: true });
+      }
     }
   }
 
-  /* A shared ?run= link replays a saved run without asking again. */
+  function retryLast() {
+    if (controller || !turns.length) return;
+    const last = turns.pop();
+    thread.lastElementChild?.remove();
+    save();
+    input.value = "";
+    ask(last.question);
+  }
+
+  function newChat() {
+    generation++;
+    if (controller) controller.abort();
+    controller = null;
+    setBusy(false);
+    turns = [];
+    thread.replaceChildren();
+    save();
+    setChatting(false);
+    history.replaceState(null, "", location.pathname);
+    window.scrollTo({ top: 0 });
+    input.focus();
+  }
+
+  /* A shared ?run= link opens that answer as a one-turn conversation. */
   async function loadRun(id) {
     try {
       const res = await fetch(`/api/research/${encodeURIComponent(id)}`);
@@ -437,44 +484,51 @@ function initResearch() {
       const payload = data.trace?.result;
       const question = data.run?.query;
       if (!payload || !question) throw new Error("incomplete run");
-      begin(question);
-      runId = id;
-      addStep({ label: "saved run", detail: new Date(Number(data.run.created_at)).toLocaleString(), kind: "ok" });
-      renderAnswer(payload);
+      showSaved([{ question, payload, runId: id }]);
     } catch (e) {
-      begin("");
-      if (questionHead) questionHead.textContent = "";
-      renderProblem(
-        "That run could not be loaded.",
-        "The link may be old, or the run was not saved. Ask the question again below."
-      );
-      setUrl({});
+      setChatting(true);
+      const view = buildTurn(0, "Shared answer");
+      thread.append(view.node);
+      renderProblem(view, "That shared answer could not be loaded.", "The link may be old, or the run was not saved. Ask the question again below.");
     }
   }
 
-  chipsWrap?.replaceChildren(
-    ...CHIPS.map((c) =>
-      el("button", {
-        class: "chip",
-        type: "button",
-        text: c,
-        onclick: () => ask(c),
-      })
+  function showSaved(saved) {
+    turns = saved;
+    setChatting(true);
+    saved.forEach((turn, i) => {
+      const view = buildTurn(i, turn.question);
+      thread.append(view.node);
+      renderFinal(view, turn);
+    });
+    refreshActions();
+    save();
+    scrollToEnd();
+  }
+
+  /* ---- Wiring ------------------------------------------------------------- */
+
+  suggest?.replaceChildren(
+    ...SUGGESTIONS.map((s) =>
+      el("button", { class: "suggest", type: "button", onclick: () => ask(s.q) }, [
+        el("span", { class: "suggest__title", text: s.title }),
+        el("span", { class: "suggest__q", text: s.q }),
+      ])
     )
   );
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
+    if (controller) { controller.abort(); return; }
     ask(input.value);
   });
-  // Enter submits; Shift+Enter for a newline.
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
-      ask(input.value);
+      if (!controller) ask(input.value);
     }
   });
-  // "/" focuses the question box from anywhere that is not already a field.
+  $("[data-chat-new]")?.addEventListener("click", newChat);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target;
@@ -483,15 +537,30 @@ function initResearch() {
     input.focus();
   });
 
-  showMode();
+  (async () => {
+    if (!modeLine) return;
+    try {
+      const res = await fetch("/api/research/mode");
+      if (!res.ok) return;
+      const text = MODE_TEXT[(await res.json()).mode];
+      if (text) modeLine.textContent = text;
+    } catch (e) {}
+  })();
   loadEvals();
+  setBusy(false);
 
   const params = new URLSearchParams(location.search);
   if (params.get("run")) loadRun(params.get("run"));
-  else if (params.get("q")) input.value = params.get("q").slice(0, 500);
+  else if (params.get("q")) {
+    input.value = params.get("q").slice(0, 500);
+    autosize();
+  } else {
+    const saved = restore();
+    if (saved.length) showSaved(saved);
+  }
 }
 
-/* ---- Eval scoreboard ---------------------------------------------------- */
+/* ---- Eval scoreboard (start screen) --------------------------------------- */
 
 async function loadEvals() {
   const box = $("[data-rs-evals]");
@@ -511,24 +580,41 @@ async function loadEvals() {
     set("adversarialOf", `${s.adversarialTotal} adversarial prompts`);
     set("intentAccuracy", pct(s.intentAccuracy));
     set("intentOf", `${s.intentEvaluated} questions with a labelled intent`);
-  } catch (e) {
-    /* Leave the placeholders; the section still explains what is measured. */
-  }
+  } catch (e) {}
 }
 
-/* ---- Helpers ------------------------------------------------------------ */
+/* ---- Helpers ---------------------------------------------------------------- */
+
+const ICON = {
+  copy: "M9 9h10v10H9zM5 15V5h10",
+  link: "M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1",
+  retry: "M4 4v6h6M20 20v-6h-6M5.5 15a7 7 0 0 0 12.3 2M18.5 9A7 7 0 0 0 6.2 7",
+};
+
+function iconButton(label, path, onClick) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.8");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", path);
+  svg.append(p);
+  const text = el("span", { text: label });
+  const btn = el("button", { class: "ai-action", type: "button" }, [svg, text]);
+  btn.addEventListener("click", () => onClick(text));
+  return btn;
+}
 
 function pct(x) {
   const n = Number(x);
   if (!Number.isFinite(n)) return "—";
   return `${Math.round((n <= 1 ? n * 100 : n) * 10) / 10}%`;
-}
-
-function setUrl(params) {
-  const url = new URL(location.href);
-  url.search = "";
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  history.replaceState(null, "", url);
 }
 
 function runUrl(id) {
@@ -547,37 +633,40 @@ function answerWithSources(payload) {
   return lines.join("\n");
 }
 
-async function copy(text, button, done) {
-  const label = button.textContent;
+async function copy(text, label, done) {
+  const before = label.textContent;
   try {
     await navigator.clipboard.writeText(text);
-    button.textContent = done;
+    label.textContent = done;
   } catch (e) {
-    button.textContent = "Copy failed";
+    label.textContent = "Copy failed";
   }
-  setTimeout(() => { button.textContent = label; }, 1800);
+  setTimeout(() => { label.textContent = before; }, 1800);
 }
 
 /* Excerpts are documentation text; drop Markdown emphasis marks from them. */
 function plainText(text) {
-  return String(text).replace(/\*\*|__|`/g, "");
+  return String(text || "").replace(/\*\*|__|`/g, "");
 }
 
-function sourceLabel(source) {
-  const kind =
-    source.sourceType === "product_documentation"
-      ? "ServiceNow product documentation"
-      : source.sourceType === "sdk_explain"
-        ? "ServiceNow SDK documentation"
-        : source.sourceType.replace(/_/g, " ");
-  return source.url ? `${kind} · ${hostOf(source.url)}` : kind;
+function capitalize(s) {
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+function kindOf(source) {
+  return source.sourceType === "product_documentation"
+    ? "ServiceNow product documentation"
+    : source.sourceType === "sdk_explain"
+      ? "ServiceNow SDK documentation"
+      : String(source.sourceType || "source").replace(/_/g, " ");
 }
 
 function hostOf(url) {
+  if (!url) return "";
   try {
-    return new URL(url).host;
+    return new URL(url).host.replace(/^www\./, "");
   } catch (e) {
-    return "source";
+    return "";
   }
 }
 
