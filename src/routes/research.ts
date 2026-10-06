@@ -26,8 +26,10 @@ import {
   getEvalScores,
   runResearchPipeline,
   researchAnswerMode,
+  authenticateHistory,
   normalizeHistory,
   retrievalQueryFor,
+  signAnswer,
   type ChatTurn,
   type ResearchRetrieved,
 } from "../domain/research";
@@ -111,7 +113,7 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
   return [
     // ---- Streamed live trace -------------------------------------------
     route("POST", "/api/research/stream", async (req, ctx: Ctx) => {
-      const { query, history = [], err } = await readQuery(req, ctx);
+      const { query, history: submitted = [], err } = await readQuery(req, ctx);
       if (err) return err;
 
       const key = clientKey(req, ctx.session.deviceId);
@@ -121,6 +123,9 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
       if (!burst.allowed) return rateLimited(burst.resetAt);
 
       const q = query!;
+      // What the model reads as its own earlier answers must be answers this
+      // server wrote; the client only echoes them back (see conversation.ts).
+      const history = await authenticateHistory(submitted, ctx.env.SESSION_SECRET);
       // Follow-ups are searched with the question they follow; the reader's
       // own words are what the model answers and what the run records.
       const searchText = retrievalQueryFor(q, history);
@@ -209,6 +214,7 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
             env: ctx.env as unknown as Record<string, string | undefined>,
             perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
             perplexityModel: ctx.env.RESEARCH_MODEL,
+            perplexityWire: ctx.env.PERPLEXITY_WIRE,
             onRetrieved,
             onDelta: (text) => sse.send("delta", { text }),
           });
@@ -244,7 +250,12 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
             },
             latencyMs: nowMs() - started,
           };
-          await sse.send("answer", answerPayload);
+          // The signature goes to the browser with the answer but not into the
+          // stored trace, which anyone holding the run id can read back.
+          await sse.send("answer", {
+            ...answerPayload,
+            historySig: await signAnswer(result.answer, ctx.env.SESSION_SECRET),
+          });
 
           persistRun(ctx.env, ctx.exec, {
             id, deviceId: ctx.session.deviceId, query: q, intent: t.classification.intent,
@@ -317,6 +328,7 @@ export function researchRoutes(route: RouteMaker): RouteDef[] {
           env: ctx.env as unknown as Record<string, string | undefined>,
           perplexityApiKey: ctx.env.PERPLEXITY_API_KEY,
           perplexityModel: ctx.env.RESEARCH_MODEL,
+          perplexityWire: ctx.env.PERPLEXITY_WIRE,
         });
         return ok({ answer, mode, notice, sources, checks, trace });
       } catch (e) {

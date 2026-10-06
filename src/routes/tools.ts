@@ -4,7 +4,7 @@
  *   GET  /api/trending         landing widgets (news / market / tech), country-aware
  *   GET  /api/servicenow       latest ServiceNow articles across 4 tracks
  *   GET  /api/metals           live gold/silver spot + FX + daily history (D1-backed)
- *   POST /api/flights          SkyFare flight search (Amadeus → Sonar fallback)
+ *   POST /api/flights          SkyFare flight search (Amadeus → Perplexity fallback)
  *   POST /api/flights/inspire  Summaverick destination ideas
  *
  * This module is the IO layer: it does the fetches, the Cloudflare Cache API
@@ -20,6 +20,7 @@
  */
 import type { Ctx, Env, RouteDef, RouteMaker } from "../types";
 import { json, nowMs } from "../lib/json";
+import { callPerplexity, perplexityConfig, type PerplexityConfig } from "../lib/perplexity";
 import { getMetalSeries, upsertMetalDaily } from "../db/queries";
 import {
   amadeusHost,
@@ -113,30 +114,20 @@ function settledValue(result: PromiseSettledResult<any> | undefined): any {
   return result && result.status === "fulfilled" ? result.value : null;
 }
 
-/* ─────────────────────────── Sonar / fetch IO ─────────────────────────── */
+/* ───────────────────────── Perplexity / fetch IO ───────────────────────── */
 
-async function callSonarWithTimeout(
-  apiKey: string,
+/** One Perplexity call, as a Sonar-shaped body (see lib/perplexity.ts). */
+async function askPerplexity(
+  pplx: PerplexityConfig,
   payload: unknown,
   timeoutMs: number
 ): Promise<any> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch("https://api.perplexity.ai/v1/sonar", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + apiKey,
-      },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) throw new Error("Sonar " + res.status);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
+  const { data } = await callPerplexity({
+    ...pplx,
+    payload: payload as Record<string, unknown>,
+    timeoutMs,
+  });
+  return data;
 }
 
 async function fetchMarketJson(url: string): Promise<any> {
@@ -157,24 +148,24 @@ async function fetchMarketJson(url: string): Promise<any> {
 
 /* ─────────────────────────── trending widgets ─────────────────────────── */
 
-async function fetchNewsWidget(apiKey: string, country: string) {
+async function fetchNewsWidget(pplx: PerplexityConfig, country: string) {
   const { payload, label } = buildLocalNewsPayload(country);
-  const data = await callSonarWithTimeout(apiKey, payload, TRENDING_REQUEST_TIMEOUT_MS);
+  const data = await askPerplexity(pplx, payload, TRENDING_REQUEST_TIMEOUT_MS);
   return parseNewsWidget(data, "news", label);
 }
 
-async function fetchWorldNewsWidget(apiKey: string) {
-  const data = await callSonarWithTimeout(
-    apiKey,
+async function fetchWorldNewsWidget(pplx: PerplexityConfig) {
+  const data = await askPerplexity(
+    pplx,
     buildWorldNewsPayload(),
     TRENDING_REQUEST_TIMEOUT_MS
   );
   return parseNewsWidget(data, "worldNews", "#1 worldwide · Top story");
 }
 
-async function fetchMarketWidget(apiKey: string, country: string) {
-  const data = await callSonarWithTimeout(
-    apiKey,
+async function fetchMarketWidget(pplx: PerplexityConfig, country: string) {
+  const data = await askPerplexity(
+    pplx,
     buildMarketPayload(country),
     TRENDING_REQUEST_TIMEOUT_MS
   );
@@ -227,20 +218,20 @@ async function handleTrending(req: Request, ctx: Ctx): Promise<Response> {
     return rawJson(body, { "X-Summaverick-Cache": "HIT" });
   }
 
-  const apiKey = ctx.env.PERPLEXITY_API_KEY;
-  if (!apiKey) {
+  const pplx = perplexityConfig(ctx.env);
+  if (!pplx) {
     return json({ success: false, error: "API key not configured" });
   }
 
   /* Local news would duplicate worldNews when the country is GLOBAL, so we skip
    * that fetch and show three widgets instead of four. */
   const localNewsPromise =
-    country === "GLOBAL" ? Promise.resolve(null) : fetchNewsWidget(apiKey, country);
+    country === "GLOBAL" ? Promise.resolve(null) : fetchNewsWidget(pplx, country);
 
   const [newsRes, worldNewsRes, marketRes, techRes] = await Promise.allSettled([
     localNewsPromise,
-    fetchWorldNewsWidget(apiKey),
-    fetchMarketWidget(apiKey, country),
+    fetchWorldNewsWidget(pplx),
+    fetchMarketWidget(pplx, country),
     fetchTechWidget(),
   ]);
 
@@ -276,10 +267,10 @@ async function handleTrending(req: Request, ctx: Ctx): Promise<Response> {
 
 /* ─────────────────────────── ServiceNow feed ─────────────────────────── */
 
-async function fetchServiceNowTrack(apiKey: string, key: string, recency: string) {
+async function fetchServiceNowTrack(pplx: PerplexityConfig, key: string, recency: string) {
   const payload = buildServiceNowPayload(key, recency);
   if (!payload) return null;
-  const data = await callSonarWithTimeout(apiKey, payload, SNOW_REQUEST_TIMEOUT_MS);
+  const data = await askPerplexity(pplx, payload, SNOW_REQUEST_TIMEOUT_MS);
   return parseServiceNowTrack(data, key);
 }
 
@@ -302,13 +293,13 @@ async function handleServiceNowFeed(_req: Request, ctx: Ctx): Promise<Response> 
     return rawJson(body, { "X-Summaverick-Cache": "HIT" });
   }
 
-  const apiKey = ctx.env.PERPLEXITY_API_KEY;
-  if (!apiKey) {
+  const pplx = perplexityConfig(ctx.env);
+  if (!pplx) {
     return json({ success: false, error: "API key not configured" });
   }
 
   const settled = await Promise.allSettled(
-    keys.map((k) => fetchServiceNowTrack(apiKey, k, recency))
+    keys.map((k) => fetchServiceNowTrack(pplx, k, recency))
   );
 
   const tracks = settled
@@ -599,11 +590,11 @@ async function handleFlightSearch(req: Request, ctx: Ctx): Promise<Response> {
           aScored.source = "amadeus";
           return json({ success: true, data: aScored });
         }
-        // No offers from Amadeus → fall through to Sonar (broader, if configured).
+        // No offers from Amadeus → fall through to Perplexity (broader, if configured).
       } catch (amErr) {
         try {
           console.log(
-            "Amadeus failed; falling back to Sonar:",
+            "Amadeus failed; falling back to Perplexity:",
             amErr && (amErr as Error).message
           );
         } catch {
@@ -612,8 +603,8 @@ async function handleFlightSearch(req: Request, ctx: Ctx): Promise<Response> {
       }
     }
 
-    const apiKey = ctx.env.PERPLEXITY_API_KEY;
-    if (!apiKey)
+    const pplx = perplexityConfig(ctx.env);
+    if (!pplx)
       return json({ success: false, error: "Flight search service is not configured." });
     const payload = {
       model: "sonar-pro",
@@ -625,7 +616,7 @@ async function handleFlightSearch(req: Request, ctx: Ctx): Promise<Response> {
       max_tokens: 4096,
       web_search_options: { search_context_size: "high" },
     };
-    const data = await callSonarWithTimeout(apiKey, payload, FLIGHT_TIMEOUT_MS);
+    const data = await askPerplexity(pplx, payload, FLIGHT_TIMEOUT_MS);
     const content =
       data && data.choices && data.choices[0] && data.choices[0].message
         ? data.choices[0].message.content
@@ -657,7 +648,7 @@ async function handleFlightSearch(req: Request, ctx: Ctx): Promise<Response> {
       else if (m.indexOf("parse") >= 0)
         msg =
           "The AI returned an unexpected response format. Please try a different route or try again.";
-      else if (m.indexOf("Sonar") >= 0)
+      else if (m.indexOf("Perplexity") >= 0)
         msg =
           "The AI search service returned an error. This may be a temporary issue — please try again in a moment.";
       else if (m.indexOf("Empty") >= 0)
@@ -686,8 +677,8 @@ async function handleFlightInspire(req: Request, ctx: Ctx): Promise<Response> {
       return json({ success: false, error: "Describe your trip in a short sentence." });
     }
 
-    const apiKey = ctx.env.PERPLEXITY_API_KEY;
-    if (!apiKey) {
+    const pplx = perplexityConfig(ctx.env);
+    if (!pplx) {
       return json({ success: false, error: "Inspiration service is not configured." });
     }
 
@@ -702,7 +693,7 @@ async function handleFlightInspire(req: Request, ctx: Ctx): Promise<Response> {
       web_search_options: { search_context_size: "medium" },
     };
 
-    const data = await callSonarWithTimeout(apiKey, payload, INSPIRE_TIMEOUT_MS);
+    const data = await askPerplexity(pplx, payload, INSPIRE_TIMEOUT_MS);
     const content =
       data && data.choices && data.choices[0] && data.choices[0].message
         ? data.choices[0].message.content

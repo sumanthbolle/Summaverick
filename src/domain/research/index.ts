@@ -87,5 +87,12 @@ export type {
   ResearchChecks,
   ResearchRetrieved,
 } from "./pipeline";
-export { normalizeHistory, retrievalQueryFor, MAX_HISTORY_PAIRS } from "./conversation";
+export {
+  authenticateHistory,
+  normalizeHistory,
+  retrievalQueryFor,
+  signAnswer,
+  MAX_HISTORY_PAIRS,
+  UNVERIFIED_ANSWER,
+} from "./conversation";
 export type { ChatTurn } from "./conversation";

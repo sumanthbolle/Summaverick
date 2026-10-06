@@ -38,7 +38,7 @@ src/
     schema.ts      row types mirroring migrations
     queries.ts     the ONLY place raw SQL lives
   domain/          pure logic ported from the old api/*.js (no IO)
-  lib/             session, webauthn, crypto, ratelimit, cors(=same-origin), json, backup, retention
+  lib/             session, webauthn, crypto, ratelimit, cors(=same-origin), json, backup, retention, perplexity (the one Perplexity client)
 migrations/        0001_init, 0002_content, 0003_upsc, 0004_metals
 scripts/           seed-quiz, seed-content, export-backup, verify (+ _util)
 public/            static assets served by the Worker (full site UI)
@@ -93,4 +93,7 @@ checks for every task.
 
 `PERPLEXITY_API_KEY`, `UPSC_PUBLISH_TOKEN`, `SESSION_SECRET`,
 `AMADEUS_CLIENT_ID`, `AMADEUS_CLIENT_SECRET`, `RESEND_API_KEY`.
+Optional: `PERPLEXITY_WIRE` (`agent` or `sonar` to pin one Perplexity API; unset tries
+the Agent API and falls back to Sonar). `SESSION_SECRET` also signs research answers
+for follow-up questions, so set it in production.
 Never commit `.dev.vars`.

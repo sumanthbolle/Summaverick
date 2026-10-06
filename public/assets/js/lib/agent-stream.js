@@ -7,7 +7,8 @@
  *     stage(d), sources(d), delta(d), blocked(d), answer(d), error(d), done(d), rateLimited(msg)
  *   }, { history, signal });
  *
- * `history` is the earlier turns ([{ role, content }]) for a follow-up;
+ * `history` is the earlier turns ([{ role, content }]) for a follow-up; an
+ * assistant turn also carries `sig`, the `historySig` its answer arrived with;
  * `signal` aborts the request (the Stop button).
  *
  * Resolves true when the stream ran (including a 429, handled via rateLimited).

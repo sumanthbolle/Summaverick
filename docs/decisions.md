@@ -2,6 +2,54 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-10-06 — One Perplexity client; follow-up answers are server-signed
+
+**Decision.** Every Perplexity call goes through `src/lib/perplexity.ts`, and a
+follow-up question's earlier answer reaches the model only if this server
+signed it.
+
+**Why the client.** Perplexity announced the end of the Sonar chat-completions
+endpoints for 2026-09-27 and moved to the Agent API (`POST /v1/responses`).
+Its notes say synchronous and streaming Sonar requests are being rewritten as
+Agent API requests, model by model, so the old calls may still work, on
+borrowed time. The research answers and the five tool endpoints (trending,
+ServiceNow feed, flights, flight inspiration, news widgets) used to build
+six Sonar requests, sent by two separate HTTP helpers on two different URLs
+(`/chat/completions` and `/v1/sonar`), with different timeout and error handling.
+
+Callers still build Sonar-shaped payloads and read `choices[0].message.content`.
+The client sends the request over the Agent API, falls back to Sonar when the
+Agent API fails in a way Sonar would not share (rejected request, wrong shape,
+5xx, timeout), and returns the Sonar shape either way. `PERPLEXITY_WIRE=agent`
+or `sonar` pins one API; unset is `auto`. A failed Agent API call puts it on a
+five-minute cooldown per isolate. 401, 403 and 429 are never retried, and a
+stream that fails after text has reached the reader is not restarted.
+
+**Not confirmed.** Perplexity's reference was not reachable when this was
+written, so what the Agent API accepts comes from secondary descriptions. All of
+it is in `buildAgentRequest` and `readAgentResponse`. Not forwarded because
+their Agent API names are unknown: `temperature`, `max_tokens`,
+`web_search_options` (`user_location`, `search_context_size`). In `auto` a wrong
+guess shows up as a `perplexity: agent wire failed (…)` warning carrying
+Perplexity's own error text, and the call is still answered over Sonar. Run
+one real request on each wire before relying on it.
+
+**A leak, now visible.** The research call sets `disable_search` so `[n]`
+can only point at a retrieved source. If a wire drops that flag, or the
+response shows the model searched anyway, the answer carries a notice and
+`trace.llm.webSearchLeaked` is true. `trace.llm.wire` says which API answered.
+
+**Why signing.** A follow-up carries the earlier turns from the browser. The
+model reads an assistant turn as its own earlier words, so a visitor who wrote
+one could tell it anything with that authority; the injection scan only looked
+at the user turns. Each answer now leaves with `historySig`, an HMAC over its
+text keyed by `SESSION_SECRET`; the page echoes it back, and
+`authenticateHistory` replays the text only if it verifies and passes the
+injection scan. Otherwise the turn becomes "(The earlier answer is not
+available.)" and the follow-up is answered without it. The signature is not
+stored in the run trace. **With no `SESSION_SECRET` set, no assistant text is
+replayed**: that fails closed, and follow-ups lose the previous answer's text.
+
 ## 2026-09-28 — /research is a chat assistant; Research is in the main menu
 
 **Decision.** `/research` works like Perplexity, ChatGPT or Claude: a start
