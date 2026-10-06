@@ -21,6 +21,8 @@ export interface Env {
   PERPLEXITY_API_KEY?: string;
   /** Optional Perplexity model for research answers (default "sonar"). */
   RESEARCH_MODEL?: string;
+  /** Which Perplexity API to call: "agent", "sonar", or unset for auto (see lib/perplexity.ts). */
+  PERPLEXITY_WIRE?: string;
   UPSC_PUBLISH_TOKEN?: string;
   SESSION_SECRET?: string;
   AMADEUS_CLIENT_ID?: string;

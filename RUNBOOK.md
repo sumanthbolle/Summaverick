@@ -44,7 +44,9 @@ Secrets are **per-Worker** and are **not** inherited from any other repo. A
 The research agent needs only `PERPLEXITY_API_KEY`. Without it the live agent
 still runs — it returns the deterministic, evidence-backed draft and the trace
 shows `model answer` vs `evidence-backed draft` accordingly. The other secrets
-belong to legacy routes.
+belong to legacy routes, except `SESSION_SECRET`: it also signs research
+answers, and without it a follow-up question is answered without the earlier
+answer's text.
 
 **Local dev (`wrangler dev`).** Put it in `.dev.vars` (gitignored — never
 committed). Copy `.dev.vars.example` to `.dev.vars` and fill the value:

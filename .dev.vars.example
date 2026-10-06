@@ -3,11 +3,16 @@
 
 # Perplexity (trending / servicenow / research LLM calls)
 PERPLEXITY_API_KEY=""
+# Which Perplexity API to call: "agent", "sonar", or leave unset to try the Agent
+# API and fall back to Sonar (see src/lib/perplexity.ts).
+# PERPLEXITY_WIRE=""
 
 # Bearer token the UPSC GitHub Actions workflows use to POST to /api/upsc/*
 UPSC_PUBLISH_TOKEN=""
 
-# HMAC key for signing/verifying opaque session material & magic-link tokens
+# HMAC key for signing/verifying opaque session material & magic-link tokens.
+# Also signs research answers so a follow-up can replay them; with it unset, a
+# follow-up is answered without the earlier answer's text.
 SESSION_SECRET=""
 
 # Amadeus (SkyFare / flights)

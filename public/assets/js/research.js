@@ -339,7 +339,9 @@ function initResearch() {
     for (const t of turns.slice(0, index)) {
       if (!t.payload) continue;
       out.push({ role: "user", content: t.question });
-      out.push({ role: "assistant", content: t.payload.text || "" });
+      // `historySig` is the server's signature for this answer; without it the
+      // server will not pass the text to the model as its own earlier reply.
+      out.push({ role: "assistant", content: t.payload.text || "", sig: t.payload.historySig });
     }
     return out.slice(-6);
   }

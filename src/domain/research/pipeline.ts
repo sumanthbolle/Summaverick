@@ -25,6 +25,11 @@ import { getEvalScores, type EvalScores } from "./evals/eval-runner";
 import type { ServiceNowSourceType } from "./schemas/evidence";
 import type { ClaimVerdict } from "./answer-verifier";
 import type { ChatTurn } from "./conversation";
+import { callPerplexity, type PerplexityWire } from "../../lib/perplexity";
+
+// The stream reader moved into the Perplexity client with the rest of the wire
+// handling; it stays importable from here.
+export { readCompletionStream } from "../../lib/perplexity";
 
 export interface TraceLayer {
   /** Human label, e.g. "Layer 2 · Product docs". */
@@ -103,7 +108,16 @@ export interface ResearchTrace {
     readOnly: boolean;
     liveInstanceEnabled: boolean;
   };
-  llm: { provider: "perplexity"; used: boolean; model: string | null; error?: string };
+  llm: {
+    provider: "perplexity";
+    used: boolean;
+    model: string | null;
+    /** Which Perplexity API answered. Present when a model wrote the answer. */
+    wire?: PerplexityWire;
+    /** The model was free to search the web, so its `[n]` markers may not match `sources`. */
+    webSearchLeaked?: boolean;
+    error?: string;
+  };
   events: { name: string; timestamp: string }[];
 }
 
@@ -175,6 +189,9 @@ export function researchAnswerMode(options: {
 /** How many ranked documents become numbered sources for the answer. */
 const MAX_SOURCES = 4;
 
+/** Longest the answer model may stay silent, before its first text and between chunks. */
+const ANSWER_TIMEOUT_MS = 30_000;
+
 const LAYER_LABELS: Record<string, { label: string; sourceType: ServiceNowSourceType }> = {
   sdk_explain: { label: "Layer 1 · SDK explain", sourceType: "sdk_explain" },
   product_docs: { label: "Layer 2 · Product docs", sourceType: "product_documentation" },
@@ -203,6 +220,8 @@ export async function runResearchPipeline(options: {
   configOverride?: ServiceNowDomainConfig;
   fetchImpl?: typeof fetch;
   perplexityModel?: string;
+  /** Raw `PERPLEXITY_WIRE` value (see lib/perplexity.ts). */
+  perplexityWire?: string;
   /** Optional sink that receives internal stage events as they fire, so an SSE
    *  endpoint can stream the trace live. Absent = the default in-memory sink. */
   traceSink?: import("./core/types").TraceSink;
@@ -402,25 +421,50 @@ export async function runResearchPipeline(options: {
   const model = options.perplexityModel || "sonar";
   let llmUsed = false;
   let llmError: string | undefined;
+  let llmWire: PerplexityWire | undefined;
+  let searchLeaked = false;
   let prose = "";
 
   if (composing) {
     try {
+      const evidence = ranked
+        .slice(0, MAX_SOURCES)
+        .map((e, i) => `[${i + 1}] (${e.sourceType}) ${e.title}\n${e.content}`)
+        .join("\n\n");
       const written = await callPerplexity({
         apiKey: options.perplexityApiKey!,
-        model,
-        systemPrompt,
-        query: options.question?.trim() || query,
-        history: options.history ?? [],
-        evidence: ranked
-          .slice(0, MAX_SOURCES)
-          .map((e, i) => `[${i + 1}] (${e.sourceType}) ${e.title}\n${e.content}`)
-          .join("\n\n"),
+        wire: options.perplexityWire,
+        timeoutMs: ANSWER_TIMEOUT_MS,
+        // The caller's own fetch, if any. Not `fetchImpl` above: that one cuts
+        // a request off after 8 s, which is right for a docs mirror and wrong
+        // for an answer being written.
+        fetchImpl: options.fetchImpl,
+        sonarUrl: "https://api.perplexity.ai/chat/completions",
         onDelta: options.onDelta,
+        payload: {
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            // Earlier turns give the model the thread; the evidence below is
+            // still the only thing it may cite.
+            ...(options.history ?? []).map((t) => ({ role: t.role, content: t.content })),
+            {
+              role: "user",
+              content: `Question: ${options.question?.trim() || query}\n\n${ANSWER_INSTRUCTIONS}\n\nEvidence:\n${evidence}`,
+            },
+          ],
+          temperature: 0.2,
+          // The answer must come from the retrieved evidence, whose [n] numbers
+          // the UI links to. Without this, the model can search the web and
+          // number its own results, so [n] would point at the wrong source.
+          disable_search: true,
+        },
       });
-      if (written.trim()) {
-        prose = written.trim();
+      if (written.text.trim()) {
+        prose = written.text.trim();
         llmUsed = true;
+        llmWire = written.wire;
+        searchLeaked = written.searchLeaked;
       }
     } catch (err) {
       llmError = err instanceof Error ? err.message : String(err);
@@ -440,6 +484,7 @@ export async function runResearchPipeline(options: {
     sources,
     llmError,
     cited,
+    searchLeaked,
   });
 
   const checks: ResearchChecks = {
@@ -502,6 +547,7 @@ export async function runResearchPipeline(options: {
         provider: "perplexity",
         used: llmUsed,
         model: llmUsed ? model : null,
+        ...(llmUsed ? { wire: llmWire, webSearchLeaked: searchLeaked } : {}),
         ...(llmError ? { error: llmError } : {}),
       },
       events,
@@ -519,12 +565,15 @@ function describeResult(input: {
   sources: ResearchSource[];
   llmError?: string;
   cited: { resolved: number; unresolved: number };
+  searchLeaked: boolean;
 }): { answer: string; notice: string | null } {
   switch (input.mode) {
     case "model_answer": {
-      // Say so when the prose does not point back at the sources it was given.
-      const notice =
-        input.cited.resolved === 0
+      // Say so when the prose does not point back at the sources it was given,
+      // or when the model could have numbered results of its own.
+      const notice = input.searchLeaked
+        ? "The answer model also searched the web for this answer, so some citation numbers may not match the sources below. Check each one against its source."
+        : input.cited.resolved === 0
           ? "This answer does not cite any of the sources below. Read them before relying on it."
           : input.cited.unresolved > 0
             ? "Some citation numbers in this answer do not match a listed source."
@@ -605,115 +654,6 @@ const ANSWER_INSTRUCTIONS =
   "If the evidence is insufficient, say so plainly instead of guessing. " +
   "Format: open with a one or two sentence direct answer, then short paragraphs or numbered steps. " +
   "Put code in fenced code blocks with a language tag. No headings above level 3. No preamble.";
-
-async function callPerplexity(input: {
-  apiKey: string;
-  model: string;
-  systemPrompt: string;
-  query: string;
-  evidence: string;
-  history: ChatTurn[];
-  onDelta?: (text: string) => void | Promise<void>;
-}): Promise<string> {
-  const stream = Boolean(input.onDelta);
-  const body: Record<string, unknown> = {
-    model: input.model,
-    messages: [
-      { role: "system", content: input.systemPrompt },
-      // Earlier turns give the model the thread; the evidence below is still
-      // the only thing it may cite.
-      ...input.history.map((t) => ({ role: t.role, content: t.content })),
-      {
-        role: "user",
-        content: `Question: ${input.query}\n\n${ANSWER_INSTRUCTIONS}\n\nEvidence:\n${input.evidence}`,
-      },
-    ],
-    temperature: 0.2,
-    stream,
-    // The answer must come from the retrieved evidence, whose [n] numbers the
-    // UI links to. Without this, the model can search the web and number its
-    // own results, so [n] would point at the wrong source.
-    disable_search: true,
-  };
-
-  const post = (b: Record<string, unknown>) =>
-    fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${input.apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(b),
-    });
-
-  let res = await post(body);
-  if (res.status === 400) {
-    // A model or account that rejects `disable_search` still gets an answer;
-    // the evidence-only instruction and the citation count still apply.
-    delete body.disable_search;
-    res = await post(body);
-  }
-  if (!res.ok) {
-    throw new Error(`Perplexity HTTP ${res.status}`);
-  }
-
-  if (!stream || !res.body) {
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const text = data.choices?.[0]?.message?.content ?? "";
-    if (text && input.onDelta) await input.onDelta(text);
-    return text;
-  }
-
-  return readCompletionStream(res.body, input.onDelta!);
-}
-
-/**
- * Reads an OpenAI-style completion stream (`data: {...}` lines, `data: [DONE]`)
- * and forwards each new piece of text. Handles chunks that carry a delta and
- * chunks that carry the whole message so far.
- */
-export async function readCompletionStream(
-  body: ReadableStream<Uint8Array>,
-  onDelta: (text: string) => void | Promise<void>
-): Promise<string> {
-  const reader = body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  let full = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    let nl: number;
-    while ((nl = buf.indexOf("\n")) >= 0) {
-      const line = buf.slice(0, nl).trim();
-      buf = buf.slice(nl + 1);
-      if (!line.startsWith("data:")) continue;
-      const data = line.slice(5).trim();
-      if (!data || data === "[DONE]") continue;
-      let chunk: {
-        choices?: { delta?: { content?: string }; message?: { content?: string } }[];
-      };
-      try {
-        chunk = JSON.parse(data);
-      } catch {
-        continue;
-      }
-      const choice = chunk.choices?.[0];
-      let piece = choice?.delta?.content ?? "";
-      if (!piece && choice?.message?.content && choice.message.content.startsWith(full)) {
-        piece = choice.message.content.slice(full.length);
-      }
-      if (piece) {
-        full += piece;
-        await onDelta(piece);
-      }
-    }
-  }
-  return full;
-}
 
 function round(n: number): number {
   return Math.round(n * 1000) / 1000;

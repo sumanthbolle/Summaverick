@@ -15,6 +15,18 @@ export async function sha256Hex(input: string): Promise<string> {
   return toHex(digest);
 }
 
+/** HMAC-SHA-256 hex digest. Signs values the server must later recognise as its own. */
+export async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return toHex(await crypto.subtle.sign("HMAC", key, enc.encode(message)));
+}
+
 /** Stable, non-reversible hash of a value (e.g. UA string) with a namespace. */
 export async function fingerprint(value: string, salt = ""): Promise<string> {
   return (await sha256Hex(`${salt}:${value}`)).slice(0, 32);

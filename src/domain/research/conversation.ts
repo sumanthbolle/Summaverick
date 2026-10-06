@@ -6,7 +6,15 @@
  * History comes from the client, so it is treated like any other untrusted
  * input: shape-checked, trimmed to a few recent pairs, length-capped, and any
  * pair whose question trips the injection scan is dropped.
+ *
+ * An assistant turn is more than input. The model reads it as its own earlier
+ * words, so text the client wrote and labelled "assistant" would carry the
+ * model's own authority. Each answer therefore leaves the server with a
+ * signature (`signAnswer`), the client echoes it back, and `authenticateHistory`
+ * replays only the assistant text whose signature checks out. Anything else
+ * becomes a placeholder: the follow-up is still answered, without that text.
  */
+import { hmacSha256Hex, timingSafeEqual } from "../../lib/crypto";
 import {
   classifyServiceNowIntent,
   isServiceNowDomainQuery,
@@ -16,7 +24,15 @@ import { scanForPromptInjection } from "./security/prompt-injection";
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
+  /** Signature the server issued with this answer, echoed back by the client. */
+  sig?: string;
 }
+
+/** Stands in for an assistant turn the server cannot vouch for. */
+export const UNVERIFIED_ANSWER = "(The earlier answer is not available.)";
+
+const SIGNATURE_CONTEXT = "summaverick/research-answer/v1";
+const MAX_SIGNATURE_CHARS = 128;
 
 /** Most recent question/answer pairs kept as context. */
 export const MAX_HISTORY_PAIRS = 3;
@@ -39,9 +55,14 @@ export function normalizeHistory(raw: unknown): ChatTurn[] {
     if ((role !== "user" && role !== "assistant") || typeof content !== "string") continue;
     const text = content.trim();
     if (!text) continue;
+    const sig = (item as { sig?: unknown }).sig;
     turns.push({
       role,
-      content: text.slice(0, role === "user" ? MAX_USER_CHARS : MAX_ASSISTANT_CHARS),
+      // An assistant turn keeps exactly the text its signature was made over.
+      content: role === "user" ? text.slice(0, MAX_USER_CHARS) : canonicalAnswer(text),
+      ...(role === "assistant" && typeof sig === "string" && sig.length <= MAX_SIGNATURE_CHARS
+        ? { sig }
+        : {}),
     });
   }
 
@@ -70,4 +91,53 @@ export function retrievalQueryFor(question: string, history: ChatTurn[]): string
     isServiceNowDomainQuery(question) && classifyServiceNowIntent(question).confidence >= 0.5;
   if (standsAlone) return question;
   return `${lastQuestion}\n${question}`.slice(0, MAX_RETRIEVAL_QUERY);
+}
+
+/**
+ * The exact text that is signed and later checked, and what `normalizeHistory`
+ * keeps. Trimming again after the cut is what makes this idempotent: a cut that
+ * lands on whitespace must not leave text that canonicalises to something else.
+ */
+function canonicalAnswer(text: string): string {
+  return text.trim().slice(0, MAX_ASSISTANT_CHARS).trimEnd();
+}
+
+/**
+ * Signature for an answer the server just wrote, or null when no secret is
+ * configured (then no assistant text can be vouched for later).
+ */
+export async function signAnswer(
+  text: string,
+  secret: string | undefined
+): Promise<string | null> {
+  if (!secret) return null;
+  return hmacSha256Hex(secret, `${SIGNATURE_CONTEXT}\n${canonicalAnswer(text)}`);
+}
+
+/**
+ * Takes `normalizeHistory` output and returns turns safe to hand to the model.
+ * User turns pass through (they were scanned there and are the reader's own
+ * words). An assistant turn keeps its text only if its signature matches and
+ * the text passes the same injection scan; otherwise the text is replaced, so
+ * a forged "assistant" turn never reaches the model as one.
+ */
+export async function authenticateHistory(
+  history: ChatTurn[],
+  secret: string | undefined
+): Promise<ChatTurn[]> {
+  const out: ChatTurn[] = [];
+  for (const turn of history) {
+    if (turn.role === "user") {
+      out.push({ role: "user", content: turn.content });
+      continue;
+    }
+    const expected = await signAnswer(turn.content, secret);
+    const genuine =
+      expected !== null &&
+      typeof turn.sig === "string" &&
+      timingSafeEqual(expected, turn.sig) &&
+      !scanForPromptInjection(turn.content).suspicious;
+    out.push({ role: "assistant", content: genuine ? turn.content : UNVERIFIED_ANSWER });
+  }
+  return out;
 }
