@@ -36,11 +36,12 @@
   <link rel="stylesheet" href="/assets/css/tokens.css" />
   <link rel="stylesheet" href="/assets/css/type.css" />
   <link rel="stylesheet" href="/assets/css/site.css" />
+  <link rel="stylesheet" href="/assets/css/home.css" />
 </head>
 <body data-home>
   <a class="skip" href="#main">Skip to content</a>
 
-  <header class="nav" id="nav">
+  <header class="nav band-ink" id="nav">
     <a class="nav-brand" href="/" aria-label="Summaverick Group — home">
       <img class="brand-mark" src="/assets/img/summaverick-mark.png" width="28" height="28" alt="" />
       <span>Summaverick</span>
@@ -65,7 +66,7 @@
     </div>
   </header>
 
-  <div class="nav-panel" id="nav-panel" hidden>
+  <div class="nav-panel band-ink" id="nav-panel" hidden>
     <nav aria-label="Mobile">
       <a href="#build">What we build</a>
       <a href="#examples">Examples</a>
@@ -103,7 +104,7 @@
 
         <!-- An illustration, labelled as one: no client screenshot is approved
              for publication yet. Reserves its own height so nothing shifts. -->
-        <figure class="hero-panel" data-hero-panel>
+        <figure class="hero-panel band-ink" data-hero-panel>
           <figcaption class="hero-panel__label">Illustration</figcaption>
           <div class="hero-panel__ui">
             <p class="hero-panel__title">Follow up on a refund that never arrived</p>
@@ -138,7 +139,7 @@
           through it.
         </p>
 
-        <div class="stage__panel" data-stage>
+        <div class="stage__panel band-ink" data-stage>
           <div class="stage__bar">
             <div class="stage__tabs" role="tablist" aria-label="Choose a walk-through">
               <button class="stage__tab" type="button" role="tab" id="stage-tab-personal"
@@ -294,7 +295,7 @@
     </section>
 
     <!-- ---- What we build ----------------------------------------------- -->
-    <section class="offers" id="build" aria-labelledby="offers-title">
+    <section class="offers band-ink" id="build" aria-labelledby="offers-title">
       <div class="container">
         <div class="section-head" data-reveal>
           <h2 id="offers-title">What we <span class="text-spectrum">build</span>.</h2>
@@ -306,6 +307,11 @@
         </div>
         <div class="offers__grid" data-reveal-group>
           <article class="offer" data-reveal>
+            <div class="offer__art offer__art--chat" aria-hidden="true">
+              <span class="art-bubble art-bubble--in"></span>
+              <span class="art-bubble art-bubble--out"></span>
+              <span class="art-pill"></span>
+            </div>
             <h3>Personal agents</h3>
             <p>
               A personal assistant built around one recurring job—chasing a
@@ -315,6 +321,9 @@
             </p>
           </article>
           <article class="offer" data-reveal style="--d:30ms">
+            <div class="offer__art offer__art--phone" aria-hidden="true">
+              <span class="art-phone"><i></i><i></i><i></i></span>
+            </div>
             <h3>Mobile experiences</h3>
             <p>
               A mobile app or agent made for the moment—share a screenshot,
@@ -323,6 +332,12 @@
             </p>
           </article>
           <article class="offer" data-reveal style="--d:60ms">
+            <div class="offer__art offer__art--table" aria-hidden="true">
+              <span class="art-row"><b></b><i></i><u></u></span>
+              <span class="art-row"><b></b><i></i><u></u></span>
+              <span class="art-row art-row--on"><b></b><i></i><u></u></span>
+              <span class="art-row"><b></b><i></i><u></u></span>
+            </div>
             <h3>Enterprise agents</h3>
             <p>
               An agent inside the work your team already does, wired into
@@ -551,7 +566,7 @@
     </section>
 
     <!-- ---- Platforms ------------------------------------------------------ -->
-    <section class="platforms" id="platforms" aria-labelledby="platforms-title">
+    <section class="platforms band-ink" id="platforms" aria-labelledby="platforms-title">
       <div class="container">
         <div class="section-head" data-reveal>
           <h2 id="platforms-title">On the <span class="text-spectrum text-spectrum--emerald">platform</span> your product needs.</h2>
@@ -588,7 +603,7 @@
     </section>
 
     <!-- ---- About: the dark brand band -------------------------------------- -->
-    <section class="about" id="about" aria-labelledby="about-title">
+    <section class="about band-ink" id="about" aria-labelledby="about-title">
       <span class="anchor-alias" id="company" aria-hidden="true"></span>
       <div class="container about__grid">
         <figure class="about__brand showcase-3d" data-reveal data-tilt>
@@ -664,7 +679,7 @@
     </section>
 
     <!-- ---- Contact ------------------------------------------------------ -->
-    <section class="contact" id="contact" aria-labelledby="contact-title">
+    <section class="contact band-ink" id="contact" aria-labelledby="contact-title">
       <div class="container contact__grid">
         <div data-reveal>
           <h2 id="contact-title">What would you like an agent to help with?</h2>
@@ -765,6 +780,7 @@
     <div class="container footer-legal">
       <p>© <span data-year>2026</span> SUMMAVERICK LLP. Summaverick Group · LLPIN ADC-1832.</p>
     </div>
+    <p class="footer-wordmark" aria-hidden="true">Summaverick</p>
   </footer>
 
   <script type="application/ld+json">

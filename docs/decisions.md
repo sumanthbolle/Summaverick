@@ -2,6 +2,40 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-10-07 — Homepage UI layer (home.css)
+
+**Decision.** The homepage is restyled by a separate stylesheet,
+`public/assets/css/home.css`, loaded after `site.css` and scoped to
+`body[data-home]`. The words, anchors, section order and scripts are
+unchanged; no other page is affected.
+
+**Reference.** The structure follows patterns seen on serval.com: a floating
+dark pill nav with one white call to action; a left-aligned hero over a dotted
+ground with a large framed dark product panel; alternating light grounds and
+ink bands that blend into each other with a soft glow; a bento grid of light
+cards on an ink band; a segmented tab control; tall cards for guides; and an
+outlined wordmark closing the footer. Nothing of theirs is copied: no copy,
+logos, imagery or colours.
+
+**Kept.** The palette stays monochrome, with the existing gradient accent on a
+key phrase per section. There is no "trusted by" logo band, because there are
+no client logos we are cleared to show; the platforms section takes that place.
+
+**How.** An ink band is a token remap (`.band-ink` points the page ramp at the
+ink ramp), so the stage, the demo and the form re-skin themselves with their
+existing rules. All colour is a token or a `color-mix` of one. Nothing in the
+file animates; it also turns off the hero bloom that used to breathe forever.
+
+**On mobile** the resource cards stack. A sideways-scrolling strip tripped
+`scripts/verify/responsive.mjs`'s overflow check and hides two of the three
+cards behind a gesture nothing announces.
+
+**Tests.** The five `Homepage public contract` tests that failed before this
+change still fail, for the same reasons: they assert hero wording the page no
+longer has. They were left alone. `scripts/verify/responsive.mjs` also still
+stops at its mobile-order check, which looks for a `.studio-kicker` that the
+hero lost earlier.
+
 ## 2026-10-06 — One Perplexity client; follow-up answers are server-signed
 
 **Decision.** Every Perplexity call goes through `src/lib/perplexity.ts`, and a
