@@ -1,6 +1,7 @@
 /*
  * Shared chrome for the company surface (home, ask, library). Scrolled nav,
- * appearance toggle, scroll reveals, mobile drawer, and the copyright year.
+ * appearance toggle, scroll reveals, mobile drawer, the copyright year, and the
+ * "open in your mail app" chooser for mailto: links.
  * Product tools keep /assets/app.js.
  *
  * Appearance defaults to the operating system and can be overridden with the
@@ -9,6 +10,7 @@
  */
 
 import { $, $$ } from "./lib/dom.js";
+import { initMailChooser } from "./mail-chooser.js";
 
 const THEME_KEY = "sv-theme";
 
@@ -116,6 +118,9 @@ export function initChrome() {
   initTheme();
   initReveals();
   initHeroPanel();
+  // A mailto: link does nothing on a computer with no mail app set up; this
+  // offers Outlook, Gmail and the rest instead (see mail-chooser.js).
+  initMailChooser();
 
   const yr = $("[data-year]");
   if (yr) yr.textContent = String(new Date().getFullYear());

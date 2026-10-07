@@ -2,6 +2,32 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-10-07 — Email links open a chooser on computers (mail-chooser.js)
+
+**Decision.** On a desktop pointer, a click on any `mailto:` link opens a small
+dialog instead of going straight to `mailto:`. It offers the computer's own mail
+app, Outlook (Microsoft 365), Outlook.com, Gmail, Yahoo Mail, and a button that
+copies the address. It is loaded by the shared `chrome.js`, so it covers every
+page that has such a link (the homepage, research, learn, interviews and all
+articles) without editing them.
+
+**Why.** A `mailto:` link only works if the computer has a mail app registered.
+Phones nearly always do; many laptops do not, because people read Outlook or
+Gmail in a browser, and there the click does nothing, with no error. A page
+cannot detect which case it is in, so the choice is offered up front.
+
+**What stays as it was.** The links are unchanged `mailto:` anchors. On a phone
+(coarse pointer), with a modifier key or a non-left click, with no script, or in
+a browser without `<dialog>`, they behave exactly as before. The dialog's first
+option is the original link. The last provider used is remembered in
+`localStorage` and offered first.
+
+**Known limit.** The compose URLs (Outlook `to`/`subject`/`body`, Gmail
+`view=cm` with `to`/`su`/`body`, Yahoo `to`/`subject`/`body`) were checked
+against public descriptions, not the providers' own documentation, and a
+provider can change them. They are all in `webmailLinks()`; re-test them first
+if one stops filling in the recipient. The dialog was exercised in Chromium only.
+
 ## 2026-10-07 — Homepage UI layer (home.css)
 
 **Decision.** The homepage is restyled by a separate stylesheet,
