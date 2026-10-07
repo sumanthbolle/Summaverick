@@ -6,8 +6,11 @@
   "legalName": "SUMMAVERICK LLP",
   "tagline": "Personal assistants and enterprise agents, built for mobile, web, and business platforms.",
 
-  "inquiryEmail": "inquiry@summaverick.com",
-  "contactHref": "mailto:inquiry@summaverick.com",
+  "inquiryEmail": "hello@summaverick.com",
+  "contactHref": "mailto:hello@summaverick.com",
+
+  "ceoEmail": "ceo@summaverick.com",
+  "ceoHref": "mailto:ceo@summaverick.com",
 
   "colors": {
     "ink": "#0d0d11"
