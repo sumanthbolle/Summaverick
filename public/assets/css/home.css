@@ -535,6 +535,7 @@ body[data-home] .control p { font-size: var(--step-1); line-height: 1.55; }
 
 /* ---- About: an ink band -------------------------------------------------------------- */
 body[data-home] .about { padding-block: clamp(4rem, 9vw, 8rem); }
+body[data-home] .about__actions { margin-top: var(--space-6); }
 
 /* ---- Resources: tall cards ----------------------------------------------------------- */
 body[data-home] .resources { background: var(--c-bg); }

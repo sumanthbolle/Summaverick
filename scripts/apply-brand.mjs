@@ -7,6 +7,8 @@
  *   1. Renders the nav/footer "S" as an <img> badge of the current mark asset.
  *   2. Points every contact call-to-action at config.contactHref (mailto),
  *      tagging it data-brand="contact" so the next email change is one line.
+ *      A link's own query string (e.g. a pre-filled ?subject=) is kept.
+ *   3. Points every "Meet our CEO" link (data-brand="ceo") at config.ceoHref.
  *
  * Page prose, layout and copy are left untouched.
  */
@@ -20,6 +22,7 @@ const cfg = JSON.parse(readFileSync(resolve(root, "brand.config.json"), "utf8"))
 const publicDir = resolve(root, "public");
 
 const mailto = cfg.contactHref;
+const ceoMailto = cfg.ceoHref;
 const markSrc = cfg.assets.markPng;
 const navSize = cfg.marks.navSize;
 const footerSize = cfg.marks.footerSize;
@@ -29,8 +32,11 @@ const footerImg = `<img class="brand-mark" src="${markSrc}" width="${footerSize}
 
 // Any existing brand mark (inline SVG from an earlier design, or a previously
 // applied <img>) — matched by the 26/28 nav size and the 30/32 footer size.
-const NAV_MARK = /<(?:svg|img) class="brand-mark"[^>]*width="2[68]"[^>]*(?:\/>|>[\s\S]*?<\/svg>)/g;
-const FOOTER_MARK = /<(?:svg|img) class="brand-mark"[^>]*width="3[02]"[^>]*(?:\/>|>[\s\S]*?<\/svg>)/g;
+// The attribute runs are lazy so a self-closing <img ... /> ends at its own "/>".
+// Greedy, the pattern reached the ">" first and read on to the next </svg>,
+// deleting whatever markup lay between a logo and the next icon.
+const NAV_MARK = /<(?:svg|img) class="brand-mark"[^>]*?width="2[68]"[^>]*?(?:\/>|>[\s\S]*?<\/svg>)/g;
+const FOOTER_MARK = /<(?:svg|img) class="brand-mark"[^>]*?width="3[02]"[^>]*?(?:\/>|>[\s\S]*?<\/svg>)/g;
 
 function walk(dir) {
   const out = [];
@@ -45,6 +51,7 @@ function walk(dir) {
 let filesChanged = 0;
 let marks = 0;
 let contacts = 0;
+let ceoLinks = 0;
 
 for (const file of walk(publicDir)) {
   let html = readFileSync(file, "utf8");
@@ -57,10 +64,17 @@ for (const file of walk(publicDir)) {
   // 2) Contact CTAs → mailto, tagged for future one-line changes.
   html = html.replace(/href="\/?#contact"/g, `href="${mailto}" data-brand="contact"`);
   html = html.replace(
-    /href="mailto:[^"]*" data-brand="contact"/g,
-    `href="${mailto}" data-brand="contact"`
+    /href="mailto:[^"?]*(\?[^"]*)?" data-brand="contact"/g,
+    (_match, query = "") => `href="${mailto}${query}" data-brand="contact"`
   );
   contacts += (html.match(/data-brand="contact"/g) || []).length;
+
+  // 3) The CEO's address, kept apart from the general contact link.
+  html = html.replace(
+    /href="mailto:[^"]*" data-brand="ceo"/g,
+    `href="${ceoMailto}" data-brand="ceo"`
+  );
+  ceoLinks += (html.match(/data-brand="ceo"/g) || []).length;
 
   if (html !== before) {
     writeFileSync(file, html);
@@ -69,5 +83,5 @@ for (const file of walk(publicDir)) {
 }
 
 console.log(
-  `apply-brand: ${filesChanged} files changed · ${marks} marks → <img> · ${contacts} contact links at ${mailto}`
+  `apply-brand: ${filesChanged} files changed · ${marks} marks → <img> · ${contacts} contact links at ${mailto} · ${ceoLinks} CEO links at ${ceoMailto}`
 );

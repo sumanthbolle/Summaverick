@@ -38,6 +38,7 @@ header/footer marks:
 | `name` / `fullName` / `legalName` | Brand names |
 | `tagline` | Footer / About strapline |
 | `inquiryEmail` / `contactHref` | The address + link behind every "Build with us" / "Contact us" CTA |
+| `ceoEmail` / `ceoHref` | The address + link behind every "Meet our CEO" button |
 | `colors.ink` | The ink field behind the social card |
 | `source.masterImage` | Your master logo render |
 | `source.markCrop` | The square that isolates the "S" for small marks |
@@ -78,7 +79,9 @@ pnpm brand:apply
 ```
 
 Every "Build with us", "Contact us", and the "Prefer email?" link on the
-homepage — anything tagged `data-brand="contact"` — updates in one pass.
+homepage — anything tagged `data-brand="contact"` — updates in one pass. A
+link's own `?subject=` is kept. The "Meet our CEO" button and footer link work
+the same way from `ceoEmail` and `ceoHref`, tagged `data-brand="ceo"`.
 
 ## Resize the header/footer mark only
 
