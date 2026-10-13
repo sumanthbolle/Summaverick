@@ -741,15 +741,18 @@ body[data-home] .next-steps__list {
 }
 body[data-home] .next-steps__list li {
   counter-increment: next;
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: var(--space-3);
+  position: relative;
+  min-height: 28px;
+  padding-left: calc(28px + var(--space-3));
   color: var(--c-text-dim);
   font-size: var(--step--1);
   line-height: 1.5;
 }
 body[data-home] .next-steps__list li::before {
   content: counter(next);
+  position: absolute;
+  left: 0;
+  top: 0;
   display: grid;
   place-items: center;
   width: 28px;

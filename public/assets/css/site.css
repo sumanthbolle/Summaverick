@@ -1608,7 +1608,7 @@ body[data-nav-open] { overflow: hidden; }
   transform-origin: 0 50%;
 }
 
-.article-wrap { padding: calc(var(--space-9) + var(--tap)) 0 var(--space-9); }
+.article-wrap { padding-block: calc(var(--space-9) + var(--tap)) var(--space-9); }
 .article-inner { max-width: 44rem; margin-inline: auto; }
 .article-back {
   display: inline-flex;
