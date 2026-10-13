@@ -163,6 +163,19 @@ export function initExamples() {
   }
   toggle?.addEventListener("click", () => (paused || !running ? play() : pause()));
 
+  // Links elsewhere on the page (data-demo-open="2") open a story by number.
+  // The link's own #examples jump does the scrolling; if the player is not on
+  // screen yet, the story waits on its finished frame and plays on arrival.
+  for (const link of $$("[data-demo-open]")) {
+    link.addEventListener("click", () => {
+      const index = Number(link.dataset.demoOpen) - 1;
+      if (!tabs[index]) return;
+      autoplay = false;
+      paused = false;
+      show(index, { play: inView });
+    });
+  }
+
   // Start in the finished state; the first story plays when it comes into view.
   show(0, { play: false });
   if (reduce.matches) return;
