@@ -308,10 +308,20 @@
         </div>
         <div class="offers__grid" data-reveal-group>
           <article class="offer" data-reveal>
-            <div class="offer__art offer__art--chat" aria-hidden="true">
-              <span class="art-bubble art-bubble--in"></span>
-              <span class="art-bubble art-bubble--out"></span>
-              <span class="art-pill"></span>
+            <div class="offer__art mini mini--chat" aria-hidden="true">
+              <p class="mini__tag">Sample data</p>
+              <div class="mini__screen">
+                <p class="mini__bar"><span class="mini__avatar">S</span><b>Your assistant</b><span>Refunds</span></p>
+                <p class="mini__bubble m-in" style="--t:150">Order 4821's refund is 9 days late. I drafted a follow-up.</p>
+                <div class="mini__draft m-in" style="--t:900">
+                  <span class="mini__label">Draft to the store</span>
+                  <p>“I returned order 4821 on 2 Sep. Could you confirm when the refund was issued?”</p>
+                </div>
+                <p class="mini__actions mini__swap m-in" style="--t:1650">
+                  <span class="mini__btns m-pre" style="--t:2500"><span class="mini__btn mini__btn--quiet">Edit</span><span class="mini__btn">Send<i class="m-tap" style="--t:2250"></i></span></span>
+                  <span class="mini__done m-in" style="--t:2500">Sent · check back Friday</span>
+                </p>
+              </div>
             </div>
             <h3>Personal agents</h3>
             <p>
@@ -320,10 +330,26 @@
               attention. We shape its purpose, its conversation, and the context
               it's allowed to use.
             </p>
+            <a class="offer__link" href="#stage" data-stage-jump="personal">See it work<span class="visually-hidden">: a personal agent following up a refund</span> <span aria-hidden="true">›</span></a>
           </article>
           <article class="offer" data-reveal style="--d:30ms">
-            <div class="offer__art offer__art--phone" aria-hidden="true">
-              <span class="art-phone"><i></i><i></i><i></i></span>
+            <div class="offer__art mini mini--phone" aria-hidden="true">
+              <p class="mini__tag">Sample data</p>
+              <div class="mini__phone">
+                <p class="mini__status"><span>9:41</span><span>Assistant</span></p>
+                <div class="mini__shot m-in" style="--t:150">
+                  <span class="mini__label">Shared screenshot</span>
+                  <b>Delivery missed</b>
+                  <span>Parcel 7310 · We'll try again Friday</span>
+                </div>
+                <div class="mini__suggest m-in" style="--t:1000">
+                  <p>Reschedule for tomorrow, 9–12, when you're home?</p>
+                  <span class="mini__actions mini__swap">
+                    <span class="mini__btns m-pre" style="--t:2300"><span class="mini__btn">Approve<i class="m-tap" style="--t:2050"></i></span></span>
+                    <span class="mini__done m-in" style="--t:2300">Rescheduled for tomorrow</span>
+                  </span>
+                </div>
+              </div>
             </div>
             <h3>Mobile experiences</h3>
             <p>
@@ -331,13 +357,40 @@
               speak a request, approve a suggested action on the go. We handle
               the design, the build, and the on-device experience.
             </p>
+            <a class="offer__link" href="#examples" data-demo-open="1">See it work<span class="visually-hidden">: an assistant answering customers on WhatsApp</span> <span aria-hidden="true">›</span></a>
           </article>
           <article class="offer" data-reveal style="--d:60ms">
-            <div class="offer__art offer__art--table" aria-hidden="true">
-              <span class="art-row"><b></b><i></i><u></u></span>
-              <span class="art-row"><b></b><i></i><u></u></span>
-              <span class="art-row art-row--on"><b></b><i></i><u></u></span>
-              <span class="art-row"><b></b><i></i><u></u></span>
+            <div class="offer__art mini mini--desk" aria-hidden="true">
+              <p class="mini__tag">Sample data</p>
+              <div class="mini__screen">
+                <p class="mini__appbar"><b>Service desk</b><span>Requests · assigned to IT</span></p>
+                <div class="mini__table">
+                  <p class="mini__row mini__row--head"><span>Number</span><span>Request</span><span>State</span></p>
+                  <p class="mini__row"><span>REQ0010479</span><span>VPN access for a contractor</span><span class="mini__state">In progress</span></p>
+                  <p class="mini__row"><span>REQ0010481</span><span>Monitor for home office</span><span class="mini__state">New</span></p>
+                  <div class="mini__row mini__row--on m-hl" style="--t:500">
+                    <span>REQ0010482</span><span>Replacement laptop · Priya, Finance</span>
+                    <span class="mini__swap">
+                      <span class="mini__state m-pre" style="--t:2900">Awaiting approval</span>
+                      <span class="mini__state mini__state--ok m-in" style="--t:2900">Approved</span>
+                    </span>
+                  </div>
+                  <div class="mini__proposal m-in" style="--t:800">
+                    <span class="mini__label">Agent proposal</span>
+                    <ul class="mini__checks">
+                      <li class="m-in" style="--t:1150">Standard build fits her role</li>
+                      <li class="m-in" style="--t:1400">6 in stock</li>
+                      <li class="m-in" style="--t:1650">Within the Finance budget</li>
+                    </ul>
+                    <p class="mini__propose m-in" style="--t:1950">Approve the standard laptop and ship it to the Hyderabad office.</p>
+                    <p class="mini__actions mini__swap m-in" style="--t:2150">
+                      <span class="mini__btns m-pre" style="--t:2900"><span class="mini__btn">Approve<i class="m-tap" style="--t:2650"></i></span><span class="mini__btn mini__btn--quiet">Change</span></span>
+                      <span class="mini__done m-in" style="--t:2900">Approved by her manager · laptop ordered</span>
+                    </p>
+                  </div>
+                  <p class="mini__row"><span>REQ0010484</span><span>Reset an MFA device</span><span class="mini__state">New</span></p>
+                </div>
+              </div>
             </div>
             <h3>Enterprise agents</h3>
             <p>
@@ -346,6 +399,7 @@
               review steps agreed up front. We build the integration and the
               workflow around it.
             </p>
+            <a class="offer__link" href="#examples" data-demo-open="2">See it work<span class="visually-hidden">: an agent handling an employee request in ServiceNow</span> <span aria-hidden="true">›</span></a>
           </article>
         </div>
         <p class="section-action"><a href="mailto:hello@summaverick.com" data-brand="contact">Tell us about your use case <span aria-hidden="true">›</span></a></p>
