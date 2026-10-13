@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster. — Summaverick</title>
+  <title>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. — Summaverick</title>
   <meta name="description" content="Setting the Stage Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration…" />
   <link rel="canonical" href="https://summaverick.com/article/you-ve-handled-dozens-of-data-migrations-using-ef-migrations-ssis-or-custom-etl" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster. — Summaverick" />
+  <meta property="og:title" content="You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. — Summaverick" />
   <meta property="og:description" content="Setting the Stage Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration…" />
   <meta property="og:url" content="https://summaverick.com/article/you-ve-handled-dozens-of-data-migrations-using-ef-migrations-ssis-or-custom-etl" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster.</h1>
+        <h1>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs.</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster.</div>
+        </section>
         <div class="prose">
 <h4>Setting the Stage</h4><p>Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration scripts, the concept is identical — but the terminology and failure modes are ServiceNow-specific.</p><h4>The ETL Pipeline Comparison</h4><pre>// .NET / SSIS ETL Flow (what you know)
 // CSV/API → DataReader → Transform (C# mapping) → SqlBulkCopy → Target DB
@@ -126,8 +130,8 @@
 })(source, target, map, log, action);</pre><h4>Senior Considerations</h4><ul><li><strong>Staging table cleanup:</strong> Import Set staging tables grow forever unless you configure auto-cleanup. Like temp tables in your ETL that never get truncated.</li><li><strong>Run order matters:</strong> If multiple Transform Maps exist for one Import Set, they run sequentially. A second map can reference records created by the first — useful for parent-child relationships.</li><li><strong>Error handling:</strong> Transform errors create records in the Import Set Log. Monitor these like you'd monitor SSIS package execution logs.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Always test your coalesce strategy with production-like data volumes before go-live. The same instincts you have about choosing a proper PRIMARY KEY or UNIQUE constraint in SQL apply directly to coalesce fields. When in doubt, use a composite key — it's always safer than a single field.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/explain-servicenow-s-table-hierarchy-and-inheritance-model-how-does-it-compare-t" rel="prev"><small>‹ Previous</small><strong>Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake.</strong></a>
-          <a href="/article/your-background-includes-building-service-catalog-or-self-service-portals-with-f" rel="next"><small>Next ›</small><strong>Your background includes building Service Catalog or self-service portals with forms that kick off backend workflows. ServiceNow has a 'Service Catalog' with 'Catalog Items', 'Record Producers', and 'Order Guides.' Explain each to a developer who's built shopping-cart-style request systems before, and describe the full lifecycle of a catalog request.</strong></a>
+          <a href="/article/explain-servicenow-s-table-hierarchy-and-inheritance-model-how-does-it-compare-t" rel="prev"><small>‹ Previous</small><strong>Explain ServiceNow's table hierarchy and inheritance model.</strong></a>
+          <a href="/article/your-background-includes-building-service-catalog-or-self-service-portals-with-f" rel="next"><small>Next ›</small><strong>Your background includes building Service Catalog or self-service portals with forms that kick off backend…</strong></a>
         </nav>
       </article>
     </div>
@@ -141,7 +145,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster.",
+  "headline": "You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs.",
   "description": "Setting the Stage Import Sets are ServiceNow's ETL pipeline. Data flows: External Source → Staging Table → Transform Map → Target Table. If you've built SSIS packages or written EF seed/migration…",
   "datePublished": "2026-03-16T05:05:00.000Z",
   "author": {

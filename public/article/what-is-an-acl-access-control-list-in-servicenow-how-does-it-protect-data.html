@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is an ACL (Access Control List) in ServiceNow? How does it protect data? — Summaverick</title>
+  <title>What is an ACL (Access Control List) in ServiceNow? — Summaverick</title>
   <meta name="description" content="Why This Matters in an Interview Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is an ACL (Access Control List) in ServiceNow? How does it protect data? — Summaverick" />
+  <meta property="og:title" content="What is an ACL (Access Control List) in ServiceNow? — Summaverick" />
   <meta property="og:description" content="Why This Matters in an Interview Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Security</p>
-        <h1>What is an ACL (Access Control List) in ServiceNow? How does it protect data?</h1>
+        <h1>What is an ACL (Access Control List) in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is an ACL (Access Control List) in ServiceNow? How does it protect data?</div>
+        </section>
         <div class="prose">
 <h4>Why This Matters in an Interview</h4><p>Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the entire platform.</p><h4>What Is an ACL?</h4><p>An ACL is a security rule that controls access to tables, records, and individual fields. When a user tries to view an incident, update a change request, or delete a CI — the platform checks the ACLs to determine if that action is allowed.</p><h4>The Three Components of an ACL</h4><ul><li><strong>1. Roles:</strong> Which role(s) does the user need? e.g., <code>itil</code>, <code>admin</code>, <code>incident_manager</code>. A user must have the specified role to pass this check.</li><li><strong>2. Conditions:</strong> Filter conditions on the record. e.g., 'Only if the record is assigned to the user's group.' This provides row-level security.</li><li><strong>3. Script:</strong> Advanced JavaScript logic for complex authorization. Returns true (allow) or false (deny).</li></ul><pre>// ACL Example:
 // Table: incident
@@ -95,8 +99,8 @@
 answer = gs.getUser().isMemberOf(current.assignment_group);</pre><h4>Evaluation Order</h4><ul><li><strong>ACLs are matched from most specific to least specific — the first match at each level is the one that gets evaluated:</strong></li><li><code>incident.caller_id</code> — field-level ACL (most specific)</li><li><code>incident.*</code> — table-level ACL</li><li><code>*.*</code> — global ACL (least specific)</li><li>To reach a field, the user must pass <strong>both</strong> the matching field-level ACL <strong>and</strong> the matching table-level ACL. But when several ACLs match at the <em>same</em> point (e.g., two ACLs on incident.caller_id), passing <strong>any one</strong> of them grants access (OR) — so adding another ACL at the same level can actually loosen access.</li></ul><h4>Key Facts for Interviews</h4><ul><li><strong>Deny by default:</strong> If no ACL grants access, access is denied. Unlike some systems where everything is open unless restricted.</li><li><strong>Admin bypasses ACLs:</strong> Users with the <code>admin</code> role skip ACL checks entirely (unless the ACL script explicitly handles admin).</li><li><strong>Applies everywhere:</strong> ACLs enforce on UI, REST API, list views, reports, exports — not just forms.</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>The classic trick question: 'If I create a read ACL on the incident table requiring the itil role, and another read ACL on incident.priority requiring the incident_manager role — what happens when a user with only the itil role opens an incident?' Answer: They can see the incident (table ACL passes) but the priority field will be hidden/empty (field ACL fails). Both ACLs evaluate independently.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" rel="prev"><small>‹ Previous</small><strong>What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?</strong></a>
-          <a href="/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" rel="next"><small>Next ›</small><strong>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.</strong></a>
+          <a href="/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" rel="prev"><small>‹ Previous</small><strong>What are Update Sets in ServiceNow?</strong></a>
+          <a href="/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" rel="next"><small>Next ›</small><strong>What is GlideRecord?</strong></a>
         </nav>
       </article>
     </div>
@@ -110,7 +114,7 @@ answer = gs.getUser().isMemberOf(current.assignment_group);</pre><h4>Evaluation 
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is an ACL (Access Control List) in ServiceNow? How does it protect data?",
+  "headline": "What is an ACL (Access Control List) in ServiceNow?",
   "description": "Why This Matters in an Interview Security is a core topic in every ServiceNow interview. ACLs control who can read, write, create, and delete data — and they're enforced automatically across the…",
   "datePublished": "2026-03-16T07:20:00.000Z",
   "author": {

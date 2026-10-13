@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group. — Summaverick</title>
+  <title>What is GlideRecord? — Summaverick</title>
   <meta name="description" content="Setting the Stage GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group. — Summaverick" />
+  <meta property="og:title" content="What is GlideRecord? — Summaverick" />
   <meta property="og:description" content="Setting the Stage GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Scripting</p>
-        <h1>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.</h1>
+        <h1>What is GlideRecord?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.</div>
+        </section>
         <div class="prose">
 <h4>Setting the Stage</h4><p>GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and consultant uses GlideRecord daily.</p><h4>What Is GlideRecord?</h4><p>GlideRecord is a server-side JavaScript API that lets you query, insert, update, and delete records from any ServiceNow table. It's your primary tool for interacting with the database — like SQL queries, but in JavaScript.</p><h4>Basic Operations</h4><pre>// === QUERY (SELECT) ===
 var gr = new GlideRecord('incident');     // Target the incident table
@@ -125,8 +129,8 @@ gr.get('number', 'INC0010001');
 gr.deleteRecord();                // Delete the record</pre><h4>Key Methods to Know</h4><ul><li><code>addQuery(field, value)</code> — adds a WHERE condition</li><li><code>addQuery(field, operator, value)</code> — adds a WHERE with operator (!=, &gt;, &lt;, IN, etc.)</li><li><code>addEncodedQuery(string)</code> — adds a complex filter as encoded query string</li><li><code>query()</code> — executes the query</li><li><code>next()</code> — moves to the next record (returns false when done)</li><li><code>getValue(field)</code> — returns the raw database value</li><li><code>getDisplayValue(field)</code> — returns the display value</li><li><code>getRowCount()</code> — executes a full COUNT(*) query; avoid on large tables. Use <code>GlideAggregate</code> with <code>addAggregate('COUNT')</code> instead</li><li><code>get(field, value)</code> — shortcut to query a single record</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>When writing GlideRecord in an interview, always include <code>setLimit()</code> for queries on large tables, always use <code>getValue()</code> instead of dot-notation for field values, and always add <code>if (isLoading) return;</code> at the top if it's inside a Client Script. These small details signal experience.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" rel="prev"><small>‹ Previous</small><strong>What is an ACL (Access Control List) in ServiceNow? How does it protect data?</strong></a>
-          <a href="/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" rel="next"><small>Next ›</small><strong>What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?</strong></a>
+          <a href="/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" rel="prev"><small>‹ Previous</small><strong>What is an ACL (Access Control List) in ServiceNow?</strong></a>
+          <a href="/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" rel="next"><small>Next ›</small><strong>What is the Service Catalog in ServiceNow?</strong></a>
         </nav>
       </article>
     </div>
@@ -140,7 +144,7 @@ gr.deleteRecord();                // Delete the record</pre><h4>Key Methods to K
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.",
+  "headline": "What is GlideRecord?",
   "description": "Setting the Stage GlideRecord is the single most important API in ServiceNow development. If there's one thing you need to know for any technical interview, it's this. Every developer, admin, and…",
   "datePublished": "2026-03-16T07:15:00.000Z",
   "author": {

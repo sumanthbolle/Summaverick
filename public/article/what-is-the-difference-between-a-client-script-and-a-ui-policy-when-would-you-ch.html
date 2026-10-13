@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is the difference between a Client Script and a UI Policy? When would you choose one over the other? — Summaverick</title>
+  <title>What is the difference between a Client Script and a UI Policy? — Summaverick</title>
   <meta name="description" content="The Real Question Both Client Scripts and UI Policies run on the client side (in the browser) and both manipulate the form. The confusion is real — interviewers want to hear you explain the clear…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-the-difference-between-a-client-script-and-a-ui-policy-when-would-you-ch" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is the difference between a Client Script and a UI Policy? When would you choose one over the other? — Summaverick" />
+  <meta property="og:title" content="What is the difference between a Client Script and a UI Policy? — Summaverick" />
   <meta property="og:description" content="The Real Question Both Client Scripts and UI Policies run on the client side (in the browser) and both manipulate the form. The confusion is real — interviewers want to hear you explain the clear…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-the-difference-between-a-client-script-and-a-ui-policy-when-would-you-ch" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Scripting</p>
-        <h1>What is the difference between a Client Script and a UI Policy? When would you choose one over the other?</h1>
+        <h1>What is the difference between a Client Script and a UI Policy?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is the difference between a Client Script and a UI Policy? When would you choose one over the other?</div>
+        </section>
         <div class="prose">
 <h4>The Real Question</h4><p>Both Client Scripts and UI Policies run on the client side (in the browser) and both manipulate the form. The confusion is real — interviewers want to hear you explain the clear boundary between declarative and scripted approaches.</p><h4>UI Policy (No-Code / Declarative)</h4><p>A UI Policy uses conditions configured through the UI to control field behavior — no code required.</p><ul><li><strong>What it can do:</strong> Make a field mandatory, make it read-only, show/hide a field.</li><li><strong>How it works:</strong> You set a condition (e.g., 'Priority is Critical') and define actions (e.g., 'Set Assignment Group to Mandatory'). All configured via dropdowns — no JavaScript.</li><li><strong>Best for:</strong> Simple, condition-based field behaviors that admins (non-developers) can manage.</li></ul><h4>Client Script (Code / Imperative)</h4><p>A Client Script uses JavaScript to react to form events — much more flexible but requires coding knowledge.</p><ul><li><strong>Types:</strong> onLoad (form opens), onChange (field value changes), onSubmit (form is submitted), onCellEdit (list editing).</li><li><strong>What it can do:</strong> Everything a UI Policy does, PLUS: show alerts, make API calls (GlideAjax), set field values dynamically, perform complex calculations, interact with multiple fields at once.</li></ul><pre>// UI Policy equivalent in Client Script:
 // 'When Priority is Critical, make Assignment Group mandatory'
@@ -95,8 +99,8 @@ function onChange(control, oldValue, newValue, isLoading) {
 }</pre><h4>Decision Guide</h4><ul><li>Need to make a field mandatory/read-only/visible based on a simple condition? → <strong>UI Policy</strong></li><li>Need to set a field's value based on another field? → <strong>Client Script (onChange)</strong></li><li>Need to call the server for data? → <strong>Client Script + GlideAjax</strong></li><li>Need to validate before the form saves? → <strong>Client Script (onSubmit)</strong></li><li>Need non-developers to maintain the rule? → <strong>UI Policy</strong></li></ul><h4>Important Gotcha</h4><p>If both a UI Policy and a Client Script control the same field, <strong>the UI Policy wins</strong> because it runs after the Client Script. This is a common source of bugs — one developer sets a field with a Client Script, another admin creates a UI Policy that overrides it, and neither understands why their change 'doesn't work.'</p><div class='tip-box'><h5>💡 Interview Tip</h5><p>The safe answer is: 'Use UI Policy for simple field visibility/mandatory/read-only rules. Use Client Script for anything that requires logic, calculations, or server calls. And never use both on the same field — it creates conflicts.'</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-a-sys-id-in-servicenow-why-is-it-important-and-where-will-you-encounter" rel="prev"><small>‹ Previous</small><strong>What is a sys_id in ServiceNow? Why is it important, and where will you encounter it?</strong></a>
-          <a href="/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" rel="next"><small>Next ›</small><strong>What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?</strong></a>
+          <a href="/article/what-is-a-sys-id-in-servicenow-why-is-it-important-and-where-will-you-encounter" rel="prev"><small>‹ Previous</small><strong>What is a sys_id in ServiceNow?</strong></a>
+          <a href="/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" rel="next"><small>Next ›</small><strong>What are Update Sets in ServiceNow?</strong></a>
         </nav>
       </article>
     </div>
@@ -110,7 +114,7 @@ function onChange(control, oldValue, newValue, isLoading) {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is the difference between a Client Script and a UI Policy? When would you choose one over the other?",
+  "headline": "What is the difference between a Client Script and a UI Policy?",
   "description": "The Real Question Both Client Scripts and UI Policies run on the client side (in the browser) and both manipulate the form. The confusion is real — interviewers want to hear you explain the clear…",
   "datePublished": "2026-03-16T07:30:00.000Z",
   "author": {

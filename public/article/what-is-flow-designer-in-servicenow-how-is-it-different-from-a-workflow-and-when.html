@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is Flow Designer in ServiceNow? How is it different from a Workflow, and when would you use each? — Summaverick</title>
+  <title>What is Flow Designer in ServiceNow? — Summaverick</title>
   <meta name="description" content="The Real Question ServiceNow has two automation engines — the legacy Workflow Editor and the modern Flow Designer. Interviewers ask this to see if you know the platform's direction and can make the…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-flow-designer-in-servicenow-how-is-it-different-from-a-workflow-and-when" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is Flow Designer in ServiceNow? How is it different from a Workflow, and when would you use each? — Summaverick" />
+  <meta property="og:title" content="What is Flow Designer in ServiceNow? — Summaverick" />
   <meta property="og:description" content="The Real Question ServiceNow has two automation engines — the legacy Workflow Editor and the modern Flow Designer. Interviewers ask this to see if you know the platform's direction and can make the…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-flow-designer-in-servicenow-how-is-it-different-from-a-workflow-and-when" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>What is Flow Designer in ServiceNow? How is it different from a Workflow, and when would you use each?</h1>
+        <h1>What is Flow Designer in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is Flow Designer in ServiceNow? How is it different from a Workflow, and when would you use each?</div>
+        </section>
         <div class="prose">
 <h4>The Real Question</h4><p>ServiceNow has two automation engines — the legacy Workflow Editor and the modern Flow Designer. Interviewers ask this to see if you know the platform's direction and can make the right choice for new projects.</p><h4>Flow Designer (Modern — Recommended)</h4><ul><li>Low-code, drag-and-drop automation builder</li><li>Trigger: record created/updated, scheduled, inbound email, REST call, or custom</li><li>Actions: create/update records, send notifications, make REST calls, approvals, subflows</li><li>Supports error handling (try/catch), parallel execution, and loops</li><li>Can call Integration Hub spokes (pre-built connectors for Slack, Teams, Jira, etc.)</li><li>ServiceNow's strategic direction — all new features ship here first</li></ul><h4>Workflow Editor (Legacy — Still Supported)</h4><ul><li>Older drag-and-drop engine with a more visual canvas</li><li>Graphical state-machine approach — boxes and arrows</li><li>Well-established, millions of existing workflows in production</li><li>No longer receiving new features or significant investment</li><li>Still works, still supported, but new projects should use Flow Designer</li></ul><h4>A Simple Flow Example</h4><pre>// Flow: Auto-Escalate Unassigned P1 Incidents
 //
@@ -105,8 +109,8 @@
 // No code needed. All configured through the Flow Designer UI.</pre><h4>When to Use Each</h4><ul><li><strong>New project?</strong> → Flow Designer. Always.</li><li><strong>Maintaining existing workflow?</strong> → Keep it in Workflow Editor unless you have a reason to migrate.</li><li><strong>Complex multi-system integration?</strong> → Flow Designer + Integration Hub spokes.</li><li><strong>Need reusable automation?</strong> → Build a Subflow in Flow Designer — callable from other flows (like a function).</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>Never say 'I'd use the Workflow Editor for a new project.' That signals outdated knowledge. The safe answer: 'Flow Designer for anything new. Workflow Editor only if we're maintaining legacy automations that haven't been migrated yet.' If asked about Process Automation Designer (PAD), mention it's for complex multi-stage processes that orchestrate multiple flows — like an end-to-end employee onboarding journey.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-are-roles-and-groups-in-servicenow-how-do-they-work-together-to-control-wha" rel="prev"><small>‹ Previous</small><strong>What are Roles and Groups in ServiceNow? How do they work together to control what users can see and do?</strong></a>
-          <a href="/article/what-are-notifications-in-servicenow-how-do-you-configure-an-email-notification" rel="next"><small>Next ›</small><strong>What are Notifications in ServiceNow? How do you configure an email notification that fires when a P1 incident is created?</strong></a>
+          <a href="/article/what-are-roles-and-groups-in-servicenow-how-do-they-work-together-to-control-wha" rel="prev"><small>‹ Previous</small><strong>What are Roles and Groups in ServiceNow?</strong></a>
+          <a href="/article/what-are-notifications-in-servicenow-how-do-you-configure-an-email-notification" rel="next"><small>Next ›</small><strong>What are Notifications in ServiceNow?</strong></a>
         </nav>
       </article>
     </div>
@@ -120,7 +124,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is Flow Designer in ServiceNow? How is it different from a Workflow, and when would you use each?",
+  "headline": "What is Flow Designer in ServiceNow?",
   "description": "The Real Question ServiceNow has two automation engines — the legacy Workflow Editor and the modern Flow Designer. Interviewers ask this to see if you know the platform's direction and can make the…",
   "datePublished": "2026-03-16T06:40:00.000Z",
   "author": {

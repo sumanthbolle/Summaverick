@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM? — Summaverick</title>
+  <title>In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights… — Summaverick</title>
   <meta name="description" content="Reading Between the Lines Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You…" />
   <link rel="canonical" href="https://summaverick.com/article/in-every-net-project-you-ve-dealt-with-performance-profiling-sql-query-plans-app" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM? — Summaverick" />
+  <meta property="og:title" content="In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights… — Summaverick" />
   <meta property="og:description" content="Reading Between the Lines Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You…" />
   <meta property="og:url" content="https://summaverick.com/article/in-every-net-project-you-ve-dealt-with-performance-profiling-sql-query-plans-app" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM?</h1>
+        <h1>In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights…</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM?</div>
+        </section>
         <div class="prose">
 <h4>Reading Between the Lines</h4><p>Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You optimize within the platform's constraints. This tests whether you can be effective with platform-native tools.</p><h4>The First 5 Checks</h4><ul><li><strong>1. Transaction Log (System Diagnostics → Stats):</strong> Shows every HTTP request with response time breakdown — like Application Insights request traces. Filter by slow transactions (>5 seconds). Identifies whether the bottleneck is server processing, database queries, or network. This is your starting point.</li><li><strong>2. Slow Query Log:</strong> ServiceNow logs queries exceeding thresholds. Look for full table scans, missing indexes, or queries returning excessive rows. Like SQL Server's slow query log or EF's <code>Database.Log</code>. Check: <code>System Diagnostics → Slow Queries</code>.</li><li><strong>3. Business Rule Debug:</strong> Enable BR debugging to see which rules fire and their execution time. A single poorly written Before BR can add 3-5 seconds to every form save. Like profiling middleware execution time in ASP.NET.</li><li><strong>4. Client-side Performance:</strong> Browser DevTools (Network tab) shows how many AJAX calls the form makes. Excessive GlideAjax calls or heavy UI Scripts are common culprits. Like checking your React app's network waterfall.</li><li><strong>5. Semaphore & Worker Threads:</strong> Check <code>System Diagnostics → Semaphores</code>. If worker threads are saturated, all transactions queue up. Like thread pool starvation in .NET — your async code helps, but there's a ceiling.</li></ul><h4>Performance Anti-Patterns</h4><pre>// Anti-Pattern 1: GlideRecord in a loop (N+1 query)
 // Like .NET's lazy loading N+1 problem with EF
@@ -115,8 +119,8 @@ gr.orderByDesc('sys_created_on');
 gr.query();</pre><h4>Thinking Differently in SaaS</h4><ul><li><strong>You optimize queries, not infrastructure:</strong> Can't add more RAM or CPU. Reduce GlideRecord queries, use GlideAggregate for counts, index frequently queried fields.</li><li><strong>You optimize scripts, not threads:</strong> Can't tune thread pools. Keep Business Rules fast (&lt;200ms), move heavy work to async/scheduled jobs.</li><li><strong>You optimize architecture, not hardware:</strong> Can't horizontally scale. Design patterns matter more — batch processing, event-driven architecture, and caching lookup results in script variables (or system properties for rarely-changing values).</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Your performance instincts from .NET are your superpower in ServiceNow. N+1 queries, unnecessary data loading, synchronous operations blocking threads — the problems are identical. The tools are different, but the diagnostic thought process is exactly the same. Lead with 'show me the slow queries' and you'll earn instant credibility.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/your-team-wants-to-build-a-self-service-portal-for-employees-in-net-you-d-reach" rel="prev"><small>‹ Previous</small><strong>Your team wants to build a self-service portal for employees. In .NET, you'd reach for React/Angular with an API backend. In ServiceNow, there's 'Service Portal' and the newer 'UI Builder (Next Experience).' Compare these to what you know, and advise which to use for a new project in 2026.</strong></a>
-          <a href="/article/your-organization-discovered-that-user-pii-from-the-sys-user-table-is-being-expo" rel="next"><small>Next ›</small><strong>Your organization discovered that user PII from the sys_user table is being exposed to unauthorized users through a vulnerability in Access Control Lists (ACLs). The sys_user data is synchronized nightly from your corporate SSO system. You need to implement a data privacy strategy that protects PII in non-production environments while maintaining system functionality. Walk me through your diagnostic approach, explain the trade-offs between anonymization and deletion, and describe what happens if you anonymize sys_user records that are actively synchronized by SSO.</strong></a>
+          <a href="/article/your-team-wants-to-build-a-self-service-portal-for-employees-in-net-you-d-reach" rel="prev"><small>‹ Previous</small><strong>Your team wants to build a self-service portal for employees.</strong></a>
+          <a href="/article/your-organization-discovered-that-user-pii-from-the-sys-user-table-is-being-expo" rel="next"><small>Next ›</small><strong>Your organization discovered that user PII from the sys_user table is being exposed to unauthorized users…</strong></a>
         </nav>
       </article>
     </div>
@@ -130,7 +134,7 @@ gr.query();</pre><h4>Thinking Differently in SaaS</h4><ul><li><strong>You optimi
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights traces, memory profilers. A production ServiceNow instance is running slow. What are the first 5 things you check, what tools does the platform give you, and how do you think about performance differently in a SaaS world where you can't tune the JVM?",
+  "headline": "In every .NET project, you've dealt with performance profiling — SQL query plans, Application Insights…",
   "description": "Reading Between the Lines Performance troubleshooting in ServiceNow requires a different mindset than .NET — you have no access to the application server, no JVM tuning, no infrastructure scaling. You…",
   "datePublished": "2026-03-16T04:35:00.000Z",
   "author": {

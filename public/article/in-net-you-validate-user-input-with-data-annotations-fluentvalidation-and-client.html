@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. ServiceNow has 'Client Scripts' and 'UI Policies' that seem to do similar things. When would you use one over the other, and where do .NET developers typically trip up? — Summaverick</title>
+  <title>In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. — Summaverick</title>
   <meta name="description" content="The Real Question This tests whether you understand ServiceNow's two-layer client-side validation model and can map it to the validation patterns you've used in .NET. The core distinction: UI Policies…" />
   <link rel="canonical" href="https://summaverick.com/article/in-net-you-validate-user-input-with-data-annotations-fluentvalidation-and-client" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. ServiceNow has 'Client Scripts' and 'UI Policies' that seem to do similar things. When would you use one over the other, and where do .NET developers typically trip up? — Summaverick" />
+  <meta property="og:title" content="In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. — Summaverick" />
   <meta property="og:description" content="The Real Question This tests whether you understand ServiceNow's two-layer client-side validation model and can map it to the validation patterns you've used in .NET. The core distinction: UI Policies…" />
   <meta property="og:url" content="https://summaverick.com/article/in-net-you-validate-user-input-with-data-annotations-fluentvalidation-and-client" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. ServiceNow has 'Client Scripts' and 'UI Policies' that seem to do similar things. When would you use one over the other, and where do .NET developers typically trip up?</h1>
+        <h1>In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation.</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. ServiceNow has 'Client Scripts' and 'UI Policies' that seem to do similar things. When would you use one over the other, and where do .NET developers typically trip up?</div>
+        </section>
         <div class="prose">
 <h4>The Real Question</h4><p>This tests whether you understand ServiceNow's two-layer client-side validation model and can map it to the validation patterns you've used in .NET. The core distinction: UI Policies are declarative (no-code), Client Scripts are imperative (code). Like Data Annotations vs FluentValidation.</p><h4>The Direct Mapping</h4><pre>// .NET Validation Approaches (what you know)
 // 1. Data Annotations: [Required], [MaxLength(100)]
@@ -125,8 +129,8 @@ function onSubmit() {
 }</pre><h4>Where .NET Developers Trip Up</h4><ul><li><strong>UI Policies override Client Scripts:</strong> If both try to control the same field, UI Policies run after Client Scripts and win. It's like having two middleware components fighting — order matters. The fix: use one or the other per field, not both.</li><li><strong>Client-side only:</strong> Neither UI Policies nor Client Scripts enforce on the server. A REST API call bypasses them entirely. You MUST duplicate critical validation in a Business Rule — like how .NET always validates server-side even if client validation exists.</li><li><strong>g_form is not DOM manipulation:</strong> Don't try <code>document.getElementById()</code>. ServiceNow provides <code>g_form</code> as the only supported API for form manipulation. Directly touching the DOM will break in future upgrades.</li><li><strong>Four types of Client Scripts:</strong> onLoad (page ready), onChange (field changed), onSubmit (form submit), onCellEdit (list editing). Map these to DOM events you already know.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Follow the same rule you follow in .NET: use declarative (UI Policy) for simple cases, imperative (Client Script) for complex logic. And never trust client-side validation alone — always back it up with a Before Business Rule on the server. Your instincts are already correct.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/you-ve-set-up-hundreds-of-automated-ci-cd-tests-in-xunit-and-nunit-your-servicen" rel="prev"><small>‹ Previous</small><strong>You've set up hundreds of automated CI/CD tests in xUnit and NUnit. Your ServiceNow team mentions 'ATF' — Automated Test Framework. How does it compare to your .NET testing experience, and what kind of testing does ServiceNow handle that's fundamentally different from unit testing code?</strong></a>
-          <a href="/article/your-net-background-includes-working-with-azure-logic-apps-power-automate-or-han" rel="next"><small>Next ›</small><strong>Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow automation. ServiceNow has 'Flow Designer' which the team says replaces a lot of custom coding. Compare Flow Designer to what you've used, and explain when you'd still write code instead of using it.</strong></a>
+          <a href="/article/you-ve-set-up-hundreds-of-automated-ci-cd-tests-in-xunit-and-nunit-your-servicen" rel="prev"><small>‹ Previous</small><strong>You've set up hundreds of automated CI/CD tests in xUnit and NUnit.</strong></a>
+          <a href="/article/your-net-background-includes-working-with-azure-logic-apps-power-automate-or-han" rel="next"><small>Next ›</small><strong>Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow…</strong></a>
         </nav>
       </article>
     </div>
@@ -140,7 +144,7 @@ function onSubmit() {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation. ServiceNow has 'Client Scripts' and 'UI Policies' that seem to do similar things. When would you use one over the other, and where do .NET developers typically trip up?",
+  "headline": "In .NET, you validate user input with Data Annotations, FluentValidation, and client-side jQuery validation.",
   "description": "The Real Question This tests whether you understand ServiceNow's two-layer client-side validation model and can map it to the validation patterns you've used in .NET. The core distinction: UI Policies…",
   "datePublished": "2026-03-16T05:20:00.000Z",
   "author": {

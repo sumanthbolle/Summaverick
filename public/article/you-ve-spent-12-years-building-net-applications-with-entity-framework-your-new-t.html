@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>You've spent 12 years building .NET applications with Entity Framework. Your new team tells you ServiceNow uses 'GlideRecord' to interact with data. Walk me through how GlideRecord compares to what you already know — DbContext, LINQ queries, and EF migrations. What would surprise you the most coming from that world? — Summaverick</title>
+  <title>You've spent 12 years building .NET applications with Entity Framework. — Summaverick</title>
   <meta name="description" content="Why This Matters in an Interview This question tests whether a seasoned .NET developer can mentally map their existing ORM knowledge to ServiceNow's server-side data API. Interviewers want to see that…" />
   <link rel="canonical" href="https://summaverick.com/article/you-ve-spent-12-years-building-net-applications-with-entity-framework-your-new-t" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="You've spent 12 years building .NET applications with Entity Framework. Your new team tells you ServiceNow uses 'GlideRecord' to interact with data. Walk me through how GlideRecord compares to what you already know — DbContext, LINQ queries, and EF migrations. What would surprise you the most coming from that world? — Summaverick" />
+  <meta property="og:title" content="You've spent 12 years building .NET applications with Entity Framework. — Summaverick" />
   <meta property="og:description" content="Why This Matters in an Interview This question tests whether a seasoned .NET developer can mentally map their existing ORM knowledge to ServiceNow's server-side data API. Interviewers want to see that…" />
   <meta property="og:url" content="https://summaverick.com/article/you-ve-spent-12-years-building-net-applications-with-entity-framework-your-new-t" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>You've spent 12 years building .NET applications with Entity Framework. Your new team tells you ServiceNow uses 'GlideRecord' to interact with data. Walk me through how GlideRecord compares to what you already know — DbContext, LINQ queries, and EF migrations. What would surprise you the most coming from that world?</h1>
+        <h1>You've spent 12 years building .NET applications with Entity Framework.</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">You've spent 12 years building .NET applications with Entity Framework. Your new team tells you ServiceNow uses 'GlideRecord' to interact with data. Walk me through how GlideRecord compares to what you already know — DbContext, LINQ queries, and EF migrations. What would surprise you the most coming from that world?</div>
+        </section>
         <div class="prose">
 <h4>Why This Matters in an Interview</h4><p>This question tests whether a seasoned .NET developer can mentally map their existing ORM knowledge to ServiceNow's server-side data API. Interviewers want to see that you're not starting from zero — you're translating.</p><h4>The Direct Mapping</h4><p>GlideRecord is ServiceNow's server-side API for database operations. If Entity Framework is your ORM that abstracts SQL into C# objects, GlideRecord is the equivalent abstraction layer — but with key differences:</p><pre>// .NET Entity Framework (what you know)
 var incidents = dbContext.Incidents
@@ -103,8 +107,8 @@ while (gr.next()) {
 }</pre><h4>What Surprises .NET Developers</h4><ul><li><strong>No model classes:</strong> There's no <code>Incident.cs</code> with typed properties. GlideRecord fields are accessed by string name — <code>gr.getValue('priority')</code> not <code>incident.Priority</code>. It feels like working with <code>DataRow</code> instead of strongly-typed entities.</li><li><strong>Cursor-based, not collection-based:</strong> GlideRecord behaves like <code>SqlDataReader</code>, not <code>List&lt;T&gt;</code>. You iterate with <code>while(gr.next())</code>, not <code>foreach</code>. There's no <code>.ToList()</code> that materializes everything into memory.</li><li><strong>No migrations:</strong> Schema changes happen through the UI or Update Sets — not code-first migrations. Adding a column to a table is a point-and-click operation, not an <code>Add-Migration</code> command.</li><li><strong>getValue() vs dot-walking:</strong> <code>gr.caller_id</code> returns a GlideElement object (not the value). Use <code>gr.getValue('caller_id')</code> for the raw sys_id or <code>gr.getDisplayValue('caller_id')</code> for the display name — similar to how EF navigation properties vs foreign key IDs work.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Think of GlideRecord as ADO.NET's DataReader wrapped with a query builder. It's not as elegant as LINQ, but the mental model is identical: build a query, execute it, iterate results. Your instincts about N+1 queries, limiting result sets, and indexing all transfer directly.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-are-notifications-in-servicenow-how-do-you-configure-an-email-notification" rel="prev"><small>‹ Previous</small><strong>What are Notifications in ServiceNow? How do you configure an email notification that fires when a P1 incident is created?</strong></a>
-          <a href="/article/in-your-net-projects-you-ve-used-middleware-action-filters-and-database-triggers" rel="next"><small>Next ›</small><strong>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer?</strong></a>
+          <a href="/article/what-are-notifications-in-servicenow-how-do-you-configure-an-email-notification" rel="prev"><small>‹ Previous</small><strong>What are Notifications in ServiceNow?</strong></a>
+          <a href="/article/in-your-net-projects-you-ve-used-middleware-action-filters-and-database-triggers" rel="next"><small>Next ›</small><strong>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at…</strong></a>
         </nav>
       </article>
     </div>
@@ -118,7 +122,7 @@ while (gr.next()) {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "You've spent 12 years building .NET applications with Entity Framework. Your new team tells you ServiceNow uses 'GlideRecord' to interact with data. Walk me through how GlideRecord compares to what you already know — DbContext, LINQ queries, and EF migrations. What would surprise you the most coming from that world?",
+  "headline": "You've spent 12 years building .NET applications with Entity Framework.",
   "description": "Why This Matters in an Interview This question tests whether a seasoned .NET developer can mentally map their existing ORM knowledge to ServiceNow's server-side data API. Interviewers want to see that…",
   "datePublished": "2026-03-16T06:00:00.000Z",
   "author": {

@@ -441,7 +441,14 @@ describe("Homepage public contract", () => {
     expect(learn).not.toContain("/api/content");
     expect(interviews).not.toContain("/api/content");
     for (const p of posts) expect(learn, p.title).toContain(esc(p.title));
-    for (const q of qas) expect(interviews, q.question).toContain(esc(q.question));
+    // Interview questions carry inline <strong> markup; listings show the
+    // words, never the tags.
+    const plain = (s: string) => s.replace(/<\/?(strong|em|b|i|code|pre)>/gi, "").replace(/\s+/g, " ").trim();
+    for (const q of qas) {
+      const opening = plain(q.question).split(/(?<=[.?!])\s+/)[0] ?? "";
+      expect(interviews, q.question).toContain(esc(opening.slice(0, 60)));
+    }
+    expect(interviews).not.toMatch(/&lt;\/?strong&gt;/);
 
     const sitemap = text("public/sitemap.xml");
     for (const slug of slugs) {

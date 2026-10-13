@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request? — Summaverick</title>
+  <title>What is the Service Catalog in ServiceNow? — Summaverick</title>
   <meta name="description" content="Why Interviewers Ask This The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request? — Summaverick" />
+  <meta property="og:title" content="What is the Service Catalog in ServiceNow? — Summaverick" />
   <meta property="og:description" content="Why Interviewers Ask This The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-the-service-catalog-in-servicenow-how-is-it-different-from-the-regular-i" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?</h1>
+        <h1>What is the Service Catalog in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?</div>
+        </section>
         <div class="prose">
 <h4>Why Interviewers Ask This</h4><p>The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the front-end form.</p><h4>What Is the Service Catalog?</h4><p>The Service Catalog is a self-service portal where employees can browse and request services or products — like an internal shopping site. Instead of sending emails or calling the help desk, users find what they need, fill out a form, and submit.</p><h4>Catalog vs Incident — The Key Difference</h4><ul><li><strong>Incident:</strong> Something is BROKEN. Reactive. 'My laptop won't turn on.' The goal is to fix it fast.</li><li><strong>Service Request (Catalog):</strong> The user WANTS something. Proactive. 'I need a new laptop.' The goal is to fulfill the order through a defined process.</li></ul><h4>The Components</h4><ul><li><strong>Catalog Item:</strong> A requestable service or product. 'Request a Laptop', 'VPN Access', 'New Hire Onboarding Package'.</li><li><strong>Variables:</strong> The form fields specific to that item. Laptop model dropdown, justification text field, delivery date picker.</li><li><strong>Variable Sets:</strong> Reusable groups of variables shared across multiple catalog items. A 'Delivery Address' variable set used by laptop, monitor, and phone requests.</li><li><strong>Workflow / Flow:</strong> The backend process that handles approval and fulfillment.</li></ul><h4>What Happens When a User Submits</h4><pre>// User clicks 'Order Now' on 'Request a Laptop'
 //
@@ -108,8 +112,8 @@
 //    User gets a notification: 'Your laptop is on its way!'</pre><div class='tip-box'><h5>💡 Interview Tip</h5><p>Know the table relationships: <code>sc_request</code> (the order) → <code>sc_req_item</code> (the line item) → <code>sc_task</code> (the fulfillment tasks). If asked 'Where are the user's variable answers stored?' — values are stored in the <code>sc_item_option</code> table, linked to the RITM via the <code>sc_item_option_mtom</code> many-to-many table.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" rel="prev"><small>‹ Previous</small><strong>What is GlideRecord? Write a basic GlideRecord query to find all open P1 incidents assigned to a specific group.</strong></a>
-          <a href="/article/what-is-a-glideajax-call-and-why-do-you-need-it-write-a-simple-example-of-a-clie" rel="next"><small>Next ›</small><strong>What is a GlideAjax call, and why do you need it? Write a simple example of a Client Script calling a server-side Script Include using GlideAjax.</strong></a>
+          <a href="/article/what-is-gliderecord-write-a-basic-gliderecord-query-to-find-all-open-p1-incident" rel="prev"><small>‹ Previous</small><strong>What is GlideRecord?</strong></a>
+          <a href="/article/what-is-a-glideajax-call-and-why-do-you-need-it-write-a-simple-example-of-a-clie" rel="next"><small>Next ›</small><strong>What is a GlideAjax call, and why do you need it?</strong></a>
         </nav>
       </article>
     </div>
@@ -123,7 +127,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is the Service Catalog in ServiceNow? How is it different from the regular incident form, and what happens when a user submits a catalog request?",
+  "headline": "What is the Service Catalog in ServiceNow?",
   "description": "Why Interviewers Ask This The Service Catalog is one of the most visible parts of ServiceNow for end users. Interviewers want to see that you understand the full request lifecycle — not just the…",
   "datePublished": "2026-03-16T07:10:00.000Z",
   "author": {

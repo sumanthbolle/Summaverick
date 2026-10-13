@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What are Notifications in ServiceNow? How do you configure an email notification that fires when a P1 incident is created? — Summaverick</title>
+  <title>What are Notifications in ServiceNow? — Summaverick</title>
   <meta name="description" content="Context Notifications are one of the first things configured in any ITSM implementation. Every interviewer expects you to know how they work — from basic configuration to when scripts are needed. How…" />
   <link rel="canonical" href="https://summaverick.com/article/what-are-notifications-in-servicenow-how-do-you-configure-an-email-notification" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What are Notifications in ServiceNow? How do you configure an email notification that fires when a P1 incident is created? — Summaverick" />
+  <meta property="og:title" content="What are Notifications in ServiceNow? — Summaverick" />
   <meta property="og:description" content="Context Notifications are one of the first things configured in any ITSM implementation. Every interviewer expects you to know how they work — from basic configuration to when scripts are needed. How…" />
   <meta property="og:url" content="https://summaverick.com/article/what-are-notifications-in-servicenow-how-do-you-configure-an-email-notification" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>What are Notifications in ServiceNow? How do you configure an email notification that fires when a P1 incident is created?</h1>
+        <h1>What are Notifications in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What are Notifications in ServiceNow? How do you configure an email notification that fires when a P1 incident is created?</div>
+        </section>
         <div class="prose">
 <h4>Context</h4><p>Notifications are one of the first things configured in any ITSM implementation. Every interviewer expects you to know how they work — from basic configuration to when scripts are needed.</p><h4>How Notifications Work</h4><p>ServiceNow Notifications are email (or SMS/push) alerts triggered by record events. They have three parts: WHO gets it, WHEN it fires, and WHAT it says.</p><h4>Configuring a P1 Incident Notification</h4><pre>// Notification Configuration:
 //
@@ -117,8 +121,8 @@ gs.eventQueue('incident.priority.critical', current,
 // Event name: incident.priority.critical</pre></li><li><strong>Flow Designer:</strong> A flow action sends the notification as part of an automated workflow. Best for multi-step processes.</li></ul><h4>Key Configuration Points</h4><ul><li><strong>Weight:</strong> Each notification has a numeric weight. When multiple notifications for the same record and recipients would send, only the highest-weight one is delivered — the rest are skipped. The default weight 0 means the notification always sends. Use weights to prevent duplicate emails.</li><li><strong>Digest:</strong> Batch multiple notifications into a single daily/hourly email instead of spamming users.</li><li><strong>Subscribe:</strong> Users can subscribe/unsubscribe from certain notification types.</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>If asked 'What's the best practice: direct notification or event-driven?' — the answer is <strong>event-driven</strong> for production. Direct notifications are fine for simple cases, but events give you flexibility to change what happens (email, Slack, SMS) without modifying the Business Rule. It follows the principle of loose coupling.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-flow-designer-in-servicenow-how-is-it-different-from-a-workflow-and-when" rel="prev"><small>‹ Previous</small><strong>What is Flow Designer in ServiceNow? How is it different from a Workflow, and when would you use each?</strong></a>
-          <a href="/article/you-ve-spent-12-years-building-net-applications-with-entity-framework-your-new-t" rel="next"><small>Next ›</small><strong>You've spent 12 years building .NET applications with Entity Framework. Your new team tells you ServiceNow uses 'GlideRecord' to interact with data. Walk me through how GlideRecord compares to what you already know — DbContext, LINQ queries, and EF migrations. What would surprise you the most coming from that world?</strong></a>
+          <a href="/article/what-is-flow-designer-in-servicenow-how-is-it-different-from-a-workflow-and-when" rel="prev"><small>‹ Previous</small><strong>What is Flow Designer in ServiceNow?</strong></a>
+          <a href="/article/you-ve-spent-12-years-building-net-applications-with-entity-framework-your-new-t" rel="next"><small>Next ›</small><strong>You've spent 12 years building .NET applications with Entity Framework.</strong></a>
         </nav>
       </article>
     </div>
@@ -132,7 +136,7 @@ gs.eventQueue('incident.priority.critical', current,
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What are Notifications in ServiceNow? How do you configure an email notification that fires when a P1 incident is created?",
+  "headline": "What are Notifications in ServiceNow?",
   "description": "Context Notifications are one of the first things configured in any ITSM implementation. Every interviewer expects you to know how they work — from basic configuration to when scripts are needed. How…",
   "datePublished": "2026-03-16T06:35:00.000Z",
   "author": {

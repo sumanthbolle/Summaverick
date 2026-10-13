@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What are Update Sets in ServiceNow? How do you move customizations from a development instance to production? — Summaverick</title>
+  <title>What are Update Sets in ServiceNow? — Summaverick</title>
   <meta name="description" content="Context Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding…" />
   <link rel="canonical" href="https://summaverick.com/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What are Update Sets in ServiceNow? How do you move customizations from a development instance to production? — Summaverick" />
+  <meta property="og:title" content="What are Update Sets in ServiceNow? — Summaverick" />
   <meta property="og:description" content="Context Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding…" />
   <meta property="og:url" content="https://summaverick.com/article/what-are-update-sets-in-servicenow-how-do-you-move-customizations-from-a-develop" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?</h1>
+        <h1>What are Update Sets in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?</div>
+        </section>
         <div class="prose">
 <h4>Context</h4><p>Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding it is essential for any role.</p><h4>What Is an Update Set?</h4><p>An Update Set is a container that automatically captures every configuration change you make while it's active. When you modify a Business Rule, create a UI Policy, or add a field to a table — that change is recorded in your current Update Set.</p><h4>The Migration Process</h4><pre>// Step-by-step deployment:
 //
@@ -110,8 +114,8 @@
 //    Apply all changes to the target instance</pre><h4>What Update Sets Capture (and Don't)</h4><ul><li><strong>DO capture:</strong> Business Rules, Client Scripts, UI Policies, UI Actions, Script Includes, ACLs, form layouts, System Properties, Scheduled Jobs, Flow Designer flows, table schema changes (new fields/tables).</li><li><strong>DON'T capture:</strong> Data records (incidents, users, CMDB CIs), homepage/dashboard configurations (user-specific), report definitions (sometimes), attachment content.</li></ul><h4>Common Mistakes</h4><ul><li><strong>Wrong Update Set:</strong> Forgetting to switch your active Update Set before making changes. Your changes end up in the 'Default' Update Set and get mixed with other unrelated work. Always check your current Update Set before starting.</li><li><strong>Missing dependencies:</strong> You create a Script Include in one Update Set and a Business Rule that calls it in another. If you deploy the Business Rule first, it fails because the Script Include doesn't exist yet. Always track dependencies and deploy in order.</li><li><strong>Overwriting changes:</strong> Two developers modify the same Business Rule in different Update Sets. The second one committed overwrites the first — no merge, just overwrite. Communication is critical.</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>If asked 'How is this different from Git?' — explain that Update Sets capture configuration changes automatically (you don't 'commit' individual changes), there's no branching or merging, and the last commit wins on conflicts. For scoped applications, ServiceNow now offers Source Control Integration with Git, which is closer to what modern developers expect.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-the-difference-between-a-client-script-and-a-ui-policy-when-would-you-ch" rel="prev"><small>‹ Previous</small><strong>What is the difference between a Client Script and a UI Policy? When would you choose one over the other?</strong></a>
-          <a href="/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" rel="next"><small>Next ›</small><strong>What is an ACL (Access Control List) in ServiceNow? How does it protect data?</strong></a>
+          <a href="/article/what-is-the-difference-between-a-client-script-and-a-ui-policy-when-would-you-ch" rel="prev"><small>‹ Previous</small><strong>What is the difference between a Client Script and a UI Policy?</strong></a>
+          <a href="/article/what-is-an-acl-access-control-list-in-servicenow-how-does-it-protect-data" rel="next"><small>Next ›</small><strong>What is an ACL (Access Control List) in ServiceNow?</strong></a>
         </nav>
       </article>
     </div>
@@ -125,7 +129,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What are Update Sets in ServiceNow? How do you move customizations from a development instance to production?",
+  "headline": "What are Update Sets in ServiceNow?",
   "description": "Context Every ServiceNow environment has separate instances (dev, test, prod). Update Sets are how you package and move your changes between them. This is the deployment mechanism — and understanding…",
   "datePublished": "2026-03-16T07:25:00.000Z",
   "author": {

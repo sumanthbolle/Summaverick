@@ -1618,7 +1618,24 @@ body[data-nav-open] { overflow: hidden; }
   font-size: var(--step--1);
   text-decoration: none;
 }
-.article-inner h1 { margin: var(--space-3) 0 0; text-wrap: pretty; }
+.article-inner h1 { margin: var(--space-3) 0 0; text-wrap: pretty; overflow-wrap: break-word; }
+.article-question {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-2);
+}
+.article-question__label {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step--1);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-text-mute);
+}
+.article-question__body { color: var(--c-text); line-height: 1.6; overflow-wrap: break-word; }
+.article-question__body pre { margin: var(--space-3) 0 0; padding: var(--space-3); overflow-x: auto; white-space: pre-wrap; font-family: var(--font-mono); font-size: var(--step--1); }
 .article-meta { margin-top: var(--space-4); color: var(--c-text-mute); font-size: var(--step--1); }
 
 .prose {
