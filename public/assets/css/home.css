@@ -635,3 +635,158 @@ body[data-home] .footer-wordmark {
   user-select: none;
   pointer-events: none;
 }
+
+/* ---- Primary nav: the section being read ----------------------------------------------
+   Set by chrome.js as the page scrolls; a quiet pill, the same as hover. */
+body[data-home] .nav .nav-links a[aria-current="location"] {
+  color: var(--c-on-ink);
+  background: color-mix(in srgb, var(--c-on-ink) 12%, transparent);
+}
+
+/* ---- Questions: header beside an open list ------------------------------------------- */
+body[data-home] .faq {
+  padding-block: clamp(4rem, 9vw, 8rem);
+  border-top: 1px solid var(--c-line);
+  background: var(--c-bg);
+}
+body[data-home] .faq__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: start;
+}
+body[data-home] .faq .section-head { margin: 0; }
+body[data-home] .faq h2 {
+  max-width: 18ch;
+  margin: 0;
+  font-size: var(--step-3);
+  font-weight: var(--weight-semibold);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+  text-wrap: pretty;
+}
+body[data-home] .faq__list { border-top: 1px solid var(--c-line-strong); }
+body[data-home] .faq__item { border-bottom: 1px solid var(--c-line); }
+body[data-home] .faq__item summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: var(--space-5) var(--space-7) var(--space-5) 0;
+  font-size: var(--step-1);
+  font-weight: var(--weight-medium);
+  line-height: 1.3;
+  letter-spacing: var(--tracking-snug);
+  list-style: none;
+  cursor: pointer;
+}
+body[data-home] .faq__item summary::-webkit-details-marker { display: none; }
+/* A plus that turns into a minus: two bars, the vertical one folds away. */
+body[data-home] .faq__item summary::before,
+body[data-home] .faq__item summary::after {
+  content: "";
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  width: 14px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--c-text-dim);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+body[data-home] .faq__item summary::after { transform: rotate(90deg); }
+body[data-home] .faq__item[open] summary::after { transform: rotate(0deg); }
+body[data-home] .faq__item summary:hover::before,
+body[data-home] .faq__item summary:hover::after { background: var(--c-text); }
+body[data-home] .faq__item summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+body[data-home] .faq__answer { padding: 0 var(--space-7) var(--space-5) 0; }
+body[data-home] .faq__answer p { max-width: 62ch; margin: 0; color: var(--c-text-dim); }
+body[data-home] .faq__answer a { color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  body[data-home] .faq__item[open] .faq__answer { animation: faq-open 260ms var(--ease-out) both; }
+}
+@keyframes faq-open { from { opacity: 0; transform: translateY(-4px); } }
+@media (max-width: 860px) {
+  body[data-home] .faq__grid { grid-template-columns: minmax(0, 1fr); }
+  body[data-home] .faq__item summary { font-size: var(--step-0); }
+  body[data-home] .faq__answer { padding-right: 0; }
+}
+
+/* ---- Contact: what happens after you write ------------------------------------------ */
+body[data-home] .next-steps {
+  max-width: 42ch;
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--c-line);
+}
+body[data-home] .next-steps__title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--step--1);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-text-mute);
+}
+body[data-home] .next-steps__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: next;
+  display: grid;
+  gap: var(--space-4);
+}
+body[data-home] .next-steps__list li {
+  counter-increment: next;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--space-3);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: 1.5;
+}
+body[data-home] .next-steps__list li::before {
+  content: counter(next);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
+  color: var(--c-text);
+  font-size: 0.8rem;
+  font-weight: var(--weight-semibold);
+}
+body[data-home] .next-steps__list strong { display: block; color: var(--c-text); font-weight: var(--weight-medium); }
+
+/* ---- Phone call-to-action ---------------------------------------------------------------
+   The header drops its "Build with us" button at this width; this pill stands
+   in for it between the hero and the form. chrome.js shows and hides it. */
+body[data-home] .dock-cta { display: none; }
+@media (max-width: 640px) {
+  body[data-home] .dock-cta:not([hidden]) {
+    position: fixed;
+    z-index: 60;
+    left: 50%;
+    bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    min-height: var(--tap);
+    padding: 0 var(--space-5);
+    border-radius: var(--radius-pill);
+    background: var(--c-text);
+    color: var(--c-bg);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+    text-decoration: none;
+    box-shadow: 0 14px 34px -12px color-mix(in srgb, black 60%, transparent);
+    transform: translate(-50%, 0);
+    transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+  }
+  body[data-home] .dock-cta[data-away] { opacity: 0; transform: translate(-50%, 140%); pointer-events: none; }
+  body[data-nav-open] .dock-cta { display: none !important; }
+}
