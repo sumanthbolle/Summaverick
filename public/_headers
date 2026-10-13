@@ -1,0 +1,18 @@
+# Applied by Workers Static Assets to every file served from public/.
+# API responses get the same baseline from securityHeaders() in src/lib/cors.ts.
+
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# File names are not content-hashed, so CSS and JS keep revalidating on every
+# visit. Fonts and images change rarely: cache them, and refresh in the background.
+/assets/fonts/*
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+
+/assets/img/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
