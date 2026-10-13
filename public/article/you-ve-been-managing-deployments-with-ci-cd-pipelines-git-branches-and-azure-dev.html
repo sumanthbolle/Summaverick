@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur? — Summaverick</title>
+  <title>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. — Summaverick</title>
   <meta name="description" content="What This Question Really Tests This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track configuration…" />
   <link rel="canonical" href="https://summaverick.com/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur? — Summaverick" />
+  <meta property="og:title" content="You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. — Summaverick" />
   <meta property="og:description" content="What This Question Really Tests This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track configuration…" />
   <meta property="og:url" content="https://summaverick.com/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?</h1>
+        <h1>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps.</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?</div>
+        </section>
         <div class="prose">
 <h4>What This Question Really Tests</h4><p>This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track <em>configuration changes</em> (not source code) and move them between instances — and the limitations catch every developer coming from a Git workflow.</p><h4>The Mental Model</h4><pre>// Git Workflow (what you know)
 // feature-branch → commit → pull request → merge → CI/CD → deploy
@@ -108,8 +112,8 @@ if (us.next()) {
 }</pre><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>ServiceNow now offers Source Control Integration for Scoped Applications — this connects to Git repositories and gives you the branch/merge/PR workflow you're used to. If you're building scoped apps, push for this approach. For global configurations, Update Sets remain the primary mechanism, so learn the discipline of checking your active Update Set before every change.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" rel="prev"><small>‹ Previous</small><strong>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?</strong></a>
-          <a href="/article/in-asp-net-you-separate-concerns-with-controllers-services-and-repositories-in-s" rel="next"><small>Next ›</small><strong>In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC.</strong></a>
+          <a href="/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" rel="prev"><small>‹ Previous</small><strong>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted…</strong></a>
+          <a href="/article/in-asp-net-you-separate-concerns-with-controllers-services-and-repositories-in-s" rel="next"><small>Next ›</small><strong>In ASP.NET, you separate concerns with Controllers, Services, and Repositories.</strong></a>
         </nav>
       </article>
     </div>
@@ -123,7 +127,7 @@ if (us.next()) {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?",
+  "headline": "You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps.",
   "description": "What This Question Really Tests This question reveals whether you understand that ServiceNow's deployment model is fundamentally different from code-based deployments. Update Sets track configuration…",
   "datePublished": "2026-03-16T05:45:00.000Z",
   "author": {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What are the different types of scripts in ServiceNow? List them, explain where each one runs, and give a one-line example of when you'd use each. — Summaverick</title>
+  <title>What are the different types of scripts in ServiceNow? — Summaverick</title>
   <meta name="description" content="The Intent Behind This Question This is a staple interview question because it tests whether you understand the client-server architecture. Many candidates mix up which scripts run where — and that's…" />
   <link rel="canonical" href="https://summaverick.com/article/what-are-the-different-types-of-scripts-in-servicenow-list-them-explain-where-ea" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What are the different types of scripts in ServiceNow? List them, explain where each one runs, and give a one-line example of when you'd use each. — Summaverick" />
+  <meta property="og:title" content="What are the different types of scripts in ServiceNow? — Summaverick" />
   <meta property="og:description" content="The Intent Behind This Question This is a staple interview question because it tests whether you understand the client-server architecture. Many candidates mix up which scripts run where — and that's…" />
   <meta property="og:url" content="https://summaverick.com/article/what-are-the-different-types-of-scripts-in-servicenow-list-them-explain-where-ea" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Scripting</p>
-        <h1>What are the different types of scripts in ServiceNow? List them, explain where each one runs, and give a one-line example of when you'd use each.</h1>
+        <h1>What are the different types of scripts in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What are the different types of scripts in ServiceNow? List them, explain where each one runs, and give a one-line example of when you'd use each.</div>
+        </section>
         <div class="prose">
 <h4>The Intent Behind This Question</h4><p>This is a staple interview question because it tests whether you understand the client-server architecture. Many candidates mix up which scripts run where — and that's a red flag for interviewers.</p><h4>Server-Side Scripts (run on the ServiceNow server)</h4><ul><li><strong>Business Rules:</strong> Trigger automatically when a record is inserted, updated, deleted, or queried. <em>Example: Auto-assign a P1 incident to the on-call team when it's created.</em></li><li><strong>Script Includes:</strong> Reusable server-side JavaScript classes/functions. Called by Business Rules, other Script Includes, or from the client via GlideAjax. <em>Example: A shared utility function that calculates SLA breach time, used by multiple Business Rules.</em></li><li><strong>Scheduled Jobs (Scheduled Script Executions):</strong> Run on a defined schedule — daily, weekly, or at a specific time. <em>Example: Every night at midnight, close all resolved incidents older than 7 days.</em></li><li><strong>Fix Scripts:</strong> One-time scripts that run manually. Used for data cleanup or bulk updates. <em>Example: Update all 5,000 legacy incidents to a new category structure after a migration.</em></li><li><strong>Background Scripts:</strong> Ad-hoc scripts run by admins for testing or troubleshooting. Not saved or scheduled. <em>Example: Quickly check how many open P1 incidents exist right now.</em></li></ul><h4>Client-Side Scripts (run in the user's browser)</h4><ul><li><strong>Client Scripts:</strong> Trigger on form events — onLoad, onChange, onSubmit, onCellEdit. <em>Example: When the 'Category' dropdown changes to 'Network', show the 'Network Device' field and make it mandatory.</em></li><li><strong>UI Policies:</strong> Declarative (no-code) rules to make fields mandatory, read-only, or visible. <em>Example: When Priority is 'Critical', make 'Assignment Group' mandatory — configured entirely through the UI, no code.</em></li><li><strong>UI Actions:</strong> Custom buttons, links, or context menu items on forms or lists. Can run client-side, server-side, or both. <em>Example: A 'Close and Notify' button that resolves the incident and sends the caller an email in one click.</em></li></ul><h4>The Golden Rule</h4><pre>// SERVER-SIDE: Has access to GlideRecord, can query/update database directly
 // CLIENT-SIDE: Has access to g_form, g_user — manipulates the form in the browser
@@ -91,7 +95,7 @@
         </div>
         <nav class="article-pager" aria-label="More in this collection">
           <a href="/article/what-is-itsm-and-what-are-the-core-itil-processes-that-servicenow-supports-out-o" rel="prev"><small>‹ Previous</small><strong>What is ITSM, and what are the core ITIL processes that ServiceNow supports out of the box?</strong></a>
-          <a href="/article/explain-the-difference-between-an-incident-a-problem-a-change-request-and-a-serv" rel="next"><small>Next ›</small><strong>Explain the difference between an Incident, a Problem, a Change Request, and a Service Request. Give a real-world scenario that connects all four.</strong></a>
+          <a href="/article/explain-the-difference-between-an-incident-a-problem-a-change-request-and-a-serv" rel="next"><small>Next ›</small><strong>Explain the difference between an Incident, a Problem, a Change Request, and a Service Request.</strong></a>
         </nav>
       </article>
     </div>
@@ -105,7 +109,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What are the different types of scripts in ServiceNow? List them, explain where each one runs, and give a one-line example of when you'd use each.",
+  "headline": "What are the different types of scripts in ServiceNow?",
   "description": "The Intent Behind This Question This is a staple interview question because it tests whether you understand the client-server architecture. Many candidates mix up which scripts run where — and that's…",
   "datePublished": "2026-03-16T07:50:00.000Z",
   "author": {

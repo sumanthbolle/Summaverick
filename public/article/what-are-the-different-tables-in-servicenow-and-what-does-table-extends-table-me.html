@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What are the different tables in ServiceNow, and what does 'table extends table' mean? Give an example. — Summaverick</title>
+  <title>What are the different tables in ServiceNow, and what does 'table extends table' mean? — Summaverick</title>
   <meta name="description" content="The Intent Behind This Question Table inheritance is one of ServiceNow's most important concepts. It affects how data is stored, how scripts execute, and how security is applied. Interviewers ask this…" />
   <link rel="canonical" href="https://summaverick.com/article/what-are-the-different-tables-in-servicenow-and-what-does-table-extends-table-me" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What are the different tables in ServiceNow, and what does 'table extends table' mean? Give an example. — Summaverick" />
+  <meta property="og:title" content="What are the different tables in ServiceNow, and what does 'table extends table' mean? — Summaverick" />
   <meta property="og:description" content="The Intent Behind This Question Table inheritance is one of ServiceNow's most important concepts. It affects how data is stored, how scripts execute, and how security is applied. Interviewers ask this…" />
   <meta property="og:url" content="https://summaverick.com/article/what-are-the-different-tables-in-servicenow-and-what-does-table-extends-table-me" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>What are the different tables in ServiceNow, and what does 'table extends table' mean? Give an example.</h1>
+        <h1>What are the different tables in ServiceNow, and what does 'table extends table' mean?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What are the different tables in ServiceNow, and what does 'table extends table' mean? Give an example.</div>
+        </section>
         <div class="prose">
 <h4>The Intent Behind This Question</h4><p>Table inheritance is one of ServiceNow's most important concepts. It affects how data is stored, how scripts execute, and how security is applied. Interviewers ask this to check if you understand why a Business Rule on 'task' fires on incidents too.</p><h4>Tables in ServiceNow</h4><p>Every piece of data in ServiceNow lives in a table. Tables are like database tables — they have columns (fields) and rows (records). But ServiceNow tables support <strong>inheritance</strong>, which means one table can extend another and inherit all its fields.</p><h4>The Task Table Hierarchy</h4><pre>// task (base table)
 // ├── Fields: number, state, priority, assigned_to, short_description
@@ -114,8 +118,8 @@ gr.query();
 // Returns only incidents</pre><h4>Other Important Tables (Non-Task)</h4><ul><li><code>sys_user</code> — User records</li><li><code>sys_user_group</code> — Group records</li><li><code>cmdb_ci</code> — Configuration Items (extends to cmdb_ci_server, cmdb_ci_database, etc.)</li><li><code>kb_knowledge</code> — Knowledge articles</li><li><code>sys_choice</code> — Dropdown/choice list values</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>Always check if the table you're working with extends another table before writing a Business Rule. The classic mistake: writing a BR on 'task' thinking it only affects your custom task type, then discovering it fires on every incident, change, and problem in the system.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-a-glideajax-call-and-why-do-you-need-it-write-a-simple-example-of-a-clie" rel="prev"><small>‹ Previous</small><strong>What is a GlideAjax call, and why do you need it? Write a simple example of a Client Script calling a server-side Script Include using GlideAjax.</strong></a>
-          <a href="/article/what-is-the-difference-between-getvalue-and-getdisplayvalue-in-gliderecord-why-d" rel="next"><small>Next ›</small><strong>What is the difference between getValue() and getDisplayValue() in GlideRecord? Why does this matter?</strong></a>
+          <a href="/article/what-is-a-glideajax-call-and-why-do-you-need-it-write-a-simple-example-of-a-clie" rel="prev"><small>‹ Previous</small><strong>What is a GlideAjax call, and why do you need it?</strong></a>
+          <a href="/article/what-is-the-difference-between-getvalue-and-getdisplayvalue-in-gliderecord-why-d" rel="next"><small>Next ›</small><strong>What is the difference between getValue() and getDisplayValue() in GlideRecord?</strong></a>
         </nav>
       </article>
     </div>
@@ -129,7 +133,7 @@ gr.query();
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What are the different tables in ServiceNow, and what does 'table extends table' mean? Give an example.",
+  "headline": "What are the different tables in ServiceNow, and what does 'table extends table' mean?",
   "description": "The Intent Behind This Question Table inheritance is one of ServiceNow's most important concepts. It affects how data is stored, how scripts execute, and how security is applied. Interviewers ask this…",
   "datePublished": "2026-03-16T07:00:00.000Z",
   "author": {

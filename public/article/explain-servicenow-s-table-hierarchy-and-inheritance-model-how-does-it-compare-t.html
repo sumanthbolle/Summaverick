@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake. — Summaverick</title>
+  <title>Explain ServiceNow's table hierarchy and inheritance model. — Summaverick</title>
   <meta name="description" content="Why This Matters in an Interview ServiceNow tables support single-table inheritance — one of the most important architectural concepts to grasp. If you've used Entity Framework's Table-Per-Hierarchy…" />
   <link rel="canonical" href="https://summaverick.com/article/explain-servicenow-s-table-hierarchy-and-inheritance-model-how-does-it-compare-t" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake. — Summaverick" />
+  <meta property="og:title" content="Explain ServiceNow's table hierarchy and inheritance model. — Summaverick" />
   <meta property="og:description" content="Why This Matters in an Interview ServiceNow tables support single-table inheritance — one of the most important architectural concepts to grasp. If you've used Entity Framework's Table-Per-Hierarchy…" />
   <meta property="og:url" content="https://summaverick.com/article/explain-servicenow-s-table-hierarchy-and-inheritance-model-how-does-it-compare-t" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake.</h1>
+        <h1>Explain ServiceNow's table hierarchy and inheritance model.</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake.</div>
+        </section>
         <div class="prose">
 <h4>Why This Matters in an Interview</h4><p>ServiceNow tables support single-table inheritance — one of the most important architectural concepts to grasp. If you've used Entity Framework's Table-Per-Hierarchy (TPH) mapping, you already understand the core concept. Every ServiceNow table can extend another, and child records physically live in the parent table's database.</p><h4>The C# Inheritance Parallel</h4><pre>// C# Class Hierarchy (what you know)
 public class Task { // Base class
@@ -129,8 +133,8 @@ gr.addQuery('sys_class_name', 'incident'); // Discriminator!
 gr.query();</pre><h4>Real-World Production Mistake</h4><ul><li><strong>The scenario:</strong> A developer writes a Business Rule on the <code>task</code> table that sends an email notification on every update. They test it with incidents — works fine. But in production, it fires on every change request, problem, catalog item, and HR case update too — because they all extend <code>task</code>. The email server gets flooded with 10,000 notifications in an hour.</li><li><strong>The fix:</strong> Either move the Business Rule to the <code>incident</code> table specifically, or add a condition: <code>current.sys_class_name == 'incident'</code>.</li><li><strong>The .NET equivalent:</strong> It's like putting a <code>[NotifyOnUpdate]</code> attribute on the base <code>Task</code> class and being surprised when every derived type triggers it. In EF, your <code>DbContext.SaveChanges</code> interceptor would fire for every entity type in the TPH hierarchy.</li></ul><h4>Key Fields to Know</h4><ul><li><strong>sys_class_name:</strong> The discriminator column. Every record knows what 'type' it is. Like EF's <code>Discriminator</code> column.</li><li><strong>sys_id:</strong> The primary key. A 32-character GUID. Like <code>Guid.NewGuid()</code> in C#.</li><li><strong>Dot-walking:</strong> <code>caller_id.department.name</code> traverses relationships — like EF's <code>Include().ThenInclude()</code> for navigation properties, but resolved on-the-fly.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Always ask 'does this table extend another table?' before writing any script. Check the table's 'Extends table' field in the dictionary. A Business Rule on a parent table affects ALL children — just like a virtual method override in C# applies to every derived class that doesn't override it.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/your-net-background-includes-working-with-azure-logic-apps-power-automate-or-han" rel="prev"><small>‹ Previous</small><strong>Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow automation. ServiceNow has 'Flow Designer' which the team says replaces a lot of custom coding. Compare Flow Designer to what you've used, and explain when you'd still write code instead of using it.</strong></a>
-          <a href="/article/you-ve-handled-dozens-of-data-migrations-using-ef-migrations-ssis-or-custom-etl" rel="next"><small>Next ›</small><strong>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs. ServiceNow has 'Import Sets' and 'Transform Maps' for loading external data. Walk through how data import works, what a Transform Map does, and a real scenario where a wrong coalesce field causes a production disaster.</strong></a>
+          <a href="/article/your-net-background-includes-working-with-azure-logic-apps-power-automate-or-han" rel="prev"><small>‹ Previous</small><strong>Your .NET background includes working with Azure Logic Apps, Power Automate, or Hangfire for workflow…</strong></a>
+          <a href="/article/you-ve-handled-dozens-of-data-migrations-using-ef-migrations-ssis-or-custom-etl" rel="next"><small>Next ›</small><strong>You've handled dozens of data migrations using EF Migrations, SSIS, or custom ETL jobs.</strong></a>
         </nav>
       </article>
     </div>
@@ -144,7 +148,7 @@ gr.query();</pre><h4>Real-World Production Mistake</h4><ul><li><strong>The scena
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "Explain ServiceNow's table hierarchy and inheritance model. How does it compare to class inheritance in C# or table-per-hierarchy in Entity Framework? Give a real example of when understanding this saves you from a production mistake.",
+  "headline": "Explain ServiceNow's table hierarchy and inheritance model.",
   "description": "Why This Matters in an Interview ServiceNow tables support single-table inheritance — one of the most important architectural concepts to grasp. If you've used Entity Framework's Table-Per-Hierarchy…",
   "datePublished": "2026-03-16T05:10:00.000Z",
   "author": {

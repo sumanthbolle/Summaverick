@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is a Business Rule in ServiceNow? Explain the different types (before, after, async, display) and when each one fires. — Summaverick</title>
+  <title>What is a Business Rule in ServiceNow? — Summaverick</title>
   <meta name="description" content="What the Interviewer Wants to Hear Business Rules are the most important server-side automation in ServiceNow. Every developer and admin needs to know the four types and their execution timing. What…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-a-business-rule-in-servicenow-explain-the-different-types-before-after-a" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is a Business Rule in ServiceNow? Explain the different types (before, after, async, display) and when each one fires. — Summaverick" />
+  <meta property="og:title" content="What is a Business Rule in ServiceNow? — Summaverick" />
   <meta property="og:description" content="What the Interviewer Wants to Hear Business Rules are the most important server-side automation in ServiceNow. Every developer and admin needs to know the four types and their execution timing. What…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-a-business-rule-in-servicenow-explain-the-different-types-before-after-a" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Scripting</p>
-        <h1>What is a Business Rule in ServiceNow? Explain the different types (before, after, async, display) and when each one fires.</h1>
+        <h1>What is a Business Rule in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is a Business Rule in ServiceNow? Explain the different types (before, after, async, display) and when each one fires.</div>
+        </section>
         <div class="prose">
 <h4>What the Interviewer Wants to Hear</h4><p>Business Rules are the most important server-side automation in ServiceNow. Every developer and admin needs to know the four types and their execution timing.</p><h4>What Is a Business Rule?</h4><p>A Business Rule is a server-side script that runs automatically when a record is displayed, inserted, updated, deleted, or queried. Think of it as an automatic trigger — you define WHEN it fires and WHAT it does.</p><h4>The Four Types</h4><ul><li><strong>Before Business Rule:</strong> Fires BEFORE the record is saved to the database. Use it to validate data, modify field values, or abort the save entirely.<pre>// Example: Auto-set priority based on impact and urgency
 (function executeRule(current, previous) {
@@ -122,8 +126,8 @@
 // 4. Client Script (onLoad) — browser-side setup</pre><div class='tip-box'><h5>💡 Interview Tip</h5><p>The follow-up question is always: 'Can you access the <code>previous</code> object in an async Business Rule?' The answer is <strong>no</strong> — async BRs don't have access to the previous values because they run outside the original transaction. If you need to compare old vs new values, do it in a before/after BR and store the result.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/explain-the-difference-between-an-incident-a-problem-a-change-request-and-a-serv" rel="prev"><small>‹ Previous</small><strong>Explain the difference between an Incident, a Problem, a Change Request, and a Service Request. Give a real-world scenario that connects all four.</strong></a>
-          <a href="/article/what-is-a-sys-id-in-servicenow-why-is-it-important-and-where-will-you-encounter" rel="next"><small>Next ›</small><strong>What is a sys_id in ServiceNow? Why is it important, and where will you encounter it?</strong></a>
+          <a href="/article/explain-the-difference-between-an-incident-a-problem-a-change-request-and-a-serv" rel="prev"><small>‹ Previous</small><strong>Explain the difference between an Incident, a Problem, a Change Request, and a Service Request.</strong></a>
+          <a href="/article/what-is-a-sys-id-in-servicenow-why-is-it-important-and-where-will-you-encounter" rel="next"><small>Next ›</small><strong>What is a sys_id in ServiceNow?</strong></a>
         </nav>
       </article>
     </div>
@@ -137,7 +141,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is a Business Rule in ServiceNow? Explain the different types (before, after, async, display) and when each one fires.",
+  "headline": "What is a Business Rule in ServiceNow?",
   "description": "What the Interviewer Wants to Hear Business Rules are the most important server-side automation in ServiceNow. Every developer and admin needs to know the four types and their execution timing. What…",
   "datePublished": "2026-03-16T07:40:00.000Z",
   "author": {

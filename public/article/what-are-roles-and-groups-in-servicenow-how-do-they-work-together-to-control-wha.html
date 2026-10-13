@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What are Roles and Groups in ServiceNow? How do they work together to control what users can see and do? — Summaverick</title>
+  <title>What are Roles and Groups in ServiceNow? — Summaverick</title>
   <meta name="description" content="Reading Between the Lines Every ServiceNow interview touches on user management. Roles and Groups are the foundation of security and task routing — understanding how they connect is essential. Roles…" />
   <link rel="canonical" href="https://summaverick.com/article/what-are-roles-and-groups-in-servicenow-how-do-they-work-together-to-control-wha" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What are Roles and Groups in ServiceNow? How do they work together to control what users can see and do? — Summaverick" />
+  <meta property="og:title" content="What are Roles and Groups in ServiceNow? — Summaverick" />
   <meta property="og:description" content="Reading Between the Lines Every ServiceNow interview touches on user management. Roles and Groups are the foundation of security and task routing — understanding how they connect is essential. Roles…" />
   <meta property="og:url" content="https://summaverick.com/article/what-are-roles-and-groups-in-servicenow-how-do-they-work-together-to-control-wha" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Security</p>
-        <h1>What are Roles and Groups in ServiceNow? How do they work together to control what users can see and do?</h1>
+        <h1>What are Roles and Groups in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What are Roles and Groups in ServiceNow? How do they work together to control what users can see and do?</div>
+        </section>
         <div class="prose">
 <h4>Reading Between the Lines</h4><p>Every ServiceNow interview touches on user management. Roles and Groups are the foundation of security and task routing — understanding how they connect is essential.</p><h4>Roles vs Groups</h4><ul><li><strong>Role:</strong> Defines WHAT a user can do. A role grants permissions — access to modules, ability to read/write tables, visibility of UI elements. Examples: <code>itil</code> (IT staff), <code>admin</code> (full access), <code>incident_manager</code>, <code>catalog_admin</code>.</li><li><strong>Group:</strong> Defines WHO works together. A group is a collection of users — typically a team. Examples: 'Network Support', 'Database Admins', 'HR Service Desk'. Groups are used for task assignment and routing.</li></ul><h4>How They Connect</h4><pre>// A user can have:
 // - Roles assigned directly (user → role)
@@ -103,8 +107,8 @@
 // → The group manager gets escalation notifications</pre><h4>Common Role Types</h4><ul><li><code>admin</code> — Full system access. Bypasses all ACLs. Use sparingly.</li><li><code>itil</code> — Standard IT staff role. Access to incident, problem, change modules.</li><li><code>catalog_admin</code> — Manage Service Catalog items and categories.</li><li><code>knowledge_admin</code> — Manage Knowledge Base articles.</li><li><code>approver_user</code> — Can approve/reject requests and changes.</li></ul><h4>Important Distinctions</h4><ul><li><strong>Roles control access:</strong> Can this user SEE the incident table? Can they EDIT change requests? Can they DELETE records?</li><li><strong>Groups control routing:</strong> Which TEAM should this ticket go to? Who gets notified? Who's in the approval chain?</li><li><strong>A user without a group</strong> can still have roles and access. They just won't receive group-assigned work.</li><li><strong>A user in a group</strong> inherits the group's roles automatically.</li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>If asked 'How would you give a new IT support agent access to manage incidents?' — don't say 'give them admin.' Say: 'Add them to the appropriate support group, which should already have the <code>itil</code> role. They'll inherit the role from the group and be able to see incidents assigned to their team.' This shows you understand the proper model.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-the-import-set-and-transform-map-in-servicenow-describe-a-scenario-where" rel="prev"><small>‹ Previous</small><strong>What is the Import Set and Transform Map in ServiceNow? Describe a scenario where you'd use them.</strong></a>
-          <a href="/article/what-is-flow-designer-in-servicenow-how-is-it-different-from-a-workflow-and-when" rel="next"><small>Next ›</small><strong>What is Flow Designer in ServiceNow? How is it different from a Workflow, and when would you use each?</strong></a>
+          <a href="/article/what-is-the-import-set-and-transform-map-in-servicenow-describe-a-scenario-where" rel="prev"><small>‹ Previous</small><strong>What is the Import Set and Transform Map in ServiceNow?</strong></a>
+          <a href="/article/what-is-flow-designer-in-servicenow-how-is-it-different-from-a-workflow-and-when" rel="next"><small>Next ›</small><strong>What is Flow Designer in ServiceNow?</strong></a>
         </nav>
       </article>
     </div>
@@ -118,7 +122,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What are Roles and Groups in ServiceNow? How do they work together to control what users can see and do?",
+  "headline": "What are Roles and Groups in ServiceNow?",
   "description": "Reading Between the Lines Every ServiceNow interview touches on user management. Roles and Groups are the foundation of security and task routing — understanding how they connect is essential. Roles…",
   "datePublished": "2026-03-16T06:45:00.000Z",
   "author": {

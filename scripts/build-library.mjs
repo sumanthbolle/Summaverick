@@ -70,6 +70,29 @@ function stripTags(html) {
     .trim();
 }
 
+/* Interview questions carry a little inline markup (<strong>, one <pre>) and
+   literal "<" in prose ("<50 records"), so only those tags are recognised —
+   a generic tag pattern would swallow the text after a bare "<". */
+const QUESTION_TAGS = /<\/?(strong|em|b|i|code|pre)>/gi;
+
+function questionText(q) {
+  return String(q ?? "").replace(QUESTION_TAGS, "").replace(/\s+/g, " ").trim();
+}
+
+/** The question as safe HTML: everything escaped, then its own tags restored. */
+function questionHtml(q) {
+  return esc(String(q ?? "").trim()).replace(/&lt;(\/?)(strong|em|b|i|code|pre)&gt;/gi, "<$1$2>");
+}
+
+/* Scenario questions run to a thousand characters; as a page title they fill
+   a phone screen. The headline is the opening sentence, cut on a word. */
+function headline(text, max = 110) {
+  const first = text.split(/(?<=[.?!])\s+(?=[A-Z0-9"'(])/)[0] ?? text;
+  if (first.length <= max) return first;
+  const cut = first.lastIndexOf(" ", max - 1);
+  return (cut > max * 0.6 ? first.slice(0, cut) : first.slice(0, max - 1)).replace(/[\s,;:–—-]+$/, "") + "…";
+}
+
 /** Bodies are our own published prose; still, no scripts or handlers ship. */
 function sanitizeBody(html) {
   return String(html ?? "")
@@ -235,7 +258,7 @@ const FILTER_SCRIPT = `<script>
 </script>`;
 
 function card(item) {
-  const search = [item.title, item.excerpt, item.categoryLabel, item.meta]
+  const search = [item.searchText || item.title, item.excerpt, item.categoryLabel, item.meta]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
@@ -331,7 +354,11 @@ ${header("learn")}
         <p class="kicker">${esc(item.kicker)}</p>
         <h1>${esc(item.title)}</h1>
         <p class="article-meta">${esc(item.meta)}</p>
-        <div class="prose">
+${item.question ? `        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">${item.question}</div>
+        </section>
+` : ""}        <div class="prose">
 ${item.body}
         </div>
         <nav class="article-pager" aria-label="More in this collection">
@@ -397,11 +424,15 @@ function main() {
 
   const qas = interviews.map((iv) => {
     const numId = String(iv.id);
+    const text = questionText(iv.question);
+    const title = headline(text);
     return {
       kind: "interview",
       numId,
       slug: uniqueSlug(slugify(iv.question), numId),
-      title: iv.question,
+      title,
+      question: title === text ? "" : questionHtml(iv.question),
+      searchText: text,
       kicker: iv.category || "Interview",
       category: iv.category || "interview",
       categoryLabel: iv.category || "Interview",

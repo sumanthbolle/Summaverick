@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is the difference between getValue() and getDisplayValue() in GlideRecord? Why does this matter? — Summaverick</title>
+  <title>What is the difference between getValue() and getDisplayValue() in GlideRecord? — Summaverick</title>
   <meta name="description" content="Why This Comes Up in Interviews This is one of the most frequently asked questions in ServiceNow interviews at all levels. It tests whether you understand how ServiceNow stores data vs how it displays…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-the-difference-between-getvalue-and-getdisplayvalue-in-gliderecord-why-d" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is the difference between getValue() and getDisplayValue() in GlideRecord? Why does this matter? — Summaverick" />
+  <meta property="og:title" content="What is the difference between getValue() and getDisplayValue() in GlideRecord? — Summaverick" />
   <meta property="og:description" content="Why This Comes Up in Interviews This is one of the most frequently asked questions in ServiceNow interviews at all levels. It tests whether you understand how ServiceNow stores data vs how it displays…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-the-difference-between-getvalue-and-getdisplayvalue-in-gliderecord-why-d" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Scripting</p>
-        <h1>What is the difference between getValue() and getDisplayValue() in GlideRecord? Why does this matter?</h1>
+        <h1>What is the difference between getValue() and getDisplayValue() in GlideRecord?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is the difference between getValue() and getDisplayValue() in GlideRecord? Why does this matter?</div>
+        </section>
         <div class="prose">
 <h4>Why This Comes Up in Interviews</h4><p>This is one of the most frequently asked questions in ServiceNow interviews at all levels. It tests whether you understand how ServiceNow stores data vs how it displays data — a critical distinction that causes real bugs.</p><h4>The Core Difference</h4><ul><li><strong>getValue()</strong> — Returns the raw value stored in the database (internal value)</li><li><strong>getDisplayValue()</strong> — Returns the human-readable value shown to users</li></ul><h4>Where They Differ</h4><pre>var gr = new GlideRecord('incident');
 gr.get('number', 'INC0010001');
@@ -116,8 +120,8 @@ var payload = {
 };</pre></li></ul><div class='tip-box'><h5>💡 Interview Tip</h5><p>The follow-up trap: 'What does <code>gr.caller_id</code> return without using getValue or getDisplayValue?' Answer: it returns a <strong>GlideElement object</strong> — not a string. This object behaves unpredictably in comparisons. Always use <code>getValue()</code> or <code>getDisplayValue()</code> explicitly to avoid subtle bugs.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-are-the-different-tables-in-servicenow-and-what-does-table-extends-table-me" rel="prev"><small>‹ Previous</small><strong>What are the different tables in ServiceNow, and what does 'table extends table' mean? Give an example.</strong></a>
-          <a href="/article/what-is-the-import-set-and-transform-map-in-servicenow-describe-a-scenario-where" rel="next"><small>Next ›</small><strong>What is the Import Set and Transform Map in ServiceNow? Describe a scenario where you'd use them.</strong></a>
+          <a href="/article/what-are-the-different-tables-in-servicenow-and-what-does-table-extends-table-me" rel="prev"><small>‹ Previous</small><strong>What are the different tables in ServiceNow, and what does 'table extends table' mean?</strong></a>
+          <a href="/article/what-is-the-import-set-and-transform-map-in-servicenow-describe-a-scenario-where" rel="next"><small>Next ›</small><strong>What is the Import Set and Transform Map in ServiceNow?</strong></a>
         </nav>
       </article>
     </div>
@@ -131,7 +135,7 @@ var payload = {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is the difference between getValue() and getDisplayValue() in GlideRecord? Why does this matter?",
+  "headline": "What is the difference between getValue() and getDisplayValue() in GlideRecord?",
   "description": "Why This Comes Up in Interviews This is one of the most frequently asked questions in ServiceNow interviews at all levels. It tests whether you understand how ServiceNow stores data vs how it displays…",
   "datePublished": "2026-03-16T06:55:00.000Z",
   "author": {

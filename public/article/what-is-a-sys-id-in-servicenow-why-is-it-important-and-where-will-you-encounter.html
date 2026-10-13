@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>What is a sys_id in ServiceNow? Why is it important, and where will you encounter it? — Summaverick</title>
+  <title>What is a sys_id in ServiceNow? — Summaverick</title>
   <meta name="description" content="Reading Between the Lines This seems like a basic question, but it reveals whether you understand ServiceNow's data model at a fundamental level. sys_id is everywhere in ServiceNow, and…" />
   <link rel="canonical" href="https://summaverick.com/article/what-is-a-sys-id-in-servicenow-why-is-it-important-and-where-will-you-encounter" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="What is a sys_id in ServiceNow? Why is it important, and where will you encounter it? — Summaverick" />
+  <meta property="og:title" content="What is a sys_id in ServiceNow? — Summaverick" />
   <meta property="og:description" content="Reading Between the Lines This seems like a basic question, but it reveals whether you understand ServiceNow's data model at a fundamental level. sys_id is everywhere in ServiceNow, and…" />
   <meta property="og:url" content="https://summaverick.com/article/what-is-a-sys-id-in-servicenow-why-is-it-important-and-where-will-you-encounter" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>What is a sys_id in ServiceNow? Why is it important, and where will you encounter it?</h1>
+        <h1>What is a sys_id in ServiceNow?</h1>
         <p class="article-meta">Beginner · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">What is a sys_id in ServiceNow? Why is it important, and where will you encounter it?</div>
+        </section>
         <div class="prose">
 <h4>Reading Between the Lines</h4><p>This seems like a basic question, but it reveals whether you understand ServiceNow's data model at a fundamental level. sys_id is everywhere in ServiceNow, and misunderstanding it causes real bugs.</p><h4>The Answer</h4><p>A <strong>sys_id</strong> is a 32-character globally unique identifier (GUID) automatically assigned to every record in every table in ServiceNow. It's the primary key — the one field that uniquely identifies a record across the entire instance.</p><pre>// Example sys_id:
 // 6816f79cc0a8016401c5a33be04be441
@@ -109,8 +113,8 @@ if (gr.next()) {
 }</pre><div class='tip-box'><h5>💡 Interview Tip</h5><p>If asked 'What does getValue() return for a reference field?' — always say <strong>the sys_id</strong>. If you want the display name, use <code>getDisplayValue()</code>. This distinction comes up in almost every technical ServiceNow interview.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/what-is-a-business-rule-in-servicenow-explain-the-different-types-before-after-a" rel="prev"><small>‹ Previous</small><strong>What is a Business Rule in ServiceNow? Explain the different types (before, after, async, display) and when each one fires.</strong></a>
-          <a href="/article/what-is-the-difference-between-a-client-script-and-a-ui-policy-when-would-you-ch" rel="next"><small>Next ›</small><strong>What is the difference between a Client Script and a UI Policy? When would you choose one over the other?</strong></a>
+          <a href="/article/what-is-a-business-rule-in-servicenow-explain-the-different-types-before-after-a" rel="prev"><small>‹ Previous</small><strong>What is a Business Rule in ServiceNow?</strong></a>
+          <a href="/article/what-is-the-difference-between-a-client-script-and-a-ui-policy-when-would-you-ch" rel="next"><small>Next ›</small><strong>What is the difference between a Client Script and a UI Policy?</strong></a>
         </nav>
       </article>
     </div>
@@ -124,7 +128,7 @@ if (gr.next()) {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "What is a sys_id in ServiceNow? Why is it important, and where will you encounter it?",
+  "headline": "What is a sys_id in ServiceNow?",
   "description": "Reading Between the Lines This seems like a basic question, but it reveals whether you understand ServiceNow's data model at a fundamental level. sys_id is everywhere in ServiceNow, and…",
   "datePublished": "2026-03-16T07:35:00.000Z",
   "author": {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>You're used to managing NuGet packages and npm modules with clear dependency trees. ServiceNow has 'Scoped Applications' and 'Global scope.' Explain the scoping model to a full-stack developer, why it matters, and what goes wrong when teams ignore it. — Summaverick</title>
+  <title>You're used to managing NuGet packages and npm modules with clear dependency trees. — Summaverick</title>
   <meta name="description" content="What the Interviewer Wants to Hear ServiceNow's scoping model is its namespace and package system. It determines what code can access what data, prevents naming collisions, and controls…" />
   <link rel="canonical" href="https://summaverick.com/article/you-re-used-to-managing-nuget-packages-and-npm-modules-with-clear-dependency-tre" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="You're used to managing NuGet packages and npm modules with clear dependency trees. ServiceNow has 'Scoped Applications' and 'Global scope.' Explain the scoping model to a full-stack developer, why it matters, and what goes wrong when teams ignore it. — Summaverick" />
+  <meta property="og:title" content="You're used to managing NuGet packages and npm modules with clear dependency trees. — Summaverick" />
   <meta property="og:description" content="What the Interviewer Wants to Hear ServiceNow's scoping model is its namespace and package system. It determines what code can access what data, prevents naming collisions, and controls…" />
   <meta property="og:url" content="https://summaverick.com/article/you-re-used-to-managing-nuget-packages-and-npm-modules-with-clear-dependency-tre" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>You're used to managing NuGet packages and npm modules with clear dependency trees. ServiceNow has 'Scoped Applications' and 'Global scope.' Explain the scoping model to a full-stack developer, why it matters, and what goes wrong when teams ignore it.</h1>
+        <h1>You're used to managing NuGet packages and npm modules with clear dependency trees.</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">You're used to managing NuGet packages and npm modules with clear dependency trees. ServiceNow has 'Scoped Applications' and 'Global scope.' Explain the scoping model to a full-stack developer, why it matters, and what goes wrong when teams ignore it.</div>
+        </section>
         <div class="prose">
 <h4>What the Interviewer Wants to Hear</h4><p>ServiceNow's scoping model is its namespace and package system. It determines what code can access what data, prevents naming collisions, and controls cross-application dependencies — exactly like .NET namespaces + assembly isolation + NuGet package boundaries.</p><h4>The Mental Model</h4><pre>// .NET Namespace / Assembly Model (what you know)
 // MyCompany.HRApp (separate project/assembly)
@@ -108,8 +112,8 @@ gs.info('Running in scope: ' + scope);
 // Output: 'x_myco_hr_app' or 'global'</pre><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Treat scoped applications like microservices — each owns its data, exposes APIs for others, and is independently deployable. Start every new project as a scoped app, not in Global. Your future self (and the upgrade team) will thank you. The discipline is identical to keeping your .NET solution modular.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/you-ve-configured-authorize-roles-admin-and-policy-based-authorization-in-dozens" rel="prev"><small>‹ Previous</small><strong>You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps. ServiceNow uses 'ACLs' — Access Control Lists — to protect data at the table, row, and field level. Walk me through how ACLs work, the evaluation order, and what surprises a developer used to role-based auth in .NET.</strong></a>
-          <a href="/article/you-ve-set-up-hundreds-of-automated-ci-cd-tests-in-xunit-and-nunit-your-servicen" rel="next"><small>Next ›</small><strong>You've set up hundreds of automated CI/CD tests in xUnit and NUnit. Your ServiceNow team mentions 'ATF' — Automated Test Framework. How does it compare to your .NET testing experience, and what kind of testing does ServiceNow handle that's fundamentally different from unit testing code?</strong></a>
+          <a href="/article/you-ve-configured-authorize-roles-admin-and-policy-based-authorization-in-dozens" rel="prev"><small>‹ Previous</small><strong>You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps.</strong></a>
+          <a href="/article/you-ve-set-up-hundreds-of-automated-ci-cd-tests-in-xunit-and-nunit-your-servicen" rel="next"><small>Next ›</small><strong>You've set up hundreds of automated CI/CD tests in xUnit and NUnit.</strong></a>
         </nav>
       </article>
     </div>
@@ -123,7 +127,7 @@ gs.info('Running in scope: ' + scope);
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "You're used to managing NuGet packages and npm modules with clear dependency trees. ServiceNow has 'Scoped Applications' and 'Global scope.' Explain the scoping model to a full-stack developer, why it matters, and what goes wrong when teams ignore it.",
+  "headline": "You're used to managing NuGet packages and npm modules with clear dependency trees.",
   "description": "What the Interviewer Wants to Hear ServiceNow's scoping model is its namespace and package system. It determines what code can access what data, prevents naming collisions, and controls…",
   "datePublished": "2026-03-16T05:30:00.000Z",
   "author": {

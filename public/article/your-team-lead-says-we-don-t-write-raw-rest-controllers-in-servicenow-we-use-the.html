@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard? — Summaverick</title>
+  <title>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted… — Summaverick</title>
   <meta name="description" content="Why Interviewers Ask This This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API…" />
   <link rel="canonical" href="https://summaverick.com/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard? — Summaverick" />
+  <meta property="og:title" content="Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted… — Summaverick" />
   <meta property="og:description" content="Why Interviewers Ask This This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API…" />
   <meta property="og:url" content="https://summaverick.com/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?</h1>
+        <h1>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted…</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?</div>
+        </section>
         <div class="prose">
 <h4>Why Interviewers Ask This</h4><p>This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API for every table (Table API), plus the ability to build custom endpoints (Scripted REST) when you need more control.</p><h4>The Direct Comparison</h4><pre>// ASP.NET Web API (what you've built)
 [Route("api/incidents")]
@@ -121,8 +125,8 @@ public class IncidentController : ApiController {
 })(request, response);</pre><h4>What Catches Developers Off Guard</h4><ul><li><strong>No model binding:</strong> There's no <code>[FromBody]</code> attribute. You parse the request body manually with <code>request.body.data</code> — feels like Express.js more than ASP.NET.</li><li><strong>ACLs still apply:</strong> Unlike .NET where you explicitly add <code>[Authorize]</code>, ServiceNow's ACL system enforces row-level and field-level security on Table API calls by default. Your API consumer only sees records they're authorized to access.</li><li><strong>Response format:</strong> Table API wraps everything in <code>{"result": [...]}</code>. If you're building a mobile app expecting flat JSON, Scripted REST gives you full control over the response shape.</li><li><strong>Rate limiting is platform-managed:</strong> No need to implement your own throttling middleware — ServiceNow handles rate limits at the instance level.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Think of Table API as your auto-generated OData endpoints and Scripted REST as your custom ApiControllers. The decision matrix is the same: use the auto-generated path for standard CRUD, build custom when business logic demands it. Your instinct to version APIs, validate input, and return proper HTTP status codes transfers perfectly.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/in-your-net-projects-you-ve-used-middleware-action-filters-and-database-triggers" rel="prev"><small>‹ Previous</small><strong>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer?</strong></a>
-          <a href="/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" rel="next"><small>Next ›</small><strong>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?</strong></a>
+          <a href="/article/in-your-net-projects-you-ve-used-middleware-action-filters-and-database-triggers" rel="prev"><small>‹ Previous</small><strong>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at…</strong></a>
+          <a href="/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" rel="next"><small>Next ›</small><strong>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps.</strong></a>
         </nav>
       </article>
     </div>
@@ -136,7 +140,7 @@ public class IncidentController : ApiController {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?",
+  "headline": "Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted…",
   "description": "Why Interviewers Ask This This tests whether you can translate your deep REST API experience into ServiceNow's two-tier API model. The key insight: ServiceNow gives you a free, auto-generated CRUD API…",
   "datePublished": "2026-03-16T05:50:00.000Z",
   "author": {

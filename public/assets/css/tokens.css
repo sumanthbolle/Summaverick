@@ -85,6 +85,32 @@
   --tracking-tight: -0.022em;
   --tracking-snug:  -0.012em;
 
+  /* ---- Fixed paints -------------------------------------------------
+     Literal colours used by site.css that do not change with the theme:
+     hairlines and shadows on ink, and the glass wordmark's light. */
+  --c-black-a60: rgba(0, 0, 0, 0.6);
+  --c-shade-a40: rgba(15, 15, 20, 0.4);
+  --c-shade-a50: rgba(15, 15, 20, 0.5);
+  --c-white: #fff;
+  --c-white-a08: rgba(255, 255, 255, 0.08);
+  --c-white-a14: rgba(255, 255, 255, 0.14);
+  --c-white-a32: rgba(255, 255, 255, 0.32);
+  --c-white-a55: rgba(255, 255, 255, 0.55);
+  --c-white-a90: rgba(255, 255, 255, 0.9);
+  --c-white-a95: rgba(255, 255, 255, 0.95);
+  --glass-amber-a55: rgba(255, 206, 138, 0.55);
+  --glass-flash-a92: rgba(255, 238, 206, 0.92);
+  --glass-flash-amber-a58: rgba(255, 178, 96, 0.58);
+  --glass-flash-core-a98: rgba(255, 238, 205, 0.98);
+  --glass-glint-a92: rgba(255, 252, 244, 0.92);
+  --glass-glint-amber-a50: rgba(255, 216, 154, 0.5);
+  --glass-ice-a0: rgba(214, 246, 255, 0);
+  --glass-ice-a95: rgba(214, 246, 255, 0.95);
+  --glass-lilac-a0: rgba(242, 216, 255, 0);
+  --glass-lilac-a95: rgba(242, 216, 255, 0.95);
+  --glass-violet-a22: rgba(120, 90, 220, 0.22);
+  --glass-warm-a85: rgba(255, 244, 222, 0.85);
+
   /* ---- Space (4px base) ----------------------------------------------- */
   --space-2: 0.5rem;
   --space-3: 0.75rem;

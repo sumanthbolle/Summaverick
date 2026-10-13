@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer? — Summaverick</title>
+  <title>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at… — Summaverick</title>
   <meta name="description" content="Setting the Stage Business Rules are server-side scripts that execute when a record is inserted, updated, deleted, or queried. They are the closest equivalent to a combination of ASP.NET middleware,…" />
   <link rel="canonical" href="https://summaverick.com/article/in-your-net-projects-you-ve-used-middleware-action-filters-and-database-triggers" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer? — Summaverick" />
+  <meta property="og:title" content="In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at… — Summaverick" />
   <meta property="og:description" content="Setting the Stage Business Rules are server-side scripts that execute when a record is inserted, updated, deleted, or queried. They are the closest equivalent to a combination of ASP.NET middleware,…" />
   <meta property="og:url" content="https://summaverick.com/article/in-your-net-projects-you-ve-used-middleware-action-filters-and-database-triggers" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer?</h1>
+        <h1>In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at…</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer?</div>
+        </section>
         <div class="prose">
 <h4>Setting the Stage</h4><p>Business Rules are server-side scripts that execute when a record is inserted, updated, deleted, or queried. They are the closest equivalent to a combination of ASP.NET middleware, Entity Framework interceptors, and SQL triggers — depending on the type.</p><h4>The Execution Pipeline</h4><pre>// ASP.NET Request Pipeline (what you know)
 // Request → Middleware → Controller → Action Filter → DB → Response
@@ -102,8 +106,8 @@
 })(current, previous);</pre><h4>Senior Considerations</h4><ul><li><strong>Performance awareness:</strong> Before/After BRs are synchronous — they block the user's save like sync middleware. Keep them under 200ms. Heavy work goes to Async BRs.</li><li><strong>No dependency injection:</strong> Unlike .NET where you'd inject services into filters, Business Rules access shared logic through Script Includes (ServiceNow's equivalent of utility classes/services).</li><li><strong>The 'previous' object:</strong> This is gold for .NET devs — it's like EF's <code>ChangeTracker</code>. You can compare <code>current.state</code> vs <code>previous.state</code> to detect exactly what changed, similar to checking <code>entity.State</code> in EF.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>If you've ever written a global action filter in ASP.NET that logs every request, you already understand Before Query Business Rules — they modify every database query on a table, like applying a global <code>.Where()</code> clause to every LINQ query automatically.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/you-ve-spent-12-years-building-net-applications-with-entity-framework-your-new-t" rel="prev"><small>‹ Previous</small><strong>You've spent 12 years building .NET applications with Entity Framework. Your new team tells you ServiceNow uses 'GlideRecord' to interact with data. Walk me through how GlideRecord compares to what you already know — DbContext, LINQ queries, and EF migrations. What would surprise you the most coming from that world?</strong></a>
-          <a href="/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" rel="next"><small>Next ›</small><strong>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted REST APIs.' As someone who's built hundreds of Web API controllers in .NET, explain how ServiceNow's REST story compares. When would you use Table API vs Scripted REST, and what catches developers off guard?</strong></a>
+          <a href="/article/you-ve-spent-12-years-building-net-applications-with-entity-framework-your-new-t" rel="prev"><small>‹ Previous</small><strong>You've spent 12 years building .NET applications with Entity Framework.</strong></a>
+          <a href="/article/your-team-lead-says-we-don-t-write-raw-rest-controllers-in-servicenow-we-use-the" rel="next"><small>Next ›</small><strong>Your team lead says 'We don't write raw REST controllers in ServiceNow — we use the Table API and Scripted…</strong></a>
         </nav>
       </article>
     </div>
@@ -117,7 +121,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at different points. ServiceNow has something called 'Business Rules' that run on database operations. If an interviewer asks you — 'When does a Business Rule fire, and how is it different from what you've built in ASP.NET middleware?' — what's your answer?",
+  "headline": "In your .NET projects, you've used middleware, action filters, and database triggers to intercept requests at…",
   "description": "Setting the Stage Business Rules are server-side scripts that execute when a record is inserted, updated, deleted, or queried. They are the closest equivalent to a combination of ASP.NET middleware,…",
   "datePublished": "2026-03-16T05:55:00.000Z",
   "author": {

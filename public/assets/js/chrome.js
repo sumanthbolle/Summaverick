@@ -126,6 +126,60 @@ export function initChrome() {
   if (yr) yr.textContent = String(new Date().getFullYear());
 
   initMobileNav();
+  initSectionSpy();
+  initDockCta();
+}
+
+/* Marks the primary-nav link for the section under the reading line, so the
+   header doubles as a "you are here". Sections without a link clear it. */
+function initSectionSpy() {
+  const links = $$('#nav-links a[href^="#"]');
+  if (!links.length || !("IntersectionObserver" in window)) return;
+  const byId = new Map(links.map((a) => [a.getAttribute("href").slice(1), a]));
+  const sections = $$("main > section[id]");
+  const mark = (id) => {
+    for (const [key, a] of byId) {
+      if (key === id) a.setAttribute("aria-current", "location");
+      else a.removeAttribute("aria-current");
+    }
+  };
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const en of entries) if (en.isIntersecting) mark(en.target.id);
+    },
+    { rootMargin: "-35% 0px -60% 0px" }
+  );
+  sections.forEach((s) => io.observe(s));
+}
+
+/* The phone call-to-action: shown once the hero has left the screen, and
+   tucked away again while the contact form or the footer is on screen. */
+function initDockCta() {
+  const cta = $("[data-dock-cta]");
+  const hero = $("#top");
+  const contact = $("#contact");
+  const footer = $(".footer");
+  if (!cta || !hero || !("IntersectionObserver" in window)) return;
+  const seen = new Set();
+  const sync = () => {
+    const away = seen.has(hero) || seen.has(contact) || seen.has(footer);
+    cta.toggleAttribute("data-away", away);
+    cta.tabIndex = away ? -1 : 0;
+  };
+  const io = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (en.isIntersecting) seen.add(en.target);
+      else seen.delete(en.target);
+    }
+    sync();
+  });
+  [hero, contact, footer].forEach((el) => el && io.observe(el));
+  cta.setAttribute("data-away", "");
+  cta.hidden = false;
+  cta.addEventListener("click", () => {
+    // Land in the form, not just beside it.
+    setTimeout(() => $("#lead-name")?.focus({ preventScroll: true }), 400);
+  });
 }
 
 function initMobileNav() {

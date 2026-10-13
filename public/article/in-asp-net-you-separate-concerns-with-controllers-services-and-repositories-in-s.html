@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC. — Summaverick</title>
+  <title>In ASP.NET, you separate concerns with Controllers, Services, and Repositories. — Summaverick</title>
   <meta name="description" content="The Intent Behind This Question This tests whether you can map ServiceNow's server-client architecture to the layered patterns you've built in .NET. The key insight: ServiceNow's UI is server-rendered…" />
   <link rel="canonical" href="https://summaverick.com/article/in-asp-net-you-separate-concerns-with-controllers-services-and-repositories-in-s" />
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -13,7 +13,7 @@
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d11" />
   <meta property="og:site_name" content="Summaverick Group" />
-  <meta property="og:title" content="In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC. — Summaverick" />
+  <meta property="og:title" content="In ASP.NET, you separate concerns with Controllers, Services, and Repositories. — Summaverick" />
   <meta property="og:description" content="The Intent Behind This Question This tests whether you can map ServiceNow's server-client architecture to the layered patterns you've built in .NET. The key insight: ServiceNow's UI is server-rendered…" />
   <meta property="og:url" content="https://summaverick.com/article/in-asp-net-you-separate-concerns-with-controllers-services-and-repositories-in-s" />
   <meta property="og:type" content="article" />
@@ -80,8 +80,12 @@
       <article class="article-inner">
         <p><a class="article-back" href="/interviews">‹ All interview questions</a></p>
         <p class="kicker">Core Concepts</p>
-        <h1>In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC.</h1>
+        <h1>In ASP.NET, you separate concerns with Controllers, Services, and Repositories.</h1>
         <p class="article-meta">Foundation · ServiceNow · Mar 2026</p>
+        <section class="article-question" aria-label="The question">
+          <p class="article-question__label">The question</p>
+          <div class="article-question__body">In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC.</div>
+        </section>
         <div class="prose">
 <h4>The Intent Behind This Question</h4><p>This tests whether you can map ServiceNow's server-client architecture to the layered patterns you've built in .NET. The key insight: ServiceNow's UI is server-rendered (think classic ASP.NET Web Forms / Razor Pages), not a detached SPA. The client-server boundary is explicit and enforced.</p><h4>The Architecture Map</h4><pre>// ASP.NET MVC Architecture (what you know)
 //
@@ -126,8 +130,8 @@ ga.getXMLAnswer(function(answer) {
 });</pre><h4>The Critical Boundary</h4><ul><li><strong>Client-side</strong> (runs in browser): Client Scripts, UI Policies, UI Scripts, GlideAjax calls. You have <code>g_form</code> (form manipulation API — like jQuery for ServiceNow forms) and <code>g_user</code> (current user context).</li><li><strong>Server-side</strong> (runs on instance): Business Rules, Script Includes, Scheduled Jobs, Flow Designer. You have <code>GlideRecord</code>, <code>GlideSystem (gs)</code>, and full database access.</li><li><strong>You cannot call GlideRecord from a Client Script.</strong> This is the #1 mistake .NET devs make — assuming they can query the DB from the browser like they would with Entity Framework in a Blazor Server app. The bridge is always GlideAjax.</li></ul><div class='tip-box'><h5>💡 .NET Developer Pro Tip</h5><p>Think of GlideAjax as your <code>fetch('/api/...')</code> calls. The Script Include with <code>AbstractAjaxProcessor</code> is your API Controller. The method you call via <code>sysparm_name</code> is the action method. The parameters you pass are your query string. Everything you know about async client-server communication applies — just with different syntax.</p></div>
         </div>
         <nav class="article-pager" aria-label="More in this collection">
-          <a href="/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" rel="prev"><small>‹ Previous</small><strong>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps. Now someone says ServiceNow uses 'Update Sets' for version control. How would you explain Update Sets to your .NET team, what are the limitations compared to Git, and when do real-world problems occur?</strong></a>
-          <a href="/article/you-ve-configured-authorize-roles-admin-and-policy-based-authorization-in-dozens" rel="next"><small>Next ›</small><strong>You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps. ServiceNow uses 'ACLs' — Access Control Lists — to protect data at the table, row, and field level. Walk me through how ACLs work, the evaluation order, and what surprises a developer used to role-based auth in .NET.</strong></a>
+          <a href="/article/you-ve-been-managing-deployments-with-ci-cd-pipelines-git-branches-and-azure-dev" rel="prev"><small>‹ Previous</small><strong>You've been managing deployments with CI/CD pipelines, Git branches, and Azure DevOps.</strong></a>
+          <a href="/article/you-ve-configured-authorize-roles-admin-and-policy-based-authorization-in-dozens" rel="next"><small>Next ›</small><strong>You've configured [Authorize(Roles = 'Admin')] and policy-based authorization in dozens of .NET apps.</strong></a>
         </nav>
       </article>
     </div>
@@ -141,7 +145,7 @@ ga.getXMLAnswer(function(answer) {
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "In ASP.NET, you separate concerns with Controllers, Services, and Repositories. In ServiceNow, there's something called 'Script Includes' that people say is like a reusable class library. But then there's also 'GlideAjax' which apparently bridges client and server. Explain the ServiceNow layered architecture to someone who thinks in MVC.",
+  "headline": "In ASP.NET, you separate concerns with Controllers, Services, and Repositories.",
   "description": "The Intent Behind This Question This tests whether you can map ServiceNow's server-client architecture to the layered patterns you've built in .NET. The key insight: ServiceNow's UI is server-rendered…",
   "datePublished": "2026-03-16T05:40:00.000Z",
   "author": {

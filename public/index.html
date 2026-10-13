@@ -73,6 +73,7 @@
       <a href="#how-we-work">How we work</a>
       <a href="#platforms">Platforms</a>
       <a href="#about">About</a>
+      <a href="#faq">Questions</a>
       <a href="/learn">Guides</a>
       <a href="/interviews">Interview questions</a>
       <a href="/research">ServiceNow research</a>
@@ -384,6 +385,10 @@
               <strong>Your own systems</strong><span>Databases &amp; apps</span><i class="demo__bar" aria-hidden="true"></i>
             </button>
           </div>
+          <div class="demo__toolbar" data-demo-toolbar hidden>
+            <p class="demo__hint" data-demo-hint>Each example plays in turn. Pick one to stay on it.</p>
+            <button class="demo__toggle" type="button" data-demo-toggle aria-pressed="false">Pause</button>
+          </div>
 
           <!-- 1 · Customer questions -->
           <div class="demo__panel" id="demo-panel-1" role="tabpanel" aria-labelledby="demo-tab-1" tabindex="0" data-demo-panel>
@@ -681,6 +686,66 @@
       </div>
     </section>
 
+    <!-- ---- Questions ------------------------------------------------------
+         Native <details>, so every answer opens with scripting off. Answers
+         restate what the page already commits to; nothing here adds a claim. -->
+    <section class="faq" id="faq" aria-labelledby="faq-title" itemscope itemtype="https://schema.org/FAQPage">
+      <div class="container faq__grid">
+        <div class="section-head" data-reveal>
+          <h2 id="faq-title">Questions people ask before they write.</h2>
+          <p>
+            If yours isn't here, ask it in the form below. A rough idea is
+            enough to start.
+          </p>
+          <p class="section-action"><a href="#contact-form">Ask us directly <span aria-hidden="true">›</span></a></p>
+        </div>
+        <div class="faq__list" data-reveal>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">What do you need from us to get started?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">Who it's for, what they need to get done, and where the experience should live. We begin by understanding that one task — the information it needs and the steps that take up people's time — before we design or build anything.</p>
+            </div>
+          </details>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">Do you only work with ServiceNow?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">No. ServiceNow is one of our areas of expertise. We also build standalone mobile and web products, and connect agents to other systems through the interfaces and access those systems provide.</p>
+            </div>
+          </details>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">Will the agent act on its own?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">Only inside limits you agree to. We make progress visible, explain what needs attention, and give people a clear way to review important actions before they happen. Those controls are defined around the task and the product.</p>
+            </div>
+          </details>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">How do you handle our data and systems?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">Data access, guardrails, and review steps are agreed up front, before anything is connected. We then test complete tasks — including missing information and failed actions — before the product is used.</p>
+            </div>
+          </details>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">What happens after launch?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">Before launch we agree how the product will run, who will maintain it, and how improvements will be measured — then we help you keep it running.</p>
+            </div>
+          </details>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">Are the examples on this page real?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">They are illustrations built from invented data, and pressing their buttons changes nothing outside the page. For something you can use today, try <a href="/research">Summaverick Research</a>, which finds ServiceNow documentation and shows its sources.</p>
+            </div>
+          </details>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">Who is behind Summaverick?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">Summaverick Group is the brand of SUMMAVERICK LLP, a software business in Telangana, India. The registered details are under <a href="#about">Company information</a>, and you can <a href="mailto:ceo@summaverick.com" data-brand="ceo">write to our CEO</a> directly.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
     <!-- ---- Contact ------------------------------------------------------ -->
     <section class="contact band-ink" id="contact" aria-labelledby="contact-title">
       <div class="container contact__grid">
@@ -698,9 +763,17 @@
             Prefer email? Write to
             <a href="mailto:hello@summaverick.com" data-brand="contact">hello@summaverick.com</a>.
           </p>
+          <div class="next-steps">
+            <h3 class="next-steps__title">What happens after you write</h3>
+            <ol class="next-steps__list">
+              <li><strong>We read it.</strong> A person on the team reads every message.</li>
+              <li><strong>We reply with questions.</strong> Usually about who the agent is for and the one task worth solving first.</li>
+              <li><strong>We agree the scope.</strong> Nothing is built until the task, the systems, and the review steps are agreed.</li>
+            </ol>
+          </div>
         </div>
 
-        <form class="contact-form" data-lead-form novalidate>
+        <form class="contact-form" id="contact-form" data-lead-form novalidate aria-labelledby="contact-title">
           <div class="form-grid">
             <div class="field">
               <label for="lead-name">Your name</label>
@@ -745,6 +818,10 @@
     </section>
   </main>
 
+  <!-- Phones only, once the hero has scrolled away and until the form is in
+       view: the header keeps just the menu button at that width. -->
+  <a class="dock-cta" href="#contact-form" data-dock-cta hidden>Tell us what you're building <span aria-hidden="true">›</span></a>
+
   <footer class="footer">
     <div class="container footer-cols">
       <div class="footer-brand">
@@ -761,6 +838,7 @@
           <li><a href="#examples">Examples</a></li>
           <li><a href="#how-we-work">How we work</a></li>
           <li><a href="#about">About</a></li>
+          <li><a href="#faq">Questions</a></li>
         </ul>
       </div>
       <div>
