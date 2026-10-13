@@ -132,14 +132,15 @@ a:hover { text-decoration-color: currentColor; }
 .skip {
   position: absolute;
   left: 12px;
-  top: -40px;
+  top: 12px;
+  transform: translateY(calc(-100% - 24px));
   z-index: 100;
   background: var(--accent);
   color: var(--on-accent);
   padding: 8px 14px;
   border-radius: 8px;
 }
-.skip:focus { top: 12px; }
+.skip:focus { transform: none; }
 
 /* ---- liquid glass chrome (functional layer only) ---- */
 .nav {
@@ -276,6 +277,10 @@ a:hover { text-decoration-color: currentColor; }
   margin-bottom: 16px;
 }
 .site-foot a { color: var(--label-2); }
+@media (pointer: coarse) {
+  .site-foot nav { gap: 0 4px; margin-inline: -10px; }
+  .site-foot nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; }
+}
 .site-foot .copy { margin: 0; }
 
 /* ---- layout ---- */
@@ -601,6 +606,7 @@ label.lbl {
 }
 .stage.active { border-color: var(--accent); color: var(--label); }
 .stage.done { background: var(--ok); border-color: var(--ok); color: #fff; }
+.stage.skipped { background: none; border-style: dashed; border-color: var(--separator); color: var(--label-2); }
 .chat {
   border: 1px solid var(--separator);
   border-radius: var(--r);
@@ -622,6 +628,7 @@ label.lbl {
 .msg.bot { align-self: flex-start; background: var(--fill); }
 .msg.system { align-self: center; color: var(--label-2); font: var(--footnote); font-style: italic; max-width: 100%; }
 .who { font: var(--caption); opacity: 0.8; margin-bottom: 3px; }
+.msg { scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
 .price {
   font: var(--title-1);
@@ -717,4 +724,12 @@ label.lbl {
 @media (max-width: 639px) {
   .library-intro { padding-top: 4rem; }
   .library-intro h1 { font-size: clamp(2.7rem, 13vw, 4rem); }
+}
+
+/* iOS Safari zooms the whole page when a focused field's text is under 16px.
+   Touch screens only, so desktop type keeps its scale. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea { font-size: max(16px, 1em) !important; }
 }

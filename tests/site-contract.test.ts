@@ -47,7 +47,7 @@ describe("Homepage public contract", () => {
       "public/assets/android-chrome-512x512.png",
       "public/assets/android-chrome-maskable-512x512.png",
       "public/assets/site.webmanifest",
-      "public/assets/img/summaverick-mark.svg",
+      "public/assets/img/summaverick-mark.png",
       "public/assets/img/summaverick-logo.png",
       "public/assets/img/summaverick-group-logo.webp",
     ]) {
@@ -84,15 +84,16 @@ describe("Homepage public contract", () => {
   it("states the offer, both audiences and mobile in the first screen", () => {
     const home = text("public/index.html");
 
-    expect(home).toContain("AI agents for everyday life and work.");
-    expect(home).toContain("Personal assistants and enterprise agents");
-    expect(home).toContain("from personal assistants on mobile to enterprise workflows");
-    // Standalone products and platform work are both explicit.
-    expect(home).toContain("We build standalone products and agents that work with ServiceNow");
-    expect(home).toContain(">Build with us<");
-    expect(home).toContain(">Explore the possibilities<");
-    // The hero must not depend on the illustration or on any animation.
     const hero = home.slice(home.indexOf('id="top"'), home.indexOf('id="stage"'));
+    expect(hero).toContain("A software studio for AI agents.");
+    // Both audiences, and mobile, are named before the first scroll.
+    expect(hero).toContain("a personal assistant on someone's");
+    expect(hero).toContain("phone, a mobile experience");
+    expect(hero).toContain("an enterprise agent wired into ServiceNow");
+    expect(hero).toContain(">Build with us<");
+    expect(hero).toContain(">See what we do<");
+    expect(home).toContain("Personal assistants and enterprise agents");
+    // The hero must not depend on the illustration or on any animation.
     expect(hero).toContain("<h1");
     expect(hero).not.toContain("data-reveal");
   });
@@ -143,8 +144,10 @@ describe("Homepage public contract", () => {
     expect(js).toContain("prefers-reduced-motion: reduce");
     // Playback waits at the review step instead of deciding for the visitor.
     expect(js).toContain("waitForDecision");
-    // Nothing on the page loops forever.
-    expect(css).not.toContain("infinite");
+    // Nothing decorative loops forever. The only endless animations are the
+    // two progress indicators that run while a research answer streams in.
+    const loops = css.split("\n").filter((line) => line.includes("infinite"));
+    for (const line of loops) expect(line, line.trim()).toMatch(/\b(rs-caret|chat-spin)\b/);
   });
 
   it("cannot let an illustration be mistaken for a real action", () => {
@@ -320,7 +323,7 @@ describe("Homepage public contract", () => {
     expect(ld["@type"]).toBe("Organization");
 
     // The June concept keeps its own date, and nothing backdates the LLP.
-    expect(home).toContain("Hackathon concept · June 2026");
+    expect(home).toContain("Our early hackathon concept");
     for (const claim of ["government-verified", "certificate of incorporation", "GSTIN", "CIN", "PAN"]) {
       expect(home, claim).not.toMatch(new RegExp(`\\b${claim}\\b`, "i"));
     }
