@@ -335,8 +335,7 @@ body[data-home] .examples::before {
 
 /* ---- What we build: a bento -------------------------------------------------
    One large card for the flagship, two stacked beside it. The cards are light
-   objects on the ink band; each carries a small drawn stand-in for its product
-   (decorative, hidden from assistive tech, no copy of its own). */
+   objects on the ink band; each carries a miniature screen of its product. */
 body[data-home] .offers {
   padding-block: clamp(3.5rem, 8vw, 7rem) clamp(3rem, 6vw, 5rem);
   border-top: 0;
@@ -376,9 +375,9 @@ body[data-home] .offer h3 {
   background: none;
   -webkit-text-fill-color: currentColor;
 }
-body[data-home] .offer p { max-width: 44ch; margin: 0; color: var(--c-text-dim); font-size: var(--step--1); }
+body[data-home] .offer > p { max-width: 44ch; margin: 0; color: var(--c-text-dim); font-size: var(--step--1); }
 body[data-home] .offer:nth-child(3) h3 { font-size: var(--step-2); }
-body[data-home] .offer:nth-child(3) p { font-size: var(--step-0); }
+body[data-home] .offer:nth-child(3) > p { font-size: var(--step-0); }
 
 body[data-home] .offer__art {
   position: relative;
@@ -390,62 +389,321 @@ body[data-home] .offer__art {
   margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   pointer-events: none;
 }
-/* Shared skeleton: soft ink on the light card. */
-body[data-home] .offer__art :is(.art-bubble, .art-pill, .art-phone, .art-phone i, .art-row b, .art-row i, .art-row u) {
-  display: block;
-  background: color-mix(in srgb, var(--c-ink) 9%, transparent);
+/* ---- The miniature screens -------------------------------------------------
+   Each card carries a small, readable screen made from sample data. It is
+   decorative (hidden from assistive tech; the card copy says the same thing)
+   and labelled "Sample data" so it cannot be read as client work.
+
+   The finished frame is the default: with reduced motion, without JavaScript,
+   or before the reveal script runs, every screen shows its outcome. Once the
+   card is revealed it plays its steps once and stops on that same frame.
+     .m-in   appears at --t ms
+     .m-pre  shows until --t ms, then gives way to the outcome stacked with it
+     .m-hl   is highlighted from --t ms
+     .m-tap  a single press ring at --t ms */
+body[data-home] .mini {
+  --mini-line: color-mix(in srgb, var(--c-ink) 10%, transparent);
+  --mini-dim: color-mix(in srgb, var(--c-ink) 60%, transparent);
+  --mini-ok: color-mix(in srgb, var(--c-ok) 62%, var(--c-ink));
+  --mini-ok-soft: color-mix(in srgb, var(--c-ok) 14%, var(--c-white));
+  align-content: start;
+  gap: 0;
+  color: var(--c-ink);
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
-/* Chat: a message in, a reply out, a small pill for the decision. */
-body[data-home] .art-bubble { height: 2.1rem; border-radius: var(--radius-md); }
-body[data-home] .art-bubble--in { width: 62%; }
-body[data-home] .art-bubble--out { width: 74%; justify-self: end; background: color-mix(in srgb, var(--c-ink) 86%, transparent); }
-body[data-home] .art-pill { width: 5.5rem; height: 1.7rem; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--c-ink) 14%, transparent); }
-/* Phone: an outline with three rows. */
-body[data-home] .offer__art--phone { justify-items: center; }
-body[data-home] .art-phone {
-  width: 7.5rem;
-  height: 9rem;
-  padding: 1.1rem 0.8rem 0;
-  border: 1px solid color-mix(in srgb, var(--c-ink) 22%, transparent);
-  border-radius: 1.3rem 1.3rem 0 0;
-  background: color-mix(in srgb, var(--c-ink) 4%, transparent);
-}
-body[data-home] .art-phone::before {
-  content: "";
-  display: block;
-  width: 2.2rem;
-  height: 0.28rem;
-  margin: -0.55rem auto 0.9rem;
+body[data-home] .mini p { margin: 0; max-width: none; color: inherit; font-size: inherit; }
+body[data-home] .mini .mini__tag {
+  justify-self: start;
+  margin-bottom: var(--space-3);
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--mini-line);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--c-ink) 24%, transparent);
+  color: var(--mini-dim);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
-body[data-home] .art-phone i { height: 0.6rem; margin-bottom: 0.55rem; border-radius: var(--radius-pill); }
-body[data-home] .art-phone i:nth-child(2) { width: 72%; }
-body[data-home] .art-phone i:nth-child(3) { width: 48%; }
-/* Table: rows of a status dot, a label bar and a value bar. */
-body[data-home] .offer__art--table { gap: 0.55rem; align-content: end; }
-body[data-home] .art-row {
+body[data-home] .mini__screen {
   display: grid;
-  grid-template-columns: 1.1rem minmax(0, 1fr) 4.5rem;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--c-ink) 10%, transparent);
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--mini-line);
   border-radius: var(--radius-md);
+  background: var(--c-white);
+  box-shadow: 0 18px 36px -28px color-mix(in srgb, var(--c-ink) 60%, transparent);
 }
-body[data-home] .art-row b { width: 0.7rem; height: 0.7rem; border-radius: 50%; }
-body[data-home] .art-row i { height: 0.6rem; border-radius: var(--radius-pill); }
-body[data-home] .art-row u { height: 1.5rem; border-radius: var(--radius-pill); }
-body[data-home] .art-row--on {
-  border-color: color-mix(in srgb, var(--c-ink) 30%, transparent);
-  background: color-mix(in srgb, var(--c-ink) 4%, transparent);
+body[data-home] .mini__label {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--mini-dim);
+  font-size: 0.6875rem;
+  font-weight: 600;
 }
-body[data-home] .art-row--on u { background: color-mix(in srgb, var(--c-ink) 86%, transparent); }
+body[data-home] .mini__btns { display: inline-flex; gap: 0.4rem; }
+body[data-home] .mini__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--c-ink);
+  color: var(--c-on-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+body[data-home] .mini__btn--quiet {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-ink) 22%, transparent);
+  color: var(--c-ink);
+}
+body[data-home] .mini__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.75rem;
+  color: var(--mini-ok);
+  font-weight: 600;
+}
+body[data-home] .mini__done::before {
+  content: "";
+  flex: none;
+  width: 0.45rem;
+  height: 0.75rem;
+  margin: -0.2rem 0.15rem 0 0.2rem;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+/* Two states in one cell: the step before the decision and its outcome. */
+body[data-home] .mini__swap { display: grid; align-items: center; justify-items: start; }
+body[data-home] .mini__swap > * { grid-area: 1 / 1; }
+body[data-home] .m-pre { visibility: hidden; }
+body[data-home] .m-tap {
+  position: absolute;
+  inset: -0.3rem;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-ink) 45%, transparent);
+  opacity: 0;
+}
+
+/* Personal: a short conversation and a draft. */
+body[data-home] .mini__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--mini-line);
+}
+body[data-home] .mini__bar span:last-child { margin-left: auto; color: var(--mini-dim); }
+body[data-home] .mini__avatar {
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: var(--c-ink);
+  color: var(--c-on-ink);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+body[data-home] .mini .mini__bubble {
+  justify-self: start;
+  max-width: 88%;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.2rem var(--radius-md) var(--radius-md) var(--radius-md);
+  background: color-mix(in srgb, var(--c-ink) 6%, var(--c-white));
+}
+body[data-home] .mini__draft {
+  padding: 0.55rem 0.7rem;
+  border-left: 2px solid var(--c-ink);
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--c-ink) 3%, var(--c-white));
+}
+
+/* Mobile: a phone, fading out at the bottom, turning a screenshot into a
+   suggestion. */
+body[data-home] .mini--phone { justify-items: center; }
+body[data-home] .mini__phone {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  width: min(100%, 15rem);
+  min-height: 12.5rem;
+  padding: 0.6rem 0.65rem 1rem;
+  border: 5px solid var(--c-ink);
+  border-bottom: 0;
+  border-radius: 1.6rem 1.6rem 0 0;
+  background: color-mix(in srgb, var(--c-ink) 4%, var(--c-white));
+  -webkit-mask-image: linear-gradient(to bottom, black 78%, transparent);
+  mask-image: linear-gradient(to bottom, black 78%, transparent);
+}
+body[data-home] .mini .mini__status {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.35rem;
+  color: var(--mini-dim);
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+body[data-home] .mini__shot {
+  display: grid;
+  gap: 0.1rem;
+  justify-self: end;
+  width: 82%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--mini-line);
+  border-radius: var(--radius-sm);
+  background: var(--c-white);
+  transform: rotate(-1.5deg);
+}
+body[data-home] .mini__shot span:last-child { color: var(--mini-dim); }
+body[data-home] .mini__suggest {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem 0.65rem;
+  border-radius: var(--radius-md);
+  background: var(--c-white);
+  box-shadow: 0 10px 24px -16px color-mix(in srgb, var(--c-ink) 55%, transparent);
+}
+body[data-home] .mini__suggest p { font-weight: 600; }
+
+/* Enterprise: a request list with the agent's proposal under one row. */
+body[data-home] .mini--desk { align-content: center; font-size: 0.875rem; }
+body[data-home] .mini--desk .mini__tag { margin-bottom: var(--space-4); }
+body[data-home] .mini--desk .mini__screen { padding: 0; overflow: hidden; gap: 0; }
+body[data-home] .mini .mini__appbar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--c-ink);
+  color: var(--c-on-ink);
+}
+body[data-home] .mini__appbar span { color: color-mix(in srgb, var(--c-on-ink) 65%, transparent); }
+body[data-home] .mini__table { display: grid; padding: 0.3rem 0.4rem 0.4rem; }
+body[data-home] .mini__row {
+  display: grid;
+  grid-template-columns: 6.6em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.2rem;
+  padding: 0.3rem 0.45rem;
+  border-bottom: 1px solid var(--mini-line);
+  border-radius: 0.35rem;
+}
+body[data-home] .mini__row > span:nth-child(-n + 2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-home] .mini__row > span:first-child { color: var(--mini-dim); font-variant-numeric: tabular-nums; }
+body[data-home] .mini .mini__row--head {
+  min-height: 1.7rem;
+  color: var(--mini-dim);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+body[data-home] .mini__row--on > span:nth-child(2) { white-space: normal; }
+body[data-home] .mini__row--on {
+  border-bottom-color: transparent;
+  background: color-mix(in srgb, var(--c-ink) 6%, var(--c-white));
+  box-shadow: inset 2px 0 0 var(--c-ink);
+  font-weight: 600;
+}
+body[data-home] .mini__state {
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--c-ink) 7%, transparent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+body[data-home] .mini__state--ok { background: var(--mini-ok-soft); color: var(--mini-ok); }
+body[data-home] .mini__row .mini__swap { justify-items: end; }
+body[data-home] .mini__proposal {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.15rem 0 0.35rem 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--mini-line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--c-ink) 2%, var(--c-white));
+}
+body[data-home] .mini__checks { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin: 0; padding: 0; list-style: none; }
+body[data-home] .mini__checks li { display: inline-flex; align-items: center; gap: 0.35rem; }
+body[data-home] .mini__checks li::before {
+  content: "";
+  width: 0.3rem;
+  height: 0.55rem;
+  margin: -0.15rem 0.1rem 0 0.1rem;
+  border: solid var(--mini-ok);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+body[data-home] .mini__propose { font-weight: 600; }
+
+body[data-home] .offer__link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: var(--tap);
+  margin-bottom: -0.5rem;
+  color: var(--c-ink);
+  font-size: var(--step--1);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--c-ink) 30%, transparent);
+  text-underline-offset: 0.2em;
+}
+body[data-home] .offer__link:hover { text-decoration-color: currentColor; }
+body[data-home] .offer__link:focus-visible {
+  outline: none;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 2px var(--c-on-ink), 0 0 0 4px var(--c-ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="on"] body[data-home] .offer:not(.is-in) :is(.m-in, .m-pre) { opacity: 0; }
+  :root[data-motion="on"] body[data-home] .offer.is-in .m-in {
+    animation: mini-in 360ms var(--ease-out) both;
+    animation-delay: calc(var(--t, 0) * 1ms + var(--d, 0ms) + 380ms);
+  }
+  :root[data-motion="on"] body[data-home] .offer.is-in .m-pre {
+    animation: mini-pre calc(var(--t, 0) * 1ms + var(--d, 0ms) + 380ms) linear;
+  }
+  :root[data-motion="on"] body[data-home] .offer.is-in .m-hl {
+    animation: mini-hl 420ms var(--ease-out) both;
+    animation-delay: calc(var(--t, 0) * 1ms + var(--d, 0ms) + 380ms);
+  }
+  :root[data-motion="on"] body[data-home] .offer.is-in .m-tap {
+    animation: mini-tap 520ms var(--ease-out) both;
+    animation-delay: calc(var(--t, 0) * 1ms + var(--d, 0ms) + 380ms);
+  }
+}
+@keyframes mini-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mini-pre {
+  from, to { visibility: visible; }
+}
+@keyframes mini-hl {
+  from { background: transparent; box-shadow: inset 0 0 0 transparent; border-bottom-color: var(--mini-line); }
+}
+@keyframes mini-tap {
+  from { opacity: 0; transform: scale(0.7); }
+  35% { opacity: 1; }
+  to { opacity: 0; transform: scale(1.15); }
+}
 
 @media (max-width: 860px) {
   body[data-home] .offers__grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   body[data-home] .offer:nth-child(n) { grid-column: auto; grid-row: auto; }
-  body[data-home] .offer:nth-child(3) { order: -1; min-height: 24rem; }
+  body[data-home] .offer:nth-child(3) { order: -1; }
+}
+@media (max-width: 480px) {
+  body[data-home] .mini--desk { font-size: 0.75rem; }
+  body[data-home] .mini__row { grid-template-columns: minmax(0, 1fr) auto; }
+  body[data-home] .mini__row > span:first-child { display: none; }
+  body[data-home] .mini__proposal { margin-left: 0; }
 }
 
 /* ---- Examples: the demo player ---------------------------------------------- */
