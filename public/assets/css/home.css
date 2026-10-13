@@ -778,12 +778,17 @@ body[data-home] .dock-cta { display: none; }
     min-height: var(--tap);
     padding: 0 var(--space-5);
     border-radius: var(--radius-pill);
-    background: var(--c-text);
-    color: var(--c-bg);
+    /* The header's glass, so it reads over light bands and ink bands alike. */
+    background: color-mix(in srgb, var(--c-ink) 86%, transparent);
+    -webkit-backdrop-filter: saturate(150%) blur(14px);
+    backdrop-filter: saturate(150%) blur(14px);
+    color: var(--c-on-ink);
     font-weight: var(--weight-medium);
     white-space: nowrap;
     text-decoration: none;
-    box-shadow: 0 14px 34px -12px color-mix(in srgb, black 60%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--c-on-ink) 22%, transparent),
+      0 14px 34px -12px color-mix(in srgb, black 60%, transparent);
     transform: translate(-50%, 0);
     transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out);
   }
