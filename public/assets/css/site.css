@@ -90,7 +90,25 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
 .btn-quiet:hover { color: var(--c-accent); }
 .btn-lg { padding: 0.85em 1.7em; font-size: var(--step-0); }
 
-/* ---- Navigation -------------------------------------------------------- */
+/* ---- Navigation --------------------------------------------------------
+   One bar on every page: Apple's light grey glass, 48px, with a hairline. It
+   does not follow the appearance or the section beneath it, so the page ramp
+   is pointed at the bar's own light ramp for everything inside it. */
+.nav,
+.nav-panel {
+  --c-text: var(--c-bar-text);
+  --c-text-dim: var(--c-bar-text-dim);
+  --c-line: var(--c-bar-line);
+  --c-line-strong: var(--c-bar-line);
+  --c-surface: transparent;
+  --c-accent: var(--c-bar-text);
+  --c-accent-fill: var(--c-bar-text);
+  --c-accent-press: var(--c-bar-text);
+  --c-on-accent: var(--c-white);
+  --grad-head: var(--grad-head-bar);
+  --focus-ring: 0 0 0 2px var(--c-bar-text);
+  color: var(--c-text);
+}
 .nav {
   position: fixed;
   inset: 0 0 auto 0;
@@ -99,20 +117,19 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+  min-height: var(--bar-h);
   /* Full-bleed bar, but its contents line up with .container so the wordmark
      sits on the same edge as the headline below it. */
-  padding-block: var(--space-2);
+  padding-block: 0;
   padding-inline: max(
     var(--space-5),
     calc((100vw - var(--container)) / 2 + var(--space-5))
   );
-  background: color-mix(in srgb, var(--c-bg) 94%, transparent);
-  backdrop-filter: saturate(140%) blur(12px);
-  -webkit-backdrop-filter: saturate(140%) blur(12px);
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--dur-base) var(--ease-out);
+  background: var(--c-bar);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--c-bar-line);
 }
-.nav[data-scrolled="true"] { border-bottom-color: var(--c-line); }
 
 .nav-brand {
   display: inline-flex;
@@ -143,11 +160,28 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
   align-items: center;
   min-height: var(--tap);
   padding-inline: var(--space-3);
+  border-radius: var(--radius-pill);
   color: var(--c-text-dim);
   font-size: var(--step--1);
   text-decoration: none;
 }
 .nav-links a:hover { color: var(--c-text); text-decoration: none; }
+.nav .btn {
+  min-height: 2rem;
+  padding: 0.35em 1em;
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+  font-size: var(--step--1);
+}
+.nav .theme-toggle,
+.nav .nav-toggle {
+  width: var(--tap);
+  height: var(--tap);
+  border-color: transparent;
+  border-radius: 50%;
+}
+.nav .theme-toggle:hover,
+.nav .nav-toggle:hover { background: var(--c-bar-fill); }
 .nav-links a[aria-current="page"] { color: var(--c-text); font-weight: var(--weight-medium); }
 
 .nav-actions { display: flex; align-items: center; gap: var(--space-3); }
@@ -219,11 +253,12 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
 
 .nav-panel {
   position: fixed;
-  inset: 60px 0 0 0;
+  inset: calc(var(--bar-h) + 1px) 0 0 0;
   z-index: 99;
   padding: var(--space-6) var(--space-5);
-  background: var(--c-bg);
-  border-top: 1px solid var(--c-line);
+  background: var(--c-bar-sheet);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
   overflow: auto;
 }
 .nav-panel nav { display: grid; max-width: 28rem; }
@@ -1529,7 +1564,7 @@ body[data-nav-open] { overflow: hidden; }
 
 .library-toolbar {
   position: sticky;
-  top: 60px;
+  top: calc(var(--bar-h) + 1px);
   z-index: 50;
   padding-block: var(--space-4);
   background: color-mix(in srgb, var(--c-bg) 94%, transparent);
@@ -2003,23 +2038,6 @@ body[data-nav-open] { overflow: hidden; }
   box-shadow: 0 34px 90px var(--c-black-a60);
 }
 
-/* ---- Transparent nav over the cinematic hero (homepage) ----------------
-   At the top of the homepage the bar is glass over the black hero with light
-   controls; once scrolled past the hero it becomes the normal solid bar. The
-   swap rides the existing data-scrolled flag and the nav's own transitions. */
-body[data-home] .nav {
-  transition: background var(--dur-base) var(--ease-out),
-              border-color var(--dur-base) var(--ease-out);
-}
-body[data-home] .nav:not([data-scrolled="true"]) {
-  background: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-bottom-color: transparent;
-}
-/* The bar's controls keep their theme colours over the hero — dark on the
-   apple-white ground, light on the dark one — so nothing is forced. */
-
 /* ---- A more dramatic first screen ------------------------------------- */
 .hero {
   padding-top: clamp(7rem, 13vw, 11rem);
@@ -2042,8 +2060,8 @@ body[data-home] .nav:not([data-scrolled="true"]) {
 
 /* ---- Brushed-metal wordmark -------------------------------------------
    "Summaverick" in the nav and footer takes the same metal paint as the
-   headings, context-aware: dark metal on the solid light bar, light metal on
-   the footer ink and on the homepage's transparent-over-hero bar. A slow
+   headings, context-aware: dark metal on the light grey bar, and the
+   theme's metal in the footer. A slow
    shimmer gives it life; reduced motion stills it. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .nav-brand span,
@@ -2784,4 +2802,167 @@ a.src-card__link:hover { border-color: var(--c-line-strong); }
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
   select,
   textarea { font-size: max(16px, 1em) !important; }
+}
+
+/* ======================================================================== *
+ * Advocate — the customer-advocacy demo (/advocate).
+ * A console on the page ground: a header with the controls, the stage bar,
+ * then the case file beside the transcript.
+ * ======================================================================== */
+.adv-hero .studio-kicker a { color: inherit; }
+.adv-run { padding-block: var(--space-7) var(--space-9); }
+.adv-console {
+  display: grid;
+  gap: var(--space-5);
+  padding: clamp(1rem, 2.5vw, 1.75rem);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-xl);
+  background: var(--c-surface);
+  box-shadow: 0 30px 70px -50px var(--c-shade-a50);
+}
+.adv-console__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.adv-console__title { margin: 0; font-size: var(--step-1); }
+.adv-console__meta { margin: var(--space-2) 0 0; color: var(--c-text-mute); font-size: var(--step--1); }
+.adv-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); }
+.adv-controls .btn { border-radius: var(--radius-pill); }
+.adv-select { display: grid; gap: var(--space-2); color: var(--c-text-dim); font-size: var(--step--1); }
+.adv-select select {
+  min-height: var(--tap);
+  padding: 0 2.2em 0 0.9em;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--c-bg);
+  color: var(--c-text);
+  font: inherit;
+}
+
+.adv-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.adv-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  min-height: var(--hit);
+  padding: 0 0.85em;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-pill);
+  color: var(--c-text-mute);
+  font-size: var(--step--1);
+}
+.adv-stage::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--c-line-strong);
+}
+.adv-stage.is-done { color: var(--c-text); }
+.adv-stage.is-done::before { background: var(--c-ok); }
+.adv-stage.is-active {
+  border-color: var(--c-text);
+  color: var(--c-text);
+  font-weight: var(--weight-medium);
+}
+.adv-stage.is-active::before { background: var(--c-text); }
+.adv-stage.is-skipped { border-style: dashed; color: var(--c-text-mute); }
+.adv-stage.is-skipped::before { background: transparent; box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+
+.adv-body {
+  display: grid;
+  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.adv-case {
+  position: sticky;
+  top: calc(var(--bar-h) + var(--space-4));
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+}
+.adv-case h3 { margin: 0 0 var(--space-3); font-size: var(--step-0); }
+.adv-case dl { display: grid; gap: var(--space-3); margin: 0; }
+.adv-case dl > div { display: grid; gap: 0.15rem; }
+.adv-case dt { color: var(--c-text-mute); font-size: var(--step--1); }
+.adv-case dd { margin: 0; color: var(--c-text-mute); font-size: var(--step--1); }
+.adv-case dd.is-set { color: var(--c-text); }
+
+.adv-chat {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-height: 22rem;
+  padding: var(--space-5);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+}
+.adv-msg {
+  max-width: min(36rem, 86%);
+  margin: 0;
+  padding: 0.7rem 0.95rem;
+  border-radius: 1.1rem;
+  scroll-margin-block: calc(var(--bar-h) + var(--space-4)) var(--space-6);
+}
+.adv-msg p { margin: 0; font-size: var(--step--1); line-height: 1.5; }
+.adv-msg .adv-msg__who { margin-bottom: 0.2rem; font-size: 0.72rem; font-weight: var(--weight-medium); opacity: 0.7; }
+.adv-msg--bot {
+  justify-self: start;
+  border-bottom-left-radius: 0.35rem;
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+.adv-msg--agent {
+  justify-self: end;
+  border-bottom-right-radius: 0.35rem;
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+}
+.adv-msg--system {
+  justify-self: center;
+  max-width: 100%;
+  padding-block: 0.2rem;
+  color: var(--c-text-mute);
+  font-size: var(--step--1);
+  text-align: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .adv-msg { animation: adv-in 240ms var(--ease-out) both; }
+}
+@keyframes adv-in { from { opacity: 0; transform: translateY(6px); } }
+
+.adv-banner { display: none; margin: 0; }
+.adv-banner.is-shown {
+  display: block;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--c-ok-soft);
+  color: var(--c-text);
+  font-weight: var(--weight-medium);
+}
+.adv-note { max-width: 62ch; margin: var(--space-5) 0 0; color: var(--c-text-mute); font-size: var(--step--1); }
+
+@media (max-width: 760px) {
+  .adv-body { grid-template-columns: minmax(0, 1fr); }
+  .adv-case { position: static; }
+  .adv-case dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adv-case dl > div:nth-child(4) { grid-column: 1 / -1; order: 1; }
+  .adv-chat { min-height: 16rem; padding: var(--space-4); }
+  .adv-msg { max-width: 92%; }
+  .adv-controls { width: 100%; }
+  .adv-select { flex: 1 1 12rem; }
+  .adv-select select { width: 100%; }
 }

@@ -53,7 +53,7 @@
   --pad: 20px;
   --max: 1080px;
   --narrow: 720px;
-  --nav-h: 52px;
+  --nav-h: 48px;
   --tab-h: 56px;
   --target: 44px;
 }
@@ -143,7 +143,16 @@ a:hover { text-decoration-color: currentColor; }
 .skip:focus { transform: none; }
 
 /* ---- liquid glass chrome (functional layer only) ---- */
+/* The top bar is the same light grey glass as the main site in both
+   appearances, so its labels use the light ramp whatever the theme. */
 .nav {
+  --label: #1d1d1f;
+  --label-2: rgba(29, 29, 31, 0.8);
+  --accent: #1d1d1f;
+  --on-accent: #ffffff;
+  --fill: rgba(0, 0, 0, 0.05);
+  --fill-2: rgba(0, 0, 0, 0.08);
+  --separator: rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
   z-index: 40;
@@ -152,10 +161,11 @@ a:hover { text-decoration-color: currentColor; }
   align-items: center;
   gap: 8px;
   padding: 0 16px;
-  background: var(--glass);
-  -webkit-backdrop-filter: saturate(1.4) blur(28px);
-  backdrop-filter: saturate(1.4) blur(28px);
+  background: rgba(251, 251, 253, 0.8);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--separator);
+  color: var(--label);
 }
 .nav .brand {
   font: var(--headline);
@@ -594,41 +604,6 @@ label.lbl {
 .meter { text-align: center; padding: 14px; background: var(--bg); border-radius: var(--r-sm); }
 .meter .m-val { font: var(--title-1); }
 .meter .m-lbl { color: var(--label-2); font: var(--caption); }
-
-/* ---- advocate chat ---- */
-.timeline { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
-.stage {
-  padding: 6px 12px;
-  border: 1px solid var(--separator);
-  border-radius: var(--r-pill);
-  font: var(--caption);
-  color: var(--label-2);
-}
-.stage.active { border-color: var(--accent); color: var(--label); }
-.stage.done { background: var(--ok); border-color: var(--ok); color: #fff; }
-.stage.skipped { background: none; border-style: dashed; border-color: var(--separator); color: var(--label-2); }
-.chat {
-  border: 1px solid var(--separator);
-  border-radius: var(--r);
-  background: var(--bg-elevated);
-  padding: 14px;
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.msg {
-  max-width: 82%;
-  padding: 10px 12px;
-  border-radius: 16px;
-  font: var(--callout);
-  white-space: pre-wrap;
-}
-.msg.agent { align-self: flex-end; background: var(--accent); color: var(--on-accent); }
-.msg.bot { align-self: flex-start; background: var(--fill); }
-.msg.system { align-self: center; color: var(--label-2); font: var(--footnote); font-style: italic; max-width: 100%; }
-.who { font: var(--caption); opacity: 0.8; margin-bottom: 3px; }
-.msg { scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
 .price {
   font: var(--title-1);

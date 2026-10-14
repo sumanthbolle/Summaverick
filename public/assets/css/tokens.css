@@ -111,6 +111,16 @@
   --glass-violet-a22: rgba(120, 90, 220, 0.22);
   --glass-warm-a85: rgba(255, 244, 222, 0.85);
 
+  /* The top bar is Apple's light grey glass in both appearances and over
+     every section, so it reads as one fixed object on every page. */
+  --c-bar: rgba(251, 251, 253, 0.8);
+  --c-bar-sheet: rgba(251, 251, 253, 0.97);
+  --c-bar-line: rgba(0, 0, 0, 0.1);
+  --c-bar-fill: rgba(0, 0, 0, 0.05);
+  --c-bar-text: #1d1d1f;
+  --c-bar-text-dim: rgba(29, 29, 31, 0.8);
+  --grad-head-bar: linear-gradient(180deg, #2a2b31 0%, #3f4048 48%, #5a5c65 100%);
+
   /* ---- Space (4px base) ----------------------------------------------- */
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -126,6 +136,7 @@
   /* Minimum comfortable hit area for a pointer. Touch targets get --tap. */
   --hit: 28px;
   --tap: 44px;
+  --bar-h: 48px;
 
   /* ---- Radii ---------------------------------------------------------- */
   --radius-sm: 8px;
@@ -200,6 +211,22 @@
   --cine-spot-soft: rgba(255, 150, 90, 0.07);
   --cine-vignette: transparent;
 
+  /* Homepage bands: Apple's section grey with dark type in light, ink in
+     dark. Cards set on a band take --band-card with --band-card-text. */
+  --band: #f5f5f7;
+  --band-text: #1d1d1f;
+  --band-text-dim: #424245;
+  --band-text-mute: #6e6e73;
+  --band-line: rgba(0, 0, 0, 0.1);
+  --band-card: #ffffff;
+  --band-card-text: #1d1d1f;
+  --band-elev: #ffffff;
+  --band-surface: #ffffff;
+  --band-surface-2: #fafafc;
+  --band-raise: #ffffff;
+  --band-glow: #f5f5f7;
+  --band-scheme: light;
+
   color-scheme: light;
 }
 
@@ -245,6 +272,20 @@
     --cine-vignette: rgba(0, 0, 0, 0.6);
     --glass-spectrum: linear-gradient(100deg, #73CAFF 0%, #B4E9FF 10%, #A795F1 25%, #E6BDF9 42%, #F391C9 53%, #FFD0B6 68%, #EED29B 80%, #A0E1E8 91%, #73CAFF 100%);
 
+    --band: var(--c-ink);
+    --band-text: var(--c-on-ink);
+    --band-text-dim: var(--c-on-ink-dim);
+    --band-text-mute: var(--c-on-ink-mute);
+    --band-line: var(--c-ink-line);
+    --band-card: var(--c-on-ink);
+    --band-card-text: var(--c-ink);
+    --band-elev: color-mix(in srgb, var(--c-on-ink) 5%, var(--c-ink));
+    --band-surface: color-mix(in srgb, var(--c-on-ink) 7%, var(--c-ink));
+    --band-surface-2: color-mix(in srgb, var(--c-on-ink) 10%, var(--c-ink));
+    --band-raise: color-mix(in srgb, var(--c-on-ink) 6%, transparent);
+    --band-glow: color-mix(in srgb, var(--c-on-ink) 20%, var(--c-ink));
+    --band-scheme: dark;
+
     color-scheme: dark;
   }
 }
@@ -287,6 +328,20 @@
   --cine-spot-soft: rgba(255, 255, 255, 0.06);
   --cine-vignette: rgba(0, 0, 0, 0.6);
   --glass-spectrum: linear-gradient(100deg, #73CAFF 0%, #B4E9FF 10%, #A795F1 25%, #E6BDF9 42%, #F391C9 53%, #FFD0B6 68%, #EED29B 80%, #A0E1E8 91%, #73CAFF 100%);
+
+  --band: var(--c-ink);
+  --band-text: var(--c-on-ink);
+  --band-text-dim: var(--c-on-ink-dim);
+  --band-text-mute: var(--c-on-ink-mute);
+  --band-line: var(--c-ink-line);
+  --band-card: var(--c-on-ink);
+  --band-card-text: var(--c-ink);
+  --band-elev: color-mix(in srgb, var(--c-on-ink) 5%, var(--c-ink));
+  --band-surface: color-mix(in srgb, var(--c-on-ink) 7%, var(--c-ink));
+  --band-surface-2: color-mix(in srgb, var(--c-on-ink) 10%, var(--c-ink));
+  --band-raise: color-mix(in srgb, var(--c-on-ink) 6%, transparent);
+  --band-glow: color-mix(in srgb, var(--c-on-ink) 20%, var(--c-ink));
+  --band-scheme: dark;
 
   color-scheme: dark;
 }
