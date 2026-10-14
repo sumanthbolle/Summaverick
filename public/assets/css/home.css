@@ -10,11 +10,11 @@
  * long page a rhythm:
  *
  *   - light bands follow the theme (white in light, near-black in dark);
- *   - ink bands are always dark, so a framed product panel or a bento grid
- *     reads as an object set on the page.
+ *   - grey bands (Apple's section grey in light, ink in dark) frame a product
+ *     panel or a bento grid as an object set on the page.
  *
- * An ink band is a token remap, not a second set of rules. `.band-ink` points
- * the page ramp (--c-text, --c-surface, --c-line, ...) at the ink ramp for
+ * A band is a token remap, not a second set of rules. `.band-ink` points the
+ * page ramp (--c-text, --c-surface, --c-line, ...) at the band's ramp for
  * everything inside it, so the stage, the demo and the form re-skin themselves
  * with the rules they already have.
  *
@@ -23,20 +23,23 @@
  * prefers-reduced-motion: no-preference.
  */
 
-/* ---- The ink band ---------------------------------------------------------
-   `inherit` on the ink ramp matters: .about and .footer remap --c-on-ink to the
-   page ramp, and --c-text below reads --c-on-ink, which would then point back
-   at itself. Taking the value from the parent breaks that loop. */
+/* ---- The band ------------------------------------------------------------
+   A band is Apple's section grey in light and ink in dark (--band* in
+   tokens.css). The rules inside a band are written against the ink ramp, so
+   the band points that ramp at its own colours and everything inside it, the
+   stage, the demo and the form, re-skins itself with the rules it already
+   has. Gradients and shadows are left to the theme. */
 body[data-home] .band-ink {
-  --c-on-ink: inherit;
-  --c-on-ink-dim: inherit;
-  --c-on-ink-mute: inherit;
-  --c-ink-line: inherit;
+  --c-ink: var(--band);
+  --c-on-ink: var(--band-text);
+  --c-on-ink-dim: var(--band-text-dim);
+  --c-on-ink-mute: var(--band-text-mute);
+  --c-ink-line: var(--band-line);
 
   --c-bg: var(--c-ink);
-  --c-bg-elev: color-mix(in srgb, var(--c-on-ink) 5%, var(--c-ink));
-  --c-surface: color-mix(in srgb, var(--c-on-ink) 7%, var(--c-ink));
-  --c-surface-2: color-mix(in srgb, var(--c-on-ink) 10%, var(--c-ink));
+  --c-bg-elev: var(--band-elev);
+  --c-surface: var(--band-surface);
+  --c-surface-2: var(--band-surface-2);
   --c-line: var(--c-ink-line);
   --c-line-strong: color-mix(in srgb, var(--c-on-ink) 26%, transparent);
   --c-text: var(--c-on-ink);
@@ -47,17 +50,11 @@ body[data-home] .band-ink {
   --c-accent-soft: color-mix(in srgb, var(--c-on-ink) 12%, transparent);
   --c-accent-fill: var(--c-on-ink);
   --c-on-accent: var(--c-ink);
-  --shadow-2: 0 10px 30px color-mix(in srgb, black 55%, transparent);
   --focus-ring: 0 0 0 2px var(--c-ink), 0 0 0 4px var(--c-on-ink);
-  --grad-head: var(--grad-head-ink);
-  --grad-spectrum: var(--grad-spectrum-bright);
-  --grad-cyan: var(--grad-cyan-bright);
-  --grad-warm: var(--grad-warm-bright);
-  --grad-emerald: var(--grad-emerald-bright);
 
   background: var(--c-ink);
   color: var(--c-on-ink-dim);
-  color-scheme: dark;
+  color-scheme: var(--band-scheme);
 }
 
 /* The page's own grounds, captured on <body> before any band remaps them, for
@@ -145,7 +142,7 @@ body[data-home] .hero-panel__ui {
   min-height: 0;
   border-color: var(--c-ink-line);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--c-on-ink) 6%, transparent);
+  background: var(--band-raise);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
@@ -228,7 +225,7 @@ body[data-home] .stage__tabs {
 }
 body[data-home] .stage__tab { padding: 0.5em 1.4em; }
 body[data-home] .stage__tab[aria-selected="true"] {
-  background: color-mix(in srgb, var(--c-on-ink) 14%, transparent);
+  background: color-mix(in srgb, var(--c-on-ink) 14%, var(--band-raise));
   color: var(--c-on-ink);
   box-shadow: inset 0 0 0 1px var(--c-ink-line);
 }
@@ -271,7 +268,7 @@ body[data-home] .examples::before {
 
 /* ---- What we build: a bento -------------------------------------------------
    One large card for the flagship, two stacked beside it. The cards are light
-   objects on the ink band; each carries a miniature screen of its product. */
+   objects on the band; each carries a miniature screen of its product. */
 body[data-home] .offers {
   padding-block: clamp(3.5rem, 8vw, 7rem) clamp(3rem, 6vw, 5rem);
   border-top: 0;
@@ -282,6 +279,8 @@ body[data-home] .offers__grid {
   gap: var(--space-4);
 }
 body[data-home] .offer {
+  --c-ink: var(--band-card-text);
+  --c-on-ink: var(--band-card);
   --c-text: var(--c-ink);
   --c-text-dim: color-mix(in srgb, var(--c-ink) 66%, transparent);
   --c-line: color-mix(in srgb, var(--c-ink) 11%, transparent);
@@ -297,7 +296,7 @@ body[data-home] .offer {
   border-radius: var(--radius-lg);
   background: var(--c-on-ink);
   color: var(--c-text);
-  box-shadow: 0 30px 60px -36px color-mix(in srgb, black 80%, transparent);
+  box-shadow: 0 30px 60px -36px color-mix(in srgb, black 45%, transparent);
 }
 body[data-home] .offer:nth-child(3) { grid-column: 1; grid-row: 1 / span 2; }
 body[data-home] .offer:nth-child(1) { grid-column: 2; grid-row: 1; }
@@ -707,7 +706,7 @@ body[data-home] .platforms__grid { grid-template-columns: minmax(0, 1fr); gap: v
 body[data-home] .platform {
   padding: clamp(1.25rem, 2.5vw, 2rem);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--c-on-ink) 6%, transparent);
+  background: var(--band-raise);
 }
 body[data-home] .platform h3 { color: var(--c-on-ink); }
 @media (max-width: 860px) {
@@ -790,21 +789,21 @@ body[data-home] .resources__list span {
   body[data-home] .resources__list li { min-height: 11rem; }
 }
 
-/* ---- Contact: an ink band that melts into the footer --------------------------------- */
+/* ---- Contact: a band that melts into the footer --------------------------------- */
 body[data-home] .contact {
   padding-block: clamp(4rem, 9vw, 8rem) clamp(7rem, 14vw, 12rem);
   border-top: 0;
   background: linear-gradient(
     to bottom,
     var(--c-ink) 0 56%,
-    color-mix(in srgb, var(--c-on-ink) 20%, var(--c-ink)) 84%,
+    var(--band-glow) 84%,
     var(--page-bg-elev) 100%
   );
 }
 body[data-home] .contact-form {
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--c-on-ink) 6%, transparent);
-  box-shadow: 0 40px 90px -50px color-mix(in srgb, black 80%, transparent);
+  background: var(--band-raise);
+  box-shadow: 0 40px 90px -50px color-mix(in srgb, black 45%, transparent);
 }
 
 /* ---- Footer: the wordmark, drawn in outline ------------------------------------------- */
