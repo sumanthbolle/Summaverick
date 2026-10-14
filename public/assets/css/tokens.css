@@ -111,6 +111,16 @@
   --glass-violet-a22: rgba(120, 90, 220, 0.22);
   --glass-warm-a85: rgba(255, 244, 222, 0.85);
 
+  /* The top bar is Apple's light grey glass in both appearances and over
+     every section, so it reads as one fixed object on every page. */
+  --c-bar: rgba(251, 251, 253, 0.8);
+  --c-bar-sheet: rgba(251, 251, 253, 0.97);
+  --c-bar-line: rgba(0, 0, 0, 0.1);
+  --c-bar-fill: rgba(0, 0, 0, 0.05);
+  --c-bar-text: #1d1d1f;
+  --c-bar-text-dim: rgba(29, 29, 31, 0.8);
+  --grad-head-bar: linear-gradient(180deg, #2a2b31 0%, #3f4048 48%, #5a5c65 100%);
+
   /* ---- Space (4px base) ----------------------------------------------- */
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -126,6 +136,7 @@
   /* Minimum comfortable hit area for a pointer. Touch targets get --tap. */
   --hit: 28px;
   --tap: 44px;
+  --bar-h: 48px;
 
   /* ---- Radii ---------------------------------------------------------- */
   --radius-sm: 8px;

@@ -90,7 +90,25 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
 .btn-quiet:hover { color: var(--c-accent); }
 .btn-lg { padding: 0.85em 1.7em; font-size: var(--step-0); }
 
-/* ---- Navigation -------------------------------------------------------- */
+/* ---- Navigation --------------------------------------------------------
+   One bar on every page: Apple's light grey glass, 48px, with a hairline. It
+   does not follow the appearance or the section beneath it, so the page ramp
+   is pointed at the bar's own light ramp for everything inside it. */
+.nav,
+.nav-panel {
+  --c-text: var(--c-bar-text);
+  --c-text-dim: var(--c-bar-text-dim);
+  --c-line: var(--c-bar-line);
+  --c-line-strong: var(--c-bar-line);
+  --c-surface: transparent;
+  --c-accent: var(--c-bar-text);
+  --c-accent-fill: var(--c-bar-text);
+  --c-accent-press: var(--c-bar-text);
+  --c-on-accent: var(--c-white);
+  --grad-head: var(--grad-head-bar);
+  --focus-ring: 0 0 0 2px var(--c-bar-text);
+  color: var(--c-text);
+}
 .nav {
   position: fixed;
   inset: 0 0 auto 0;
@@ -99,20 +117,19 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+  min-height: var(--bar-h);
   /* Full-bleed bar, but its contents line up with .container so the wordmark
      sits on the same edge as the headline below it. */
-  padding-block: var(--space-2);
+  padding-block: 0;
   padding-inline: max(
     var(--space-5),
     calc((100vw - var(--container)) / 2 + var(--space-5))
   );
-  background: color-mix(in srgb, var(--c-bg) 94%, transparent);
-  backdrop-filter: saturate(140%) blur(12px);
-  -webkit-backdrop-filter: saturate(140%) blur(12px);
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--dur-base) var(--ease-out);
+  background: var(--c-bar);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--c-bar-line);
 }
-.nav[data-scrolled="true"] { border-bottom-color: var(--c-line); }
 
 .nav-brand {
   display: inline-flex;
@@ -143,11 +160,28 @@ a:hover { color: var(--c-accent-press); text-decoration-color: currentColor; }
   align-items: center;
   min-height: var(--tap);
   padding-inline: var(--space-3);
+  border-radius: var(--radius-pill);
   color: var(--c-text-dim);
   font-size: var(--step--1);
   text-decoration: none;
 }
 .nav-links a:hover { color: var(--c-text); text-decoration: none; }
+.nav .btn {
+  min-height: 2rem;
+  padding: 0.35em 1em;
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+  font-size: var(--step--1);
+}
+.nav .theme-toggle,
+.nav .nav-toggle {
+  width: var(--tap);
+  height: var(--tap);
+  border-color: transparent;
+  border-radius: 50%;
+}
+.nav .theme-toggle:hover,
+.nav .nav-toggle:hover { background: var(--c-bar-fill); }
 .nav-links a[aria-current="page"] { color: var(--c-text); font-weight: var(--weight-medium); }
 
 .nav-actions { display: flex; align-items: center; gap: var(--space-3); }
@@ -219,11 +253,12 @@ body[data-nav-open] .nav-toggle-bars::after { top: 0; transform: rotate(-45deg);
 
 .nav-panel {
   position: fixed;
-  inset: 60px 0 0 0;
+  inset: calc(var(--bar-h) + 1px) 0 0 0;
   z-index: 99;
   padding: var(--space-6) var(--space-5);
-  background: var(--c-bg);
-  border-top: 1px solid var(--c-line);
+  background: var(--c-bar-sheet);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
   overflow: auto;
 }
 .nav-panel nav { display: grid; max-width: 28rem; }
@@ -1529,7 +1564,7 @@ body[data-nav-open] { overflow: hidden; }
 
 .library-toolbar {
   position: sticky;
-  top: 60px;
+  top: calc(var(--bar-h) + 1px);
   z-index: 50;
   padding-block: var(--space-4);
   background: color-mix(in srgb, var(--c-bg) 94%, transparent);
@@ -2003,23 +2038,6 @@ body[data-nav-open] { overflow: hidden; }
   box-shadow: 0 34px 90px var(--c-black-a60);
 }
 
-/* ---- Transparent nav over the cinematic hero (homepage) ----------------
-   At the top of the homepage the bar is glass over the black hero with light
-   controls; once scrolled past the hero it becomes the normal solid bar. The
-   swap rides the existing data-scrolled flag and the nav's own transitions. */
-body[data-home] .nav {
-  transition: background var(--dur-base) var(--ease-out),
-              border-color var(--dur-base) var(--ease-out);
-}
-body[data-home] .nav:not([data-scrolled="true"]) {
-  background: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-bottom-color: transparent;
-}
-/* The bar's controls keep their theme colours over the hero — dark on the
-   apple-white ground, light on the dark one — so nothing is forced. */
-
 /* ---- A more dramatic first screen ------------------------------------- */
 .hero {
   padding-top: clamp(7rem, 13vw, 11rem);
@@ -2042,8 +2060,8 @@ body[data-home] .nav:not([data-scrolled="true"]) {
 
 /* ---- Brushed-metal wordmark -------------------------------------------
    "Summaverick" in the nav and footer takes the same metal paint as the
-   headings, context-aware: dark metal on the solid light bar, light metal on
-   the footer ink and on the homepage's transparent-over-hero bar. A slow
+   headings, context-aware: dark metal on the light grey bar, and the
+   theme's metal in the footer. A slow
    shimmer gives it life; reduced motion stills it. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .nav-brand span,
