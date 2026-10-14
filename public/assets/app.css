@@ -605,41 +605,6 @@ label.lbl {
 .meter .m-val { font: var(--title-1); }
 .meter .m-lbl { color: var(--label-2); font: var(--caption); }
 
-/* ---- advocate chat ---- */
-.timeline { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
-.stage {
-  padding: 6px 12px;
-  border: 1px solid var(--separator);
-  border-radius: var(--r-pill);
-  font: var(--caption);
-  color: var(--label-2);
-}
-.stage.active { border-color: var(--accent); color: var(--label); }
-.stage.done { background: var(--ok); border-color: var(--ok); color: #fff; }
-.stage.skipped { background: none; border-style: dashed; border-color: var(--separator); color: var(--label-2); }
-.chat {
-  border: 1px solid var(--separator);
-  border-radius: var(--r);
-  background: var(--bg-elevated);
-  padding: 14px;
-  min-height: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.msg {
-  max-width: 82%;
-  padding: 10px 12px;
-  border-radius: 16px;
-  font: var(--callout);
-  white-space: pre-wrap;
-}
-.msg.agent { align-self: flex-end; background: var(--accent); color: var(--on-accent); }
-.msg.bot { align-self: flex-start; background: var(--fill); }
-.msg.system { align-self: center; color: var(--label-2); font: var(--footnote); font-style: italic; max-width: 100%; }
-.who { font: var(--caption); opacity: 0.8; margin-bottom: 3px; }
-.msg { scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom)); }
-
 .price {
   font: var(--title-1);
   font-variant-numeric: tabular-nums;

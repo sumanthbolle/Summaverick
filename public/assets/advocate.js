@@ -1,12 +1,15 @@
-import { mountChrome, $ } from "/assets/app.js";
+import { initChrome } from "/assets/js/chrome.js";
 
-mountChrome({ active: "tools" });
+initChrome();
 
+const $ = (id) => document.getElementById(id);
 const STAGES = ["Intake", "Policy", "Drafting", "Engaging", "Escalating", "Resolved"];
 const chat = $("chat");
 const banner = $("banner");
 const timelineEl = $("timeline");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const CASE_FIELDS = ["order", "issue", "amount", "policy", "tone"];
+const title = (word) => word.charAt(0).toUpperCase() + word.slice(1);
 let reached = new Set();
 let escalated = false;
 let source = null;
@@ -14,31 +17,36 @@ let source = null;
 function renderTimeline(active) {
   timelineEl.textContent = "";
   for (const s of STAGES) {
-    const d = document.createElement("div");
+    const li = document.createElement("li");
     const skipped = s === "Escalating" && reached.has("Resolved") && !escalated;
-    d.className =
-      "stage" +
-      (reached.has(s) ? " done" : "") +
-      (skipped ? " skipped" : "") +
-      (s === active ? " active" : "");
-    d.setAttribute("role", "listitem");
-    d.textContent = skipped ? `${s} (not needed)` : s;
-    if (s === active) d.setAttribute("aria-current", "step");
-    timelineEl.append(d);
+    li.className =
+      "adv-stage" +
+      (reached.has(s) ? " is-done" : "") +
+      (skipped ? " is-skipped" : "") +
+      (s === active ? " is-active" : "");
+    li.textContent = skipped ? `${s} (not needed)` : s;
+    if (s === active) li.setAttribute("aria-current", "step");
+    timelineEl.append(li);
   }
+}
+
+function setCase(field, value) {
+  const dd = $(`case-${field}`);
+  dd.textContent = value;
+  dd.classList.add("is-set");
 }
 
 function addMsg(who, text) {
   chat.querySelector("[data-placeholder]")?.remove();
   const wrap = document.createElement("div");
-  wrap.className = "msg " + (who === "agent" ? "agent" : who === "bot" ? "bot" : "system");
+  wrap.className = `adv-msg adv-msg--${who === "agent" ? "agent" : who === "bot" ? "bot" : "system"}`;
   if (who === "system") {
     wrap.textContent = text;
   } else {
-    const label = document.createElement("div");
-    label.className = "who";
-    label.textContent = who === "agent" ? "Summaverick" : "Support bot";
-    const body = document.createElement("div");
+    const label = document.createElement("p");
+    label.className = "adv-msg__who";
+    label.textContent = who === "agent" ? "Summaverick agent" : "Support bot";
+    const body = document.createElement("p");
     body.textContent = text;
     wrap.append(label, body);
   }
@@ -48,14 +56,18 @@ function addMsg(who, text) {
   wrap.scrollIntoView({ block: "nearest", behavior: reduceMotion.matches ? "auto" : "smooth" });
 }
 
-$("start").addEventListener("click", async () => {
+$("start").addEventListener("click", () => {
   const scenario = $("scenario").value;
   const btn = $("start");
   btn.disabled = true;
   $("scenario").disabled = true;
   chat.textContent = "";
-  banner.className = "banner";
+  banner.className = "adv-banner";
   banner.textContent = "";
+  for (const field of CASE_FIELDS) {
+    $(`case-${field}`).textContent = "—";
+    $(`case-${field}`).classList.remove("is-set");
+  }
   reached = new Set();
   escalated = false;
   renderTimeline("Intake");
@@ -75,23 +87,35 @@ $("start").addEventListener("click", async () => {
     else if (stage) reached.add(stage);
     renderTimeline(stage);
   });
+  source.addEventListener("intake", (e) => {
+    const d = JSON.parse(e.data);
+    setCase("order", d.orderId);
+    setCase("issue", d.issueType === "missing_item" ? "Missing item" : d.issueType);
+    setCase("amount", `₹${d.amount}`);
+  });
+  source.addEventListener("policy", (e) => {
+    const d = JSON.parse(e.data);
+    setCase("policy", d.eligible ? `Eligible. ${d.notes}` : `Not eligible. ${d.notes}`);
+  });
+  source.addEventListener("draft", (e) => setCase("tone", title(JSON.parse(e.data).tone || "polite")));
   source.addEventListener("agent_sent", (e) => addMsg("agent", JSON.parse(e.data).message));
   source.addEventListener("bot_replied", (e) => addMsg("bot", JSON.parse(e.data).message));
-  source.addEventListener("channel_opened", () => addMsg("system", "Connected to support channel"));
+  source.addEventListener("channel_opened", () => addMsg("system", "Connected to the support chat"));
   source.addEventListener("escalating", (e) => {
     escalated = true;
     reached.add("Engaging");
     renderTimeline("Escalating");
-    const d = JSON.parse(e.data);
-    addMsg("system", `Escalating (tone: ${d.tone || "firm"})`);
+    const tone = JSON.parse(e.data).tone || "firm";
+    setCase("tone", title(tone));
+    addMsg("system", `Refused, so the agent escalates (tone: ${tone})`);
   });
   source.addEventListener("resolved", (e) => {
     ["Engaging", "Resolved"].forEach((s) => reached.add(s));
     if (escalated) reached.add("Escalating");
     renderTimeline("Resolved");
     const amt = JSON.parse(e.data).refund_amount;
-    banner.textContent = `Resolved — the mock support bot approved a ₹${amt} refund without the customer stepping in.`;
-    banner.className = "banner show";
+    banner.textContent = `Resolved: the mock support bot approved a ₹${amt} refund without the customer stepping in.`;
+    banner.className = "adv-banner is-shown";
   });
   source.addEventListener("needs_human", () => addMsg("system", "Handed off to a human representative"));
   source.addEventListener("done", finish);
