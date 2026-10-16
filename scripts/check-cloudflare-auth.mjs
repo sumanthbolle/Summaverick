@@ -62,6 +62,23 @@ function errText(body) {
   return `${e.message ?? "unknown"} [code: ${e.code ?? "?"}]`;
 }
 
+/** Account-owned tokens cannot be verified through /user/tokens/verify.
+ * New tokens identify their type with cfat_/cfut_; legacy tokens do not.
+ * Wrangler likewise treats code 1000 on the user endpoint as a possible
+ * account token. Verify against the configured account before accepting it.
+ */
+async function verifyToken(token, accountId) {
+  const accountPath = `/accounts/${accountId}/tokens/verify`;
+  if (token.startsWith("cfat_")) {
+    return { ...(await cf(token, accountPath)), type: "account" };
+  }
+  const user = await cf(token, "/user/tokens/verify");
+  if (user.body.success || !user.body.errors?.some(error => error.code === 1000)) {
+    return { ...user, type: "user" };
+  }
+  return { ...(await cf(token, accountPath)), type: "account" };
+}
+
 async function main() {
   const token = (process.env.CLOUDFLARE_API_TOKEN ?? "").trim();
   const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID ?? "").trim();
@@ -98,19 +115,30 @@ async function main() {
   console.log(`CLOUDFLARE_ACCOUNT_ID is present (${accountId.length} chars)`);
   lines.push(`- Account ID: \`${accountId}\``);
 
-  const verify = await cf(token, "/user/tokens/verify");
-  if (!verify.body.success) {
-    gh(
-      "error",
-      `API token was rejected (${errText(verify.body)}). Recreate it at https://dash.cloudflare.com/profile/api-tokens. Use a custom API token, not the Global API Key. Paste only the token value into the GitHub secret.`
-    );
-    lines.push(`- Token verify: **failed** — ${errText(verify.body)}`);
+  if (!/^[a-f0-9]{32}$/i.test(accountId)) {
+    gh("error", "CLOUDFLARE_ACCOUNT_ID must be the 32-character hexadecimal Account ID from the Workers overview.");
+    lines.push("- Account ID: **invalid format**");
     summary(lines);
     output({ d1_ok: "false", workers_ok: "false" });
     process.exit(1);
   }
-  console.log("Token verify: ok");
-  lines.push("- Token verify: ok");
+
+  const verify = await verifyToken(token, accountId);
+  if (verify.status < 200 || verify.status >= 300 || !verify.body.success || verify.body.result?.status !== "active") {
+    const reason = verify.body.success
+      ? `Token status is ${verify.body.result?.status ?? "unknown"} (HTTP ${verify.status})`
+      : errText(verify.body);
+    gh(
+      "error",
+      `API token verification failed (${reason}). Check the token's validity and account scope. Use a User API Token from My Profile → API Tokens or an Account API Token from Manage Account → Account API Tokens, not the Global API Key. Paste only the token value into the production CLOUDFLARE_API_TOKEN secret.`
+    );
+    lines.push(`- Token verify (${verify.type}): **failed** — ${reason}`);
+    summary(lines);
+    output({ d1_ok: "false", workers_ok: "false" });
+    process.exit(1);
+  }
+  console.log(`Token verify: ok (${verify.type} token)`);
+  lines.push(`- Token verify: ok (${verify.type} token)`);
 
   const zone = await cf(token, `/zones/${accountId}`);
   if (zone.body.success && zone.body.result) {

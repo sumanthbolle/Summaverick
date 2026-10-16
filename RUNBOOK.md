@@ -185,9 +185,19 @@ required-key check → typecheck → tests → credential probe → `d1 migratio
 → `wrangler deploy` → Worker secret upload → live Perplexity check →
 `scripts/verify.mjs --core https://summaverick.com`.
 
-If the credential probe reports **Invalid API Token [code: 1000]**, replace
-`CLOUDFLARE_API_TOKEN` with a valid custom API token before retrying. A failed
-credential probe occurs before deployment and before Perplexity secret upload.
+The credential probe supports both user-owned and account-owned API tokens.
+New account tokens (`cfat_…`) are verified at
+`/accounts/<account-id>/tokens/verify`; user tokens use `/user/tokens/verify`.
+Legacy account tokens are detected by retrying the account endpoint after
+code 1000 from the user endpoint. A successful response must report an active
+token, and Workers access is then checked independently.
+
+Code 1000 from the **user** verification endpoint alone does not prove an
+account-owned token is invalid. If verification fails at the correct endpoint,
+check expiry, account scope and the saved token value, then replace it if needed.
+A failed credential probe occurs before deployment and before Perplexity secret
+upload. See Cloudflare's [account-token documentation](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
+and [current token formats](https://developers.cloudflare.com/fundamentals/api/get-started/token-formats/).
 
 ### Cloudflare error 7403
 
