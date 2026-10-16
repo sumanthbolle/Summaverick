@@ -1,0 +1,204 @@
+/* Utilities nav tab — shared across every page.
+   Colours come from each page's own tokens so the menu matches its theme. */
+
+.nav-drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nav-drop__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--nav-drop-fg, inherit);
+  font-family: inherit;
+  font-size: var(--nav-drop-size, 13px);
+  font-weight: inherit;
+  line-height: 1.2;
+  letter-spacing: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.nav-drop__btn:hover,
+.nav-drop__btn[aria-expanded="true"],
+.nav-drop__btn.active {
+  opacity: 1;
+  color: var(--nav-drop-accent, var(--blue, #0066cc));
+}
+
+.nav-drop__chev {
+  width: 9px;
+  height: 9px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s;
+}
+
+.nav-drop__btn[aria-expanded="true"] .nav-drop__chev {
+  transform: rotate(180deg);
+}
+
+.nav-drop__menu {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 50%;
+  z-index: 10;
+  min-width: 244px;
+  margin-top: 0;
+  padding: 12px 6px 6px;
+  background: var(--nav-drop-bg, #fff);
+  border: 1px solid var(--nav-drop-line, rgba(0, 0, 0, 0.1));
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+
+.nav-drop.open .nav-drop__menu,
+html:not(.nav-enhanced) .nav-drop:hover .nav-drop__menu,
+html:not(.nav-enhanced) .nav-drop:focus-within .nav-drop__menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.nav-drop__menu a {
+  display: block;
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  opacity: 1;
+}
+
+.nav-drop__menu a:hover,
+.nav-drop__menu a:focus-visible {
+  background: var(--nav-drop-hover, rgba(0, 0, 0, 0.05));
+  color: inherit;
+}
+
+.nav-drop__btn:focus-visible,
+.nav-drop__menu a:focus-visible {
+  outline: 2px solid var(--nav-drop-accent, var(--blue, #0066cc));
+  outline-offset: 2px;
+}
+
+.nav-drop__name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.nav-drop__desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  opacity: 0.62;
+}
+
+.nav-drop__menu a[aria-current="page"] .nav-drop__name {
+  color: var(--nav-drop-accent, var(--blue, #0066cc));
+}
+
+/* Mobile menu grouping */
+.mobile-menu__label {
+  display: block;
+  padding: 16px 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  border-bottom: 0;
+}
+
+.mobile-menu a.mobile-menu__sub,
+.site-mobile-menu a.mobile-menu__sub {
+  padding-left: 14px;
+}
+
+.menu-toggle {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mobile-menu a {
+  min-height: 44px;
+}
+
+.site-menu-toggle,
+.site-mobile-menu {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .site-menu-toggle {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--nav-drop-line, rgba(0, 0, 0, 0.1));
+    border-radius: 10px;
+    background: var(--nav-drop-bg, #fff);
+    color: var(--nav-drop-fg, inherit);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .site-menu-toggle:focus-visible {
+    outline: 2px solid var(--nav-drop-accent, var(--blue, #0066cc));
+    outline-offset: 2px;
+  }
+
+  .site-mobile-menu {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    left: 12px;
+    z-index: 10000;
+    max-height: calc(100dvh - 72px);
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--nav-drop-line, rgba(0, 0, 0, 0.1));
+    border-radius: 14px;
+    background: var(--nav-drop-bg, #fff);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+  }
+
+  .site-mobile-menu.open {
+    display: block;
+  }
+
+  .site-mobile-menu a {
+    display: block;
+    min-height: 44px;
+    padding: 12px;
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-drop__menu,
+  .nav-drop__chev {
+    transition: none;
+  }
+}

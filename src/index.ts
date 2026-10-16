@@ -15,6 +15,7 @@ import { upscRoutes } from "./routes/upsc";
 import { adminRoutes } from "./routes/admin";
 import { researchRoutes } from "./routes/research";
 import { advocateRoutes } from "./routes/advocate";
+import { chatRoutes } from "./routes/chat";
 import { contactRoutes } from "./routes/contact";
 import { runScheduled } from "./scheduled";
 
@@ -23,6 +24,7 @@ const PAGES: Record<string, string> = {
   "/": "/index.html",
   "/quiz": "/quiz.html",
   "/research": "/research.html",
+  "/ask-summaverick": "/ask-summaverick.html",
   "/learn": "/learn.html",
   "/interviews": "/interviews.html",
   "/search": "/search.html",
@@ -39,7 +41,6 @@ const PAGES: Record<string, string> = {
 const REDIRECTS: Record<string, string> = {
   "/ask": "/research",
   "/ask.html": "/research",
-  "/ask-summaverick": "/research",
 };
 
 function route(method: string, pattern: string, handler: Handler): RouteDef {
@@ -56,6 +57,7 @@ const ROUTES: RouteDef[] = [
   ...upscRoutes(route),
   ...adminRoutes(route),
   ...researchRoutes(route),
+  ...chatRoutes(route),
   ...advocateRoutes(route),
   ...contactRoutes(route),
 ];

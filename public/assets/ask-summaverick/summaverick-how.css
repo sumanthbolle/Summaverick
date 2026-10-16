@@ -1,0 +1,200 @@
+/* Summaverick — How it works as a quiet research timeline.
+   Desktop: horizontal SEARCH → LIVE SEARCH → REASON → VERIFY
+   Mobile: compact vertical steps. Reveals once on scroll. */
+
+.sm-how {
+  --sm-how-composer: var(--composer-h, 132px);
+  position: relative;
+  width: 100%;
+  margin: 40px 0 8px;
+  color: inherit;
+  isolation: isolate;
+}
+
+.sm-how__pin {
+  position: relative;
+  height: auto;
+  overflow: visible;
+  background: transparent;
+}
+
+.sm-how__canvas,
+.sm-how__veil,
+.sm-how__pips,
+.sm-how__progress {
+  display: none;
+}
+
+.sm-how__copy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 0;
+}
+
+.sm-how__kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint, rgba(255, 255, 255, 0.34));
+  margin-bottom: 18px;
+}
+
+.sm-how__acts {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sm-how__act {
+  position: relative;
+  opacity: 0.42;
+  transform: none;
+  filter: none;
+  padding: 0 0 22px 22px;
+  transition: opacity var(--motion-normal, 260ms) var(--ease-standard, ease);
+}
+
+.sm-how__act::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  bottom: 0;
+  width: 1px;
+  background: var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.sm-how__act:last-of-type {
+  padding-bottom: 8px;
+}
+
+.sm-how__act:last-of-type::before {
+  display: none;
+}
+
+.sm-how.is-revealed .sm-how__act {
+  opacity: 1;
+}
+
+.sm-how__index {
+  display: block;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--text-faint, rgba(255, 255, 255, 0.34));
+  margin-bottom: 6px;
+}
+
+.sm-how__title {
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text, inherit);
+}
+
+.sm-how__body {
+  margin: 6px 0 0;
+  max-width: 36rem;
+  font-size: clamp(0.95rem, 1.2vw, 1.05rem);
+  line-height: 1.5;
+  color: var(--text-muted, rgba(255, 255, 255, 0.58));
+}
+
+.sm-how__cta {
+  position: relative;
+  z-index: 2;
+  margin-top: 10px;
+  margin-left: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--send-bg, #fff);
+  color: var(--send-fg, #050608);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.sm-how__cta svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sm-how-line {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sm-how { margin-top: 56px; }
+
+  .sm-how__acts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 22px;
+    padding-top: 18px;
+  }
+
+  .sm-how__act {
+    padding: 12px 0 0;
+  }
+
+  .sm-how__act::before { display: none; }
+
+  .sm-how-line {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 6%;
+    right: 6%;
+    height: 1px;
+    background: var(--border, rgba(255, 255, 255, 0.08));
+    overflow: hidden;
+  }
+
+  .sm-how-line > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--text-faint, rgba(255, 255, 255, 0.34));
+  }
+
+  .sm-how.is-revealed .sm-how-line > span {
+    animation: sm-how-line 720ms var(--ease-standard, ease) forwards;
+  }
+
+  .sm-how__cta { margin-left: 0; }
+}
+
+@keyframes sm-how-line {
+  to { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sm-how__act,
+  .sm-how.is-revealed .sm-how__act {
+    opacity: 1;
+    transition: none;
+  }
+
+  .sm-how.is-revealed .sm-how-line > span {
+    animation: none;
+    width: 100%;
+  }
+}

@@ -8,6 +8,7 @@ export const LINKS = [
 ];
 
 const TOOL_LINKS = [
+  { href: "/ask-summaverick", label: "Meet Summaverick" },
   { href: "/research", label: "Research" },
   { href: "/flights", label: "SkyFare" },
   { href: "/metals", label: "Metals" },
@@ -108,6 +109,7 @@ function isActive(href, path) {
     return [
       "/tools",
       "/research",
+      "/ask-summaverick",
       "/flights",
       "/metals",
       "/upsc",

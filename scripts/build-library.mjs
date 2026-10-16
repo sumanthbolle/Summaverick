@@ -183,6 +183,7 @@ function header(active) {
       ${link("/#examples", "", "Examples")}
       ${link("/#how-we-work", "", "How we work")}
       ${link("/#about", "", "About")}
+      ${link("/ask-summaverick", "ask-summaverick", "Meet Summaverick")}
       ${link("/research", "research", "Research")}
       ${link("/learn", "learn", "Resources")}
     </nav>
@@ -501,7 +502,7 @@ function main() {
     "utf8"
   );
 
-  const urls = ["/", "/research", "/learn", "/interviews", "/quiz", "/tools", "/search", "/flights", "/metals", "/upsc", "/advocate", "/signin"]
+  const urls = ["/", "/ask-summaverick", "/research", "/learn", "/interviews", "/quiz", "/tools", "/search", "/flights", "/metals", "/upsc", "/advocate", "/signin"]
     .concat(essays.map((e) => `/article/${e.slug}`))
     .concat(qas.map((q) => `/article/${q.slug}`));
   writeFileSync(join(ROOT, "public", "sitemap.xml"), sitemapXml(urls), "utf8");
