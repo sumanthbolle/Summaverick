@@ -33,6 +33,21 @@ function assert(cond, msg) {
 
 const coreChecks = [
   {
+    name: "Meet Summaverick page and same-origin chat",
+    run: async () => {
+      const res = await fetch(BASE + "/ask-summaverick?q=hello");
+      assert(res.status === 200, `assistant status ${res.status}`);
+      assert(new URL(res.url).pathname === "/ask-summaverick", "assistant redirected away");
+      const html = await res.text();
+      assert(html.includes("<title>Meet Summaverick"), "assistant title missing");
+      assert(html.includes("'/api/ask-summaverick'"), "assistant does not use this origin");
+      const invalid = await fetch(BASE + "/api/ask-summaverick", {
+        method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+      });
+      assert(invalid.status === 400, `invalid chat should be 400, got ${invalid.status}`);
+    },
+  },
+  {
     name: "home page is the product site",
     run: async () => {
       const res = await fetch(BASE + "/");
@@ -45,8 +60,8 @@ const coreChecks = [
         "home is still the placeholder stub, not the product site"
       );
       assert(
-        text.includes("AI agents for everyday life and work."),
-        "home missing the personal/enterprise agent headline"
+        text.includes("A software studio for AI agents."),
+        "home missing the software studio headline"
       );
       assert(
         text.includes("Personal assistants and enterprise agents"),

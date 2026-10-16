@@ -73,6 +73,7 @@ Pretty URLs (also served as `*.html`):
 | `/` | Company home — Store apps, implementations, AI, product work, fine-tuning |
 | `/quiz` | ServiceNow quiz |
 | `/learn` · `/interviews` · `/article/:slug` | Library |
+| `/ask-summaverick` | Meet Summaverick — general-purpose AI chat with citations, follow-ups, three answer depths, local chat history, and trending widgets |
 | `/research` | Summaverick Research for ServiceNow — chat assistant with streamed, cited answers and follow-ups (`/ask` redirects here) |
 | `/flights` | SkyFare |
 | `/metals` | Gold & silver |
@@ -97,3 +98,15 @@ Optional: `PERPLEXITY_WIRE` (`agent` or `sonar` to pin one Perplexity API; unset
 the Agent API and falls back to Sonar). `SESSION_SECRET` also signs research answers
 for follow-up questions, so set it in production.
 Never commit `.dev.vars`.
+
+## Meet Summaverick
+
+`/ask-summaverick` serves the assistant migrated from the personal website. It calls
+`POST /api/ask-summaverick` and `GET /api/trending` on this origin. The existing
+`PERPLEXITY_API_KEY` Worker secret powers both, through `src/lib/perplexity.ts`; no
+old-domain Worker or CORS configuration is required. A missing key returns 503,
+an upstream failure returns 502, and rate limits return 429. Questions are limited
+to 6,000 characters (including depth/format instructions), with the last 10
+conversation turns carried as context. Chat history stays in this browser on
+summaverick.com; history from the personal domain is not imported. `/research`
+and the legacy `/ask` redirect remain available for ServiceNow-specific research.

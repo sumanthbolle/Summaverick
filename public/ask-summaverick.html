@@ -1,0 +1,3388 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Meet Summaverick | Ask Summaverick</title>
+  <meta
+    name="description"
+    content="Summaverick is an AI-powered search assistant and conversational AI answer engine. Ask anything and get source-backed AI answers on news, code, careers, and research — a free alternative to Perplexity AI, ChatGPT search, and Google AI Overviews."
+  />
+  <meta
+    name="keywords"
+    content="AI, AI search, AI assistant, AI search engine, AI answer engine, conversational AI, generative AI, LLM, large language model, AI chatbot, AI agent, Perplexity alternative, ChatGPT alternative, AI research tool, Summaverick, Sumanth Bolle AI"
+  />
+  <meta name="author" content="Sumanth Bolle" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow" />
+  <link rel="canonical" href="https://summaverick.com/ask-summaverick" />
+  <meta property="og:site_name" content="Summaverick" />
+  <meta property="og:title" content="Meet Summaverick | Ask Summaverick" />
+  <meta
+    property="og:description"
+    content="AI-powered search assistant. Ask anything — get source-backed AI answers on news, code, research, and career decisions. A free conversational AI alternative to Perplexity, ChatGPT, and Google AI."
+  />
+  <meta property="og:image" content="https://summaverick.com/assets/ask-summaverick/summaverick-logo.png" />
+  <meta property="og:image:alt" content="Summaverick — glass arrow logo with flowing light trails" />
+  <meta property="og:url" content="https://summaverick.com/ask-summaverick" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Meet Summaverick | Ask Summaverick" />
+  <meta name="twitter:description" content="Conversational AI search that shows its sources. Ask anything about news, code, research, and careers." />
+  <meta name="twitter:image" content="https://summaverick.com/assets/ask-summaverick/summaverick-logo.png" />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+  <link rel="manifest" href="/assets/ask-summaverick/manifest.webmanifest" />
+  <meta name="theme-color" content="#050608" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "@id": "https://summaverick.com/ask-summaverick#app",
+        "name": "Summaverick",
+        "alternateName": ["Summaverick AI", "Summaverick AI Search"],
+        "url": "https://summaverick.com/ask-summaverick",
+        "description": "Summaverick is an AI-powered search assistant and conversational AI answer engine that returns source-backed answers on news, code, research, and career questions.",
+        "applicationCategory": "SearchApplication",
+        "applicationSubCategory": "AI Assistant",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires modern web browser with JavaScript",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "AI-powered conversational search",
+          "Source-backed answers with citations",
+          "Multi-turn context across questions",
+          "Quick, Deeper, and Full picture answer depths",
+          "Today trending news, markets, and tech widgets"
+        ],
+        "keywords": "AI, AI search, AI assistant, AI answer engine, conversational AI, generative AI, LLM",
+        "creator": {
+          "@id": "https://sumanthbolle.com/#person"
+        },
+        "publisher": {
+          "@id": "https://sumanthbolle.com/#person"
+        }
+      },
+      {
+        "@type": "Person",
+        "@id": "https://sumanthbolle.com/#person",
+        "name": "Sumanth Bolle",
+        "url": "https://sumanthbolle.com/",
+        "image": "https://sumanthbolle.com/profile.jpeg",
+        "jobTitle": "Senior Forward-Deployed AI Solutions Architect",
+        "sameAs": [
+          "https://www.linkedin.com/in/sumanthbolle/"
+        ]
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://summaverick.com/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Summaverick AI",
+            "item": "https://summaverick.com/ask-summaverick"
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --max: 1180px;
+      --chat: 860px;
+      --drawer-w: 300px;
+      --composer-h: 132px;
+      --ease: cubic-bezier(.22, 1, .36, 1);
+      --shadow-xl: 0 28px 90px rgba(0, 0, 0, 0.22);
+      --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.14);
+      --radius-xl: 32px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --rgb-red: #ff5f57;
+      --rgb-green: #28c840;
+      --rgb-blue: #3b82f6;
+      --rgb-pink: #ff4fd8;
+      --rgb-cyan: #33d6ff;
+      --rgb-violet: #8b5cf6;
+      --motion-instant: 100ms;
+      --motion-fast: 160ms;
+      --motion-normal: 260ms;
+      --motion-slow: 420ms;
+      --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+      --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+      --answer-max-width: 860px;
+      --bg-primary: #050608;
+      --bg-secondary: #090b10;
+      --surface-hover: rgba(255, 255, 255, 0.065);
+      --text-primary: #f5f5f7;
+      --text-secondary: rgba(255, 255, 255, 0.58);
+      --accent: #8ec5ff;
+      --accent-soft: rgba(142, 197, 255, 0.14);
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.14);
+    }
+
+    html[data-theme="dark"] {
+      --bg: #050608;
+      --bg-2: #090b10;
+      --surface: rgba(255, 255, 255, 0.045);
+      --surface-2: rgba(255, 255, 255, 0.065);
+      --surface-3: rgba(255, 255, 255, 0.085);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.13);
+      --text: #f5f5f7;
+      --text-soft: rgba(255, 255, 255, 0.84);
+      --text-muted: rgba(255, 255, 255, 0.58);
+      --text-faint: rgba(255, 255, 255, 0.34);
+      --link: #8ec5ff;
+      --topbar: rgba(5, 6, 8, 0.68);
+      --hero-glow-a: rgba(59, 130, 246, 0.15);
+      --hero-glow-b: rgba(168, 85, 247, 0.16);
+      --hero-glow-c: rgba(45, 212, 191, 0.11);
+      --ambient-opacity: 1;
+      --composer-bg: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.03));
+      --panel-bg: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025));
+      --body-bg:
+        radial-gradient(1000px 520px at 50% -12%, rgba(124, 58, 237, 0.16), transparent 56%),
+        radial-gradient(760px 360px at 82% 18%, rgba(34, 211, 238, 0.11), transparent 62%),
+        radial-gradient(720px 340px at 14% 82%, rgba(125, 211, 252, 0.07), transparent 64%),
+        linear-gradient(180deg, #040507 0%, #06080d 46%, #040507 100%);
+      --bottom-fade: linear-gradient(to top, rgba(5, 6, 8, 0.96), rgba(5, 6, 8, 0.8) 56%, transparent);
+      --send-bg: #ffffff;
+      --send-fg: #050608;
+    }
+
+    html[data-theme="light"] {
+      --bg: #f6f7fb;
+      --bg-2: #eef1f7;
+      --surface: rgba(255, 255, 255, 0.72);
+      --surface-2: rgba(255, 255, 255, 0.88);
+      --surface-3: rgba(255, 255, 255, 0.96);
+      --border: rgba(15, 23, 42, 0.08);
+      --border-strong: rgba(15, 23, 42, 0.14);
+      --text: #0f172a;
+      --text-soft: rgba(15, 23, 42, 0.88);
+      --text-muted: rgba(15, 23, 42, 0.62);
+      --text-faint: rgba(15, 23, 42, 0.38);
+      --link: #2563eb;
+      --topbar: rgba(246, 247, 251, 0.74);
+      --hero-glow-a: rgba(59, 130, 246, 0.12);
+      --hero-glow-b: rgba(236, 72, 153, 0.10);
+      --hero-glow-c: rgba(16, 185, 129, 0.10);
+      --ambient-opacity: 1;
+      --composer-bg: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.84));
+      --panel-bg: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72));
+      --body-bg:
+        radial-gradient(920px 480px at 50% -10%, rgba(99, 102, 241, 0.10), transparent 56%),
+        radial-gradient(740px 340px at 88% 18%, rgba(56, 189, 248, 0.09), transparent 62%),
+        radial-gradient(660px 320px at 12% 82%, rgba(236, 72, 153, 0.07), transparent 64%),
+        linear-gradient(180deg, #f8f9fc 0%, #f2f5fb 46%, #f7f9fc 100%);
+      --shadow-xl: 0 28px 90px rgba(15, 23, 42, 0.10);
+      --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.08);
+      --bottom-fade: linear-gradient(to top, rgba(246, 247, 251, 0.95), rgba(246, 247, 251, 0.78) 56%, transparent);
+      --send-bg: #0f172a;
+      --send-fg: #ffffff;
+      --bg-primary: #f6f7fb;
+      --bg-secondary: #eef1f7;
+      --surface-hover: rgba(255, 255, 255, 0.88);
+      --text-primary: #0f172a;
+      --text-secondary: rgba(15, 23, 42, 0.62);
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.08);
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      min-height: 100svh;
+      min-height: 100dvh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+      color: var(--text);
+      background: var(--body-bg);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;
+      transition: background 160ms var(--ease), color 160ms ease;
+    }
+
+    body.input-focused { --ambient-opacity: 1.08; }
+    body.loading-active { --ambient-opacity: 1.16; }
+
+    a { color: inherit; text-decoration: none; }
+    button, textarea { font: inherit; }
+
+    .ambient {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+      opacity: var(--ambient-opacity);
+      transition: opacity 500ms var(--ease);
+    }
+
+    .ambient::before,
+    .ambient::after,
+    .ambient .orb {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      filter: none;
+      opacity: 0.55;
+      transition: transform 420ms var(--ease), opacity 260ms ease;
+    }
+
+    .ambient::before {
+      width: 40rem;
+      height: 40rem;
+      left: 50%;
+      top: -14rem;
+      transform: translateX(-50%);
+      background: radial-gradient(circle at center, var(--hero-glow-b), transparent 58%);
+    }
+
+    .ambient::after {
+      width: 30rem;
+      height: 30rem;
+      right: -6rem;
+      top: 14%;
+      background: radial-gradient(circle at center, var(--hero-glow-a), transparent 60%);
+    }
+
+    .ambient .orb {
+      width: 26rem;
+      height: 26rem;
+      left: -8rem;
+      bottom: 10%;
+      background: radial-gradient(circle at center, var(--hero-glow-c), transparent 62%);
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      min-height: 100svh;
+      min-height: 100dvh;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      background: var(--topbar);
+      border-bottom: 1px solid var(--border);
+      transition: background 250ms ease, border-color 250ms ease;
+    }
+
+    .topbar-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,0.26), transparent 40%),
+        var(--surface);
+      transition: background 250ms ease, border-color 250ms ease;
+    }
+
+    html[data-theme="light"] .brand-mark {
+      background:
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,0.94), transparent 44%),
+        rgba(255,255,255,0.72);
+    }
+
+    .brand-mark svg {
+      width: 17px;
+      height: 17px;
+      fill: none;
+      stroke: var(--text-soft);
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .brand-copy { line-height: 1.02; }
+    .brand-name {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .brand-sub {
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--text-faint);
+      letter-spacing: -0.01em;
+    }
+
+    .brand-logo {
+      display: block;
+      height: 40px;
+      width: auto;
+      border-radius: 10px;
+      transition: transform 220ms var(--ease);
+    }
+
+    .brand:hover .brand-logo { transform: translateY(-1px); }
+
+    .hero-logo {
+      display: block;
+      height: 110px;
+      width: auto;
+      border-radius: 18px;
+      margin-bottom: 22px;
+    }
+
+    .topnav {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .topnav a {
+      font-size: 13px;
+      color: var(--text-muted);
+      transition: color 180ms ease;
+    }
+
+    .topnav a:hover { color: var(--text); }
+
+    .topnav {
+      --nav-drop-fg: var(--text-muted);
+      --nav-drop-accent: var(--text);
+      --nav-drop-line: var(--border-strong);
+    }
+
+    html[data-theme="dark"] .topnav {
+      --nav-drop-bg: #0e1016;
+      --nav-drop-hover: rgba(255, 255, 255, 0.07);
+    }
+
+    html[data-theme="light"] .topnav {
+      --nav-drop-bg: #fff;
+      --nav-drop-hover: rgba(15, 23, 42, 0.06);
+    }
+
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: background 250ms ease, border-color 250ms ease;
+    }
+
+    .theme-btn,
+    .new-btn {
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+    }
+
+    .theme-btn.active {
+      background: var(--surface-3);
+      color: var(--text);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset;
+    }
+
+    html[data-theme="light"] .theme-btn.active {
+      box-shadow: 0 1px 0 rgba(255,255,255,0.75) inset;
+    }
+
+    .new-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .new-btn:hover,
+    .theme-btn:hover { transform: translateY(-1px); }
+
+    .new-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .page {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+    }
+
+    .landing {
+      transition: opacity 600ms var(--ease), transform 700ms var(--ease), filter 500ms var(--ease);
+      transform-origin: top center;
+      padding-bottom: 28px;
+    }
+
+    .app-active .landing {
+      opacity: 0;
+      transform: translateY(-8px);
+      filter: none;
+      pointer-events: none;
+      height: 0;
+      overflow: hidden;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hero {
+      padding: 36px 0 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      align-items: flex-start;
+      min-height: 0;
+    }
+
+    .hero-copy { max-width: 680px; }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 18px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-faint);
+    }
+
+    .hero-title {
+      font-size: clamp(2.25rem, 5vw, 5rem);
+      line-height: 0.96;
+      letter-spacing: -0.04em;
+      font-weight: 620;
+    }
+
+    .hero-line { display: block; }
+    .hero-static { color: var(--text); }
+    .hero-phrase-wrap {
+      position: relative;
+      display: inline-flex;
+      min-height: 1.06em;
+      align-items: center;
+    }
+
+    .rgb-text {
+      color: var(--text);
+    }
+
+    .phrase {
+      display: inline-block;
+      transform-origin: center;
+      transition: opacity 420ms var(--ease), transform 420ms var(--ease), filter 420ms var(--ease);
+    }
+
+    .phrase.is-exit {
+      opacity: 0;
+      transform: translateY(12px) scale(0.985);
+      filter: blur(4px);
+    }
+
+    .phrase.is-enter {
+      opacity: 0;
+      transform: translateY(-12px) scale(1.012);
+      filter: blur(4px);
+    }
+
+    .phrase.is-enter-active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+
+    .hero-sub {
+      margin-top: 20px;
+      max-width: 600px;
+      font-size: 19px;
+      line-height: 1.52;
+      letter-spacing: -0.016em;
+      color: var(--text-muted);
+    }
+
+    .hero-notes {
+      margin-top: 30px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-note {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 13px;
+      color: var(--text-soft);
+      letter-spacing: -0.01em;
+      transition: background 250ms ease, border-color 250ms ease;
+    }
+
+    .hero-right {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .editorial {
+      position: relative;
+      border-radius: 30px;
+      border: 1px solid var(--border);
+      background: var(--panel-bg);
+      box-shadow: var(--shadow-xl);
+      padding: 22px;
+      overflow: hidden;
+      transition: background 250ms ease, border-color 250ms ease, box-shadow 250ms ease;
+    }
+
+    .editorial::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(120deg, rgba(59,130,246,0.08), transparent 35%),
+        linear-gradient(300deg, rgba(236,72,153,0.07), transparent 36%);
+      pointer-events: none;
+    }
+
+    html[data-theme="light"] .editorial::before {
+      background:
+        linear-gradient(120deg, rgba(59,130,246,0.055), transparent 35%),
+        linear-gradient(300deg, rgba(236,72,153,0.05), transparent 36%);
+    }
+
+    .editorial-head {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .editorial-label {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .editorial-region {
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+
+    .editorial-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 10px;
+    }
+
+    .lead-story,
+    .mini-story {
+      cursor: pointer;
+      transition: transform 220ms var(--ease), background 220ms ease, border-color 220ms ease;
+      outline: none;
+    }
+
+    .lead-story {
+      min-height: 228px;
+      padding: 20px 20px 18px;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .mini-story {
+      min-height: 132px;
+      padding: 16px 16px 14px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .lead-story:hover,
+    .mini-story:hover,
+    .lead-story:focus-visible,
+    .mini-story:focus-visible {
+      transform: translateY(-1px);
+      border-color: var(--border-strong);
+      background: var(--surface-2);
+    }
+
+    .lead-kicker,
+    .mini-kicker {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-bottom: 10px;
+    }
+
+    .lead-title {
+      font-size: 22px;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      font-weight: 620;
+      color: var(--text);
+      max-width: 15ch;
+    }
+
+    .lead-summary {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      max-width: 44ch;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .lead-meta,
+    .mini-meta {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mini-title {
+      font-size: 14px;
+      line-height: 1.34;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: var(--text-soft);
+    }
+
+    .skeleton-card {
+      min-height: 150px;
+      border-radius: 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .sk {
+      border-radius: 999px;
+      background: rgba(127, 127, 127, 0.16);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    .sk-1 { height: 12px; width: 30%; }
+    .sk-2 { height: 14px; width: 88%; border-radius: 7px; }
+    .sk-3 { height: 14px; width: 74%; border-radius: 7px; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.42; }
+      50% { opacity: 0.9; }
+    }
+
+    .starter-wrap { padding-bottom: calc(var(--composer-h) + 24px); }
+
+    .starter-head {
+      margin-bottom: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+    }
+
+    .starter-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .starter {
+      text-align: left;
+      padding: 15px 16px 16px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-soft);
+      cursor: pointer;
+      transition: transform 200ms var(--ease), background 180ms ease, border-color 180ms ease;
+    }
+
+    .starter:hover,
+    .starter:focus-visible {
+      transform: translateY(-1px);
+      background: var(--surface-2);
+      border-color: var(--border-strong);
+      outline: none;
+    }
+
+    .starter-kicker {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 11px;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-faint);
+    }
+
+    .starter span {
+      display: block;
+      font-size: 13.5px;
+      line-height: 1.45;
+      letter-spacing: -0.012em;
+      color: var(--text-muted);
+    }
+
+    .starter span em {
+      font-style: normal;
+      color: var(--link);
+    }
+
+    .conversation {
+      display: none;
+      max-width: var(--answer-max-width);
+      margin: 0 auto;
+      padding: 20px 0 calc(var(--composer-h) + 28px);
+      opacity: 0;
+      transform: translateY(10px);
+      min-width: 0;
+      transition: opacity 420ms var(--ease), transform 420ms var(--ease);
+    }
+
+    .app-active .conversation {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .msg {
+      margin-bottom: 30px;
+      animation: fadeUp 380ms var(--ease);
+    }
+
+    .msg.user {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .bubble {
+      max-width: 78%;
+      padding: 13px 16px;
+      border-radius: 20px 20px 8px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.58;
+      letter-spacing: -0.01em;
+      white-space: pre-wrap;
+      transition: background 250ms ease, border-color 250ms ease;
+    }
+
+    .msg.ai .content {
+      color: var(--text-soft);
+      font-size: 15px;
+      line-height: 1.76;
+      letter-spacing: -0.013em;
+    }
+
+    .stream-block {
+      animation: fadeUp 320ms var(--ease);
+    }
+
+    .content p,
+    .content ul,
+    .content ol,
+    .content pre,
+    .content h2,
+    .content h3 {
+      margin-bottom: 15px;
+    }
+
+    .content h2,
+    .content h3 {
+      margin-top: 24px;
+      line-height: 1.3;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .content h2 { font-size: 18px; }
+    .content h3 { font-size: 16px; }
+
+    .content strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .content code {
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--surface);
+      font-size: 13px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    .content,
+    .answer-content {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .content pre {
+      position: relative;
+      max-width: 100%;
+      overflow-x: auto;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 13px;
+      line-height: 1.6;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    .content table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+    }
+
+    .pre-copy {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      min-height: 32px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      cursor: pointer;
+      opacity: 1;
+      transition: opacity 160ms ease, color 160ms ease, background 160ms ease;
+    }
+
+    .content pre:hover .pre-copy,
+    .pre-copy:focus-visible { opacity: 1; }
+    .pre-copy:hover { color: var(--text); background: var(--surface-3); }
+
+    .content ul,
+    .content ol {
+      padding-left: 18px;
+    }
+
+    .content li { margin-bottom: 7px; }
+
+    .content a {
+      color: var(--link);
+      text-decoration: none;
+    }
+
+    .content a:hover { text-decoration: underline; }
+
+    .cite {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 17px;
+      height: 17px;
+      margin: 0 2px;
+      padding: 0 4px;
+      border-radius: 5px;
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      vertical-align: 1px;
+      transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+
+    .cite:hover {
+      background: var(--surface-2);
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+
+    .sources {
+      margin-top: 22px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .sources-label {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-bottom: 2px;
+    }
+
+    .source {
+      display: grid;
+      grid-template-columns: 22px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      transition: opacity 150ms ease;
+    }
+
+    .source-index {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    .source-title {
+      font-size: 13px;
+      line-height: 1.35;
+      color: var(--text-soft);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .source-domain {
+      margin-top: 2px;
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+
+    .source-arrow {
+      color: var(--text-faint);
+      font-size: 14px;
+    }
+
+    .related {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .related button {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+    }
+
+    .related button:hover {
+      background: var(--surface-2);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
+    /* ── Research step tracker (replaces the single rotating line) ── */
+    .research-steps {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 11px;
+      padding: 16px 20px 16px 18px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      min-width: 250px;
+      animation: fadeUp 320ms var(--ease);
+    }
+
+    .rstep {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      font-size: 13.5px;
+      letter-spacing: -0.01em;
+      color: var(--text-faint);
+      transition: color 300ms ease;
+    }
+
+    .rstep-ic {
+      width: 16px;
+      height: 16px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .rstep .ring {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      opacity: 0.3;
+    }
+
+    .rstep.active { color: var(--text-soft); }
+
+    .rstep.active .ring {
+      display: none;
+    }
+
+    .rstep.active .activity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: activity-pulse 1.6s ease-in-out infinite;
+    }
+
+    .rstep.done { color: var(--text-muted); }
+
+    .rstep-ic svg {
+      width: 14px;
+      height: 14px;
+      stroke: var(--rgb-green);
+      fill: none;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    @keyframes activity-pulse {
+      0%, 100% { opacity: 0.35; transform: scale(0.92); }
+      50% { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Source chips shown above the answer (research-agent pattern) ── */
+    .src-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 16px;
+      scrollbar-width: none;
+      animation: fadeUp 320ms var(--ease);
+    }
+
+    .src-chips::-webkit-scrollbar { display: none; }
+
+    .src-chip {
+      flex: 0 0 auto;
+      width: 190px;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      transition: transform 180ms var(--ease), background 160ms ease, border-color 160ms ease;
+    }
+
+    .src-chip:hover,
+    .src-chip:focus-visible {
+      transform: translateY(-1px);
+      background: var(--surface-2);
+      border-color: var(--border-strong);
+      outline: none;
+    }
+
+    .src-chip-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+      font-size: 10.5px;
+      color: var(--text-faint);
+      min-width: 0;
+    }
+
+    .src-chip-top .source-index { width: 18px; height: 18px; border-radius: 6px; flex-shrink: 0; }
+
+    .src-chip-domain {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .src-chip-title {
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--text-soft);
+      letter-spacing: -0.01em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ── Answer toolbar ── */
+    .answer-actions {
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      animation: fadeUp 320ms var(--ease);
+    }
+
+    .act-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 13px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
+    }
+
+    .act-btn:hover {
+      background: var(--surface-2);
+      border-color: var(--border-strong);
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+
+    .act-btn svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .answer-meta {
+      font-size: 12px;
+      color: var(--text-faint);
+      letter-spacing: -0.01em;
+    }
+
+    .trunc-note {
+      margin-top: 18px;
+      font-size: 12.5px;
+      color: #d97706;
+      letter-spacing: -0.01em;
+    }
+
+    html[data-theme="dark"] .trunc-note { color: #fbbf24; }
+
+    .act-accent {
+      border-color: rgba(217, 119, 6, 0.45);
+      color: #d97706;
+    }
+
+    html[data-theme="dark"] .act-accent {
+      border-color: rgba(251, 191, 36, 0.4);
+      color: #fbbf24;
+    }
+
+    .act-accent:hover { color: #b45309; }
+    html[data-theme="dark"] .act-accent:hover { color: #fcd34d; }
+
+    /* ── Jump to latest (shown when new content lands below the fold) ── */
+    .jump-latest {
+      position: fixed;
+      left: 50%;
+      bottom: calc(var(--composer-h) + 14px);
+      transform: translate(-50%, 10px);
+      z-index: 44;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 36px;
+      padding: 0 15px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-3);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: var(--shadow-lg);
+      color: var(--text-soft);
+      font-size: 12.5px;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms var(--ease), transform 220ms var(--ease);
+    }
+
+    .jump-latest.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    .jump-latest svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    @media (min-width: 1024px) {
+      .jump-latest { left: calc(50% + var(--drawer-w) / 2); }
+    }
+
+    .composer-wrap {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 45;
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      background: var(--bottom-fade);
+      transition: background 160ms ease;
+    }
+
+    .composer-shell {
+      max-width: var(--chat);
+      margin: 0 auto;
+    }
+
+    .composer {
+      border-radius: 30px;
+      border: 1px solid var(--border);
+      background: var(--composer-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-xl);
+      padding: 12px;
+      transition: border-color 200ms ease, transform 220ms var(--ease), background 200ms ease, box-shadow 220ms ease;
+    }
+
+    body.input-focused .composer {
+      transform: translateY(-1px) scale(1.004);
+      border-color: var(--border-strong);
+    }
+
+    .composer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 4px 4px 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+
+    .mode-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .mode-pill {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-faint);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+      white-space: nowrap;
+    }
+
+    .mode-pill:hover {
+      background: var(--surface-2);
+      color: var(--text-soft);
+    }
+
+    .mode-pill.active {
+      background: var(--surface-3);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
+    .composer-mode-note {
+      font-size: 12px;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+
+    .composer-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    .composer-stage {
+      position: relative;
+      flex: 1;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+    }
+
+    .composer textarea {
+      flex: 1;
+      min-height: 28px;
+      max-height: 160px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.5;
+      letter-spacing: -0.012em;
+      padding: 4px 4px 2px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .composer-hint {
+      position: absolute;
+      left: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      z-index: 1;
+      font-size: 16px;
+      line-height: 1.5;
+      letter-spacing: -0.012em;
+      color: var(--text-faint);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: calc(100% - 12px);
+      transition: opacity 180ms ease;
+    }
+
+    .composer.has-input .composer-hint,
+    body.input-focused .composer.has-focus .composer-hint {
+      opacity: 0;
+    }
+
+    .composer-hint .phrase { min-width: 1px; }
+
+    .send {
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: 0;
+      background: var(--send-bg);
+      color: var(--send-fg);
+      display: grid;
+      place-items: center;
+      opacity: 0.32;
+      pointer-events: none;
+      cursor: pointer;
+      transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease, background 200ms ease, color 200ms ease;
+      flex-shrink: 0;
+    }
+
+    .send.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .send:hover {
+      transform: scale(1.045);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.14);
+    }
+
+    .send svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .composer-meta {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-faint);
+      transition: opacity 180ms ease;
+    }
+
+    .composer-meta.faded {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .composer-meta a { border-bottom: 1px solid var(--border-strong); }
+
+    .footer-space { height: calc(var(--composer-h) + 8px); }
+
+    /* ─── Chat history drawer (Copilot / ChatGPT style) ─── */
+    .icon-btn {
+      height: 32px;
+      width: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-soft);
+      cursor: pointer;
+      transition: background 180ms ease, color 180ms ease, transform 180ms ease, border-color 180ms ease;
+    }
+
+    .icon-btn:hover { transform: translateY(-1px); color: var(--text); }
+    .icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 55;
+      background: rgba(0, 0, 0, 0.42);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 260ms var(--ease);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+    }
+
+    .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 60;
+      height: 100%;
+      width: var(--drawer-w);
+      max-width: 86vw;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-2);
+      border-right: 1px solid var(--border);
+      box-shadow: var(--shadow-xl);
+      transform: translateX(-102%);
+      transition: transform 320ms var(--ease);
+    }
+
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 60px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .drawer-title { font-size: 15px; font-weight: 620; letter-spacing: -0.01em; }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 10px 16px;
+    }
+
+    .chat-list { display: flex; flex-direction: column; gap: 4px; }
+
+    .chat-item {
+      position: relative;
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 11px 40px 11px 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-soft);
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .chat-item:hover { background: var(--surface); }
+    .chat-item.active { background: var(--surface-2); border-color: var(--border-strong); }
+
+    .chat-item-title {
+      font-size: 13.5px;
+      line-height: 1.35;
+      font-weight: 550;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .chat-item-time { margin-top: 3px; font-size: 11px; color: var(--text-faint); }
+
+    .chat-del {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      transform: translateY(-50%);
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      border: 0;
+      background: transparent;
+      color: var(--text-faint);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      transition: opacity 150ms ease, background 150ms ease, color 150ms ease;
+    }
+
+    .chat-item:hover .chat-del,
+    .chat-item:focus-within .chat-del { opacity: 1; }
+    .chat-del:hover { background: var(--surface-3); color: var(--rgb-red); }
+    .chat-del svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+    .chat-empty {
+      padding: 34px 16px;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .drawer-foot {
+      border-top: 1px solid var(--border);
+      padding: 12px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .clear-all {
+      width: 100%;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+    }
+
+    .clear-all:hover { color: var(--rgb-red); border-color: var(--border-strong); }
+    .drawer-note { font-size: 11px; color: var(--text-faint); line-height: 1.5; text-align: center; }
+
+    /* On wider screens the history panel is docked open permanently
+       (ChatGPT / Copilot style) and the rest of the app shifts right. */
+    @media (min-width: 1024px) {
+      .shell { padding-left: var(--drawer-w); }
+      .drawer {
+        transform: none;
+        box-shadow: none;
+        background: var(--bg);
+      }
+      .drawer-overlay { display: none !important; }
+      #historyBtn,
+      #drawerClose { display: none; }
+      .composer-wrap { left: var(--drawer-w); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 980px) {
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 30px;
+        padding-top: 46px;
+        min-height: auto;
+      }
+
+      .starter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 760px) {
+      .page,
+      .topbar-inner {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .topnav > a,
+      .topnav > .nav-drop { display: none; }
+
+      /* Tighten the top-bar controls so the Menu toggle, theme switch,
+         history, and new-chat button fit without horizontal scroll at 320px. */
+      .topbar-inner { gap: 12px; }
+      .topnav { gap: 10px; }
+
+      .hero { padding-top: 34px; }
+
+      .hero-title {
+        font-size: 46px;
+        max-width: 9.6ch;
+      }
+
+      .hero-sub { font-size: 16px; }
+      .editorial {
+        padding: 16px;
+        border-radius: 24px;
+      }
+
+      .lead-story { min-height: 186px; }
+      .lead-title { font-size: 20px; }
+      .mini-grid { grid-template-columns: 1fr; }
+      .starter-grid { grid-template-columns: 1fr; }
+      .bubble { max-width: 88%; }
+      .composer-wrap { padding: 14px 14px 18px; }
+
+      .composer-top {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .mode-group {
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .mode-group::-webkit-scrollbar { display: none; }
+      .composer-mode-note { white-space: normal; }
+      .new-btn-label { display: none; }
+      .new-btn {
+        padding: 0;
+        width: 32px;
+        justify-content: center;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="/assets/ask-summaverick/nav-utilities.css">
+  <link rel="stylesheet" href="/assets/ask-summaverick/summaverick-how.css">
+  <link rel="stylesheet" href="/assets/ask-summaverick/summaverick-workspace.css">
+</head>
+<body>
+  <div class="ambient"><div class="orb"></div></div>
+
+  <div class="shell app-shell" id="appShell" data-app-state="resting">
+    <header class="topbar app-header">
+      <div class="topbar-inner">
+        <button class="hamburger" id="workspaceMenuBtn" type="button" aria-label="Open navigation and chats" aria-controls="chatDrawer" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <a class="brand" href="/" aria-label="Summaverick — home">
+          <img class="brand-logo" src="/assets/ask-summaverick/summaverick-logo.png" alt="" width="76" height="40" />
+          <span class="brand-wordmark">Summaverick</span>
+        </a>
+
+        <nav class="topnav" aria-label="Primary">
+          <div class="nav-drop" data-nav-drop data-nav-group="learn">
+            <button type="button" class="nav-drop__btn" aria-expanded="false" aria-controls="navLearn">Learn<svg class="nav-drop__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="nav-drop__menu" id="navLearn" data-nav-panel="learn">
+              <a href="/research"><span class="nav-drop__name">ServiceNow Research</span><span class="nav-drop__desc">Platform guides and practice</span></a>
+              <a href="/learn"><span class="nav-drop__name">Articles &amp; Tutorials</span><span class="nav-drop__desc">Technical articles and walkthroughs</span></a>
+              <a href="/interviews"><span class="nav-drop__name">Interview Prep</span><span class="nav-drop__desc">Scenario questions and explanations</span></a>
+              <a href="/upsc"><span class="nav-drop__name">UPSC Today</span><span class="nav-drop__desc">Current affairs and revision</span></a>
+            </div>
+          </div>
+          <div class="nav-drop" data-nav-drop data-nav-group="tools">
+            <button type="button" class="nav-drop__btn" aria-expanded="false" aria-controls="navTools">Tools<svg class="nav-drop__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="nav-drop__menu" id="navTools" data-nav-panel="tools">
+              <a href="/flights"><span class="nav-drop__name">SkyFare</span><span class="nav-drop__desc">Flight search and fare comparison</span></a>
+              <a href="/metals"><span class="nav-drop__name">Metals</span><span class="nav-drop__desc">Gold and silver prices</span></a>
+              <a href="/tools"><span class="nav-drop__name">Tools</span><span class="nav-drop__desc">Explore all tools</span></a>
+            </div>
+          </div>
+          <a data-nav-link="summaverick" class="active" aria-current="page" href="/ask-summaverick">Meet Summaverick</a>
+          <a data-nav-link="about" href="/#about">About</a>
+          <button class="site-menu-toggle" type="button" data-site-menu-toggle aria-expanded="false" aria-controls="siteMobileNav">Menu</button>
+          <div class="site-mobile-menu" id="siteMobileNav" data-mobile-nav data-site-mobile-menu>
+            <a href="/">Home</a>
+            <span class="mobile-menu__label" data-mobile-group="learn">Learn</span>
+            <a class="mobile-menu__sub" href="/research">ServiceNow Research</a>
+            <a class="mobile-menu__sub" href="/learn">Articles &amp; Tutorials</a>
+            <a class="mobile-menu__sub" href="/interviews">Interview Prep</a>
+            <a class="mobile-menu__sub" href="/upsc">UPSC Today</a>
+            <span class="mobile-menu__label" data-mobile-group="tools">Tools</span>
+            <a class="mobile-menu__sub" href="/flights">SkyFare</a>
+            <a class="mobile-menu__sub" href="/metals">Metals</a>
+            <a class="mobile-menu__sub" href="/tools">Tools</a>
+            <a class="active" aria-current="page" href="/ask-summaverick">Meet Summaverick</a>
+            <a href="/#about">About</a>
+          </div>
+
+          <div class="theme-toggle" aria-label="Theme">
+            <button class="theme-btn" type="button" data-theme="light">Light</button>
+            <button class="theme-btn active" type="button" data-theme="dark">Dark</button>
+          </div>
+
+          <button class="icon-btn" id="historyBtn" type="button" aria-label="Chat history" title="Chat history" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-8 5"></path><path d="M3 4v4h4"></path><path d="M12 8v4l3 2"></path></svg>
+          </button>
+
+          <button class="new-btn" id="newChatBtn" type="button" aria-label="New conversation" title="New conversation">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span class="new-btn-label">New chat</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page workspace">
+      <div class="workspace-main">
+      <section class="landing" id="landing">
+        <section class="hero">
+          <div class="hero-copy">
+            <img class="hero-logo hero-item" src="/assets/ask-summaverick/summaverick-logo.png" alt="" width="209" height="110" />
+
+            <h1 class="hero-title hero-item">
+              <span class="hero-line hero-static">Meet Summaverick.</span>
+              <span class="hero-line">Ask anything.</span>
+            </h1>
+
+            <p class="hero-sub hero-item">
+              For questions that need more than a quick answer.
+              News, code, work, career decisions, and the strange corners of the internet —
+              with the sources left visible.
+            </p>
+
+            <div class="trust-row hero-item" aria-label="Product promises">
+              <span class="trust-item"><i aria-hidden="true"></i> Live web</span>
+              <span class="trust-item"><i aria-hidden="true"></i> Sources shown</span>
+              <span class="trust-item"><i aria-hidden="true"></i> Private</span>
+              <span class="trust-item"><i aria-hidden="true"></i> No account</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="starter-wrap">
+          <div class="starter-head">Try one of these</div>
+          <div class="starter-grid" id="starterGrid"></div>
+        </section>
+
+        <section class="sm-how" id="summaverick-how" aria-label="How Summaverick works">
+          <div class="sm-how__pin">
+            <div class="sm-how__copy">
+              <p class="sm-how__kicker">How it works</p>
+              <div class="sm-how__acts">
+                <div class="sm-how-line" aria-hidden="true"><span></span></div>
+                <article class="sm-how__act" data-act="0">
+                  <span class="sm-how__index">01</span>
+                  <h2 class="sm-how__title">Search</h2>
+                  <p class="sm-how__body">You ask once. Summaverick queries the live web — not a frozen training cutoff.</p>
+                </article>
+                <article class="sm-how__act" data-act="1">
+                  <span class="sm-how__index">02</span>
+                  <h2 class="sm-how__title">Live search</h2>
+                  <p class="sm-how__body">Sources arrive as they are found. Headlines, docs, and papers land while the answer is still being built.</p>
+                </article>
+                <article class="sm-how__act" data-act="2">
+                  <span class="sm-how__index">03</span>
+                  <h2 class="sm-how__title">Reasoning</h2>
+                  <p class="sm-how__body">Each claim is walked: understand, search, read, then check. Nothing is guessed in one leap.</p>
+                </article>
+                <article class="sm-how__act" data-act="3">
+                  <span class="sm-how__index">04</span>
+                  <h2 class="sm-how__title">Accuracy</h2>
+                  <p class="sm-how__body">The answer keeps its receipts. Citations stay attached, and disagreement between sources stays visible.</p>
+                </article>
+              </div>
+              <button class="sm-how__cta" type="button">
+                Ask from here
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="support-block" aria-label="Today">
+            <section class="editorial">
+              <div class="editorial-head">
+                <div class="editorial-label">Today</div>
+                <div class="editorial-region" id="trendingRegion">Loading</div>
+              </div>
+
+              <div class="editorial-grid" id="trendingGrid">
+                <div class="skeleton-card">
+                  <div class="sk sk-1"></div>
+                  <div class="sk sk-2"></div>
+                  <div class="sk sk-3"></div>
+                </div>
+                <div class="mini-grid">
+                  <div class="skeleton-card">
+                    <div class="sk sk-1"></div>
+                    <div class="sk sk-2"></div>
+                    <div class="sk sk-3"></div>
+                  </div>
+                  <div class="skeleton-card">
+                    <div class="sk sk-1"></div>
+                    <div class="sk sk-2"></div>
+                    <div class="sk sk-3"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+        </section>
+      </section>
+
+      <section class="conversation" id="chatArea"></section>
+      <div class="footer-space"></div>
+      </div>
+      <aside class="source-rail" id="sourceRail" hidden>
+        <div class="source-rail-head">
+          <div class="source-rail-title">Sources</div>
+        </div>
+        <div class="source-rail-list" id="sourceRailList"></div>
+      </aside>
+    </main>
+
+    <button class="jump-latest" id="jumpLatest" type="button" aria-label="Jump to latest">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"></path></svg>
+      Jump to latest
+    </button>
+
+    <div class="composer-wrap">
+      <div class="composer-shell">
+        <div class="composer" id="composer">
+          <div class="composer-top">
+            <div class="mode-group" id="depthModes" role="radiogroup" aria-label="Research depth">
+              <span class="mode-indicator" aria-hidden="true"></span>
+              <button class="mode-pill active" type="button" role="radio" aria-checked="true" data-mode="quick">Quick</button>
+              <button class="mode-pill" type="button" role="radio" aria-checked="false" data-mode="deeper">Deeper</button>
+              <button class="mode-pill" type="button" role="radio" aria-checked="false" data-mode="research">Full picture</button>
+            </div>
+            <div class="composer-mode-note" id="modeNote">Direct answer, less context.</div>
+          </div>
+
+          <div class="composer-row">
+            <div class="composer-stage">
+              <textarea id="queryInput" rows="1" autocomplete="off" spellcheck="false" aria-label="Ask Summaverick"></textarea>
+              <div class="composer-hint" id="composerHint" aria-hidden="true">
+                <span class="phrase" id="composerPhrase">Ask anything</span>
+              </div>
+            </div>
+
+            <button class="send" id="sendBtn" type="button" aria-label="Send">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 19V5"></path>
+                <path d="M6 11l6-6 6 6"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="composer-meta" id="inputMeta">
+          <span>Free · sources shown · no account · built by <a href="https://www.linkedin.com/in/sumanthbolle/" target="_blank" rel="noopener">Sumanth Bolle</a></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-overlay" id="drawerOverlay" hidden></div>
+    <aside class="drawer" id="chatDrawer" aria-label="Chat history" aria-hidden="true">
+      <div class="drawer-head">
+        <div class="drawer-title">Chats</div>
+        <button class="icon-btn" id="drawerClose" type="button" aria-label="Close history">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <nav class="drawer-site" aria-label="Site">
+        <a href="/">Home</a>
+        <span class="mobile-menu__label">Learn</span>
+        <a href="/research">ServiceNow Research</a>
+        <a href="/learn">Articles &amp; Tutorials</a>
+        <a href="/interviews">Interview Prep</a>
+        <a href="/upsc">UPSC Today</a>
+        <span class="mobile-menu__label">Tools</span>
+        <a href="/flights">SkyFare</a>
+        <a href="/metals">Metals</a>
+        <a href="/tools">Tools</a>
+        <a href="/#about">About</a>
+      </nav>
+      <div class="drawer-body">
+        <div class="chat-list" id="chatList"></div>
+      </div>
+      <div class="drawer-foot">
+        <div class="theme-toggle drawer-theme" aria-label="Theme">
+          <button class="theme-btn" type="button" data-theme="light">Light</button>
+          <button class="theme-btn" type="button" data-theme="dark">Dark</button>
+        </div>
+        <button class="clear-all" id="clearAllBtn" type="button">Clear all chats</button>
+        <div class="drawer-note">Saved on this device only. Clears when you clear your browser data.</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="cite-sheet-overlay" id="citeSheetOverlay" hidden></div>
+  <div class="cite-preview" id="citePreview" hidden>
+    <div class="cite-preview__source" data-cite-source></div>
+    <div class="cite-preview__title" data-cite-title></div>
+    <p class="cite-preview__excerpt" data-cite-excerpt hidden></p>
+    <a class="cite-preview__open" data-cite-open href="#" target="_blank" rel="noopener">Open source</a>
+  </div>
+  <div class="cite-sheet" id="citeSheet" hidden role="dialog" aria-label="Source preview">
+    <div class="cite-sheet-head">
+      <div class="cite-preview__source" data-cite-source></div>
+      <button class="cite-sheet-close" type="button" aria-label="Close source preview">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="cite-preview__title" data-cite-title></div>
+    <p class="cite-preview__excerpt" data-cite-excerpt hidden></p>
+    <a class="cite-sheet__open" data-cite-open href="#" target="_blank" rel="noopener">Open source</a>
+  </div>
+
+  <script>
+    window.SB_AI_SEARCH_ENDPOINT = '/api/ask-summaverick';
+
+    (function () {
+      'use strict';
+
+      const ENDPOINT = window.SB_AI_SEARCH_ENDPOINT;
+      const MAX_CONTEXT_MESSAGES = 10;
+      const THEME_KEY = 'sv-theme';
+      const CHATS_KEY = 'summaverick-chats';
+      const MAX_CHATS = 60;
+
+      /* Lightweight prompt chips — four jobs, not a wall of AI cards.
+       * `run` submits immediately; `fill` drops a template into the composer
+       * with the [blank] pre-selected so typing replaces it. */
+      const starters = [
+        { kicker: 'Understand', fill: 'Explain [a topic] in simple words, like I’m completely new to it.', text: 'Understand something' },
+        { kicker: 'Compare', fill: 'Compare [option one] and [option two] — trade-offs, evidence, and which is better for me.', text: 'Compare options' },
+        { kicker: 'Research', fill: 'Research [a topic]: what is settled, what is disputed, and which sources matter.', text: 'Research a topic' },
+        { kicker: 'Debug', fill: 'Help me debug [this error or unexpected behavior]. Walk through likely causes and what to check first.', text: 'Debug something' }
+      ];
+
+      const followUps = {
+        simpler: 'Explain your last answer again in plain, simple words for someone completely new to the topic. Keep the sources.',
+        deeper: 'Go deeper on your last answer — more detail, the trade-offs, and where sources or experts disagree.',
+        continue: 'Continue your previous answer from exactly where it stopped. Do not repeat what you already covered.'
+      };
+
+      /* Sent with every query (never shown in the user's bubble): keeps
+       * answers human-readable and stops the model from over-committing to
+       * long template lists that hit the response limit mid-sentence. */
+      const STYLE_GUIDE = ' (Formatting: write for a general reader in plain English. Use short headings and short paragraphs or simple bullets only where they help. Never use label templates like "The Story:" or "Plain Explanation:". Cover fewer points fully rather than many points cut short, and always finish your final sentence.)';
+
+      const modeMeta = {
+        quick: {
+          note: 'Direct answer, less context.',
+          prefix: '',
+          label: 'Quick',
+          steps: ['Understanding', 'Searching', 'Writing']
+        },
+        deeper: {
+          note: 'More nuance, more context.',
+          prefix: 'Answer with extra context and trade-offs: ',
+          label: 'Deeper',
+          steps: ['Understanding', 'Searching', 'Reading', 'Writing']
+        },
+        research: {
+          note: 'Fuller answer, stronger context.',
+          prefix: 'Give a fuller research-style answer with context and strong sourcing: ',
+          label: 'Full picture',
+          steps: ['Understanding', 'Searching', 'Reading', 'Cross-checking', 'Writing']
+        }
+      };
+
+      const icons = {
+        externalLink: '<svg viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>',
+        check: '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
+        copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+        simple: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14.5a4.5 4.5 0 0 0 7 0"/></svg>',
+        layers: '<svg viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/></svg>'
+      };
+
+      const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+      const state = {
+        history: [],
+        messages: [],
+        currentId: null,
+        loading: false,
+        mode: 'quick',
+        loadingTimer: null,
+        loadingIndex: 0,
+        followAnswer: true
+      };
+
+      const root = document.documentElement;
+      const body = document.body;
+      const appShell = document.getElementById('appShell');
+      const landing = document.getElementById('landing');
+      const starterGrid = document.getElementById('starterGrid');
+      const chatArea = document.getElementById('chatArea');
+      const queryInput = document.getElementById('queryInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const newChatBtn = document.getElementById('newChatBtn');
+      const inputMeta = document.getElementById('inputMeta');
+      const composer = document.getElementById('composer');
+      const depthModes = document.getElementById('depthModes');
+      const modeNote = document.getElementById('modeNote');
+      const trendingGrid = document.getElementById('trendingGrid');
+      const trendingRegion = document.getElementById('trendingRegion');
+      const composerPhrase = document.getElementById('composerPhrase');
+      const sourceRail = document.getElementById('sourceRail');
+      const sourceRailList = document.getElementById('sourceRailList');
+      const workspaceMenuBtn = document.getElementById('workspaceMenuBtn');
+      const themeButtons = Array.from(document.querySelectorAll('.theme-btn'));
+      const historyBtn = document.getElementById('historyBtn');
+      const chatDrawer = document.getElementById('chatDrawer');
+      const drawerOverlay = document.getElementById('drawerOverlay');
+      const chatList = document.getElementById('chatList');
+      const drawerClose = document.getElementById('drawerClose');
+      const clearAllBtn = document.getElementById('clearAllBtn');
+      const jumpLatest = document.getElementById('jumpLatest');
+
+      function init() {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/ask-summaverick-sw.js', { scope: '/ask-summaverick' }).catch(function () {});
+        }
+        applyInitialTheme();
+        renderStarters();
+        bindEvents();
+        resizeTextarea();
+        observeComposerHeight();
+        updateComposerState();
+        updateSendState();
+        setMode('quick');
+        loadTrending();
+        renderChatList();
+        syncDrawerMode();
+        if (window.matchMedia) {
+          const dockMql = window.matchMedia('(min-width: 1024px)');
+          const onDockChange = function () { syncDrawerMode(); };
+          if (dockMql.addEventListener) dockMql.addEventListener('change', onDockChange);
+          else if (dockMql.addListener) dockMql.addListener(onDockChange);
+        }
+        maybeHandleQueryParam();
+      }
+
+      // Deep-link support: /ask-summaverick?q=... prefills the composer and, when
+      // valid, auto-submits. Used by the quiz "Explain with Summaverick AI"
+      // buttons and any shared link. The query is cleared from the URL so a
+      // refresh doesn't resubmit.
+      function maybeHandleQueryParam() {
+        var raw = '';
+        try {
+          raw = new URLSearchParams(window.location.search).get('q') || '';
+        } catch (e) {
+          return;
+        }
+        var q = raw.trim();
+        if (!q) return;
+        if (q.length > 1000) q = q.slice(0, 1000);
+        try {
+          var clean = window.location.pathname + window.location.hash;
+          window.history.replaceState(null, '', clean);
+        } catch (e) { /* ignore */ }
+        if (q.length < 2) {
+          queryInput.value = q;
+          updateComposerState();
+          resizeTextarea();
+          updateSendState();
+          return;
+        }
+        submitQuery(q);
+      }
+
+      function bindEvents() {
+        sendBtn.addEventListener('click', handleSend);
+
+        queryInput.addEventListener('input', function () {
+          updateComposerState();
+          updateSendState();
+          resizeTextarea();
+        });
+
+        queryInput.addEventListener('focus', function () {
+          body.classList.add('input-focused');
+          composer.classList.add('has-focus');
+          updateComposerState();
+        });
+
+        queryInput.addEventListener('blur', function () {
+          body.classList.remove('input-focused');
+          composer.classList.remove('has-focus');
+          updateComposerState();
+        });
+
+        queryInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+          }
+        });
+
+        starterGrid.addEventListener('click', function (e) {
+          const btn = e.target.closest('[data-starter]');
+          if (!btn) return;
+          const item = starters[Number(btn.dataset.starter)];
+          if (!item) return;
+          if (item.run) submitQuery(item.run);
+          else if (item.fill) fillComposer(item.fill);
+        });
+
+        depthModes.addEventListener('click', function (e) {
+          const btn = e.target.closest('[data-mode]');
+          if (!btn) return;
+          setMode(btn.dataset.mode);
+        });
+
+        chatArea.addEventListener('click', function (e) {
+          const related = e.target.closest('[data-related]');
+          if (related) {
+            submitQuery(related.dataset.related);
+            return;
+          }
+
+          const followup = e.target.closest('[data-followup]');
+          if (followup && followUps[followup.dataset.followup]) {
+            submitQuery(followUps[followup.dataset.followup]);
+            return;
+          }
+
+          const chip = e.target.closest('.src-chip');
+          if (chip) {
+            e.preventDefault();
+            if (window.SVWorkspace && window.SVWorkspace.openCite) {
+              window.SVWorkspace.openCite(chip, {
+                url: chip.dataset.url || '',
+                title: chip.dataset.title || chip.title || '',
+                source: chip.dataset.source || '',
+                excerpt: chip.dataset.excerpt || ''
+              });
+            } else if (chip.dataset.url) {
+              window.open(chip.dataset.url, '_blank', 'noopener');
+            }
+            return;
+          }
+
+          const cite = e.target.closest('.cite');
+          if (cite) {
+            e.preventDefault();
+          }
+        });
+
+        jumpLatest.addEventListener('click', function () {
+          scrollToBottom();
+          jumpLatest.classList.remove('show');
+        });
+
+        window.addEventListener('scroll', function () {
+          state.followAnswer = isNearBottom();
+          updateJumpPill();
+        }, { passive: true });
+
+        // "/" focuses the composer from anywhere (standard research-agent shortcut)
+        document.addEventListener('keydown', function (e) {
+          if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+          const el = document.activeElement;
+          if (el === queryInput || (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable))) return;
+          e.preventDefault();
+          queryInput.focus();
+        });
+
+        newChatBtn.addEventListener('click', resetChat);
+
+        historyBtn.addEventListener('click', toggleDrawer);
+        if (workspaceMenuBtn) {
+          workspaceMenuBtn.addEventListener('click', function () {
+            toggleDrawer();
+          });
+        }
+        drawerClose.addEventListener('click', closeDrawer);
+        drawerOverlay.addEventListener('click', closeDrawer);
+        clearAllBtn.addEventListener('click', clearAllChats);
+
+        chatList.addEventListener('click', function (e) {
+          const del = e.target.closest('[data-del]');
+          if (del) {
+            e.stopPropagation();
+            deleteConversation(del.getAttribute('data-del'));
+            return;
+          }
+          const item = e.target.closest('[data-open]');
+          if (item) loadConversation(item.getAttribute('data-open'));
+        });
+
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && chatDrawer.classList.contains('open')) closeDrawer();
+        });
+
+        themeButtons.forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            setTheme(btn.dataset.theme);
+          });
+        });
+      }
+
+      function applyInitialTheme() {
+        // One theme across the site; fall back to the older Summaverick-only key.
+        const saved = localStorage.getItem(THEME_KEY) || localStorage.getItem('summaverick-theme');
+        if (saved === 'light' || saved === 'dark') {
+          setTheme(saved, false);
+          return;
+        }
+        const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        setTheme(prefersLight ? 'light' : 'dark', false);
+      }
+
+      function setTheme(theme, persist = true) {
+        root.setAttribute('data-theme', theme);
+        themeButtons.forEach(function (btn) {
+          btn.classList.toggle('active', btn.dataset.theme === theme);
+        });
+        if (persist) localStorage.setItem(THEME_KEY, theme);
+      }
+
+      function observeComposerHeight() {
+        const wrap = document.querySelector('.composer-wrap');
+        if (!wrap) return;
+
+        const apply = function () {
+          const h = Math.ceil(wrap.getBoundingClientRect().height);
+          document.documentElement.style.setProperty('--composer-h', h + 'px');
+        };
+
+        apply();
+        if (typeof ResizeObserver === 'function') {
+          new ResizeObserver(apply).observe(wrap);
+        } else {
+          window.addEventListener('resize', apply);
+        }
+      }
+
+      function composerMaxHeight() {
+        return window.matchMedia && window.matchMedia('(max-width: 767px)').matches ? 140 : 172;
+      }
+
+      function resizeTextarea() {
+        queryInput.style.height = 'auto';
+        queryInput.style.height = Math.min(queryInput.scrollHeight, composerMaxHeight()) + 'px';
+      }
+
+      function updateComposerState() {
+        composer.classList.toggle('has-input', queryInput.value.trim().length > 0);
+      }
+
+      function updateSendState() {
+        const hasText = queryInput.value.trim().length > 1;
+        sendBtn.classList.toggle('active', hasText && !state.loading);
+      }
+
+      function setMode(mode) {
+        state.mode = mode;
+        Array.from(depthModes.querySelectorAll('.mode-pill')).forEach(function (pill) {
+          var on = pill.dataset.mode === mode;
+          pill.classList.toggle('active', on);
+          pill.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+        modeNote.textContent = modeMeta[mode].note;
+        if (window.SVWorkspace && window.SVWorkspace.syncModePill) {
+          window.requestAnimationFrame(window.SVWorkspace.syncModePill);
+        }
+      }
+
+      function renderStarters() {
+        starterGrid.innerHTML = starters.map(function (item, i) {
+          return `
+            <button class="starter" type="button" data-starter="${i}">
+              <span class="starter-kicker">${esc(item.kicker)}</span>
+              <span>${item.text}</span>
+            </button>
+          `;
+        }).join('');
+      }
+
+      /* Drop a template into the composer with its [blank] selected so the
+       * user's first keystroke replaces it — prompting without the jargon. */
+      function fillComposer(template) {
+        queryInput.value = template;
+        updateComposerState();
+        resizeTextarea();
+        updateSendState();
+        queryInput.focus();
+        const start = template.indexOf('[');
+        const end = template.indexOf(']');
+        if (start >= 0 && end > start) {
+          try { queryInput.setSelectionRange(start, end + 1); } catch (e) { /* ignore */ }
+        }
+      }
+
+      function setAppState(name) {
+        appShell.setAttribute('data-app-state', name);
+        body.classList.toggle('loading-active', name === 'researching');
+      }
+
+      function enterConversationMode() {
+        appShell.classList.add('app-active');
+        inputMeta.classList.add('faded');
+        if (appShell.getAttribute('data-app-state') === 'resting') {
+          setAppState('researching');
+        }
+      }
+
+      function resetChat() {
+        persistCurrent();
+        clearLoadingCycle();
+        state.history = [];
+        state.messages = [];
+        state.currentId = null;
+        state.loading = false;
+        chatArea.innerHTML = '';
+        appShell.classList.remove('app-active', 'has-sources');
+        inputMeta.classList.remove('faded');
+        body.classList.remove('loading-active');
+        setAppState('resting');
+        clearSourceRail();
+        jumpLatest.classList.remove('show');
+        queryInput.value = '';
+        updateComposerState();
+        resizeTextarea();
+        updateSendState();
+        renderChatList();
+        closeDrawer();
+        loadTrending();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      /* ─── Chat history (persisted in localStorage; clears with browser data) ─── */
+      function loadChats() {
+        try {
+          const raw = localStorage.getItem(CHATS_KEY);
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function saveChats(chats) {
+        try {
+          localStorage.setItem(CHATS_KEY, JSON.stringify(chats.slice(0, MAX_CHATS)));
+        } catch (e) { /* storage unavailable / full */ }
+      }
+
+      function chatTitle(text) {
+        const t = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!t) return 'New chat';
+        return t.length > 64 ? t.slice(0, 61) + '…' : t;
+      }
+
+      /* Persist the in-progress conversation, creating an id on first save and
+       * moving it to the top of the list on every update. */
+      function persistCurrent() {
+        if (!state.messages.length) return;
+        const firstUser = state.messages.find(function (m) { return m.role === 'user'; });
+        if (!firstUser) return;
+
+        if (!state.currentId) {
+          state.currentId = 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        }
+
+        const chats = loadChats().filter(function (c) { return c.id !== state.currentId; });
+        const existing = loadChats().find(function (c) { return c.id === state.currentId; });
+        chats.unshift({
+          id: state.currentId,
+          title: chatTitle(firstUser.content),
+          createdAt: existing ? existing.createdAt : Date.now(),
+          updatedAt: Date.now(),
+          messages: state.messages
+        });
+        saveChats(chats);
+        renderChatList();
+      }
+
+      function renderChatList() {
+        const chats = loadChats();
+        if (!chats.length) {
+          chatList.innerHTML = '<div class="chat-empty">No saved chats yet.<br>Your conversations will appear here.</div>';
+          return;
+        }
+        chatList.innerHTML = chats.map(function (c) {
+          const active = c.id === state.currentId ? ' active' : '';
+          return '' +
+            '<div class="chat-item' + active + '" data-open="' + escAttr(c.id) + '" role="button" tabindex="0">' +
+              '<div class="chat-item-title">' + esc(c.title) + '</div>' +
+              '<div class="chat-item-time">' + esc(relativeTime(c.updatedAt)) + '</div>' +
+              '<button class="chat-del" type="button" data-del="' + escAttr(c.id) + '" aria-label="Delete chat" title="Delete">' +
+                '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>' +
+              '</button>' +
+            '</div>';
+        }).join('');
+      }
+
+      function relativeTime(ts) {
+        if (!ts) return '';
+        const diff = Date.now() - ts;
+        const min = Math.round(diff / 60000);
+        if (min < 1) return 'just now';
+        if (min < 60) return min + ' min ago';
+        const hr = Math.round(min / 60);
+        if (hr < 24) return hr + (hr === 1 ? ' hour ago' : ' hours ago');
+        const day = Math.round(hr / 24);
+        if (day < 7) return day + (day === 1 ? ' day ago' : ' days ago');
+        try { return new Date(ts).toLocaleDateString(); } catch (e) { return ''; }
+      }
+
+      function openDrawer() {
+        drawerOverlay.hidden = false;
+        requestAnimationFrame(function () {
+          chatDrawer.classList.add('open');
+          drawerOverlay.classList.add('open');
+        });
+        chatDrawer.setAttribute('aria-hidden', 'false');
+        historyBtn.setAttribute('aria-expanded', 'true');
+        if (workspaceMenuBtn) workspaceMenuBtn.setAttribute('aria-expanded', 'true');
+        renderChatList();
+      }
+
+      function isDrawerDocked() {
+        return window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
+      }
+
+      function closeDrawer() {
+        // When docked (desktop), the panel stays open permanently.
+        if (isDrawerDocked()) return;
+        chatDrawer.classList.remove('open');
+        drawerOverlay.classList.remove('open');
+        chatDrawer.setAttribute('aria-hidden', 'true');
+        historyBtn.setAttribute('aria-expanded', 'false');
+        if (workspaceMenuBtn) workspaceMenuBtn.setAttribute('aria-expanded', 'false');
+        window.setTimeout(function () {
+          if (!chatDrawer.classList.contains('open')) drawerOverlay.hidden = true;
+        }, 320);
+      }
+
+      function syncDrawerMode() {
+        if (isDrawerDocked()) {
+          // Docked open: reflect state for assistive tech and clear overlay.
+          chatDrawer.classList.remove('open');
+          chatDrawer.setAttribute('aria-hidden', 'false');
+          drawerOverlay.classList.remove('open');
+          drawerOverlay.hidden = true;
+          historyBtn.setAttribute('aria-expanded', 'true');
+          if (workspaceMenuBtn) workspaceMenuBtn.setAttribute('aria-expanded', 'false');
+        } else if (!chatDrawer.classList.contains('open')) {
+          chatDrawer.setAttribute('aria-hidden', 'true');
+          historyBtn.setAttribute('aria-expanded', 'false');
+          if (workspaceMenuBtn) workspaceMenuBtn.setAttribute('aria-expanded', 'false');
+        }
+      }
+
+      function toggleDrawer() {
+        if (chatDrawer.classList.contains('open')) closeDrawer();
+        else openDrawer();
+      }
+
+      function loadConversation(id) {
+        const chats = loadChats();
+        const convo = chats.find(function (c) { return c.id === id; });
+        if (!convo) return;
+
+        // Save any in-progress conversation before switching away.
+        if (state.currentId !== id) persistCurrent();
+
+        clearLoadingCycle();
+        state.loading = false;
+        body.classList.remove('loading-active');
+        state.currentId = id;
+        state.messages = Array.isArray(convo.messages) ? convo.messages.slice() : [];
+        state.history = [];
+        state.messages.forEach(function (m) {
+          if (m.role === 'user') {
+            state.history.push({ role: 'user', content: m.content });
+          } else if (m.role === 'assistant' && m.result) {
+            state.history.push({ role: 'assistant', content: m.result.answer || '' });
+          }
+        });
+
+        enterConversationMode();
+        setAppState('ready');
+        chatArea.innerHTML = '';
+        var lastSources = [];
+        state.messages.forEach(function (m) {
+          if (m.role === 'user') appendUserMessage(m.content);
+          else if (m.role === 'assistant' && m.result) {
+            appendAIMessage(m.result, false);
+            if (m.result.sources && m.result.sources.length) lastSources = m.result.sources;
+          }
+        });
+        renderSourceRail(lastSources);
+
+        queryInput.value = '';
+        updateComposerState();
+        resizeTextarea();
+        updateSendState();
+        renderChatList();
+        closeDrawer();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function deleteConversation(id) {
+        const chats = loadChats().filter(function (c) { return c.id !== id; });
+        saveChats(chats);
+        if (state.currentId === id) {
+          state.currentId = null;
+          state.history = [];
+          state.messages = [];
+          chatArea.innerHTML = '';
+          appShell.classList.remove('app-active', 'has-sources');
+          inputMeta.classList.remove('faded');
+          jumpLatest.classList.remove('show');
+          setAppState('resting');
+          clearSourceRail();
+          loadTrending();
+        }
+        renderChatList();
+      }
+
+      function clearAllChats() {
+        if (!loadChats().length) return;
+        const ok = window.confirm('Clear all saved chats? This cannot be undone.');
+        if (!ok) return;
+        saveChats([]);
+        state.currentId = null;
+        renderChatList();
+      }
+
+      function submitQuery(query) {
+        queryInput.value = query;
+        updateComposerState();
+        resizeTextarea();
+        updateSendState();
+        handleSend();
+      }
+
+      function handleSend() {
+        const query = queryInput.value.trim();
+        if (!query || query.length < 2 || state.loading) return;
+
+        if (!appShell.classList.contains('app-active')) {
+          enterConversationMode();
+        }
+
+        appendUserMessage(query);
+        state.history.push({ role: 'user', content: query });
+        state.messages.push({ role: 'user', content: query });
+        persistCurrent();
+
+        queryInput.value = '';
+        updateComposerState();
+        resizeTextarea();
+        setLoading(true);
+        state.followAnswer = true;
+        appendThinking();
+        fetchResponse(query);
+      }
+
+      function setLoading(flag) {
+        state.loading = flag;
+        body.classList.toggle('loading-active', flag);
+        updateSendState();
+      }
+
+      function buildRequestBody(query) {
+        const prior = state.history.slice(-MAX_CONTEXT_MESSAGES);
+        const context = prior.length > 1 ? prior.slice(0, -1) : [];
+        return {
+          query: modeMeta[state.mode].prefix + query + STYLE_GUIDE,
+          context,
+          depth: state.mode
+        };
+      }
+
+      function appendUserMessage(text) {
+        const node = document.createElement('div');
+        node.className = 'msg user';
+        node.innerHTML = `<div class="bubble">${esc(text)}</div>`;
+        chatArea.appendChild(node);
+        anchorToMessage(node);
+      }
+
+      /* Anchor the just-asked question near the top of the viewport so the
+       * answer streams downward from where the user is already reading —
+       * never pin them to the bottom of a growing page. */
+      function anchorToMessage(node) {
+        requestAnimationFrame(function () {
+          const top = node.getBoundingClientRect().top + window.scrollY - 74;
+          window.scrollTo({ top: Math.max(top, 0), behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
+        });
+      }
+
+      function appendThinking() {
+        const steps = modeMeta[state.mode].steps;
+        const node = document.createElement('div');
+        node.className = 'msg ai';
+        node.id = 'loadingMsg';
+        node.innerHTML =
+          '<div class="research-steps" role="status" aria-live="polite">' +
+          steps.map(function (label, i) {
+            return '<div class="rstep' + (i === 0 ? ' active' : '') + '" data-step="' + i + '">' +
+              '<span class="rstep-ic">' +
+                (i === 0 ? '<span class="activity-dot"></span>' : '<span class="ring"></span>') +
+              '</span>' +
+              '<span>' + esc(label) + '</span></div>';
+          }).join('') +
+          '</div>';
+        chatArea.appendChild(node);
+        state.loadingIndex = 0;
+      }
+
+      function setResearchStage(index) {
+        const wrap = document.getElementById('loadingMsg');
+        if (!wrap) return;
+        const steps = wrap.querySelectorAll('.rstep');
+        steps.forEach(function (step, i) {
+          const ic = step.querySelector('.rstep-ic');
+          if (i < index) {
+            step.classList.remove('active');
+            step.classList.add('done');
+            if (ic) ic.innerHTML = icons.check;
+          } else if (i === index) {
+            step.classList.add('active');
+            step.classList.remove('done');
+            if (ic) ic.innerHTML = '<span class="activity-dot"></span>';
+          } else {
+            step.classList.remove('active', 'done');
+            if (ic) ic.innerHTML = '<span class="ring"></span>';
+          }
+        });
+        state.loadingIndex = index;
+      }
+
+      function clearLoadingCycle() {
+        if (state.loadingTimer) {
+          window.clearInterval(state.loadingTimer);
+          state.loadingTimer = null;
+        }
+      }
+
+      function removeLoading() {
+        clearLoadingCycle();
+        const node = document.getElementById('loadingMsg');
+        if (node) node.remove();
+      }
+
+      async function fetchResponse(query) {
+        const startedAt = performance.now();
+        const steps = modeMeta[state.mode].steps;
+        const searchAt = Math.max(0, steps.indexOf('Searching'));
+        const readAt = steps.indexOf('Reading');
+        const checkAt = steps.indexOf('Cross-checking');
+        const writeAt = Math.max(0, steps.indexOf('Writing'));
+        setAppState('researching');
+        if (searchAt > 0) setResearchStage(searchAt);
+        try {
+          const res = await fetch(ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(buildRequestBody(query))
+          });
+
+          if (!res.ok) {
+            const failure = await res.json().catch(function () { return {}; });
+            throw new Error(failure.message || 'Could not answer right now. Please try again.');
+          }
+          if (readAt > -1) setResearchStage(readAt);
+          const data = await res.json();
+          if (checkAt > -1) setResearchStage(checkAt);
+          if (writeAt > -1) setResearchStage(writeAt);
+
+          removeLoading();
+          setLoading(false);
+          setAppState('ready');
+
+          if (data.success && data.result) {
+            data.result.elapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
+            const answer = data.result.answer || 'No answer available.';
+            state.history.push({ role: 'assistant', content: answer });
+            state.messages.push({ role: 'assistant', result: data.result });
+            persistCurrent();
+            appendAIMessage(data.result);
+          } else {
+            appendErrorMessage('No results found. Try rephrasing your question.');
+          }
+        } catch (err) {
+          removeLoading();
+          setLoading(false);
+          setAppState('ready');
+          appendErrorMessage(err.message || 'Something went wrong. Please try again.');
+        }
+      }
+
+      function appendAIMessage(result, stream) {
+        if (stream === undefined) stream = true;
+        const answer = result.answer || '';
+        const sources = result.sources || [];
+        const related = result.relatedQuestions || [];
+
+        let formattedAnswer = formatMarkdown(answer);
+        sources.forEach(function (s) {
+          const citeRe = new RegExp('\\[' + s.index + '\\]', 'g');
+          formattedAnswer = formattedAnswer.replace(
+            citeRe,
+            `<a class="cite" href="#" data-url="${escAttr(s.url || '')}" data-title="${escAttr(s.title || s.source || '')}" data-source="${escAttr(s.source || '')}" data-excerpt="${escAttr(s.snippet || s.excerpt || '')}" title="${escAttr(s.title || s.source || '')}">${esc(String(s.index))}</a>`
+          );
+        });
+
+        // Sources lead the answer as scannable chips (research-agent pattern)
+        // instead of a long list the reader only reaches after scrolling.
+        let chipsHtml = '';
+        if (sources.length > 0) {
+          chipsHtml = sources.map(function (s) {
+            return `
+              <button class="src-chip" type="button" data-url="${escAttr(s.url || '')}" data-title="${escAttr(s.title || s.source || '')}" data-source="${escAttr(s.source || '')}" data-excerpt="${escAttr(s.snippet || s.excerpt || '')}" title="${escAttr(s.title || s.source || '')}">
+                <span class="src-chip-top">
+                  <span class="source-index">${esc(String(s.index))}</span>
+                  <span class="src-chip-domain">${esc(s.source || 'Source')}</span>
+                </span>
+                <span class="src-chip-title">${esc(s.title || s.source || 'Source')}</span>
+              </button>
+            `;
+          }).join('');
+        }
+
+        let relatedHtml = '';
+        if (related.length > 0) {
+          relatedHtml = `
+            <div class="related">
+              ${related.map(function (q) {
+                return `<button type="button" data-related="${escAttr(q)}">${esc(q)}</button>`;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        const truncated = looksTruncated(answer);
+
+        const actionsHtml =
+          (truncated
+            ? '<div class="trunc-note">This answer looks cut off — continue it below.</div>'
+            : '') +
+          '<div class="answer-actions">' +
+            (truncated
+              ? '<button class="act-btn act-accent" type="button" data-followup="continue">' + icons.layers + 'Continue the answer</button>'
+              : '') +
+            '<button class="act-btn" type="button" data-followup="simpler">' + icons.simple + 'Explain simpler</button>' +
+            '<button class="act-btn" type="button" data-followup="deeper">' + icons.layers + 'Go deeper</button>' +
+            '<button class="act-btn" type="button" data-copy-answer>' + icons.copy + 'Copy answer</button>' +
+            '<span class="answer-meta">' +
+              (sources.length ? sources.length + ' source' + (sources.length === 1 ? '' : 's') + ' · ' : '') +
+              esc(modeMeta[state.mode] ? modeMeta[state.mode].label : '') +
+              (result.elapsed ? ' · ' + esc(result.elapsed) + 's' : '') +
+            '</span>' +
+          '</div>';
+
+        const div = document.createElement('div');
+        div.className = 'msg ai';
+        div.innerHTML = `
+          ${chipsHtml ? '<div class="src-chips">' + chipsHtml + '</div>' : ''}
+          <div class="content"></div>
+          <div class="tail"></div>
+        `;
+        chatArea.appendChild(div);
+
+        const contentEl = div.querySelector('.content');
+        const tailEl = div.querySelector('.tail');
+
+        function finalize() {
+          tailEl.innerHTML = actionsHtml + relatedHtml;
+          bindCopyAnswer(tailEl, contentEl);
+          addPreCopyButtons(contentEl);
+          wrapAnswerTables(contentEl);
+          renderSourceRail(sources);
+          updateJumpPill();
+        }
+
+        if (!stream || REDUCED_MOTION) {
+          // Instant render when replaying a saved conversation.
+          contentEl.innerHTML = formattedAnswer;
+          finalize();
+          return;
+        }
+
+        streamHTMLInto(contentEl, formattedAnswer, 110).then(finalize);
+      }
+
+      function bindCopyAnswer(scope, contentEl) {
+        const btn = scope.querySelector('[data-copy-answer]');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          copyText(renderedAnswerText(contentEl), btn);
+        });
+      }
+
+      /* Human-readable plain text of the rendered answer — what someone
+       * pastes into a chat or email. Never the raw markdown source. */
+      function renderedAnswerText(contentEl) {
+        const parts = [];
+        Array.from(contentEl.children).forEach(function (block) {
+          const clone = block.cloneNode(true);
+          Array.from(clone.querySelectorAll('.pre-copy')).forEach(function (b) { b.remove(); });
+          Array.from(clone.querySelectorAll('.cite')).forEach(function (c) { c.textContent = ' [' + c.textContent + ']'; });
+          const tag = clone.tagName;
+          if (tag === 'UL' || tag === 'OL') {
+            parts.push(Array.from(clone.querySelectorAll('li')).map(function (li, i) {
+              return (tag === 'OL' ? (i + 1) + '. ' : '• ') + li.textContent.trim();
+            }).join('\n'));
+          } else {
+            const text = clone.textContent.trim();
+            if (text) parts.push(text);
+          }
+        });
+        return parts.join('\n\n');
+      }
+
+      /* Heuristic: an answer whose last line is prose that stops without
+       * terminal punctuation most likely hit the response limit. */
+      function looksTruncated(answer) {
+        const t = String(answer || '').trim();
+        if (!t) return false;
+        const lastLine = t.split('\n').pop().trim();
+        if (!lastLine) return false;
+        if (/^([-*•]|\d+\.)\s/.test(lastLine)) return false; // list items often end unpunctuated
+        if (/^```/.test(lastLine) || /^#{1,4}\s*$/.test(lastLine)) return false;
+        return !/[.!?…]["')\]]*\s*$/.test(lastLine);
+      }
+
+      function addPreCopyButtons(contentEl) {
+        Array.from(contentEl.querySelectorAll('pre')).forEach(function (pre) {
+          if (pre.closest('.code-block')) return;
+          const lang = pre.getAttribute('data-lang') || 'code';
+          const wrap = document.createElement('div');
+          wrap.className = 'code-block';
+          const bar = document.createElement('div');
+          bar.className = 'code-block__bar';
+          bar.innerHTML = '<span>' + esc(lang) + '</span>';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'pre-copy';
+          btn.textContent = 'Copy';
+          btn.addEventListener('click', function () {
+            copyText(pre.innerText, btn);
+          });
+          bar.appendChild(btn);
+          pre.parentNode.insertBefore(wrap, pre);
+          wrap.appendChild(bar);
+          wrap.appendChild(pre);
+        });
+      }
+
+      function wrapAnswerTables(contentEl) {
+        Array.from(contentEl.querySelectorAll('table')).forEach(function (table) {
+          if (table.parentNode && table.parentNode.classList.contains('table-scroll')) return;
+          const wrap = document.createElement('div');
+          wrap.className = 'table-scroll';
+          table.parentNode.insertBefore(wrap, table);
+          wrap.appendChild(table);
+        });
+      }
+
+      function sourceHost(url) {
+        if (window.SVWorkspace && window.SVWorkspace.hostFrom) return window.SVWorkspace.hostFrom(url);
+        try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; }
+      }
+
+      function clearSourceRail() {
+        if (sourceRailList) sourceRailList.innerHTML = '';
+        if (sourceRail) {
+          sourceRail.hidden = true;
+          sourceRail.classList.remove('is-on');
+        }
+        appShell.classList.remove('has-sources');
+      }
+
+      function renderSourceRail(sources) {
+        if (!sourceRail || !sourceRailList) return;
+        if (!sources || !sources.length) {
+          clearSourceRail();
+          return;
+        }
+        sourceRailList.innerHTML = sources.map(function (s, i) {
+          const host = s.source || sourceHost(s.url) || 'Source';
+          return '<button class="source-card" type="button" data-url="' + escAttr(s.url || '') + '" data-title="' + escAttr(s.title || host) + '" data-source="' + escAttr(host) + '" data-excerpt="' + escAttr(s.snippet || s.excerpt || '') + '">' +
+            '<img class="source-card__favicon" alt="" src="https://www.google.com/s2/favicons?domain=' + escAttr(host) + '&sz=32" width="18" height="18" />' +
+            '<span class="source-card__domain">' + esc(host) + '</span>' +
+            '<span class="source-card__title">' + esc(s.title || host) + '</span>' +
+            '<span class="source-card__meta">' + (i === 0 ? 'just now' : 'used in answer') + '</span>' +
+          '</button>';
+        }).join('');
+        sourceRail.hidden = false;
+        sourceRail.classList.add('is-on');
+        appShell.classList.add('has-sources');
+        Array.from(sourceRailList.querySelectorAll('.source-card')).forEach(function (card) {
+          card.addEventListener('click', function () {
+            if (window.SVWorkspace && window.SVWorkspace.openCite) {
+              window.SVWorkspace.openCite(card, {
+                url: card.dataset.url || '',
+                title: card.dataset.title || '',
+                source: card.dataset.source || '',
+                excerpt: card.dataset.excerpt || ''
+              });
+            }
+          });
+        });
+      }
+
+      function copyText(text, btn) {
+        if (!(navigator.clipboard && navigator.clipboard.writeText)) return;
+        navigator.clipboard.writeText(text).then(function () {
+          const prev = btn.innerHTML;
+          btn.innerHTML = btn.classList.contains('pre-copy') ? 'Copied' : icons.check + 'Copied';
+          window.setTimeout(function () { btn.innerHTML = prev; }, 1600);
+        }).catch(function () {});
+      }
+
+      /* Reveal the answer block by block, top to bottom, without ever moving
+       * the page. The question stays anchored where the reader is; overflow
+       * streams below the fold and the jump pill offers the way down. */
+      async function streamHTMLInto(target, html, delay) {
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const nodes = Array.from(temp.childNodes);
+
+        if (nodes.length === 0) {
+          target.innerHTML = html;
+          return;
+        }
+
+        for (const node of nodes) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'stream-block';
+          wrapper.appendChild(node.cloneNode(true));
+          target.appendChild(wrapper.firstChild);
+          if (state.followAnswer && isNearBottom()) {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
+          }
+          updateJumpPill();
+          await wait(delay);
+        }
+      }
+
+      function isNearBottom() {
+        return window.innerHeight + window.scrollY >= document.body.scrollHeight - 140;
+      }
+
+      function updateJumpPill() {
+        const active = appShell.classList.contains('app-active');
+        jumpLatest.classList.toggle('show', active && !isNearBottom());
+      }
+
+      function wait(ms) {
+        return new Promise(function (resolve) {
+          window.setTimeout(resolve, ms);
+        });
+      }
+
+      function appendErrorMessage(text) {
+        const div = document.createElement('div');
+        div.className = 'msg ai';
+        div.innerHTML = `<div class="content" style="color:var(--text-muted)"><p>${esc(text)}</p></div>`;
+        chatArea.appendChild(div);
+        updateJumpPill();
+      }
+
+      function trendingUrl() {
+        if (!ENDPOINT) return null;
+        try {
+          const u = new URL(ENDPOINT, window.location.origin);
+          u.pathname = '/api/trending';
+          u.search = '';
+          return u.toString();
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async function loadTrending() {
+        const url = trendingUrl();
+        if (!url) {
+          trendingRegion.textContent = '';
+          trendingGrid.innerHTML = '';
+          return;
+        }
+
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 12000);
+          const res = await fetch(url, { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          if (!data || !data.success || !data.widgets) throw new Error('no widgets');
+          renderTrending(data);
+        } catch (e) {
+          trendingRegion.textContent = '';
+          trendingGrid.innerHTML = '';
+        }
+      }
+
+      function renderTrending(data) {
+        const w = data.widgets || {};
+        const cards = [];
+
+        if (w.worldNews) cards.push(makeWorldLead(w.worldNews));
+        else if (w.news) cards.push(makeLocalLead(w.news));
+
+        if (w.news && w.worldNews) cards.push(makeLocalMini(w.news));
+        if (w.market) cards.push(makeMarketMini(w.market));
+        if (w.tech) cards.push(makeTechMini(w.tech));
+
+        if (!cards.length) {
+          trendingGrid.innerHTML = '';
+          trendingRegion.textContent = '';
+          return;
+        }
+
+        const region = data.countryName && data.countryName !== 'Global' ? data.countryName : 'Worldwide';
+        trendingRegion.textContent = region;
+
+        const lead = cards[0];
+        const minis = cards.slice(1, 3);
+
+        trendingGrid.innerHTML = `
+          ${lead ? lead.html : ''}
+          ${minis.length ? `<div class="mini-grid">${minis.map(item => item.html).join('')}</div>` : ''}
+        `;
+
+        bindTrendingCard(document.querySelector('.lead-story'), lead);
+        Array.from(document.querySelectorAll('.mini-story')).forEach(function (node, index) {
+          bindTrendingCard(node, minis[index]);
+        });
+      }
+
+      function bindTrendingCard(node, card) {
+        if (!node || !card || !card.ask) return;
+        node.setAttribute('tabindex', '0');
+        node.setAttribute('role', 'button');
+        node.addEventListener('click', function () { submitQuery(card.ask); });
+        node.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            submitQuery(card.ask);
+          }
+        });
+      }
+
+      function makeWorldLead(item) {
+        return {
+          ask: `What's the full story behind this global headline: "${item.title}"? Give me the facts, context, and credible perspectives.`,
+          html: `
+            <article class="lead-story">
+              <div>
+                <div class="lead-kicker">Worldwide</div>
+                <div class="lead-title">${esc(item.title || '')}</div>
+                <div class="lead-summary">${esc(item.summary || '')}</div>
+              </div>
+              <div class="lead-meta">${esc(item.source || 'Source')}</div>
+            </article>
+          `
+        };
+      }
+
+      function makeLocalLead(item) {
+        const kicker = item.label && item.label.includes('·')
+          ? item.label.split('·').slice(1).join('·').trim()
+          : (item.label || 'News');
+
+        return {
+          ask: `Give me a deeper briefing on this story: "${item.title}". What matters most and what context should I know?`,
+          html: `
+            <article class="lead-story">
+              <div>
+                <div class="lead-kicker">${esc(kicker)}</div>
+                <div class="lead-title">${esc(item.title || '')}</div>
+                <div class="lead-summary">${esc(item.summary || '')}</div>
+              </div>
+              <div class="lead-meta">${esc(item.source || 'Source')}</div>
+            </article>
+          `
+        };
+      }
+
+      function makeLocalMini(item) {
+        const kicker = item.label && item.label.includes('·')
+          ? item.label.split('·').slice(1).join('·').trim()
+          : (item.label || 'News');
+
+        return {
+          ask: `Summarise this story clearly: "${item.title}". What are the facts and what should I pay attention to?`,
+          html: `
+            <article class="mini-story">
+              <div>
+                <div class="mini-kicker">${esc(kicker)}</div>
+                <div class="mini-title">${esc(item.title || '')}</div>
+              </div>
+              <div class="mini-meta">${esc(item.source || 'Source')}</div>
+            </article>
+          `
+        };
+      }
+
+      function makeMarketMini(item) {
+        const sign = Number(item.changePercent) >= 0 ? '+' : '';
+        return {
+          ask: `Why is ${item.name} (${item.symbol}) moving ${sign}${item.changePercent}% today? Give me context and sources.`,
+          html: `
+            <article class="mini-story">
+              <div>
+                <div class="mini-kicker">${esc(item.index || 'Markets')}</div>
+                <div class="mini-title">${esc(item.symbol || '')} ${esc(sign + String(item.changePercent || ''))}%</div>
+              </div>
+              <div class="mini-meta">${esc(item.name || '')}</div>
+            </article>
+          `
+        };
+      }
+
+      function makeTechMini(item) {
+        return {
+          ask: `Summarise this developer story: "${item.title}". Why is it getting attention and what should I know?`,
+          html: `
+            <article class="mini-story">
+              <div>
+                <div class="mini-kicker">Developer signal</div>
+                <div class="mini-title">${esc(item.title || '')}</div>
+              </div>
+              <div class="mini-meta">${esc(String(item.score || 0))} points · ${esc(String(item.comments || 0))} comments</div>
+            </article>
+          `
+        };
+      }
+
+      function startPhraseCycle() {}
+
+      function transitionPhrase() {}
+
+      function scrollToBottom() {
+        requestAnimationFrame(function () {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
+        });
+      }
+
+      /* Line-based markdown → HTML. Groups only consecutive "-"/"1." lines
+       * into a single list, so bullets never merge across paragraphs or get
+       * re-wrapped as one document-wide ordered list. */
+      function formatMarkdown(md) {
+        if (!md) return '<p></p>';
+
+        function inline(text) {
+          let t = esc(text);
+          t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+          t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+          return t;
+        }
+
+        const out = [];
+        const lines = String(md).replace(/\r\n/g, '\n').split('\n');
+        let i = 0;
+        let para = [];
+
+        function flushPara() {
+          if (!para.length) return;
+          out.push('<p>' + para.map(inline).join('<br>') + '</p>');
+          para = [];
+        }
+
+        while (i < lines.length) {
+          const line = lines[i];
+          const trimmed = line.trim();
+
+          if (/^```/.test(trimmed)) {
+            flushPara();
+            const code = [];
+            i += 1; // skip the opening fence (and its language tag)
+            while (i < lines.length && !/^```/.test(lines[i].trim())) {
+              code.push(lines[i]);
+              i += 1;
+            }
+            i += 1; // skip the closing fence
+            var lang = trimmed.replace(/^```/, '').trim() || 'code';
+            out.push('<pre data-lang="' + escAttr(lang) + '">' + esc(code.join('\n').trim()) + '</pre>');
+            continue;
+          }
+
+          if (/^###\s+/.test(trimmed)) {
+            flushPara();
+            out.push('<h3>' + inline(trimmed.replace(/^###\s+/, '')) + '</h3>');
+            i += 1;
+            continue;
+          }
+
+          if (/^##\s+/.test(trimmed)) {
+            flushPara();
+            out.push('<h2>' + inline(trimmed.replace(/^##\s+/, '')) + '</h2>');
+            i += 1;
+            continue;
+          }
+
+          if (/^[-*]\s+/.test(trimmed)) {
+            flushPara();
+            const items = [];
+            while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
+              items.push('<li>' + inline(lines[i].trim().replace(/^[-*]\s+/, '')) + '</li>');
+              i += 1;
+            }
+            out.push('<ul>' + items.join('') + '</ul>');
+            continue;
+          }
+
+          if (/^\d+\.\s+/.test(trimmed)) {
+            flushPara();
+            const items = [];
+            while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+              items.push('<li>' + inline(lines[i].trim().replace(/^\d+\.\s+/, '')) + '</li>');
+              i += 1;
+            }
+            out.push('<ol>' + items.join('') + '</ol>');
+            continue;
+          }
+
+          if (trimmed === '') {
+            flushPara();
+            i += 1;
+            continue;
+          }
+
+          para.push(trimmed);
+          i += 1;
+        }
+
+        flushPara();
+        return out.length ? out.join('') : '<p></p>';
+      }
+
+      function esc(str) {
+        if (str == null) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+      }
+
+      function escAttr(str) {
+        if (str == null) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      init();
+    })();
+  </script>
+  <script src="/assets/ask-summaverick/summaverick-workspace.js"></script>
+  <script src="/assets/ask-summaverick/summaverick-how.js"></script>
+  <script src="/assets/ask-summaverick/help-panel.js"></script>
+  <script>
+    SBHelpGuide.init({
+      page: 'summaverick',
+      tabLabel: 'Guide',
+      title: 'How to use Summaverick',
+      intro: 'An AI research assistant built for fast, sourced answers.',
+      steps: [
+        { title: 'Start with a task', desc: 'Tap a prompt chip under the welcome line, or type your own question in the composer at the bottom of the page.' },
+        { title: 'Pick a depth', desc: 'Choose Quick, Deeper, or Full picture above the composer to control how much context and research goes into the answer.' },
+        { title: 'Keep the thread going', desc: 'Follow-up questions stay in the same conversation — Summaverick remembers the context, so you don\'t have to repeat yourself.' },
+        { title: 'Browse chat history', desc: 'Open the history icon in the top bar to revisit, rename, or delete past conversations.' },
+        { title: 'Start fresh', desc: 'Use "New conversation" to clear context and begin a new topic from scratch.' },
+        { title: 'Switch themes', desc: 'Toggle Light/Dark from the top bar — this guide matches whichever theme you pick.' }
+      ]
+    });
+  </script>
+<script src="/assets/ask-summaverick/nav-utilities.js"></script>
+</body>
+</html>
