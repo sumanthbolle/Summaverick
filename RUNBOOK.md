@@ -41,9 +41,10 @@ Secrets are **per-Worker** and are **not** inherited from any other repo. A
 **not** reach this Worker — the `summaverick` Worker only sees a key you give
 *it*, in one of the three ways below.
 
-The research agent needs only `PERPLEXITY_API_KEY`. Without it the live agent
-still runs — it returns the deterministic, evidence-backed draft and the trace
-shows `model answer` vs `evidence-backed draft` accordingly. The other secrets
+The research agent and Meet Summaverick need `PERPLEXITY_API_KEY`. Without it,
+`/research` returns documentation results and `/ask-summaverick` returns 503.
+The production deployment requires the key so it cannot silently ship an
+unconnected assistant. The other secrets
 belong to legacy routes, except `SESSION_SECRET`: it also signs research
 answers, and without it a follow-up question is answered without the earlier
 answer's text.
@@ -68,12 +69,22 @@ npx wrangler secret put AMADEUS_CLIENT_SECRET
 npx wrangler secret put RESEND_API_KEY
 ```
 
-**CI (this repo).** Add `PERPLEXITY_API_KEY` under this repo's
-[Settings → Secrets and variables → Actions](https://github.com/sumanthbolle/Summaverick/settings/secrets/actions).
-The manual **deploy** workflow (`.github/workflows/deploy.yml`) then pushes it
-onto the Worker for you with `wrangler secret put` right after `wrangler
-deploy` — piped via stdin, never printed, and skipped with a notice when the
-secret is absent. A secret in a different repo is not visible here.
+**CI (this repo).** Under
+[Settings → Environments](https://github.com/sumanthbolle/Summaverick/settings/environments),
+create/select **production** and add the environment secret
+`PERPLEXITY_API_KEY`. The **deploy** job selects `environment: production`, so
+GitHub makes that environment's secret available to it. Repository-level
+Actions secrets also work; a same-name environment secret takes precedence.
+
+The **deploy** workflow (`.github/workflows/deploy.yml`) fails early when the
+key is absent, deploys the Worker, then copies the key with `wrangler secret
+put PERPLEXITY_API_KEY` — piped via stdin, never printed. GitHub environment
+secrets do not automatically become Cloudflare Worker bindings. After upload,
+`node scripts/verify-perplexity.mjs https://summaverick.com` checks the active
+binding and makes one small model request through `/api/ask-summaverick`.
+A missing binding, upstream failure, or unusable answer fails deployment.
+Saving or rotating a GitHub secret takes effect on the Worker only after a new
+successful deployment run. A secret in a different repo is not visible here.
 
 > Note: the sandboxed dev environment blocks egress to `api.perplexity.ai`, so
 > the model call fails there and the agent falls back to the draft even with a
@@ -160,17 +171,23 @@ is non-zero and **zero bytes are added to git** in the old repo.
 ## 9. CI/CD (T11)
 
 Wrangler in GitHub Actions is non-interactive. It will not run `wrangler login`.
-Set **both** of these on the repo
-([Settings → Secrets and variables → Actions](https://github.com/sumanthbolle/Summaverick/settings/secrets/actions)):
+Set these in the repository's **production** GitHub Environment (repository-level
+Actions secrets/variables also work):
 
 | Name | Where | Value |
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | **Secret** | Custom API token from [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens). Start from **Edit Cloudflare Workers**, then **also** add **Account → D1 → Edit**, **Workers KV Storage → Edit**, and **Workers R2 Storage → Edit**. The Workers template alone is not enough for D1. |
 | `CLOUDFLARE_ACCOUNT_ID` | **Variable** (or secret) | **Account ID** from the Cloudflare dashboard **Workers** overview (right sidebar). Do **not** paste the **Zone ID** from the `summaverick.com` domain overview — both are 32 hex characters and they are not interchangeable. |
+| `PERPLEXITY_API_KEY` | **Secret** | Valid Perplexity API key for the assistant, research and trending. Never store this as a plain variable or commit it. |
 
 Push to `master` (or re-run the failed `deploy` workflow). The workflow runs
-typecheck → tests → credential probe → `d1 migrations apply --remote` (non-blocking)
-→ `wrangler deploy` → `scripts/verify.mjs --core https://summaverick.com`.
+required-key check → typecheck → tests → credential probe → `d1 migrations apply --remote` (non-blocking)
+→ `wrangler deploy` → Worker secret upload → live Perplexity check →
+`scripts/verify.mjs --core https://summaverick.com`.
+
+If the credential probe reports **Invalid API Token [code: 1000]**, replace
+`CLOUDFLARE_API_TOKEN` with a valid custom API token before retrying. A failed
+credential probe occurs before deployment and before Perplexity secret upload.
 
 ### Cloudflare error 7403
 

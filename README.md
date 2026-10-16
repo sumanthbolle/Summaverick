@@ -99,6 +99,14 @@ the Agent API and falls back to Sonar). `SESSION_SECRET` also signs research ans
 for follow-up questions, so set it in production.
 Never commit `.dev.vars`.
 
+For GitHub deployment, add `PERPLEXITY_API_KEY` as an environment secret under
+**Settings → Environments → production** in this repository. The deploy job
+selects `production`, copies the secret to the Cloudflare `summaverick` Worker,
+and checks an actual assistant response after deployment. Repository-level
+Actions secrets also work. The job also needs a valid `CLOUDFLARE_API_TOKEN`
+and `CLOUDFLARE_ACCOUNT_ID`; see [RUNBOOK.md](RUNBOOK.md#2-secrets). Re-run
+**deploy** after saving or rotating secrets.
+
 ## Meet Summaverick
 
 `/ask-summaverick` serves the assistant migrated from the personal website. It calls
