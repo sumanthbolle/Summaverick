@@ -266,6 +266,206 @@ body[data-home] .examples::before {
     linear-gradient(to bottom, var(--c-ink), transparent);
 }
 
+/* ---- RAG assistants: the flagship --------------------------------------------
+   The largest statement on the page after the hero: a centred headline over
+   three figure cards, a framed board (the data, the six modules, the answer,
+   and the week beneath), then the audience line and the two calls to action.
+   The board is a band, so it re-skins itself with the band ramp like the
+   stage and the hero panel. */
+body[data-home] .rag {
+  padding-block: clamp(4rem, 9vw, 8rem);
+  background: var(--c-bg);
+}
+body[data-home] .rag .section-head {
+  max-width: 60rem;
+  margin: 0 auto;
+  text-align: center;
+}
+body[data-home] .rag .studio-kicker { margin-bottom: var(--space-4); }
+body[data-home] .rag h2 {
+  max-width: 16ch;
+  margin-inline: auto;
+  font-size: clamp(2.3rem, 1.4rem + 3.6vw, 4.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+body[data-home] .rag__lead {
+  max-width: 60ch;
+  margin: var(--space-5) auto 0;
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+body[data-home] .rag__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+}
+body[data-home] .rag__pillar {
+  padding: clamp(1.25rem, 2.4vw, 2rem);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+body[data-home] .rag__figure {
+  margin: 0 0 var(--space-5);
+  font-size: clamp(2.2rem, 1.5rem + 2.4vw, 3.6rem);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+body[data-home] .rag__pillar h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--step-1);
+  line-height: 1.2;
+}
+body[data-home] .rag__pillar > p:last-child {
+  margin: 0;
+  color: var(--c-text-dim);
+  font-size: var(--step-0);
+  line-height: 1.55;
+}
+
+/* The board: data on the left, modules in the middle, the answer on the right,
+   the week across the bottom. Decorative; the cards above say the same. */
+body[data-home] .rag__board {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  border: 1px solid var(--c-ink-line);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--c-text) 6%, transparent),
+    0 50px 110px -50px color-mix(in srgb, var(--c-text) 34%, transparent);
+}
+body[data-home] .rag__flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.35fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-5);
+}
+body[data-home] .rag__col { display: grid; gap: var(--space-3); align-content: start; }
+body[data-home] .rag__col-title {
+  margin: 0;
+  color: var(--c-on-ink-mute);
+  font-size: var(--step--1);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+body[data-home] .rag__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+body[data-home] .rag__chips li {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--c-ink-line);
+  border-radius: var(--radius-pill);
+  color: var(--c-on-ink-dim);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+body[data-home] .rag__modules {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+body[data-home] .rag__modules li {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--c-ink-line);
+  border-radius: var(--radius-md);
+  background: var(--band-raise);
+  color: var(--c-on-ink);
+  font-size: var(--step--1);
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+}
+body[data-home] .rag__modules li span {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--c-on-ink-dim);
+  font-size: 0.8em;
+  font-weight: var(--weight-regular);
+}
+body[data-home] .rag__arrow { color: var(--c-on-ink-mute); font-size: 1.6rem; line-height: 1; }
+body[data-home] .rag__arrow::before { content: "→"; }
+body[data-home] .rag__answer {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--c-ink-line);
+  border-radius: var(--radius-md);
+  background: var(--band-raise);
+  color: var(--c-on-ink);
+  font-size: var(--step--1);
+  line-height: 1.45;
+}
+body[data-home] .rag__answer p { margin: 0; }
+body[data-home] .rag__answer .rag__q { color: var(--c-on-ink-dim); }
+body[data-home] .rag__answer .rag__src { color: var(--c-on-ink-dim); font-size: 0.85em; }
+body[data-home] .rag__week {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-5) 0 0;
+  border-top: 1px solid var(--c-ink-line);
+  list-style: none;
+  counter-reset: day;
+}
+body[data-home] .rag__week li {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+  font-size: var(--step--1);
+  line-height: 1.4;
+}
+body[data-home] .rag__week li::before {
+  content: "Day " counter(day);
+  counter-increment: day;
+  color: var(--c-on-ink-mute);
+  font-size: 0.75rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+body[data-home] .rag__week b { color: var(--c-on-ink); font-weight: var(--weight-semibold); }
+body[data-home] .rag__week span { color: var(--c-on-ink-dim); }
+
+body[data-home] .rag__cta {
+  max-width: 64ch;
+  margin: var(--space-7) auto 0;
+  text-align: center;
+}
+body[data-home] .rag__cta > p {
+  margin: 0 0 var(--space-5);
+  color: var(--c-text-dim);
+  font-size: var(--step-0);
+  line-height: 1.55;
+}
+body[data-home] .rag__cta .studio-actions { justify-content: center; margin-top: 0; }
+
+@media (max-width: 960px) {
+  body[data-home] .rag__grid { grid-template-columns: minmax(0, 1fr); }
+  body[data-home] .rag__flow { grid-template-columns: minmax(0, 1fr); }
+  body[data-home] .rag__arrow { justify-self: start; }
+  body[data-home] .rag__arrow::before { content: "↓"; }
+  body[data-home] .rag__week { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  body[data-home] .rag__modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body[data-home] .rag__week { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---- What we build: a bento -------------------------------------------------
    One large card for the flagship, two stacked beside it. The cards are light
    objects on the band; each carries a miniature screen of its product. */

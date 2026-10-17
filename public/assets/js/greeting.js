@@ -8,22 +8,25 @@
  * for assistive tech — the cycling span is aria-hidden.
  *
  * Scripts beyond Latin (Telugu, Devanagari, CJK, Arabic) render in the
- * viewer's system fonts; where a script is missing the sweep simply moves on.
+ * viewer's system fonts; the stylesheet names the face each platform ships
+ * for the script (keyed on the lang attribute set here) and gives the word
+ * room for marks that sit above and below a Latin line. Where a script is
+ * missing altogether the sweep simply moves on.
  */
 import { $ } from "./lib/dom.js";
 
-// text + the spectrum variant class suffix ("" = the default aurora).
+// text, language tag, and the spectrum variant class suffix ("" = the default aurora).
 const GREETINGS = [
-  { t: "Hello", c: "" },
-  { t: "నమస్తే", c: "warm" },       // Telugu — home ground
-  { t: "नमस्ते", c: "emerald" },     // Hindi
-  { t: "Hola", c: "cyan" },
-  { t: "Bonjour", c: "" },
-  { t: "こんにちは", c: "warm" },     // Japanese
-  { t: "안녕하세요", c: "emerald" },  // Korean
-  { t: "مرحبا", c: "cyan" },         // Arabic
-  { t: "Olá", c: "" },
-  { t: "Ciao", c: "warm" },
+  { t: "Hello", lang: "en", c: "" },
+  { t: "నమస్తే", lang: "te", c: "warm" }, // Telugu — home ground
+  { t: "नमस्ते", lang: "hi", c: "emerald" }, // Hindi
+  { t: "Hola", lang: "es", c: "cyan" },
+  { t: "Bonjour", lang: "fr", c: "" },
+  { t: "こんにちは", lang: "ja", c: "warm" }, // Japanese
+  { t: "안녕하세요", lang: "ko", c: "emerald" }, // Korean
+  { t: "مرحبا", lang: "ar", c: "cyan" }, // Arabic
+  { t: "Olá", lang: "pt", c: "" },
+  { t: "Ciao", lang: "it", c: "warm" },
 ];
 
 const HOLD_MS = 1900; // time each greeting rests
@@ -55,20 +58,13 @@ export function initGreeting() {
 function paint(el, g) {
   el.textContent = g.t;
   el.className = "hello__word text-spectrum" + (g.c ? " text-spectrum--" + g.c : "");
-  el.setAttribute("lang", langOf(g.t));
+  el.setAttribute("lang", g.lang);
+  // Arabic reads right to left; the others left to right.
+  el.setAttribute("dir", g.lang === "ar" ? "rtl" : "ltr");
   // Next frame, release to the resting state so the transition plays.
   requestAnimationFrame(() => {
     el.style.opacity = "1";
     el.style.transform = "none";
     el.style.filter = "none";
   });
-}
-
-function langOf(t) {
-  if (/[ఀ-౿]/.test(t)) return "te";
-  if (/[ऀ-ॿ]/.test(t)) return "hi";
-  if (/[぀-ヿ一-鿿]/.test(t)) return "ja";
-  if (/[가-힯]/.test(t)) return "ko";
-  if (/[؀-ۿ]/.test(t)) return "ar";
-  return "";
 }
