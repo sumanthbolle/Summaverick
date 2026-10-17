@@ -47,6 +47,7 @@
       <span>Summaverick</span>
     </a>
     <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="#rag">RAG assistants</a>
       <a href="#build">What we build</a>
       <a href="#examples">Examples</a>
       <a href="#how-we-work">How we work</a>
@@ -69,6 +70,7 @@
 
   <div class="nav-panel" id="nav-panel" hidden>
     <nav aria-label="Mobile">
+      <a href="#rag">RAG assistants</a>
       <a href="#build">What we build</a>
       <a href="#examples">Examples</a>
       <a href="#how-we-work">How we work</a>
@@ -89,9 +91,17 @@
       <div class="container hero__grid">
         <div class="hero__copy">
           <p class="hello" aria-hidden="true"><span class="hello__word text-spectrum" data-hello>Hello</span></p>
+          <!-- The headline alternates between "Super Intelligence" (the
+               spectrum word) and the glass "Summaverick" wordmark. The brand
+               face is the default, so with scripting off or motion reduced the
+               page reads "Meet Summaverick."; the other face is decorative and
+               hidden from assistive tech. hero-headline.js runs the cycle. -->
           <h1 id="hero-title" class="hero-headline">
             <span class="hero-headline__lead">Meet</span>
-            <span class="hero-headline__mark"><span class="glassmark" data-glassmark><span class="glassmark__base">Summaverick</span><span class="glassmark__layer glassmark__shade" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__rim" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__reflect" aria-hidden="true">Summaverick</span><span class="glassmark__flash" aria-hidden="true"></span><span class="glassmark__frag" data-frag="0" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="1" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="2" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="3" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="4" aria-hidden="true">Summaverick</span><span class="glassmark__glint glassmark__glint--s" aria-hidden="true"></span><span class="glassmark__glint glassmark__glint--a" aria-hidden="true"></span></span><span class="hero-headline__dot" aria-hidden="true">.</span></span>
+            <span class="hero-headline__mark" data-headline-cycle>
+              <span class="hero-headline__face hero-headline__face--super" data-face-super aria-hidden="true"><span class="supermark"><span class="supermark__word text-spectrum">Super</span> <span class="supermark__rest">Intelligence</span><span class="supermark__flash" aria-hidden="true"></span><span class="supermark__glint" aria-hidden="true"></span></span><span class="hero-headline__dot" aria-hidden="true">.</span></span>
+              <span class="hero-headline__face hero-headline__face--brand" data-face-brand><span class="glassmark" data-glassmark><span class="glassmark__base">Summaverick</span><span class="glassmark__layer glassmark__shade" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__rim" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__reflect" aria-hidden="true">Summaverick</span><span class="glassmark__flash" aria-hidden="true"></span><span class="glassmark__frag" data-frag="0" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="1" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="2" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="3" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="4" aria-hidden="true">Summaverick</span><span class="glassmark__glint glassmark__glint--s" aria-hidden="true"></span><span class="glassmark__glint glassmark__glint--a" aria-hidden="true"></span></span><span class="hero-headline__dot" aria-hidden="true">.</span></span>
+            </span>
           </h1>
           <p class="studio-lead">
             A software studio for AI agents. We design and build them end to
@@ -293,6 +303,110 @@
             merchant, opens a ticket, or changes a record — pressing a button
             advances the illustration and nothing else.
           </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---- Next-generation RAG assistants ------------------------------
+         The flagship offer for startup founders and enterprise CTOs:
+         retrieval assistants built as lightweight modules beside the data a
+         company already has, with a one-week path from proof of concept to
+         production. The board and the week strip are illustrations; the
+         three cards and the closing paragraph carry every claim. -->
+    <section class="rag" id="rag" aria-labelledby="rag-title">
+      <div class="container">
+        <div class="section-head rag__head" data-reveal>
+          <p class="studio-kicker">Next-generation RAG assistants · for founders and CTOs</p>
+          <h2 id="rag-title">Discover and implement next-generation <span class="text-spectrum text-spectrum--cyan">RAG assistants</span>.</h2>
+          <p class="rag__lead">
+            Retrieval-augmented assistants that answer from your own data and
+            show where each answer came from. They are built as lightweight
+            modules that sit beside your database rather than a platform you
+            migrate to, with a one-week path from proof of concept to
+            production, wherever your data lives.
+          </p>
+        </div>
+
+        <div class="rag__grid">
+          <article class="rag__pillar" data-reveal>
+            <p class="rag__figure text-spectrum">Modules</p>
+            <h3>Lightweight by design</h3>
+            <p>
+              Connect, index, retrieve, ground, cite, guard: six small modules
+              you switch on as you need them, running in your cloud or ours,
+              with nothing to rip out later.
+            </p>
+          </article>
+          <article class="rag__pillar" data-reveal style="--d:30ms">
+            <p class="rag__figure text-spectrum text-spectrum--warm">1 week</p>
+            <h3>Proof of concept to production</h3>
+            <p>
+              Day one scopes the questions and connects the data. Days two to
+              four build and measure against your real questions. Day five
+              hardens it, hands it over, and goes live.
+            </p>
+          </article>
+          <article class="rag__pillar" data-reveal style="--d:60ms">
+            <p class="rag__figure text-spectrum text-spectrum--emerald">Any DB</p>
+            <h3>Wherever your data lives</h3>
+            <p>
+              Postgres, MySQL, SQL Server, MongoDB, Snowflake, BigQuery,
+              ServiceNow, SharePoint, S3 or R2, on-prem, in your cloud, or
+              managed. The data stays where it is; we bring retrieval to it.
+            </p>
+          </article>
+        </div>
+
+        <div class="rag__board band-ink" data-reveal aria-hidden="true">
+          <div class="rag__flow">
+            <div class="rag__col">
+              <p class="rag__col-title">Your data, where it is</p>
+              <ul class="rag__chips">
+                <li>Postgres</li><li>SQL Server</li><li>MongoDB</li><li>Snowflake</li><li>SharePoint</li><li>ServiceNow</li>
+              </ul>
+            </div>
+            <span class="rag__arrow"></span>
+            <div class="rag__col">
+              <p class="rag__col-title">Six lightweight modules</p>
+              <ul class="rag__modules">
+                <li>Connect<span>read-only access</span></li>
+                <li>Index<span>chunks and embeddings</span></li>
+                <li>Retrieve<span>hybrid search</span></li>
+                <li>Ground<span>answer from sources</span></li>
+                <li>Cite<span>show the page</span></li>
+                <li>Guard<span>limits and review</span></li>
+              </ul>
+            </div>
+            <span class="rag__arrow"></span>
+            <div class="rag__col">
+              <p class="rag__col-title">Your assistant</p>
+              <div class="rag__answer">
+                <p class="rag__q">Which contracts renew next quarter?</p>
+                <p><strong>Seven contracts</strong> renew between January and March; three are above the approval threshold.</p>
+                <p class="rag__src">Source: contracts table · renewals view · sample data</p>
+              </div>
+            </div>
+          </div>
+          <ol class="rag__week">
+            <li><b>Scope and connect</b><span>The questions it must answer, the data it may read.</span></li>
+            <li><b>Index and retrieve</b><span>First answers from your own data.</span></li>
+            <li><b>Ground and cite</b><span>Every answer shows its source.</span></li>
+            <li><b>Measure and guard</b><span>Checked against your real questions; limits agreed.</span></li>
+            <li><b>Harden and go live</b><span>Hand-over, monitoring, and the first users.</span></li>
+          </ol>
+        </div>
+
+        <div class="rag__cta" data-reveal>
+          <p>
+            Built for startup founders who need a product this quarter, and
+            enterprise CTOs who need it inside their own security boundary.
+            Data access, review steps and the questions it will be measured on
+            are agreed on day one; the week assumes that access is ready.
+          </p>
+          <div class="studio-actions">
+            <a class="btn btn-primary btn-lg" href="mailto:hello@summaverick.com?subject=RAG%20assistant%20in%20one%20week" data-brand="contact">Plan your one-week build</a>
+            <a class="btn btn-quiet btn-lg" href="#examples" data-demo-open="3">See a RAG assistant work</a>
+          </div>
         </div>
       </div>
     </section>
@@ -769,6 +883,12 @@
             </div>
           </details>
           <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+            <summary itemprop="name">How fast can a RAG assistant go live?</summary>
+            <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+              <p itemprop="text">In a week, when the data access is ready on day one. We scope the questions it must answer and connect the data on day one, build and measure it against your real questions over the next three days, and harden and hand it over on day five. It runs as small modules beside the database you already have, in your cloud or ours — see <a href="#rag">RAG assistants</a>.</p>
+            </div>
+          </details>
+          <details class="faq__item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
             <summary itemprop="name">Will the agent act on its own?</summary>
             <div class="faq__answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
               <p itemprop="text">Only inside limits you agree to. We make progress visible, explain what needs attention, and give people a clear way to review important actions before they happen. Those controls are defined around the task and the product.</p>
@@ -851,6 +971,7 @@
               <option value="personal_assistant">Personal assistant</option>
               <option value="mobile_agent">Mobile agent experience</option>
               <option value="enterprise_agent">Enterprise agent</option>
+              <option value="rag_assistant">RAG assistant</option>
               <option value="servicenow_solution">ServiceNow solution</option>
               <option value="not_sure">Not sure yet</option>
             </select>
@@ -890,6 +1011,7 @@
       <div>
         <p class="footer-head">Explore</p>
         <ul>
+          <li><a href="#rag">RAG assistants</a></li>
           <li><a href="#build">What we build</a></li>
           <li><a href="#examples">Examples</a></li>
           <li><a href="#how-we-work">How we work</a></li>

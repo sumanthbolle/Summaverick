@@ -1,20 +1,26 @@
 /*
- * glassmark.js — the one-time crystal assembly for the hero "Summaverick".
+ * glassmark.js — the crystal assembly for the hero "Summaverick".
  *
  * The resolved glass wordmark is the default (CSS) state, so with scripting
  * off, initialization failure, or reduced motion the complete word shows
  * immediately and nothing here runs. When motion is allowed, the reveal plays
- * once, after the font is ready and the hero has entered view; it never
- * replays on scroll-back or a theme switch. No timers or listeners survive the
- * reveal. A replay control is injected only for local review (?preview).
+ * once the font is ready and the hero has entered view; it never replays on
+ * scroll-back or a theme switch by itself. hero-headline.js replays it each
+ * time the headline returns to the brand, through the controller returned
+ * here. A replay control is injected only for local review (?preview).
  */
 import { $ } from "./lib/dom.js";
 
 const PLAY_MS = 3600;
 
+/**
+ * @returns {{ play(): void, firstPlay: Promise<void>, reduce: MediaQueryList } | null}
+ *   play() restarts the assembly; firstPlay resolves after the reveal has
+ *   started on its own (never, under reduced motion).
+ */
 export function initGlassmark() {
   const mark = $("[data-glassmark]");
-  if (!mark) return;
+  if (!mark) return null;
 
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -43,13 +49,19 @@ export function initGlassmark() {
     mark.appendChild(btn);
   }
 
-  if (reduce.matches) return;
+  let resolveFirst = () => {};
+  const firstPlay = new Promise((resolve) => {
+    resolveFirst = resolve;
+  });
+
+  if (reduce.matches) return { play, firstPlay, reduce };
 
   let played = false;
   const start = () => {
     if (played) return;
     played = true;
     play();
+    resolveFirst();
   };
 
   const whenVisible = () => {
@@ -77,4 +89,6 @@ export function initGlassmark() {
   } else {
     whenVisible();
   }
+
+  return { play, firstPlay, reduce };
 }

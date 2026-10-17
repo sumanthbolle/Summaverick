@@ -2,6 +2,41 @@
 
 Running log of decisions that shape the build. Newest first.
 
+## 2026-10-17 — RAG assistants section; the headline alternates; greetings get room
+
+**RAG assistants (`#rag`).** A new homepage section between the walk-through
+and "What we build", written for startup founders and enterprise CTOs:
+retrieval assistants as lightweight modules beside the data a company already
+has, with a one-week path from proof of concept to production, wherever the
+database lives. Three cards carry the claims; the board (data → six modules →
+answer, with the week beneath) is an illustration marked `aria-hidden`. The
+one-week claim states its condition on the page: the data access is ready on
+day one. It is linked from the header, the phone menu and the footer, has an
+FAQ entry, and the contact form offers `rag_assistant`, which
+`src/routes/contact.ts` accepts.
+
+**The headline alternates.** The hero reads "Meet Super Intelligence." and
+"Meet Summaverick." in turn. Both faces share one grid cell so the line never
+changes height. The brand face is the stylesheet default: with scripting off
+or reduced motion the page reads "Meet Summaverick." and nothing moves. With
+motion, `hero-headline.js` starts after the wordmark's own first reveal and
+alternates: the spectrum phrase arrives with a sweep, a short hue drift and a
+flash; the wordmark returns by replaying its crystal assembly (`glassmark.js`
+now returns a controller for this). The cycle stops while the tab is hidden,
+while the hero is off screen, and the moment reduced motion is switched on.
+It is a script timer, so the stylesheet still has no looping animation.
+
+**Greetings.** The "hello" word's spectrum is a background clipped to the
+glyphs, and a background paints only inside the element's box. Telugu,
+Devanagari and Arabic put marks above and below a Latin line box, and the
+system fonts they fall back to are taller still, so the parts of a word that
+reached past the box went unpainted and the word looked cut. The word now
+carries padding with matching negative margins (nothing around it moves), a
+roomier line, no negative tracking for those scripts (it breaks Arabic
+joins), and a named system face per script keyed on the `lang` attribute the
+script sets. Kana and Hangul are set slightly smaller to match the Latin
+cap height.
+
 ## 2026-10-07 — Email links open a chooser on computers (mail-chooser.js)
 
 **Decision.** On a desktop pointer, a click on any `mailto:` link opens a small

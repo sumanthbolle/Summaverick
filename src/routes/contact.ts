@@ -32,6 +32,7 @@ const INTENTS = new Set([
   "personal_assistant",
   "mobile_agent",
   "enterprise_agent",
+  "rag_assistant",
   "servicenow_solution",
   "not_sure",
 ]);

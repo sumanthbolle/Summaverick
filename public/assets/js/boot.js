@@ -9,6 +9,7 @@ import { initAgentStage } from "./agent-stage.js";
 import { initMotion } from "./motion.js";
 import { initGreeting } from "./greeting.js";
 import { initGlassmark } from "./glassmark.js";
+import { initHeroHeadline } from "./hero-headline.js";
 import { initExamples } from "./examples.js";
 
 function boot() {
@@ -17,7 +18,7 @@ function boot() {
   initLeadForm();
   initMotion();
   initGreeting();
-  initGlassmark();
+  initHeroHeadline(initGlassmark());
   initExamples();
 }
 

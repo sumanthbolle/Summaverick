@@ -98,9 +98,72 @@ describe("Homepage public contract", () => {
     expect(hero).not.toContain("data-reveal");
   });
 
+  it("alternates the headline between Super Intelligence and the brand, resting on the brand", () => {
+    const home = text("public/index.html");
+    const css = text("public/assets/css/site.css");
+    const boot = text("public/assets/js/boot.js");
+    const cycle = text("public/assets/js/hero-headline.js");
+
+    const h1 = home.slice(home.indexOf("<h1"), home.indexOf("</h1>"));
+    expect(h1).toContain("Meet");
+    expect(h1).toContain('class="supermark__word text-spectrum">Super<');
+    expect(h1).toContain("Intelligence");
+    expect(h1).toContain("Summaverick");
+    // The spectrum face is decorative; assistive tech reads "Meet Summaverick."
+    expect(h1).toMatch(/data-face-super aria-hidden="true"/);
+    expect(h1).not.toMatch(/data-face-brand[^>]*aria-hidden/);
+    // The brand face is the stylesheet default; only a script sets the other.
+    expect(css).toContain(".hero-headline__face--super,\n.hero-headline__mark[data-face=\"super\"] .hero-headline__face--brand {\n  opacity: 0;");
+    expect(boot).toContain("initHeroHeadline(initGlassmark())");
+    expect(cycle).toContain('reduce.addEventListener("change"');
+    expect(cycle).toContain("visibilitychange");
+  });
+
+  it("gives every greeting script room and a face of its own", () => {
+    const css = text("public/assets/css/site.css");
+    const greeting = text("public/assets/js/greeting.js");
+
+    // The spectrum paints only inside the box, so the box must cover the
+    // marks that Telugu, Devanagari and Arabic put above and below the line.
+    const word = css.slice(css.indexOf(".hello__word {"), css.indexOf(".hello__word:lang(te)"));
+    expect(word).toMatch(/padding: 0\.\d+em 0\.\d+em;/);
+    expect(word).toMatch(/margin: -0\.\d+em -0\.\d+em;/);
+    for (const lang of ["te", "hi", "ar", "ja", "ko"]) {
+      expect(css, `no font for :lang(${lang})`).toContain(`.hello__word:lang(${lang}) {`);
+      expect(greeting, `greeting without lang ${lang}`).toContain(`lang: "${lang}"`);
+    }
+    expect(greeting).toContain('el.setAttribute("lang", g.lang)');
+  });
+
+  it("offers next-generation RAG assistants to founders and CTOs", () => {
+    const home = text("public/index.html");
+    const accepted = text("src/routes/contact.ts");
+
+    const rag = home.slice(home.indexOf('id="rag"'), home.indexOf('id="build"'));
+    expect(rag).toContain("Discover and implement next-generation");
+    expect(rag).toContain("RAG assistants");
+    expect(rag).toContain("for founders and CTOs");
+    expect(rag).toContain("lightweight");
+    expect(rag).toContain("one-week path from proof of concept to");
+    expect(rag).toContain("wherever your data lives");
+    expect(rag).toContain("startup founders");
+    expect(rag).toContain("enterprise CTOs");
+    // The one-week claim states what it depends on.
+    expect(rag).toContain("the week assumes that access is ready");
+    // The board is an illustration, labelled as such and hidden from readers.
+    expect(rag).toContain("sample data");
+    expect(rag).toMatch(/class="rag__board band-ink"[^>]*aria-hidden="true"/);
+    // Reachable from the header, the phone menu and the footer.
+    expect(home.match(/href="#rag"/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // The form offers it and the server keeps it.
+    expect(home).toContain('<option value="rag_assistant">RAG assistant</option>');
+    expect(accepted).toContain('"rag_assistant"');
+  });
+
   it("keeps the renamed sections reachable under their old anchors", () => {
     const home = text("public/index.html");
     for (const id of [
+      "rag",
       "build",
       "stage",
       "examples",
@@ -261,6 +324,7 @@ describe("Homepage public contract", () => {
       "Personal assistant",
       "Mobile agent experience",
       "Enterprise agent",
+      "RAG assistant",
       "ServiceNow solution",
       "Not sure yet",
     ]) {
