@@ -63,37 +63,27 @@ try {
   const mobileOrder = await evaluate(
     client,
     `const copy = document.querySelector(".hero__copy").getBoundingClientRect();
-     const panel = document.querySelector("[data-hero-panel]").getBoundingClientRect();
-     // Only the shown walk-through: a hidden view reports zero-sized rects,
-     // which would read as two steps sharing a line.
-     const steps = [...document.querySelectorAll('[data-stage-view]:not([hidden]) [data-stage-step]')].map(s => s.getBoundingClientRect());
+     const rag = document.querySelector("#rag").getBoundingClientRect();
      const actions = [...document.querySelectorAll(".hero .btn")].map(b => {
        const r = b.getBoundingClientRect();
        return { label: b.textContent.trim(), top: Math.round(r.top), h: Math.round(r.height) };
      });
      return {
        copyBottom: Math.round(copy.bottom),
-       panelTop: Math.round(panel.top),
-       stepsStacked: steps.every((r, i) => i === 0 || r.top > steps[i - 1].bottom - 2),
-       eyebrowVisible: document.querySelector(".hero .studio-kicker").getBoundingClientRect().height > 0,
+       ragTop: Math.round(rag.top),
+       nextSection: document.querySelector("main > section").nextElementSibling.id,
        leadVisible: document.querySelector(".hero .studio-lead").getBoundingClientRect().height > 0,
        actions,
      };`
   );
   check(
-    "390px: the hero copy reads before the illustration, and the specialty line and both buttons stay with it",
-    mobileOrder.panelTop >= mobileOrder.copyBottom - 2 &&
-      mobileOrder.eyebrowVisible &&
+    "390px: the introduction leads directly into RAG, with both actions visible",
+    mobileOrder.ragTop >= mobileOrder.copyBottom - 2 &&
+      mobileOrder.nextSection === "rag" &&
       mobileOrder.leadVisible &&
       mobileOrder.actions.length === 2,
     JSON.stringify(mobileOrder)
   );
-  check(
-    "390px: the walk-through steps stack vertically",
-    mobileOrder.stepsStacked === true,
-    `stacked=${mobileOrder.stepsStacked}`
-  );
-
   // ---- Touch targets ----------------------------------------------------
   const smallTargets = await evaluate(
     client,

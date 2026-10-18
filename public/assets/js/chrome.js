@@ -93,19 +93,6 @@ function initReveals() {
   }, 1200);
 }
 
-/* The hero illustration settles into place once the page is ready. The copy,
- * the specialties and the buttons never wait on it. */
-function initHeroPanel() {
-  const panel = $("[data-hero-panel]");
-  if (!panel) return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    panel.classList.add("is-ready");
-    return;
-  }
-  document.documentElement.setAttribute("data-motion", "on");
-  requestAnimationFrame(() => panel.classList.add("is-ready"));
-}
-
 export function initChrome() {
   const nav = $("#nav");
   const onScroll = () => {
@@ -117,7 +104,6 @@ export function initChrome() {
 
   initTheme();
   initReveals();
-  initHeroPanel();
   // A mailto: link does nothing on a computer with no mail app set up; this
   // offers Outlook, Gmail and the rest instead (see mail-chooser.js).
   initMailChooser();
