@@ -84,14 +84,14 @@ describe("Homepage public contract", () => {
   it("states the offer, both audiences and mobile in the first screen", () => {
     const home = text("public/index.html");
 
-    const hero = home.slice(home.indexOf('id="top"'), home.indexOf('id="stage"'));
+    const hero = home.slice(home.indexOf('id="top"'), home.indexOf('id="rag"'));
     expect(hero).toContain("A software studio for AI agents.");
     // Both audiences, and mobile, are named before the first scroll.
     expect(hero).toContain("a personal assistant on someone's");
     expect(hero).toContain("phone, a mobile experience");
     expect(hero).toContain("an enterprise agent wired into ServiceNow");
     expect(hero).toContain(">Build with us<");
-    expect(hero).toContain(">See what we do<");
+    expect(hero).toContain('href="#rag">Explore RAG assistants<');
     expect(home).toContain("Personal assistants and enterprise agents");
     // The hero must not depend on the illustration or on any animation.
     expect(hero).toContain("<h1");
@@ -182,63 +182,39 @@ describe("Homepage public contract", () => {
     }
   });
 
-  it("pairs a personal and an enterprise walk-through without auto-cycling", () => {
+  it("takes visitors from the introduction directly to the RAG offer", () => {
     const home = text("public/index.html");
-    const css = text("public/assets/css/site.css");
-    const js = text("public/assets/js/agent-stage.js");
-
-    expect(home).toContain("Illustrative experience");
-    expect(home).toContain('data-stage-tab="personal"');
-    expect(home).toContain('data-stage-tab="enterprise"');
-    // Five steps each: task, context, proposal, review, observable next step.
-    for (const view of ["personal", "enterprise"]) {
-      const start = home.indexOf(`data-stage-view="${view}"`);
-      const chunk = home.slice(start, home.indexOf("</ol>", start));
-      for (let step = 0; step < 5; step += 1) {
-        expect(chunk, `${view} step ${step}`).toContain(`data-stage-step="${step}"`);
-      }
-    }
-    // Play, Pause, Replay, and manual steps when motion is reduced.
-    expect(home).toContain("data-stage-play");
-    expect(home).toContain("data-stage-prev");
-    expect(home).toContain("data-stage-next");
-    expect(js).toContain("Pause");
-    expect(js).toContain("Replay");
-    expect(js).toContain("prefers-reduced-motion: reduce");
-    // Playback waits at the review step instead of deciding for the visitor.
-    expect(js).toContain("waitForDecision");
-    // Nothing decorative loops forever. The only endless animations are the
-    // two progress indicators that run while a research answer streams in.
-    const loops = css.split("\n").filter((line) => line.includes("infinite"));
-    for (const line of loops) expect(line, line.trim()).toMatch(/\b(rs-caret|chat-spin)\b/);
+    const sections = [...home.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
+    expect(sections.slice(0, 3)).toEqual(["top", "rag", "build"]);
+    expect(home).not.toContain("data-hero-panel");
+    expect(home).not.toContain("data-stage-view");
+    expect(text("public/assets/js/boot.js")).not.toContain("agent-stage");
+    expect(home).toContain('class="offer__link" href="/ask-summaverick"');
+    const examples = home.slice(home.indexOf('id="examples"'), home.indexOf('id="how-we-work"'));
+    expect(examples).toContain('id="stage"');
+    expect(examples).toContain('id="workflow"');
   });
 
-  it("cannot let an illustration be mistaken for a real action", () => {
+  it("labels the remaining examples as illustrative instead of real actions", () => {
     const home = text("public/index.html");
-    const js = text("public/assets/js/agent-stage.js");
-
-    expect(home).toContain("sample data");
-    expect(home).toContain("Nothing here contacts a\n            merchant");
-    expect(home).toContain("Nothing was sent to a merchant.");
-    expect(home).toContain("No real record was changed.");
-    expect(js).toContain("data-stage-advance");
+    expect(home).toContain("Illustrative examples with sample data");
+    expect(home).toContain("not a guarantee");
+    for (const title of ["Customer questions", "Employee requests", "Company knowledge", "Your own systems"]) {
+      expect(home).toContain(title);
+    }
+    // Only active research progress indicators may animate indefinitely.
+    const loops = text("public/assets/css/site.css").split("\n").filter(line => line.includes("infinite"));
+    for (const line of loops) expect(line, line.trim()).toMatch(/\b(rs-caret|chat-spin)\b/);
   });
 
   it("reads completely with scripting off", () => {
     const home = text("public/index.html");
     const css = text("public/assets/css/site.css");
 
-    // Tabs and playback controls only appear once the page knows JS is running.
-    expect(home).toContain('h.setAttribute("data-js", "on")');
-    expect(css).toContain(':root[data-js="on"] .stage__tabs { display: flex; }');
-    expect(css).toContain(':root[data-js="on"] .stage__controls { display: flex; }');
-    expect(css).toContain(".stage__tabs {\n  display: none;");
-
-    // The second view is never hidden by markup alone, or scripting-off
-    // visitors would lose it behind a tab strip they cannot see.
-    const stage = home.slice(home.indexOf('id="stage"'), home.indexOf('id="build"'));
-    expect(stage).not.toMatch(/data-stage-view="[^"]+"[^>]*\shidden/);
-    expect(css).toContain(':root[data-js="on"] .stage__view[data-stage-inactive]');
+    // All four examples remain in the document without requiring their player.
+    expect(home.match(/data-demo-panel/g)).toHaveLength(4);
+    expect(home).not.toMatch(/data-demo-panel[^>]*\shidden/);
+    expect(home).toContain('href="#rag">Explore RAG assistants');
 
     // The retry button ships hidden and is shown only when it applies. It also
     // carries .btn, whose `display` outranks the browser's rule for [hidden],
@@ -257,7 +233,6 @@ describe("Homepage public contract", () => {
     // The hidden pre-animation states only apply once the script has run AND
     // the visitor has not asked for reduced motion.
     expect(css).toContain(':root[data-motion="on"] [data-reveal]');
-    expect(css).toContain(':root[data-motion="on"] .hero-panel');
     expect(chrome).toContain('setAttribute("data-motion", "on")');
     expect(chrome).toContain('removeAttribute("data-motion")');
   });

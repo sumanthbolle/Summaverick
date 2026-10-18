@@ -67,21 +67,13 @@ const coreChecks = [
         text.includes("Personal assistants and enterprise agents"),
         "home missing the specialty line — the offer has to be in the first screen"
       );
-      // The three offers and both walk-throughs are in the markup, so they read
-      // whether or not the motion script runs.
       for (const offer of ["Personal agents", "Mobile experiences", "Enterprise agents"]) {
         assert(text.includes(`<h3>${offer}</h3>`), `home missing the ${offer} offer`);
       }
-      for (const view of ["personal", "enterprise"]) {
-        assert(
-          text.includes(`data-stage-view="${view}"`),
-          `home missing the ${view} walk-through`
-        );
-      }
-      // Both sequences exist to hand the decision back to a person.
-      for (const step of ["Person decides", "Reviewer decides"]) {
-        assert(text.includes(step), `home missing the walk-through step "${step}"`);
-      }
+      const sections = [...text.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
+      assert(sections[0] === "top" && sections[1] === "rag", "RAG must follow the introduction directly");
+      assert(!text.includes("data-hero-panel") && !text.includes("data-stage-view"), "retired opening illustrations are still present");
+      assert(text.includes("Illustrative examples with sample data"), "remaining demos need a clear sample-data label");
       assert(
         text.includes('class="brand-mark"'),
         "home missing the Summaverick brand mark"

@@ -431,7 +431,6 @@ body[data-nav-open] { overflow: hidden; }
 .hero,
 .rag,
 .offers,
-.stage,
 .examples,
 .process,
 .platforms,
@@ -445,7 +444,6 @@ body[data-nav-open] { overflow: hidden; }
 
 .rag h2,
 .offers h2,
-.stage h2,
 .examples h2,
 .process h2,
 .platforms h2,
@@ -512,71 +510,6 @@ body[data-nav-open] { overflow: hidden; }
   margin-top: var(--space-6);
 }
 
-/* The illustration panel. Its dimensions are reserved, and it is the only
-   thing in the hero that moves. */
-.hero-panel {
-  margin: 0;
-  padding: var(--space-5);
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-lg);
-  background: var(--c-surface);
-  box-shadow: var(--shadow-2);
-}
-.hero-panel__label {
-  display: inline-block;
-  margin-bottom: var(--space-4);
-  padding: 2px 8px;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--radius-pill);
-  color: var(--c-text-dim);
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-}
-.hero-panel__ui {
-  min-height: 15rem;
-  padding: var(--space-5);
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-md);
-  background: var(--c-bg-elev);
-}
-.hero-panel__title {
-  margin: 0 0 var(--space-4);
-  font-size: var(--step-0);
-  font-weight: var(--weight-medium);
-}
-.hero-panel__rows { margin: 0; display: grid; gap: var(--space-3); }
-.hero-panel__rows > div {
-  display: grid;
-  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
-  gap: var(--space-3);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--c-line);
-}
-.hero-panel__rows dt { color: var(--c-text-dim); font-size: var(--step--1); }
-.hero-panel__rows dd { margin: 0; font-size: var(--step--1); }
-.hero-panel__foot {
-  margin: var(--space-4) 0 0;
-  color: var(--c-text-dim);
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-}
-.hero-panel__note {
-  margin: var(--space-4) 0 0;
-  color: var(--c-text-dim);
-  font-size: var(--step--1);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  :root[data-motion="on"] .hero-panel {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  :root[data-motion="on"] .hero-panel {
-    transition: opacity 400ms var(--ease-out), transform 400ms var(--ease-out);
-  }
-  :root[data-motion="on"] .hero-panel.is-ready { opacity: 1; transform: none; }
-}
-
 /* ---- What we build ----------------------------------------------------- */
 .offers { border-top: 1px solid var(--c-line); }
 .offers__grid {
@@ -597,223 +530,7 @@ body[data-nav-open] { overflow: hidden; }
 }
 .offer p { margin: var(--space-3) 0 0; color: var(--c-text-dim); }
 
-/* ---- The paired Personal / Enterprise stage ----------------------------
-   Without scripting both views render, stacked and complete. The tabs and
-   the playback controls only appear once [data-js="on"] is set, because only
-   then can they do anything. */
-.stage { background: var(--c-bg-elev); }
-.stage__caption {
-  max-width: 62ch;
-  margin: var(--space-4) 0 0;
-  color: var(--c-text-dim);
-}
-.stage__panel {
-  margin-top: var(--space-7);
-  padding: var(--space-5);
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-lg);
-  background: var(--c-surface);
-}
-.stage__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
-}
-.stage__tabs {
-  display: none;
-  gap: var(--space-2);
-  padding: 4px;
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-pill);
-  background: var(--c-bg-elev);
-}
-.stage__tab {
-  min-height: var(--hit);
-  padding: 0.45em 1.2em;
-  font: inherit;
-  font-size: var(--step--1);
-  font-weight: var(--weight-medium);
-  color: var(--c-text-dim);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  cursor: pointer;
-  transition: color var(--dur-fast) var(--ease-out),
-              background var(--dur-fast) var(--ease-out);
-}
-.stage__tab[aria-selected="true"] {
-  color: var(--c-on-accent);
-  background: var(--c-accent-fill);
-}
-.stage__badge {
-  margin: 0;
-  padding: 2px 8px;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--radius-pill);
-  color: var(--c-text-dim);
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-}
-
-/* Both surfaces reserve the same height and the same two columns, so
-   switching view moves nothing and the phone never reads as the lesser of
-   the two. */
-.stage__views { display: grid; gap: var(--space-6); }
-.stage__view { min-height: 30rem; }
-.stage__view-title {
-  grid-column: 1 / -1;
-  margin: 0;
-  font-size: var(--step-0);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-snug);
-}
-.stage__view {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  align-items: start;
-}
-/* Pre-paint only: without scripting there is no tab strip, so both views
-   stay on the page. Once the script runs it manages `hidden` instead. */
-:root[data-js="on"] .stage__view[data-stage-inactive] { display: none; }
-.stage__view:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--radius-md); }
-
-.device {
-  padding: var(--space-4);
-  border: 1px solid var(--c-line-strong);
-  background: var(--c-bg-elev);
-}
-.device--phone {
-  width: 100%;
-  max-width: 22rem;
-  margin-inline: auto;
-  border-radius: var(--radius-xl);
-}
-.device--desk { border-radius: var(--radius-lg); }
-
-/* The right-hand column says what each step is there to demonstrate. It is
-   static prose: it never animates, so it cannot fall out of step. */
-.stage__legend {
-  padding: var(--space-5);
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-lg);
-  background: var(--c-bg-elev);
-}
-.stage__legend h4 {
-  margin: 0 0 var(--space-4);
-  color: var(--c-text);
-  font-size: var(--step--1);
-  font-weight: var(--weight-medium);
-}
-.stage__legend ol {
-  display: grid;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: legend;
-}
-.stage__legend li {
-  display: grid;
-  grid-template-columns: 1.6rem minmax(0, 1fr);
-  gap: var(--space-2);
-  color: var(--c-text-dim);
-  font-size: var(--step--1);
-  counter-increment: legend;
-}
-.stage__legend li::before {
-  content: counter(legend);
-  color: var(--c-text-mute);
-  font-family: var(--font-mono);
-}
-
-.stage__steps {
-  display: grid;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-/* Emphasis, never a reveal: an unhighlighted step is fully legible. */
-.stage__step {
-  padding: var(--space-3);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out);
-}
-.stage__step.is-active {
-  border-color: var(--c-line-strong);
-  background: var(--c-surface);
-}
-.stage__who {
-  margin: 0 0 var(--space-2);
-  color: var(--c-text-mute);
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-}
-.stage__step.is-active .stage__who { color: var(--c-text); }
-
-.bubble {
-  padding: var(--space-4);
-  border: 1px solid var(--c-line);
-  border-radius: var(--radius-md);
-  background: var(--c-surface);
-  font-size: var(--step--1);
-}
-.bubble p { margin: 0; color: var(--c-text-dim); }
-.bubble p + p { margin-top: var(--space-2); }
-.bubble__title {
-  color: var(--c-text) !important;
-  font-weight: var(--weight-medium);
-}
-.bubble__quote { color: var(--c-text) !important; }
-.bubble__meta { font-family: var(--font-mono); }
-.bubble__list { margin: 0; padding-left: 1.1em; color: var(--c-text-dim); }
-.bubble__list li + li { margin-top: var(--space-2); }
-.bubble--person { background: var(--c-bg-elev); }
-.bubble--record { border-color: var(--c-line-strong); }
-.bubble--decide { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.bubble--track .dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 0.6em;
-  border-radius: 50%;
-  background: var(--c-text-mute);
-}
 .btn-sm { min-height: var(--hit); padding: 0.45em 0.95em; font-size: var(--step--1); }
-
-/* A drawn stand-in for a screenshot, so nobody mistakes it for a real one. */
-.sample-shot {
-  display: grid;
-  gap: 4px;
-  margin-top: var(--space-3) !important;
-  padding: var(--space-3);
-  border: 1px dashed var(--c-line-strong);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-}
-
-.stage__controls {
-  display: none;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-}
-.stage__status { margin: var(--space-4) 0 0; color: var(--c-text-dim); font-size: var(--step--1); }
-.stage__status:empty { display: none; }
-.stage__note {
-  max-width: 62ch;
-  margin: var(--space-4) 0 0;
-  color: var(--c-text-mute);
-  font-size: var(--step--1);
-}
-
-:root[data-js="on"] .stage__tabs { display: flex; }
-:root[data-js="on"] .stage__controls { display: flex; }
 
 /* ---- Examples: the demo player -----------------------------------------
    Four plain-language stories. Without scripting every panel shows in full,
@@ -1152,7 +869,7 @@ body[data-nav-open] { overflow: hidden; }
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  min-height: 36px;
+  min-height: var(--tap);
   margin-top: var(--space-4);
   padding: 0 16px;
   font: inherit;
@@ -1457,7 +1174,6 @@ body[data-nav-open] { overflow: hidden; }
   .hero__grid,
   .contact__grid,
   .control__grid,
-  .stage__view,
   .about__grid { grid-template-columns: 1fr; }
   .about__brand img { max-width: 18rem; }
   .platforms__grid { grid-template-columns: 1fr; }
@@ -1472,17 +1188,7 @@ body[data-nav-open] { overflow: hidden; }
 }
 @media (max-width: 560px) {
   .studio-actions .btn { width: 100%; }
-  .stage__controls .btn { flex: 1 1 100%; }
-  /* --hit is the dense desktop size. A finger needs the full target, and the
-     tabs and the in-illustration choices are the smallest controls here. */
-  .stage__tab, .btn-sm { min-height: var(--tap); }
-  .stage__panel { padding: var(--space-4); }
-  .stage__view { min-height: 0; }
-  .stage__badge { width: 100%; text-align: center; }
-  .device { padding: var(--space-3); }
-  .hero-panel { padding: var(--space-4); }
-  .hero-panel__ui { padding: var(--space-4); }
-  .hero-panel__rows > div { grid-template-columns: 1fr; gap: 2px; }
+  .btn-sm { min-height: var(--tap); }
   .company-facts dl > div { grid-template-columns: 1fr; gap: 2px; }
 }
 

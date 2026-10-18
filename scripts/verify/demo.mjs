@@ -104,23 +104,18 @@ try {
   await sleep(1600);
 
   if (MODE === "reduced") {
-    // Show the hero already settled, then the manual step controls.
-    await sleep(1200);
-    await glideTo(client, ".flow__panel", { block: "center", pause: 1600 });
-    for (const _ of [0, 1]) {
-      await clickOn(client, "[data-flow-next]");
+    await glideTo(client, "#rag", { block: "start", pause: 1600 });
+    await glideTo(client, ".examples", { block: "start", pause: 1500 });
+    for (const index of [2, 3, 4]) {
+      await clickOn(client, `#demo-tab-${index}`);
       await sleep(1300);
     }
-    await clickOn(client, "[data-flow-prev]");
-    await sleep(1600);
-    await glideTo(client, ".offers", { block: "start", pause: 1500 });
-    await glideTo(client, ".examples", { block: "start", pause: 1500 });
   } else {
     if (MODE === "mobile") {
       // Linger on the first screen: the specialty line and both buttons have to
       // stay with the headline at this width.
       await sleep(2000);
-      await glideTo(client, "[data-hero-panel]", { block: "center", pause: 1800 });
+      await glideTo(client, "#rag", { block: "start", pause: 1800 });
       await glideTo(client, "#hero-title", { block: "start", pause: 1400 });
       // The menu carries the same destinations as the desktop header.
       await clickOn(client, "#nav-toggle");
@@ -141,21 +136,10 @@ try {
       await glideTo(client, ".offers__grid .offer:nth-child(3)", { block: "center", pause: 1400 });
     }
 
-    // The workflow example: play it, pause it, resume, let it finish.
-    await glideTo(client, ".flow__panel", { block: "center", pause: 1400 });
-    await clickOn(client, "[data-flow-play]");
-    await sleep(1500);
-    await clickOn(client, "[data-flow-play]"); // pause
-    await sleep(1400);
-    await clickOn(client, "[data-flow-play]"); // resume
-    await sleep(4200);
-
-    // The example card and its disclosure.
-    await glideTo(client, ".example", { block: "center", pause: 1300 });
-    await clickOn(client, ".disclosure > summary");
-    await sleep(2200);
-    await clickOn(client, ".disclosure > summary");
-    await sleep(900);
+    // The remaining examples have explicit scenarios and a shared demo player.
+    await glideTo(client, ".examples", { block: "start", pause: 1400 });
+    await clickOn(client, "#demo-tab-3");
+    await sleep(2000);
 
     // Contact: type a real message and send it.
     await glideTo(client, ".contact-form", { block: "center", pause: 1200 });

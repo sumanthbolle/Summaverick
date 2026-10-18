@@ -15,7 +15,7 @@
  *
  * A band is a token remap, not a second set of rules. `.band-ink` points the
  * page ramp (--c-text, --c-surface, --c-line, ...) at the band's ramp for
- * everything inside it, so the stage, the demo and the form re-skin themselves
+ * everything inside it, so the demo and the form re-skin themselves
  * with the rules they already have.
  *
  * Colour: tokens only, the same rule as site.css. Anything translucent is a
@@ -27,7 +27,7 @@
    A band is Apple's section grey in light and ink in dark (--band* in
    tokens.css). The rules inside a band are written against the ink ramp, so
    the band points that ramp at its own colours and everything inside it, the
-   stage, the demo and the form, re-skins itself with the rules it already
+   demo and the form, re-skins itself with the rules it already
    has. Gradients and shadows are left to the theme. */
 body[data-home] .band-ink {
   --c-ink: var(--band);
@@ -74,12 +74,11 @@ body[data-home] .btn-primary {
 body[data-home] .btn-quiet { border-color: transparent; }
 
 /* ---- Hero ------------------------------------------------------------------
-   A light, dotted ground. The copy leads; the illustration becomes a framed
-   product panel under it. The two stay in the order the document has them, so
-   the offer is read first on a narrow screen as well. */
+   A light, dotted ground for the introduction, followed directly by RAG.
+   The same reading order applies on desktop and narrow screens. */
 body[data-home] .hero {
   padding-top: clamp(7.5rem, 12vw, 9.5rem);
-  padding-bottom: clamp(2.5rem, 5vw, 4rem);
+  padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
   background:
     radial-gradient(
       circle,
@@ -101,134 +100,6 @@ body[data-home] .hero__grid {
 }
 body[data-home] .hero__copy { max-width: 48rem; }
 body[data-home] .hero .studio-lead { max-width: 52ch; }
-
-/* The framed product panel: an ink object, lit from one side, with a dotted
-   ring on the left and the illustrated task on the right. */
-body[data-home] .hero-panel {
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 28rem);
-  grid-template-areas:
-    "ring ui"
-    "ring note";
-  align-items: center;
-  column-gap: clamp(1.5rem, 4vw, 4rem);
-  row-gap: var(--space-4);
-  min-height: 26rem;
-  padding: clamp(1.25rem, 3vw, 2.5rem);
-  overflow: hidden;
-  border: 1px solid var(--c-ink-line);
-  border-radius: var(--radius-xl);
-  background:
-    radial-gradient(
-      70% 90% at 22% 42%,
-      color-mix(in srgb, var(--c-on-ink) 11%, var(--c-ink)),
-      var(--c-ink) 72%
-    );
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--c-text) 6%, transparent),
-    0 50px 120px -50px color-mix(in srgb, var(--c-text) 38%, transparent);
-}
-body[data-home] .hero-panel__label {
-  position: absolute;
-  top: clamp(1rem, 2vw, 1.5rem);
-  left: clamp(1rem, 2.4vw, 1.75rem);
-  margin: 0;
-  background: color-mix(in srgb, var(--c-on-ink) 8%, transparent);
-}
-body[data-home] .hero-panel__ui {
-  grid-area: ui;
-  min-height: 0;
-  border-color: var(--c-ink-line);
-  border-radius: var(--radius-lg);
-  background: var(--band-raise);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-}
-body[data-home] .hero-panel__note { grid-area: note; margin: 0; }
-
-/* The ring: dots on a grid, masked to an annulus whose brightness drifts around
-   its circumference. Static; it is a picture, not an indicator. */
-body[data-home] .hero-panel::before,
-body[data-home] .hero-panel::after {
-  content: "";
-  grid-area: ring;
-  justify-self: center;
-  align-self: center;
-  width: min(100%, 22rem);
-  aspect-ratio: 1;
-  pointer-events: none;
-}
-body[data-home] .hero-panel::before {
-  z-index: 0;
-  background: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--c-on-ink) 85%, transparent) 0 1.1px,
-      transparent 1.8px
-    ) 0 0 / 7px 7px;
-  -webkit-mask:
-    radial-gradient(closest-side, transparent 0 56%, black 58% 84%, transparent 86%),
-    conic-gradient(from 25deg, black, transparent 30%, black 56%, transparent 82%, black);
-  -webkit-mask-composite: source-in;
-  mask:
-    radial-gradient(closest-side, transparent 0 56%, black 58% 84%, transparent 86%),
-    conic-gradient(from 25deg, black, transparent 30%, black 56%, transparent 82%, black);
-  mask-composite: intersect;
-  transform: rotate(-12deg) scaleY(0.86);
-}
-body[data-home] .hero-panel::after {
-  z-index: -1;
-  background: radial-gradient(
-    closest-side,
-    transparent 38%,
-    color-mix(in srgb, var(--c-on-ink) 20%, transparent) 66%,
-    transparent 86%
-  );
-  filter: blur(26px);
-}
-
-@media (max-width: 900px) {
-  body[data-home] .hero-panel {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "ring" "ui" "note";
-    min-height: 0;
-    padding-top: 3.25rem;
-  }
-  body[data-home] .hero-panel::before,
-  body[data-home] .hero-panel::after { width: min(70%, 14rem); }
-}
-
-/* ---- Stage: the paired walk-through ------------------------------------------
-   A centred header over one framed ink panel. The panel's own rules are
-   site.css's; only the ramp underneath them changes. */
-body[data-home] .stage { background: var(--c-bg); padding-top: clamp(1.5rem, 3vw, 2.5rem); }
-body[data-home] .stage .container > :is(.studio-kicker, h2, .stage__caption) {
-  margin-inline: auto;
-  text-align: center;
-}
-body[data-home] .stage .studio-kicker { margin-bottom: var(--space-3); }
-body[data-home] .stage__panel.band-ink {
-  margin-top: var(--space-6);
-  padding: clamp(1rem, 2.5vw, 2rem);
-  text-align: left;
-  border: 1px solid var(--c-ink-line);
-  border-radius: var(--radius-xl);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--c-text) 6%, transparent),
-    0 50px 110px -50px color-mix(in srgb, var(--c-text) 34%, transparent);
-}
-body[data-home] .stage__legend { position: sticky; top: 6.5rem; }
-body[data-home] .stage__tabs {
-  padding: 5px;
-  background: color-mix(in srgb, var(--c-on-ink) 5%, transparent);
-}
-body[data-home] .stage__tab { padding: 0.5em 1.4em; }
-body[data-home] .stage__tab[aria-selected="true"] {
-  background: color-mix(in srgb, var(--c-on-ink) 14%, var(--band-raise));
-  color: var(--c-on-ink);
-  box-shadow: inset 0 0 0 1px var(--c-ink-line);
-}
 
 /* ---- Section headers --------------------------------------------------------
    The sections that open a block of cards or a panel centre their header over
@@ -271,9 +142,10 @@ body[data-home] .examples::before {
    three figure cards, a framed board (the data, the six modules, the answer,
    and the week beneath), then the audience line and the two calls to action.
    The board is a band, so it re-skins itself with the band ramp like the
-   stage and the hero panel. */
+   examples and contact form. */
 body[data-home] .rag {
   padding-block: clamp(4rem, 9vw, 8rem);
+  padding-top: clamp(2rem, 4vw, 3rem);
   background: var(--c-bg);
 }
 body[data-home] .rag .section-head {

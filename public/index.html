@@ -111,199 +111,10 @@
           </p>
           <div class="studio-actions">
             <a class="btn btn-primary btn-lg" href="mailto:hello@summaverick.com" data-brand="contact">Build with us</a>
-            <a class="btn btn-quiet btn-lg" href="#build">See what we do</a>
+            <a class="btn btn-quiet btn-lg" href="#rag">Explore RAG assistants</a>
           </div>
         </div>
 
-        <!-- An illustration, labelled as one: no client screenshot is approved
-             for publication yet. Reserves its own height so nothing shifts. -->
-        <figure class="hero-panel band-ink" data-hero-panel>
-          <figcaption class="hero-panel__label">Illustration</figcaption>
-          <div class="hero-panel__ui">
-            <p class="hero-panel__title">Follow up on a refund that never arrived</p>
-            <dl class="hero-panel__rows">
-              <div><dt>Who it is for</dt><dd>One person, on their phone</dd></div>
-              <div><dt>What it uses</dt><dd>A screenshot they already have</dd></div>
-              <div><dt>Who decides</dt><dd>The person, before anything is sent</dd></div>
-            </dl>
-            <p class="hero-panel__foot">Next step: review the draft</p>
-          </div>
-          <p class="hero-panel__note">
-            The kind of screen we build: a clear task, the context it needs, and
-            a person in charge of the next step.
-          </p>
-        </figure>
-      </div>
-    </section>
-
-    <!-- ---- The paired product stage -------------------------------------
-         Two manually selected views. Both labels show immediately, nothing
-         auto-cycles, and all ten steps read as plain text with scripting off,
-         with motion reduced, and after playback finishes. -->
-    <section class="stage" id="stage" aria-labelledby="stage-title">
-      <span class="anchor-alias" id="workflow" aria-hidden="true"></span>
-      <div class="container">
-        <p class="studio-kicker">Illustrative experience</p>
-        <h2 id="stage-title">The same idea, in two very different places.</h2>
-        <p class="stage__caption">
-          A person needs something done. The agent brings the context together,
-          proposes one concrete next step, and hands the decision back. Below
-          are two walk-throughs built from sample data — pick a view and step
-          through it.
-        </p>
-
-        <div class="stage__panel band-ink" data-stage>
-          <div class="stage__bar">
-            <div class="stage__tabs" role="tablist" aria-label="Choose a walk-through">
-              <button class="stage__tab" type="button" role="tab" id="stage-tab-personal"
-                      aria-selected="true" aria-controls="stage-view-personal"
-                      data-stage-tab="personal">Personal</button>
-              <button class="stage__tab" type="button" role="tab" id="stage-tab-enterprise"
-                      aria-selected="false" aria-controls="stage-view-enterprise" tabindex="-1"
-                      data-stage-tab="enterprise">Enterprise</button>
-            </div>
-            <p class="stage__badge">Illustrative experience · sample data</p>
-          </div>
-
-          <div class="stage__views">
-            <!-- Personal: a phone-shaped surface -->
-            <div class="stage__view" id="stage-view-personal" role="tabpanel"
-                 aria-labelledby="stage-tab-personal" data-stage-view="personal" tabindex="0">
-              <h3 class="stage__view-title">On a phone: an unpaid refund</h3>
-              <div class="device device--phone">
-                <ol class="stage__steps">
-                  <li class="stage__step" data-stage-step="0">
-                    <p class="stage__who">Person</p>
-                    <div class="bubble bubble--person">
-                      <p class="bubble__title">Shared a screenshot</p>
-                      <p class="sample-shot" aria-label="Sample screenshot">
-                        <span>Order 4821 · Returned 2 Sep</span>
-                        <span>Refund status: not issued</span>
-                      </p>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="1">
-                    <p class="stage__who">Agent</p>
-                    <div class="bubble">
-                      <p>A refund for a returned order hasn't arrived. I can see the
-                        order number, but not the return reference — do you have it?</p>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="2">
-                    <p class="stage__who">Agent</p>
-                    <div class="bubble">
-                      <p class="bubble__title">Draft follow-up</p>
-                      <p class="bubble__quote">“I returned order 4821 on 2 September and the
-                        refund hasn't reached my account. Could you confirm when it was
-                        issued?”</p>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="3">
-                    <p class="stage__who">Person decides</p>
-                    <div class="bubble bubble--decide">
-                      <button class="btn btn-sm" type="button" data-stage-advance
-                              data-stage-said="The example moved on. Nothing was sent to a merchant.">Review draft</button>
-                      <button class="btn btn-sm btn-quiet" type="button" data-stage-advance
-                              data-stage-said="The example moved on. Editing here changes only the illustration.">Edit</button>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="4">
-                    <p class="stage__who">Afterwards</p>
-                    <div class="bubble bubble--track">
-                      <p class="bubble__title">Follow-ups</p>
-                      <p><span class="dot" aria-hidden="true"></span>Refund · order 4821 —
-                        waiting for a reply, check back Friday</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-              <div class="stage__legend">
-                <h4>What each step is there to show</h4>
-                <ol>
-                  <li>Start from information the person already has.</li>
-                  <li>Say what is uncertain, and ask for it.</li>
-                  <li>Produce something concrete, not only a reply.</li>
-                  <li>Leave the decision with the person.</li>
-                  <li>Carry the task past the first answer.</li>
-                </ol>
-              </div>
-            </div>
-
-            <!-- Enterprise: a work surface at comparable scale -->
-            <div class="stage__view" id="stage-view-enterprise" role="tabpanel"
-                 aria-labelledby="stage-tab-enterprise" data-stage-view="enterprise" tabindex="0" data-stage-inactive>
-              <h3 class="stage__view-title">At work: a service request that needs a decision</h3>
-              <div class="device device--desk">
-                <ol class="stage__steps">
-                  <li class="stage__step" data-stage-step="0">
-                    <p class="stage__who">Request</p>
-                    <div class="bubble bubble--record">
-                      <p class="bubble__title">REQ0010482 · Replacement laptop</p>
-                      <p>Raised by a new joiner in finance. Priority 3.</p>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="1">
-                    <p class="stage__who">Agent gathers context</p>
-                    <div class="bubble">
-                      <ul class="bubble__list">
-                        <li>Standard build applies to this role</li>
-                        <li>Sample stock check: 6 available</li>
-                        <li>Cost centre FIN-204, within the usual limit</li>
-                      </ul>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="2">
-                    <p class="stage__who">Agent proposes</p>
-                    <div class="bubble">
-                      <p class="bubble__quote">“Approve the standard build and ship to the
-                        Hyderabad office.”</p>
-                      <p class="bubble__meta">Reviewer: the requester's team manager</p>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="3">
-                    <p class="stage__who">Reviewer decides</p>
-                    <div class="bubble bubble--decide">
-                      <button class="btn btn-sm" type="button" data-stage-advance
-                              data-stage-said="The example moved on. No real record was changed.">Accept proposal</button>
-                      <button class="btn btn-sm btn-quiet" type="button" data-stage-advance
-                              data-stage-said="The example moved on. Editing here changes only the illustration.">Edit proposal</button>
-                    </div>
-                  </li>
-                  <li class="stage__step" data-stage-step="4">
-                    <p class="stage__who">Afterwards</p>
-                    <div class="bubble bubble--track">
-                      <p class="bubble__title">Task history</p>
-                      <p><span class="dot" aria-hidden="true"></span>09:41 Agent proposed an update</p>
-                      <p><span class="dot" aria-hidden="true"></span>09:44 Manager accepted it</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-              <div class="stage__legend">
-                <h4>What each step is there to show</h4>
-                <ol>
-                  <li>A task the business already recognises.</li>
-                  <li>Context gathered inside the task, not around it.</li>
-                  <li>A proposal, and a named person to judge it.</li>
-                  <li>A controlled boundary: the reviewer acts, not the agent.</li>
-                  <li>A record of what changed, and when.</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-
-          <div class="stage__controls">
-            <button class="btn" type="button" data-stage-play>Play</button>
-            <button class="btn btn-quiet" type="button" data-stage-prev>Previous step</button>
-            <button class="btn btn-quiet" type="button" data-stage-next>Next step</button>
-          </div>
-          <p class="stage__status" data-stage-status role="status" aria-live="polite"></p>
-          <p class="stage__note">
-            Both walk-throughs use invented data. Nothing here contacts a
-            merchant, opens a ticket, or changes a record — pressing a button
-            advances the illustration and nothing else.
-          </p>
-        </div>
       </div>
     </section>
 
@@ -446,7 +257,7 @@
               attention. We shape its purpose, its conversation, and the context
               it's allowed to use.
             </p>
-            <a class="offer__link" href="#stage" data-stage-jump="personal">See it work<span class="visually-hidden">: a personal agent following up a refund</span> <span aria-hidden="true">›</span></a>
+            <a class="offer__link" href="/ask-summaverick">Try Meet Summaverick <span aria-hidden="true">›</span></a>
           </article>
           <article class="offer" data-reveal style="--d:30ms">
             <div class="offer__art mini mini--phone" aria-hidden="true">
@@ -530,6 +341,8 @@
          autoplay and motion are added by examples.js. Sample data only. -->
     <section class="examples" id="examples" aria-labelledby="examples-title">
       <span class="anchor-alias" id="work" aria-hidden="true"></span>
+      <span class="anchor-alias" id="stage" aria-hidden="true"></span>
+      <span class="anchor-alias" id="workflow" aria-hidden="true"></span>
       <div class="container">
         <div class="section-head" data-reveal>
           <h2 id="examples-title">Watch an assistant do the <span class="text-spectrum text-spectrum--cyan">work</span>.</h2>
