@@ -2,6 +2,7 @@
 #include "sve_medcheck.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 
 namespace sve {
@@ -780,6 +781,74 @@ bool mentions_medicine(const std::string &text, const std::vector<std::string> &
     for (const auto &t : norm_tokens(text)) if (kWords.count(t)) return true;
     for (const char *w : {"మందు", "మాత్ర", "డోస్"}) if (text.find(w) != std::string::npos) return true;
     return !names_in_question(text, names).empty();
+}
+
+// ---------------------------------------------------------------- the person's own reminder / to-do
+
+namespace {
+
+// Optional string key: missing or null -> "" (ok); a string -> trimmed (ok); anything else -> false.
+bool opt_text(const json &in, const char *key, std::string &out) {
+    out.clear();
+    auto it = in.find(key);
+    if (it == in.end() || it->is_null()) return true;
+    if (!it->is_string()) return false;
+    out = trim(it->get<std::string>());
+    return true;
+}
+
+// Optional whole-number key >= min: missing or null -> null (ok); anything else that is not one -> false.
+bool opt_whole(const json &in, const char *key, int64_t min, json &out) {
+    out = nullptr;
+    auto it = in.find(key);
+    if (it == in.end() || it->is_null()) return true;
+    int64_t v = jint(in, key, INT64_MIN);
+    if (v == INT64_MIN || v < min) return false;
+    out = v;
+    return true;
+}
+
+// note_id and start_sec of the source moment. start_sec without a note means nothing, so it is dropped.
+bool source_fields(const json &in, json &note, json &sec) {
+    if (!opt_whole(in, "note_id", 1, note) || !opt_whole(in, "start_sec", 0, sec)) return false;
+    if (note.is_null()) sec = nullptr;
+    return true;
+}
+
+}  // namespace
+
+json direct_reminder_row(const json &in, const std::string &today) {
+    if (!in.is_object()) return nullptr;
+    std::string text, rep, start, until;
+    if (!opt_text(in, "text", text) || text.empty()) return nullptr;
+    auto t = in.find("times");
+    if (t == in.end() || !t->is_array() || t->empty()) return nullptr;
+    for (const auto &v : *t)
+        if (!v.is_string() || !valid_hhmm(v.get<std::string>())) return nullptr;
+    std::vector<std::string> times = valid_times(*t);  // duplicates removed
+    if (times.empty()) return nullptr;
+    if (!opt_text(in, "repeat", rep)) return nullptr;
+    if (rep.empty()) rep = "once";
+    else if (sanitize_repeat(rep).empty()) return nullptr;
+    else rep = sanitize_repeat(rep);
+    if (!opt_text(in, "start_date", start) || !opt_text(in, "until_date", until)) return nullptr;
+    if (start.empty()) start = today;
+    if (!valid_ymd(start) || (!until.empty() && (!valid_ymd(until) || until < start))) return nullptr;
+    json note, sec;
+    if (!source_fields(in, note, sec)) return nullptr;
+    return {{"text", text}, {"times", times}, {"repeat", rep}, {"start_date", start},
+            {"until_date", str_or_null(until)}, {"note_id", note}, {"start_sec", sec}, {"medicine_id", nullptr}};
+}
+
+json direct_task_row(const json &in) {
+    if (!in.is_object()) return nullptr;
+    std::string text, who, due;
+    if (!opt_text(in, "text", text) || text.empty()) return nullptr;
+    if (!opt_text(in, "who", who) || !opt_text(in, "due_date", due)) return nullptr;
+    if (!due.empty() && !valid_ymd(due)) return nullptr;
+    json note, sec;
+    if (!source_fields(in, note, sec)) return nullptr;
+    return {{"text", text}, {"who", str_or_null(who)}, {"due_date", str_or_null(due)}, {"note_id", note}, {"start_sec", sec}};
 }
 
 }  // namespace sve

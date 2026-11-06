@@ -431,6 +431,42 @@ static void run_api_fixes(sve_ctx *ctx) {
     run_api_fixes2(ctx, note);
 }
 
+// Ask's "Make reminder" / "Make to-do": the person's own rows, created directly with the source moment.
+static void run_api_direct(sve_ctx *ctx) {
+    json pieces = json::parse(R"([{"start_sec":0,"text":"Walk every evening."}])");
+    int64_t note = make_note(ctx, pieces, "Walk advice");
+    size_t before = take(sve_reminders_json(ctx, 0)).size();
+    std::string rj = R"({"text":"Walk every evening","times":["18:30"],"repeat":"daily","note_id":)" + std::to_string(note) + R"(,"start_sec":0})";
+    int64_t rid = sve_reminder_create(ctx, rj.c_str());
+    json rems = take(sve_reminders_json(ctx, 0));
+    expect(rid > 0 && rems.size() == before + 1 && rems.back()["id"] == rid && rems.back()["note_id"] == note &&
+           rems.back()["start_sec"] == 0 && rems.back()["times"] == json::array({"18:30"}) && rems.back()["repeat"] == "daily" &&
+           rems.back()["medicine_id"].is_null(), "sve_reminder_create saves the row with its source");
+    expect(sve_reminder_create(ctx, R"({"text":"x","times":[]})") < 0, "reminder create needs a time");
+    expect(sve_reminder_create(ctx, R"({"text":"","times":["09:00"]})") < 0, "reminder create needs text");
+    expect(sve_reminder_create(ctx, R"({"text":"x","times":["9:00 pm"]})") < 0, "reminder create refuses a bad time");
+    expect(sve_reminder_create(ctx, "{bad") < 0 && sve_reminder_create(ctx, nullptr) < 0 && sve_reminder_create(nullptr, "{}") < 0,
+           "reminder create refuses bad JSON / null");
+    expect(take(sve_reminders_json(ctx, 0)).size() == before + 1, "refused reminders save nothing");
+    // A source note deleted after the answer: the row is kept without the link.
+    int64_t gone = make_note(ctx, pieces, "Deleted later");
+    sve_note_delete(ctx, gone);
+    int64_t r2 = sve_reminder_create(ctx, (R"({"text":"y","times":["07:00"],"note_id":)" + std::to_string(gone) + R"(,"start_sec":5})").c_str());
+    json last = take(sve_reminders_json(ctx, 0)).back();
+    expect(r2 > 0 && last["id"] == r2 && last["note_id"].is_null() && last["start_sec"].is_null(), "deleted source note dropped from the reminder");
+
+    size_t tbefore = take(sve_tasks_json(ctx, 0)).size();
+    int64_t tid = sve_task_create(ctx, (R"({"text":"Buy walking shoes","note_id":)" + std::to_string(note) + R"(,"start_sec":0})").c_str());
+    json tasks = take(sve_tasks_json(ctx, 0));
+    expect(tid > 0 && tasks.size() == tbefore + 1 && tasks.back()["id"] == tid && tasks.back()["note_id"] == note &&
+           tasks.back()["due_date"].is_null() && tasks.back()["who"].is_null(), "sve_task_create saves the row with its source");
+    expect(sve_task_create(ctx, R"({"text":"  "})") < 0 && sve_task_create(ctx, R"({"text":"x","due_date":"soon"})") < 0 &&
+           sve_task_create(ctx, "[]") < 0, "task create refuses empty text / bad date / non-object");
+    sve_reminder_set_active(ctx, rid, 0);
+    sve_reminder_set_active(ctx, r2, 0);
+    sve_task_set_done(ctx, tid, 1);
+}
+
 static int run_api(sve_ctx *ctx) {
     sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
     json prof = take(sve_profile_get(ctx));
@@ -492,6 +528,7 @@ static int run_api(sve_ctx *ctx) {
     expect(sve_extract(ctx, note, nullptr, nullptr) < 0, "extract without a model is an error");
     expect(sve_topic_summary(ctx, 12345, "en", nullptr, nullptr) == nullptr, "unknown topic -> NULL");
     run_api_fixes(ctx);
+    run_api_direct(ctx);
     return 0;
 }
 

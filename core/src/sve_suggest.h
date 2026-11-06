@@ -122,4 +122,16 @@ json sanitize_topic_summary(const json &j);
 // మందు, మాత్ర, డోస్, ...) or one of the given medicine names.
 bool mentions_medicine(const std::string &text, const std::vector<std::string> &names);
 
+// The person's own reminder or to-do (Ask's "Make reminder" / "Make to-do" form), checked before it is
+// saved directly (sve_reminder_create / sve_task_create). Nothing is filled in by guesswork.
+// Reminder keys: text (required, trimmed), times (required: a non-empty array of valid "HH:MM"; any
+// invalid entry rejects the whole input), repeat (daily|twice_daily|weekly|once; missing/empty -> "once"),
+// start_date (YYYY-MM-DD; missing/empty -> today), until_date (YYYY-MM-DD or missing/empty; not before
+// start_date), note_id (integer > 0 or missing/null), start_sec (integer >= 0 or missing/null; dropped
+// without note_id). Returns the row for Store::add_reminder, or null when the input is not acceptable.
+json direct_reminder_row(const json &in, const std::string &today);
+// Task keys: text (required, trimmed), who (optional string), due_date (YYYY-MM-DD or missing/empty),
+// note_id, start_sec (as for reminders). Returns the row for Store::add_task, or null.
+json direct_task_row(const json &in);
+
 }  // namespace sve

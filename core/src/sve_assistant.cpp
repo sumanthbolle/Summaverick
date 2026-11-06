@@ -659,6 +659,37 @@ char *sve_tasks_json(sve_ctx *ctx, int open_only) {
 int sve_task_set_done(sve_ctx *ctx, int64_t id, int done) {
     return guard("sve_task_set_done", -1, [&] { return ctx && ctx->store->set_task_done(id, done != 0) ? 0 : -1; });
 }
+
+namespace {
+// A source note that was deleted after the answer was shown: keep the row, without the link.
+void drop_missing_note(sve::Store &st, json &row) {
+    if (row["note_id"].is_null() || st.get(row["note_id"].get<int64_t>())) return;
+    row["note_id"] = nullptr;
+    row["start_sec"] = nullptr;
+}
+}  // namespace
+
+int64_t sve_reminder_create(sve_ctx *ctx, const char *js) {
+    return guard<int64_t>("sve_reminder_create", -1, [&]() -> int64_t {
+        if (!ctx) return -1;
+        json row = sve::direct_reminder_row(parse(js), today_iso());
+        if (!row.is_object()) return -1;
+        drop_missing_note(*ctx->store, row);
+        int64_t id = ctx->store->add_reminder(row);
+        return id > 0 ? id : -1;
+    });
+}
+
+int64_t sve_task_create(sve_ctx *ctx, const char *js) {
+    return guard<int64_t>("sve_task_create", -1, [&]() -> int64_t {
+        if (!ctx) return -1;
+        json row = sve::direct_task_row(parse(js));
+        if (!row.is_object()) return -1;
+        drop_missing_note(*ctx->store, row);
+        int64_t id = ctx->store->add_task(row);
+        return id > 0 ? id : -1;
+    });
+}
 char *sve_topics_json(sve_ctx *ctx, const char *kind) {
     return guard<char *>("sve_topics_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->topics(kind ? kind : "")) : nullptr; });
 }

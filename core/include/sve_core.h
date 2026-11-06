@@ -166,9 +166,20 @@ int   sve_medicine_delete(sve_ctx *ctx, int64_t id);
 /* [{"id","text","times","repeat","start_date","until_date","note_id","start_sec","medicine_id","from_deleted","active","created_at"}] */
 char *sve_reminders_json(sve_ctx *ctx, int active_only);
 int   sve_reminder_set_active(sve_ctx *ctx, int64_t id, int active);
+/* Creates a reminder the person made themselves (e.g. "Make reminder" on an Ask answer; their own edit,
+ * applied directly, no suggestion). json: {"text","times":["HH:MM",…],"repeat","start_date","until_date",
+ * "note_id","start_sec"}. Requires non-empty text and at least one time; every time must be a valid HH:MM.
+ * repeat daily|twice_daily|weekly|once (missing/empty = "once"); start_date YYYY-MM-DD (missing/empty =
+ * today); until_date YYYY-MM-DD or missing, not before start_date; note_id/start_sec optional (a note that
+ * no longer exists is dropped with its start_sec). Returns the reminder id, negative on bad input or error. */
+int64_t sve_reminder_create(sve_ctx *ctx, const char *json);
 /* [{"id","text","who","due_date","done","note_id","start_sec","from_deleted","created_at"}] */
 char *sve_tasks_json(sve_ctx *ctx, int open_only);
 int   sve_task_set_done(sve_ctx *ctx, int64_t id, int done);
+/* Creates a to-do the person made themselves (applied directly). json: {"text","who","due_date","note_id",
+ * "start_sec"}. Requires non-empty text; due_date YYYY-MM-DD or missing; note_id/start_sec as for
+ * sve_reminder_create. Returns the task id, negative on bad input or error. */
+int64_t sve_task_create(sve_ctx *ctx, const char *json);
 
 /* kind "topic" | "person" | NULL/"" = both:
  * [{"id","kind","name","summary","summary_stale","note_count","open_tasks","last_title"}] */

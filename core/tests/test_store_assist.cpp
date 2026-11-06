@@ -1,5 +1,6 @@
 #include "check.h"
 #include "sve_store.h"
+#include "sve_suggest.h"
 
 using sve::Store;
 using json = nlohmann::json;
@@ -174,4 +175,75 @@ TEST(suggestion_check_can_be_reflagged) {
     CHECK_EQ(r["check_status"].get<std::string>(), std::string("check"));
     CHECK_EQ(r["check_fields"], json::array({"dose"}));
     CHECK(!s.set_suggestion_check(9999, "check", json::array()));
+}
+
+// The person's own reminder from an Ask answer: checked by direct_reminder_row, then saved as a row.
+TEST(reminder_create_direct) {
+    using sve::direct_reminder_row;
+    Store s(":memory:");
+    int64_t note = mk(s, "Doctor visit");
+    const std::string today = "2026-11-06";
+    json row = direct_reminder_row(json::parse("{\"text\":\"  Walk 20 minutes \",\"times\":[\"07:30\",\"07:30\",\"18:00\"],\"note_id\":" +
+                                               std::to_string(note) + ",\"start_sec\":56}"), today);
+    CHECK(row.is_object());
+    CHECK_EQ(row["text"].get<std::string>(), std::string("Walk 20 minutes"));
+    CHECK_EQ(row["times"], json::array({"07:30", "18:00"}));
+    CHECK_EQ(row["repeat"].get<std::string>(), std::string("once"));   // not set -> once, never guessed
+    CHECK_EQ(row["start_date"].get<std::string>(), today);
+    CHECK(row["until_date"].is_null());
+    CHECK(row["medicine_id"].is_null());
+    int64_t id = s.add_reminder(row);
+    CHECK(id > 0);
+    json rs = s.reminders(true);
+    CHECK_EQ(rs.size(), (size_t)1);
+    CHECK_EQ(rs[0]["id"].get<int64_t>(), id);
+    CHECK_EQ(rs[0]["note_id"].get<int64_t>(), note);
+    CHECK_EQ(rs[0]["start_sec"].get<int>(), 56);
+    CHECK_EQ(rs[0]["times"], json::array({"07:30", "18:00"}));
+    CHECK(rs[0]["active"].get<bool>());
+
+    json full = direct_reminder_row(json::parse(R"({"text":"x","times":["21:00"],"repeat":"daily","start_date":"2026-11-10","until_date":"2026-11-20","note_id":null})"), today);
+    CHECK(full.is_object());
+    CHECK_EQ(full["repeat"].get<std::string>(), std::string("daily"));
+    CHECK_EQ(full["start_date"].get<std::string>(), std::string("2026-11-10"));
+    CHECK_EQ(full["until_date"].get<std::string>(), std::string("2026-11-20"));
+    CHECK(full["note_id"].is_null() && full["start_sec"].is_null());
+    // start_sec without a note is dropped
+    CHECK(direct_reminder_row(json::parse(R"({"text":"x","times":["21:00"],"start_sec":12})"), today)["start_sec"].is_null());
+
+    // refused: no text, no times, any bad time, bad repeat/dates, bad source, not an object
+    for (const char *bad : {R"({"times":["09:00"]})", R"({"text":"   ","times":["09:00"]})", R"({"text":"x"})",
+                            R"({"text":"x","times":[]})", R"({"text":"x","times":"09:00"})", R"({"text":"x","times":["9am"]})",
+                            R"({"text":"x","times":["09:00","25:00"]})", R"({"text":"x","times":[900]})",
+                            R"({"text":"x","times":["09:00"],"repeat":"hourly"})", R"({"text":"x","times":["09:00"],"start_date":"tomorrow"})",
+                            R"({"text":"x","times":["09:00"],"until_date":"2026-13-01"})",
+                            R"({"text":"x","times":["09:00"],"start_date":"2026-11-10","until_date":"2026-11-09"})",
+                            R"({"text":"x","times":["09:00"],"note_id":0})", R"({"text":"x","times":["09:00"],"note_id":"3"})",
+                            R"({"text":"x","times":["09:00"],"note_id":3,"start_sec":-1})", R"({"text":7,"times":["09:00"]})",
+                            R"(["x"])", "null"})
+        CHECK(direct_reminder_row(json::parse(bad), today).is_null());
+}
+
+TEST(task_create_direct) {
+    using sve::direct_task_row;
+    Store s(":memory:");
+    int64_t note = mk(s, "Class");
+    json row = direct_task_row(json::parse("{\"text\":\" Submit project \",\"who\":\"  \",\"note_id\":" + std::to_string(note) + ",\"start_sec\":28}"));
+    CHECK(row.is_object());
+    CHECK_EQ(row["text"].get<std::string>(), std::string("Submit project"));
+    CHECK(row["who"].is_null());
+    CHECK(row["due_date"].is_null());   // never invented
+    int64_t id = s.add_task(row);
+    CHECK(id > 0);
+    json ts = s.tasks(true);
+    CHECK_EQ(ts.size(), (size_t)1);
+    CHECK_EQ(ts[0]["id"].get<int64_t>(), id);
+    CHECK_EQ(ts[0]["note_id"].get<int64_t>(), note);
+    CHECK_EQ(ts[0]["start_sec"].get<int>(), 28);
+    json full = direct_task_row(json::parse(R"({"text":"pay fees","who":"Ravi","due_date":"2026-12-01"})"));
+    CHECK_EQ(full["who"].get<std::string>(), std::string("Ravi"));
+    CHECK_EQ(full["due_date"].get<std::string>(), std::string("2026-12-01"));
+    for (const char *bad : {R"({})", R"({"text":""})", R"({"text":"x","due_date":"next week"})", R"({"text":"x","who":5})",
+                            R"({"text":"x","note_id":-4})", R"([1])"})
+        CHECK(direct_task_row(json::parse(bad)).is_null());
 }
