@@ -310,6 +310,9 @@ char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb c
     } catch (const std::exception &e) {
         sve_logf(2, "transcribe failed: %s", e.what());
         return nullptr;
+    } catch (...) {
+        sve_logf(2, "transcribe failed");
+        return nullptr;
     }
 }
 
@@ -322,6 +325,9 @@ char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progre
         return dup_str(arr.dump());
     } catch (const std::exception &e) {
         sve_logf(2, "transcribe failed: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        sve_logf(2, "transcribe failed");
         return nullptr;
     }
 }

@@ -42,6 +42,11 @@ public:
     std::vector<NoteListRow> list(const std::string &query, int limit);
     std::vector<std::pair<int64_t, std::string>> audio_older_than(int days);
 
+    // Explicit transaction for multi-row changes (not nested; set_pieces/merge_topics use their own).
+    bool begin() { return exec("BEGIN"); }
+    bool commit() { return exec("COMMIT"); }
+    bool rollback() { return exec("ROLLBACK"); }
+
     bool setting_set(const std::string &k, const std::string &v);
     std::optional<std::string> setting_get(const std::string &k);
 

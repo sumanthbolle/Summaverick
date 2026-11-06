@@ -109,36 +109,44 @@ const char *kSafety =
     "times or dates. Never give medical advice; only repeat what was recorded or entered. If you are unsure "
     "or it is not there, say so.";
 
-std::string reminder_text(const std::string &name, const std::string &dose, const std::string &lang) {
-    std::string nd = dose.empty() ? name : name + " " + dose;
-    return lang == "te" ? nd + " \xE0\xB0\xB5\xE0\xB1\x87\xE0\xB0\xB8\xE0\xB1\x81\xE0\xB0\x95\xE0\xB1\x8B\xE0\xB0\x82\xE0\xB0\xA1\xE0\xB0\xBF"  // వేసుకోండి
-                        : "Take " + nd;
+// Turns off active reminders for a medicine: linked by id, or (recording-born, unlinked) naming it.
+void deactivate_medicine_reminders(sve::Store &st, int64_t med_id, const std::string &name) {
+    for (const auto &r : st.reminders(true)) {
+        bool linked = med_id > 0 && jint(r, "medicine_id", -1) == med_id;
+        bool named = !name.empty() && !sve::names_in_question(jstr(r, "text"), {name}).empty();
+        if (linked || named) st.set_reminder_active(jint(r, "id", 0), false);
+    }
 }
 
 // Pending reminder suggestion for a stored medicine (spec §7.8b). Older pending ones for the same
-// medicine are superseded. Skipped when a reminder for this medicine was already proposed from the note.
+// medicine are superseded. Unless force, skipped when a reminder for this medicine was already
+// proposed or accepted from the same note. No time from the routine -> "Please check" on times.
 void propose_medicine_reminder(sve::Store &st, int64_t med_id, const std::string &quote, const json &note_id,
-                               const json &start_sec) {
+                               const json &start_sec, bool force) {
     json med;
     for (const auto &m : st.medicines()) if (jint(m, "id", 0) == med_id) med = m;
     if (!med.is_object()) return;
     std::string name = jstr(med, "name"), n = sve::normalize_for_match(name);
-    if (!note_id.is_null())
+    if (!force && !note_id.is_null())
         for (const char *status : {"pending", "accepted"})
             for (const auto &s : st.suggestions(status))
                 if (jstr(s, "kind") == "reminder" && jint(s, "note_id", -1) == note_id.get<int64_t>() &&
                     sve::normalize_for_match(jstr(jobj(payload_of(s), "medicine"), "name")) == n) return;
     for (const auto &s : st.suggestions("pending"))
-        if (jstr(s, "kind") == "reminder" && jint(s, "medicine_id", -1) == med_id)
+        if (jstr(s, "kind") == "reminder" && (jint(s, "medicine_id", -1) == med_id ||
+            (!note_id.is_null() && sve::normalize_for_match(jstr(jobj(payload_of(s), "medicine"), "name")) == n)))
             st.set_suggestion_status(jint(s, "id", 0), "superseded");
     std::string dose = jstr(med, "dose");
-    json payload = {{"text", reminder_text(name, dose, lang_of(st))}, {"when_text", jstr(med, "when_text")},
-                    {"times", jarr(med, "times")}, {"repeat", med.contains("repeat") ? med["repeat"] : json(nullptr)},
+    json times = jarr(med, "times");
+    json payload = {{"text", sve::reminder_text(name, dose, lang_of(st))}, {"when_text", jstr(med, "when_text")},
+                    {"times", times}, {"repeat", med.contains("repeat") ? med["repeat"] : json(nullptr)},
                     {"until_date", med.contains("until_date") ? med["until_date"] : json(nullptr)},
-                    {"medicine", {{"name", name}, {"dose", dose}, {"frequency", ""}, {"duration", ""}}}};
+                    {"medicine", {{"name", name}, {"dose", dose}, {"when_text", jstr(med, "when_text")},
+                                  {"frequency", ""}, {"duration", ""}}}};
+    bool no_time = sve::valid_times(times).empty();
     st.add_suggestion({{"kind", "reminder"}, {"payload", payload}, {"quote", quote}, {"note_id", note_id},
-                       {"start_sec", start_sec}, {"medicine_id", med_id}, {"check_status", "ok"},
-                       {"check_fields", json::array()}});
+                       {"start_sec", start_sec}, {"medicine_id", med_id}, {"check_status", no_time ? "check" : "ok"},
+                       {"check_fields", no_time ? json::array({"times"}) : json::array()}});
 }
 
 // Medicine row fields from a JSON object (person's input or an accepted payload). Times default to the
@@ -165,21 +173,44 @@ bool medicine_fields(sve::Store &st, const json &in, json &m) {
     return true;
 }
 
+// Medicine fields of an accepted payload: medicine.{name,dose,when_text} plus payload times/repeat/until.
+json medicine_input(const json &p) {
+    json med = jobj(p, "medicine");
+    json in = {{"name", jstr(med, "name")}};
+    if (!jstr(med, "dose").empty()) in["dose"] = jstr(med, "dose");
+    std::string when = jstr(med, "when_text");
+    if (when.empty()) when = jstr(p, "when_text");
+    if (!when.empty()) in["when_text"] = when;
+    for (const char *k : {"times", "repeat", "until_date"})
+        if (p.contains(k) && !p[k].is_null()) in[k] = p[k];
+    if (!sve::sanitize_repeat(jstr(in, "repeat")).size()) in.erase("repeat");
+    return in;
+}
+
 int64_t accept_reminder(sve::Store &st, const json &s, const json &p) {
     json med = jobj(p, "medicine");
-    std::string text = jstr(p, "text");
-    if (text.empty() && !jstr(med, "name").empty()) text = reminder_text(jstr(med, "name"), jstr(med, "dose"), lang_of(st));
-    if (text.empty()) return -1;
+    const std::string name = jstr(med, "name");
     json med_id = int_or_null(s, "medicine_id");
+    if (!name.empty() && med_id.is_null()) {
+        // Link to the person's medicine; create it from the accepted payload (they tapped Yes on it).
+        int64_t id = find_medicine(st, name);
+        if (!id) {
+            json m;
+            if (!medicine_fields(st, medicine_input(p), m)) return -1;
+            id = st.add_medicine(m);
+            if (id <= 0) return -1;
+        }
+        med_id = id;
+    }
+    std::string text = name.empty() ? jstr(p, "text") : sve::reminder_text(name, jstr(med, "dose"), lang_of(st));
+    if (text.empty()) return -1;
     std::vector<std::string> times = sve::valid_times(jarr(p, "times"));
     if (times.empty()) times = sve::resolve_times(jstr(p, "when_text"), jobj(profile_of(st), "routine"));
     std::string rep = sve::sanitize_repeat(jstr(p, "repeat"));
-    if (rep.empty()) rep = (!med.is_null() || !med_id.is_null()) ? "daily" : "once";
+    if (rep.empty()) rep = !med_id.is_null() ? "daily" : "once";
     std::string start = jstr(p, "start_date"), until = jstr(p, "until_date");
     if (!sve::valid_ymd(start)) start = today_iso();
-    if (!med_id.is_null())  // the new reminder replaces earlier ones for this medicine
-        for (const auto &r : st.reminders(true))
-            if (jint(r, "medicine_id", -1) == med_id.get<int64_t>()) st.set_reminder_active(jint(r, "id", 0), false);
+    if (!med_id.is_null()) deactivate_medicine_reminders(st, med_id.get<int64_t>(), name);  // the new one replaces them
     return st.add_reminder({{"text", text}, {"times", times}, {"repeat", rep}, {"start_date", start},
                             {"until_date", sve::valid_ymd(until) ? json(until) : json(nullptr)},
                             {"note_id", int_or_null(s, "note_id")}, {"start_sec", int_or_null(s, "start_sec")},
@@ -188,32 +219,32 @@ int64_t accept_reminder(sve::Store &st, const json &s, const json &p) {
 
 int64_t accept_profile(sve::Store &st, const json &s, const json &p) {
     std::string change = jstr(p, "change");
-    json med = jobj(p, "medicine");
     json note = int_or_null(s, "note_id");
-    if (change == "routine") {
-        std::string t = jstr(p, "text");
-        return t.empty() ? -1 : st.add_memory("fact", t, note.is_null() ? std::nullopt : std::optional<int64_t>(note.get<int64_t>()));
+    if (change == "routine") {  // merged into profile.routine; returns 0 (no row)
+        json r = sve::clean_routine(jobj(p, "routine"));
+        if (r.empty()) return -1;
+        json prof = profile_of(st);
+        if (!prof.contains("routine") || !prof["routine"].is_object()) prof["routine"] = json::object();
+        for (auto it = r.begin(); it != r.end(); ++it) prof["routine"][it.key()] = it.value();
+        return st.setting_set("profile", prof.dump()) ? 0 : -1;
     }
-    std::string name = jstr(med, "name");
+    std::string name = jstr(jobj(p, "medicine"), "name");
     if (name.empty()) return -1;
     int64_t existing = find_medicine(st, name);
     if (change == "stop_medicine") {
+        deactivate_medicine_reminders(st, existing, name);
         if (!existing) return 0;
         return st.delete_medicine(existing) ? existing : -1;
     }
     if (change != "add_medicine" && change != "update_medicine") return -1;
-    json in = {{"name", name}};
-    if (!jstr(med, "dose").empty()) in["dose"] = jstr(med, "dose");
-    std::string when = jstr(p, "when_text");
-    if (when.empty()) when = jstr(med, "frequency");
-    if (!when.empty()) in["when_text"] = when;
-    for (const char *k : {"times", "repeat", "until_date"}) if (p.contains(k) && !p[k].is_null()) in[k] = p[k];
+    const bool update = change == "update_medicine";
     json m;
-    if (!medicine_fields(st, in, m)) return -1;
+    if (!medicine_fields(st, medicine_input(p), m)) return -1;
+    if (update) deactivate_medicine_reminders(st, existing, name);
     int64_t id = existing;
     if (existing) { if (!st.update_medicine(existing, m)) return -1; }
     else id = st.add_medicine(m);
-    if (id > 0) propose_medicine_reminder(st, id, jstr(s, "quote"), note, int_or_null(s, "start_sec"));
+    if (id > 0) propose_medicine_reminder(st, id, jstr(s, "quote"), note, int_or_null(s, "start_sec"), update);
     return id;
 }
 
@@ -227,6 +258,20 @@ int64_t accept_memory(sve::Store &st, const json &s, const json &p, const std::s
     return st.add_memory(kind, t, note.is_null() ? std::nullopt : std::optional<int64_t>(note.get<int64_t>()));
 }
 
+// Creates the row for an accepted suggestion; see sve_suggestion_accept for the return values.
+int64_t accept_row(sve::Store &st, const json &s, const json &p, const std::string &kind) {
+    if (kind == "reminder") return accept_reminder(st, s, p);
+    if (kind == "profile") return accept_profile(st, s, p);
+    if (kind == "vocab") return accept_memory(st, s, p, "vocab");
+    if (kind == "fact") return accept_memory(st, s, p, jstr(p, "memory_kind") == "preference" ? "preference" : "fact");
+    if (kind != "task") return -1;
+    std::string text = jstr(p, "text"), who = jstr(p, "who"), due = jstr(p, "due_date");
+    if (text.empty()) return -1;
+    return st.add_task({{"text", text}, {"who", who.empty() ? json(nullptr) : json(who)},
+                        {"due_date", sve::valid_ymd(due) ? json(due) : json(nullptr)},
+                        {"note_id", int_or_null(s, "note_id")}, {"start_sec", int_or_null(s, "start_sec")}});
+}
+
 // Text of the piece of a note starting at start_sec (for quoting cited sources).
 std::string piece_text(sve::Store &st, int64_t note_id, int64_t start_sec) {
     for (const auto &p : st.pieces(note_id)) if (jint(p, "start_sec", -1) == start_sec) return jstr(p, "text");
@@ -237,29 +282,50 @@ json ask_result(const std::string &answer, const json &sources, bool not_found, 
     return {{"answer", answer}, {"sources", sources}, {"not_found", not_found}, {"medicine", medicine}};
 }
 
+json source_of(const json &h) {
+    return {{"note_id", jint(h, "note_id", 0)}, {"start_sec", jint(h, "start_sec", 0)}, {"title", jstr(h, "title")}};
+}
+
+// Adds hits not already in `hits` (same note and start), up to `cap`.
+void add_hits(json &hits, const json &more, size_t cap) {
+    for (const auto &h : more) {
+        if (hits.size() >= cap) return;
+        bool dup = false;
+        for (const auto &x : hits)
+            dup = dup || (jint(x, "note_id", 0) == jint(h, "note_id", 0) && jint(x, "start_sec", 0) == jint(h, "start_sec", 0));
+        if (!dup) hits.push_back(h);
+    }
+}
+
+json sources_of(const json &hits) {
+    json out = json::array();
+    for (const auto &h : hits) out.push_back(source_of(h));
+    return out;
+}
+
 json medicine_route(sve::Store &st, const std::string &q, const std::vector<std::string> &names, const std::string &lang) {
     std::vector<std::string> asked = sve::names_in_question(q, names);
+    json hits = json::array();
+    if (asked.empty()) {
+        // Only a medicine word: quote recording pieces that match the question and mention a medicine.
+        std::string kq = sve::keyword_query(q);
+        json found = json::array();
+        for (const auto &h : st.search_pieces(kq.empty() ? q : kq, 10))
+            if (sve::mentions_medicine(jstr(h, "text"), names)) found.push_back(h);
+        add_hits(hits, found, 3);
+        if (!hits.empty()) return ask_result(sve::medicine_answer(json::array(), hits, lang), sources_of(hits), false, true);
+        std::string list = sve::medicine_list_answer(st.medicines(), lang);  // shown, never as the answer
+        return ask_result(list.empty() ? sve::not_found_text(lang) : list, json::array(), true, true);
+    }
     json meds = json::array();
     for (const auto &m : st.medicines()) {
         std::string n = sve::normalize_for_match(jstr(m, "name"));
-        bool want = asked.empty();
-        for (const auto &a : asked) if (sve::normalize_for_match(a) == n) want = true;
-        if (want) meds.push_back(m);
+        for (const auto &a : asked) if (sve::normalize_for_match(a) == n) { meds.push_back(m); break; }
     }
-    json hits = json::array(), sources = json::array();
-    for (const auto &name : asked.empty() ? names : asked)
-        for (const auto &h : st.search_pieces(name, 3)) {
-            if (hits.size() >= 3) break;
-            bool dup = false;
-            for (const auto &x : hits)
-                dup = dup || (jint(x, "note_id", 0) == jint(h, "note_id", 0) && jint(x, "start_sec", 0) == jint(h, "start_sec", 0));
-            if (dup) continue;
-            hits.push_back(h);
-            sources.push_back({{"note_id", jint(h, "note_id", 0)}, {"start_sec", jint(h, "start_sec", 0)}, {"title", jstr(h, "title")}});
-        }
+    for (const auto &name : asked) add_hits(hits, sve::hits_naming(st.search_pieces(name, 10), {name}), 3);
     std::string answer = sve::medicine_answer(meds, hits, lang);
     if (answer.empty()) return ask_result(sve::not_found_text(lang), json::array(), true, true);
-    return ask_result(answer, sources, false, true);
+    return ask_result(answer, sources_of(hits), false, true);
 }
 
 }  // namespace
@@ -330,7 +396,7 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         for (const auto &s : st.suggestions("pending"))
             if (jstr(s, "kind") == "vocab") known_vocab.push_back(lower(jstr(payload_of(s), "text")));
         int added = 0;
-        for (const auto &s : sve::build_suggestions(merged, pieces, note_id, jobj(profile_of(st), "routine"), today_iso())) {
+        for (const auto &s : sve::build_suggestions(merged, pieces, note_id, jobj(profile_of(st), "routine"), today_iso(), lang_of(st))) {
             if (jstr(s, "kind") == "vocab") {
                 std::string t = lower(jstr(payload_of(s), "text"));
                 if (std::find(known_vocab.begin(), known_vocab.end(), t) != known_vocab.end()) continue;
@@ -377,25 +443,26 @@ int64_t sve_suggestion_accept(sve_ctx *ctx, int64_t id, const char *edited_paylo
             if (!e.is_object()) return -1;
             for (auto it = e.begin(); it != e.end(); ++it) p[it.key()] = it.value();
         }
+        // All rows for one Yes are written together or not at all.
+        if (!st.begin()) return -1;
         int64_t row = -1;
-        if (kind == "reminder") row = accept_reminder(st, s, p);
-        else if (kind == "task") {
-            std::string text = jstr(p, "text"), who = jstr(p, "who"), due = jstr(p, "due_date");
-            if (!text.empty())
-                row = st.add_task({{"text", text}, {"who", who.empty() ? json(nullptr) : json(who)},
-                                   {"due_date", sve::valid_ymd(due) ? json(due) : json(nullptr)},
-                                   {"note_id", int_or_null(s, "note_id")}, {"start_sec", int_or_null(s, "start_sec")}});
-        } else if (kind == "profile") row = accept_profile(st, s, p);
-        else if (kind == "vocab") row = accept_memory(st, s, p, "vocab");
-        else if (kind == "fact") row = accept_memory(st, s, p, jstr(p, "memory_kind") == "preference" ? "preference" : "fact");
-        if (row < 0) return -1;
-        bool edited = p != before;
-        if (edited) sve::record_edit(st, kind, before, p);
-        st.set_suggestion_status(id, "accepted");
-        st.log_decision(kind, "decision", "", edited ? "edit" : "yes");
-        return row;
+        try {
+            row = accept_row(st, s, p, kind);
+            if (row >= 0) {
+                bool edited = p != before;
+                if (edited) sve::record_edit(st, kind, before, p);
+                if (!st.set_suggestion_status(id, "accepted") || !st.log_decision(kind, "decision", "", edited ? "edit" : "yes"))
+                    row = -1;
+            }
+        } catch (...) {
+            st.rollback();
+            throw;
+        }
+        if (row < 0) { st.rollback(); return -1; }
+        return st.commit() ? row : -1;
     });
 }
+
 
 int sve_suggestion_reject(sve_ctx *ctx, int64_t id) {
     return guard("sve_suggestion_reject", -1, [&] {
@@ -455,13 +522,20 @@ int64_t sve_medicine_save(sve_ctx *ctx, const char *js) {
                 for (const char *k : {"name", "dose", "when_text"})
                     if (!jstr(r, k).empty()) quote += (quote.empty() ? "" : " ") + jstr(r, k);
         if (quote.empty()) return -1;  // unknown id
-        propose_medicine_reminder(st, id, quote, nullptr, nullptr);
+        propose_medicine_reminder(st, id, quote, nullptr, nullptr, true);
         return id;
     });
 }
 
 int sve_medicine_delete(sve_ctx *ctx, int64_t id) {
-    return guard("sve_medicine_delete", -1, [&] { return ctx && ctx->store->delete_medicine(id) ? 0 : -1; });
+    return guard("sve_medicine_delete", -1, [&] {
+        if (!ctx) return -1;
+        std::string name;
+        for (const auto &m : ctx->store->medicines()) if (jint(m, "id", 0) == id) name = jstr(m, "name");
+        if (name.empty()) return -1;
+        deactivate_medicine_reminders(*ctx->store, id, name);  // also recording-born ones that only name it
+        return ctx->store->delete_medicine(id) ? 0 : -1;
+    });
 }
 
 // ---------------------------------------------------------------- reminders, tasks, topics, memory
@@ -556,6 +630,23 @@ char *sve_topic_summary(sve_ctx *ctx, int64_t topic_id, const char *lang_c, sve_
         json j;
         if (!sve::first_json_object(sve::strip_thinking(out), j)) { sve_logf(1, "topic summary: no JSON"); return nullptr; }
         json res = sve::sanitize_topic_summary(j);
+        res["sources"] = json::array();
+        const std::vector<std::string> med_names = known_med_names(st);
+        if (sve::filter_topic_summary(res, med_names)) {
+            // Medicine lines were removed: show what the recordings said, word for word.
+            json hits = json::array();
+            for (const auto &n : st.topic_notes(topic_id))
+                for (const auto &pc : st.pieces(jint(n, "id", 0)))
+                    if (sve::mentions_medicine(jstr(pc, "text"), med_names)) {
+                        json h = pc;
+                        h["note_id"] = jint(n, "id", 0);
+                        h["title"] = jstr(n, "title");
+                        add_hits(hits, json::array({h}), 3);
+                    }
+            std::string quotes = sve::medicine_answer(json::array(), hits, lang);
+            if (!quotes.empty()) res["summary"] = jstr(res, "summary") + (jstr(res, "summary").empty() ? "" : "\n\n") + quotes;
+            res["sources"] = sources_of(hits);
+        }
         res["lang"] = lang;
         st.set_topic_summary(topic_id, res.dump());
         return dump(res);
@@ -572,11 +663,25 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
         const std::vector<std::string> names = known_med_names(st);
         // Medicine questions are answered from stored facts only, never generated (spec §7.8a).
         if (sve::is_medicine_question(q, names)) return dump(medicine_route(st, q, names, lang));
-        if (!ctx->llm) return nullptr;
 
         std::string kq = sve::keyword_query(q);
         sve::Relevant rel = sve::relevant(st, kq.empty() ? q : kq, 6000);
         if (rel.sources.empty()) return dump(ask_result(sve::not_found_text(lang), json::array(), true, false));
+        // Retrieved material that mentions a medicine (even an unknown name) is quoted, never generated.
+        json retrieved = json::array();
+        bool med_material = false;
+        for (const auto &src : rel.sources) {
+            json h = source_of(src);
+            h["text"] = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
+            med_material = med_material || sve::mentions_medicine(jstr(h, "text"), names);
+            retrieved.push_back(h);
+        }
+        if (med_material) {
+            json hits = json::array();
+            add_hits(hits, retrieved, 3);
+            return dump(ask_result(sve::medicine_answer(json::array(), hits, lang), sources_of(hits), false, true));
+        }
+        if (!ctx->llm) return nullptr;
 
         sve::Llm &llm = *ctx->llm;
         const std::string lname = sve::language_name(lang);

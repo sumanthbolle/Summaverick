@@ -4,6 +4,7 @@
 //   extract     doctor-visit fixture: extract, list pending suggestions, two Ask questions
 //   api         assistant C API without a model (accept/reject, medicines, medicine Ask route)
 #include "sve_core.h"
+#include "sve_internal.h"  // api mode adds model-like suggestions straight to the store
 #include "third_party/nlohmann/json.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -119,6 +120,116 @@ static int run_extract(sve_ctx *ctx, const std::string &fixture) {
     return 0;
 }
 
+
+static json pending_kind(sve_ctx *ctx, const char *kind) {
+    json out = json::array();
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) if (s["kind"] == kind) out.push_back(s);
+    return out;
+}
+
+static int64_t add_sugg(sve_ctx *ctx, const json &s) { return ctx->store->add_suggestion(s); }
+
+static json active_named(sve_ctx *ctx, const char *name) {
+    json out = json::array();
+    for (const auto &r : take(sve_reminders_json(ctx, 1)))
+        if (r["text"].get<std::string>().find(name) != std::string::npos) out.push_back(r);
+    return out;
+}
+
+// Fix round 1: recording-born reminders link to the medicine; stop/update/delete turn them off;
+// Ask never generates over medicine material; routine changes; times check; transactions.
+static void run_api_fixes(sve_ctx *ctx) {
+    sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
+    json pieces = json::parse(R"([{"start_sec":0,"text":"Take Ramipril 5 mg once a day after dinner."},
+        {"start_sec":28,"text":"Take Zolfra 20 mg at night."},{"start_sec":56,"text":"Vitamin B12 1000 mcg once a week."}])");
+    int64_t note = make_note(ctx, pieces, "Clinic");
+    json med = {{"name", "Ramipril"}, {"dose", "5 mg"}, {"when_text", "after dinner"}, {"frequency", "once a day"}, {"duration", ""}};
+    json rem = {{"kind", "reminder"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Take Ramipril 5 mg once a day after dinner."},
+                {"check_status", "ok"}, {"check_fields", json::array()},
+                {"payload", {{"text", "Take Ramipril 5 mg"}, {"when_text", "after dinner"}, {"times", {"20:00"}}, {"repeat", "daily"},
+                             {"start_date", nullptr}, {"until_date", nullptr}, {"medicine", med}}}};
+
+    // Accept a recording-born reminder -> medicine row created and linked.
+    int64_t rid = sve_suggestion_accept(ctx, add_sugg(ctx, rem), nullptr);
+    json meds = take(sve_medicines_json(ctx));
+    int64_t mid = 0;
+    for (const auto &m : meds) if (m["name"] == "Ramipril") mid = m["id"];
+    json act = active_named(ctx, "Ramipril");
+    expect(rid > 0 && mid > 0 && act.size() == 1 && act[0]["medicine_id"] == mid && act[0]["text"] == "Take Ramipril 5 mg",
+           "accepted recording reminder creates and links the medicine");
+
+    // Update -> old reminder off, new reminder proposed.
+    json upd = {{"kind", "profile"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Take Ramipril 10 mg"}, {"check_status", "ok"},
+                {"payload", {{"change", "update_medicine"}, {"text", "Change medicine: Ramipril 10 mg"},
+                             {"medicine", {{"name", "Ramipril"}, {"dose", "10 mg"}, {"when_text", "after dinner"}}}}}};
+    expect(sve_suggestion_accept(ctx, add_sugg(ctx, upd), nullptr) == mid, "update_medicine accepted");
+    json pr = pending_kind(ctx, "reminder");
+    expect(active_named(ctx, "Ramipril").empty() && pr.size() == 1 && contains(pr[0]["payload"], "10 mg") && pr[0]["medicine_id"] == mid,
+           "update turns off the old reminder and proposes a new one");
+    expect(sve_suggestion_accept(ctx, pr[0]["id"], nullptr) > 0 && active_named(ctx, "Ramipril 10 mg").size() == 1, "new reminder accepted");
+
+    // Stop -> no active reminder, medicine gone.
+    json stop = {{"kind", "profile"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Stop Ramipril"}, {"check_status", "ok"},
+                 {"payload", {{"change", "stop_medicine"}, {"text", "Stop medicine: Ramipril"}, {"medicine", {{"name", "Ramipril"}}}}}};
+    expect(sve_suggestion_accept(ctx, add_sugg(ctx, stop), nullptr) == mid, "stop_medicine returns the deleted id");
+    expect(active_named(ctx, "Ramipril").empty() && take(sve_medicines_json(ctx)).empty(), "stop leaves no active reminder for it");
+
+    // Stop when no medicine row exists still turns off an unlinked reminder that names it.
+    ctx->store->add_reminder({{"text", "Take Telma 40 mg"}, {"times", {"08:00"}}, {"repeat", "daily"}});
+    json stop2 = stop;
+    stop2["payload"]["medicine"]["name"] = "Telma";
+    expect(sve_suggestion_accept(ctx, add_sugg(ctx, stop2), nullptr) == 0 && active_named(ctx, "Telma").empty(),
+           "stop without a medicine row turns off reminders naming it");
+
+    // sve_medicine_delete turns off unlinked reminders naming it.
+    ctx->store->add_reminder({{"text", "Take Metformin 500 mg"}, {"times", {"08:00"}}, {"repeat", "daily"}});
+    int64_t met = sve_medicine_save(ctx, R"({"name":"Metformin","dose":"500 mg","when":"after breakfast"})");
+    sve_medicine_delete(ctx, met);
+    expect(active_named(ctx, "Metformin").empty(), "medicine delete turns off reminders naming it");
+
+    // Ask over material that mentions an unknown medicine: verbatim quotes, no generation (no model loaded).
+    json a = take(sve_assistant_ask(ctx, "What should I do at night?", nullptr, nullptr));
+    printf("--- ask unknown medicine\n%s\n", a.dump(2).c_str());
+    expect(a.is_object() && a["medicine"] == true && contains(a["answer"], "“Take Zolfra 20 mg at night.”") &&
+           !a["sources"].empty(), "unknown medicine in pieces -> verbatim quotes");
+
+    // Vitamin D3 must not quote the Vitamin B12 piece.
+    sve_medicine_save(ctx, R"({"name":"Vitamin D3","dose":"60000 IU","when":"after breakfast","repeat":"weekly"})");
+    json d3 = take(sve_assistant_ask(ctx, "When do I take Vitamin D3?", nullptr, nullptr));
+    expect(d3.is_object() && !contains(d3["answer"], "B12") && contains(d3["answer"], "Vitamin D3 60000 IU"), "D3 answer does not quote B12");
+
+    // Word-only medicine question with nothing matching: the list is shown, not as an answer.
+    json w = take(sve_assistant_ask(ctx, "Which pills for sugar?", nullptr, nullptr));
+    printf("--- ask word-only\n%s\n", w.dump(2).c_str());
+    expect(w.is_object() && w["not_found"] == true && contains(w["answer"], "Your saved medicines:") &&
+           contains(w["answer"], "Your recordings don't name a medicine for this question."), "word-only question -> saved list, not an answer");
+
+    // Routine change: accept merges into the profile; later times use it.
+    json rt = {{"kind", "profile"}, {"note_id", note}, {"quote", "dinner at 9:30"}, {"check_status", "ok"},
+               {"payload", {{"change", "routine"}, {"text", "Dinner at 21:30"}, {"routine", {{"dinner", "21:30"}}}}}};
+    expect(sve_suggestion_accept(ctx, add_sugg(ctx, rt), nullptr) == 0, "routine change accepted");
+    json prof = take(sve_profile_get(ctx));
+    expect(prof["routine"]["dinner"] == "21:30" && prof["routine"]["breakfast"] == "08:00", "routine merged into profile");
+    int64_t amid = sve_medicine_save(ctx, R"({"name":"Atorva","dose":"10 mg","when":"after dinner"})");
+    json am;
+    for (const auto &m : take(sve_medicines_json(ctx))) if (m["id"] == amid) am = m;
+    expect(am.is_object() && am["times"] == json::array({"21:30"}), "later resolve uses the new dinner time");
+
+    // No time from the routine -> reminder suggestion is "check" on times.
+    int64_t pr_id = sve_medicine_save(ctx, R"({"name":"Dolo","dose":"650 mg","when":"when needed"})");
+    bool flagged = false;
+    for (const auto &s : pending_kind(ctx, "reminder"))
+        if (s["medicine_id"] == pr_id) flagged = s["check_status"] == "check" && s["check_fields"] == json::array({"times"});
+    expect(flagged, "medicine without a time -> times check");
+
+    // A failing accept changes nothing (transaction).
+    json bad = rt;
+    bad["payload"]["routine"] = json::object();
+    int64_t bid = add_sugg(ctx, bad);
+    expect(sve_suggestion_accept(ctx, bid, nullptr) < 0 && ctx->store->suggestion(bid)["status"] == "pending",
+           "failed accept leaves the suggestion pending");
+}
+
 static int run_api(sve_ctx *ctx) {
     sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
     json prof = take(sve_profile_get(ctx));
@@ -179,6 +290,7 @@ static int run_api(sve_ctx *ctx) {
     expect(take(sve_insight_latest(ctx)).is_null(), "no insight yet");
     expect(sve_extract(ctx, note, nullptr, nullptr) < 0, "extract without a model is an error");
     expect(sve_topic_summary(ctx, 12345, "en", nullptr, nullptr) == nullptr, "unknown topic -> NULL");
+    run_api_fixes(ctx);
     return 0;
 }
 

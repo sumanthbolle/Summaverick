@@ -93,34 +93,95 @@ bool valid_ymd(const std::string &s) {
     return m >= 1 && m <= 12 && d >= 1 && d <= 31;
 }
 
+namespace {
+
+int64_t days_from_civil(int64_t y, unsigned m, unsigned d) {  // Howard Hinnant's algorithm
+    y -= m <= 2;
+    const int64_t era = (y >= 0 ? y : y - 399) / 400;
+    const unsigned yoe = (unsigned)(y - era * 400);
+    const unsigned doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
+    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + (int64_t)doe - 719468;
+}
+
+std::string civil_from_days(int64_t z) {
+    z += 719468;
+    const int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    const unsigned doe = (unsigned)(z - era * 146097);
+    const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const unsigned mp = (5 * doy + 2) / 153;
+    const unsigned d = doy - (153 * mp + 2) / 5 + 1, m = mp < 10 ? mp + 3 : mp - 9;
+    const int64_t y = (int64_t)yoe + era * 400 + (m <= 2);
+    char b[32];
+    snprintf(b, sizeof b, "%04lld-%02u-%02u", (long long)y, m, d);
+    return b;
+}
+
+int64_t ymd_days(const std::string &s) {
+    return days_from_civil(std::stoi(s.substr(0, 4)), (unsigned)std::stoi(s.substr(5, 2)), (unsigned)std::stoi(s.substr(8, 2)));
+}
+
+int weekday_of(int64_t days) { return (int)(((days % 7) + 7 + 4) % 7); }  // 0 = Sunday; 1970-01-01 was a Thursday
+
+const char *kWeekdayNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+// Weekdays (0 = Sunday) said in the quote: English full or short forms, Telugu "...వార" (any ending),
+// or the short Telugu word on its own.
+std::set<int> named_weekdays(const std::string &quote) {
+    static const struct { const char *en[4]; const char *te_stem, *te_short; } kDays[] = {
+        {{"sunday", "sun", nullptr, nullptr}, "ఆదివార", "ఆది"},
+        {{"monday", "mon", nullptr, nullptr}, "సోమవార", "సోమ"},
+        {{"tuesday", "tue", "tues", nullptr}, "మంగళవార", "మంగళ"},
+        {{"wednesday", "wed", nullptr, nullptr}, "బుధవార", "బుధ"},
+        {{"thursday", "thu", "thur", "thurs"}, "గురువార", "గురు"},
+        {{"friday", "fri", nullptr, nullptr}, "శుక్రవార", "శుక్ర"},
+        {{"saturday", "sat", nullptr, nullptr}, "శనివార", "శని"}};
+    std::vector<std::string> q = norm_tokens(quote);
+    auto has_tok = [&](const char *t) { return t && std::find(q.begin(), q.end(), t) != q.end(); };
+    std::set<int> named;
+    for (int i = 0; i < 7; ++i) {
+        const auto &k = kDays[i];
+        bool hit = quote.find(k.te_stem) != std::string::npos || has_tok(k.te_short);
+        for (const char *e : k.en) hit = hit || has_tok(e);
+        if (hit) named.insert(i);
+    }
+    return named;
+}
+
+bool says_any(const std::string &quote, std::initializer_list<const char *> en, std::initializer_list<const char *> te) {
+    std::vector<std::string> q = norm_tokens(quote);
+    for (const char *w : en) if (std::find(q.begin(), q.end(), w) != q.end()) return true;
+    for (const char *w : te) if (quote.find(w) != std::string::npos) return true;
+    return false;
+}
+
+}  // namespace
+
 std::string weekday_name(const std::string &ymd) {
     if (!valid_ymd(ymd)) return "";
-    static const char *kNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-    static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};  // Sakamoto
-    int y = std::stoi(ymd.substr(0, 4)), m = std::stoi(ymd.substr(5, 2)), d = std::stoi(ymd.substr(8, 2));
-    if (m < 3) y -= 1;
-    return kNames[(y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7];
+    return kWeekdayNames[weekday_of(ymd_days(ymd))];
+}
+
+bool date_matches_weekday(const std::string &ymd, const std::string &quote) {
+    std::set<int> named = named_weekdays(quote);
+    return named.size() != 1 || weekday_name(ymd) == kWeekdayNames[*named.begin()];
 }
 
 namespace {
-// Weekday names ("Saturday") said in the quote, in English or Telugu.
-std::set<std::string> named_weekdays(const std::string &quote) {
-    static const struct { const char *en, *te, *name; } kDays[] = {
-        {"sunday", "ఆదివారం", "Sunday"}, {"monday", "సోమవారం", "Monday"}, {"tuesday", "మంగళవారం", "Tuesday"},
-        {"wednesday", "బుధవారం", "Wednesday"}, {"thursday", "గురువారం", "Thursday"},
-        {"friday", "శుక్రవారం", "Friday"}, {"saturday", "శనివారం", "Saturday"}};
-    std::vector<std::string> q = norm_tokens(quote);
-    std::set<std::string> named;
-    for (const auto &k : kDays)
-        if (std::find(q.begin(), q.end(), k.en) != q.end() || quote.find(k.te) != std::string::npos) named.insert(k.name);
-    return named;
+// Weekday check plus: the date must be the nearest upcoming named weekday from today (today itself
+// only when the quote says today), unless the quote says "next"/"వచ్చే".
+bool date_plausible(const std::string &ymd, const std::string &quote, const std::string &today) {
+    if (!date_matches_weekday(ymd, quote)) return false;
+    std::set<int> named = named_weekdays(quote);
+    if (named.size() != 1 || !valid_ymd(today)) return true;
+    if (says_any(quote, {"next"}, {"వచ్చే"})) return true;
+    int64_t t = ymd_days(today);
+    int ahead = (*named.begin() - weekday_of(t) + 7) % 7;
+    if (ahead == 0 && !says_any(quote, {"today"}, {"ఈరోజు", "ఈ రోజు"})) ahead = 7;
+    return ymd == civil_from_days(t + ahead);
 }
 }  // namespace
-
-bool date_matches_weekday(const std::string &ymd, const std::string &quote) {
-    std::set<std::string> named = named_weekdays(quote);
-    return named.size() != 1 || weekday_name(ymd) == *named.begin();
-}
 
 std::string sanitize_repeat(const std::string &s) {
     for (const char *r : {"daily", "twice_daily", "weekly", "once"}) if (s == r) return s;
@@ -271,22 +332,26 @@ bool check_med(const json &item, const std::string &when_text, std::vector<std::
     if (mc.status == "drop") return false;
     for (auto &x : mc.fields) fields.push_back(x);
     if (dose_missing_unit(f.dose)) fields.push_back("dose");
-    med_out = {{"name", f.name}, {"dose", f.dose}, {"frequency", f.frequency}, {"duration", f.duration}};
+    med_out = {{"name", f.name}, {"dose", f.dose}, {"when_text", f.when_text}, {"frequency", f.frequency},
+               {"duration", f.duration}};
     return true;
 }
 
-// Valid date or null; flagged when the quote names a different weekday. strict (medicines): also
-// flagged unless the date is today or the quote names its weekday.
-json date_field(const json &item, const char *key, std::vector<std::string> &fields, bool strict = false,
-                const std::string &today = "") {
+// Valid date or null, flagged when the quote names a different weekday. nearest: also flagged unless it
+// is the nearest upcoming named weekday (date_plausible). strict (medicines): also flagged unless the
+// date is today or the quote names its weekday.
+json date_field(const json &item, const char *key, std::vector<std::string> &fields, bool strict,
+                const std::string &today, bool nearest) {
     std::string d = jstr(item, key);
     if (!valid_ymd(d)) return nullptr;
     std::string q = jstr(item, "quote");
-    bool ok = date_matches_weekday(d, q);
+    bool ok = nearest ? date_plausible(d, q, today) : date_matches_weekday(d, q);
     if (ok && strict && d != today) ok = named_weekdays(q).size() == 1;
     if (!ok) fields.push_back(key);
     return d;
 }
+
+bool has_med_name(const json &med) { return !med.is_null() && !jstr(med, "name").empty(); }
 
 json finish(Base &b, const json &payload) {
     std::vector<std::string> u;
@@ -300,7 +365,7 @@ json finish(Base &b, const json &payload) {
 }  // namespace
 
 std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id, const json &routine,
-                                    const std::string &today) {
+                                    const std::string &today, const std::string &lang) {
     std::vector<json> out;
     for (const auto &it : e.reminders) {
         Base b = base_for("reminder", it, pieces, note_id);
@@ -313,22 +378,40 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
             times = model_times;
             if (!med.is_null() && !model_times.empty()) b.fields.push_back("times");  // not from the routine
         }
-        std::string text = trim(jstr(it, "text"));
-        if (text.empty() && !med.is_null() && !jstr(med, "name").empty())
-            text = trim(jstr(med, "name") + " " + jstr(med, "dose"));
+        if (!med.is_null() && times.empty()) b.fields.push_back("times");  // nothing to schedule
+        std::string text;
+        if (has_med_name(med)) {
+            text = reminder_text(jstr(med, "name"), jstr(med, "dose"), lang);  // notification text from checked fields
+        } else {
+            text = trim(jstr(it, "text"));
+            if (mentions_medicine(text, {})) b.fields.push_back("text");
+        }
         if (text.empty()) continue;
+        std::string rep = sanitize_repeat(jstr(it, "repeat"));
+        if (med.is_null() && times.empty() && (rep.empty() || rep == "once")) {
+            // A one-off with no time of day cannot be scheduled: it is a task due that day.
+            json task = it;
+            std::string day = jstr(it, "start_date");
+            if (day.empty()) day = jstr(it, "until_date");
+            task["due_date"] = day;
+            b.rec["kind"] = "task";
+            json due = date_field(task, "due_date", b.fields, false, today, true);
+            out.push_back(finish(b, {{"text", text}, {"who", nullptr}, {"due_date", due}}));
+            continue;
+        }
         const bool strict = !med.is_null();
-        json start = date_field(it, "start_date", b.fields, strict, today);
-        json until = date_field(it, "until_date", b.fields, strict, today);
+        json start = date_field(it, "start_date", b.fields, strict, today, true);
+        json until = date_field(it, "until_date", b.fields, strict, today, false);
         out.push_back(finish(b, {{"text", text}, {"when_text", when}, {"times", times},
-                                 {"repeat", str_or_null(sanitize_repeat(jstr(it, "repeat")))},
+                                 {"repeat", str_or_null(rep)},
                                  {"start_date", start}, {"until_date", until}, {"medicine", med}}));
     }
     for (const auto &it : e.tasks) {
         std::string text = trim(jstr(it, "text"));
         if (text.empty()) continue;
         Base b = base_for("task", it, pieces, note_id);
-        json due = date_field(it, "due_date", b.fields);
+        if (mentions_medicine(text, {})) b.fields.push_back("text");
+        json due = date_field(it, "due_date", b.fields, false, today, true);
         out.push_back(finish(b, {{"text", text}, {"who", str_or_null(trim(jstr(it, "who")))}, {"due_date", due}}));
     }
     for (const auto &it : e.profile) {
@@ -337,20 +420,31 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
         if (!is_med && change != "routine") continue;
         if (trim(jstr(it, "quote")).empty()) continue;  // not stated in the recording
         Base b = base_for("profile", it, pieces, note_id);
-        std::string when = trim(jstr(it, "when_text"));
-        json med;
-        if (!check_med(it, when, b.fields, med)) continue;
-        if (is_med && (med.is_null() || jstr(med, "name").empty())) continue;
-        std::string detail = trim(jstr(it, "detail"));
-        std::string text = !detail.empty() ? detail : is_med ? jstr(med, "name") : "";
-        if (text.empty()) continue;
-        out.push_back(finish(b, {{"change", change}, {"text", text}, {"detail", detail}, {"when_text", when},
-                                 {"medicine", is_med ? med : json(nullptr)}}));
+        if (is_med) {
+            std::string when = trim(jstr(jobj(it, "medicine"), "when_text"));
+            if (when.empty()) when = trim(jstr(it, "when_text"));
+            json med;
+            if (!check_med(it, when, b.fields, med) || !has_med_name(med)) continue;
+            if (change != "stop_medicine" && resolve_times(when, routine).empty()) b.fields.push_back("times");
+            std::string text = profile_text(change, jstr(med, "name"), jstr(med, "dose"), lang);
+            out.push_back(finish(b, {{"change", change}, {"text", text}, {"when_text", when}, {"medicine", med}}));
+        } else {
+            json r = clean_routine(jobj(it, "routine"));
+            if (r.empty()) continue;  // a routine change must say which time
+            std::string text = trim(jstr(it, "detail"));
+            if (text.empty())
+                for (auto kv = r.begin(); kv != r.end(); ++kv)
+                    text += (text.empty() ? "" : ", ") + kv.key() + " " + kv.value().get<std::string>();
+            if (mentions_medicine(text, {})) b.fields.push_back("text");
+            out.push_back(finish(b, {{"change", change}, {"text", text}, {"detail", text}, {"routine", r},
+                                     {"medicine", nullptr}}));
+        }
     }
     for (const auto &it : e.facts) {
         std::string text = trim(jstr(it, "text"));
         if (text.empty()) continue;
         Base b = base_for("fact", it, pieces, note_id);
+        if (mentions_medicine(text, {})) b.fields.push_back("text");
         out.push_back(finish(b, {{"memory_kind", "fact"}, {"text", text}}));
     }
     for (const auto &v : e.vocab) {
@@ -358,6 +452,29 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
         if (t.empty() || t.size() > 60 || std::count(t.begin(), t.end(), ' ') > 2) continue;  // terms, not sentences
         out.push_back({{"kind", "vocab"}, {"payload", {{"text", t}}}, {"quote", nullptr}, {"note_id", note_id},
                        {"start_sec", nullptr}, {"check_status", nullptr}, {"check_fields", json::array()}});
+    }
+    return out;
+}
+
+std::string reminder_text(const std::string &name, const std::string &dose, const std::string &lang) {
+    std::string nd = dose.empty() ? name : name + " " + dose;
+    return lang == "te" ? nd + " వేసుకోండి" : "Take " + nd;
+}
+
+std::string profile_text(const std::string &change, const std::string &name, const std::string &dose,
+                         const std::string &lang) {
+    const bool te = lang == "te";
+    std::string nd = dose.empty() || change == "stop_medicine" ? name : name + " " + dose;
+    if (change == "stop_medicine") return (te ? "మందు ఆపండి: " : "Stop medicine: ") + nd;
+    if (change == "update_medicine") return (te ? "మందు మార్చండి: " : "Change medicine: ") + nd;
+    return (te ? "మందు చేర్చండి: " : "Add medicine: ") + nd;
+}
+
+json clean_routine(const json &routine) {
+    json out = json::object();
+    for (const char *k : {"wake", "breakfast", "lunch", "dinner", "bed"}) {
+        std::string t = jstr(routine, k);
+        if (valid_hhmm(t)) out[k] = t;
     }
     return out;
 }
@@ -522,6 +639,56 @@ std::string medicine_answer(const json &medicines, const json &hits, const std::
     return trim(out);
 }
 
+json hits_naming(const json &hits, const std::vector<std::string> &names) {
+    json out = json::array();
+    if (!hits.is_array()) return out;
+    for (const auto &h : hits)
+        if (!names_in_question(jstr(h, "text"), names).empty()) out.push_back(h);
+    return out;
+}
+
+std::string medicine_list_answer(const json &medicines, const std::string &lang) {
+    std::string list = medicine_answer(medicines, json::array(), lang);
+    size_t nl = list.find('\n');
+    if (list.empty() || nl == std::string::npos) return "";
+    const bool te = lang == "te";
+    return std::string(te ? "మీరు సేవ్ చేసిన మందులు:" : "Your saved medicines:") + list.substr(nl) + "\n\n" +
+           (te ? "మీ రికార్డింగ్‌లలో ఈ ప్రశ్నకు ఏ మందు పేరూ లేదు." : "Your recordings don't name a medicine for this question.");
+}
+
+bool filter_topic_summary(json &s, const std::vector<std::string> &names) {
+    bool dropped = false;
+    // A sentence ends at . ! ? followed by a space or the end (so "2.5 mg" stays whole), or a newline.
+    std::string text = jstr(s, "summary"), kept, cur;
+    auto flush = [&] {
+        std::string t = trim(cur);
+        cur.clear();
+        if (t.empty()) return;
+        if (mentions_medicine(t, names)) { dropped = true; return; }
+        kept += (kept.empty() ? "" : " ") + t;
+    };
+    for (size_t i = 0; i < text.size(); ++i) {
+        char c = text[i];
+        cur += c;
+        bool next_blank = i + 1 == text.size() || text[i + 1] == ' ' || text[i + 1] == '\n';
+        if (c == '\n' || ((c == '.' || c == '!' || c == '?') && next_blank)) flush();
+    }
+    flush();
+    s["summary"] = kept;
+    for (const char *key : {"key_terms", "quiz"}) {
+        json keep = json::array();
+        for (const auto &e : jarr(s, key)) {
+            std::string all;
+            if (e.is_object())
+                for (auto it = e.begin(); it != e.end(); ++it) if (it->is_string()) all += it->get<std::string>() + " ";
+            if (mentions_medicine(all, names)) dropped = true;
+            else keep.push_back(e);
+        }
+        s[key] = keep;
+    }
+    return dropped;
+}
+
 json sanitize_topic_summary(const json &j) {
     json out = {{"summary", trim(jstr(j, "summary"))}, {"key_terms", json::array()}, {"quiz", json::array()}};
     for (const auto &k : jarr(j, "key_terms")) {
@@ -536,8 +703,11 @@ json sanitize_topic_summary(const json &j) {
 }
 
 bool mentions_medicine(const std::string &text, const std::vector<std::string> &names) {
-    static const std::set<std::string> kUnits = {"mg", "ml", "mcg", "iu", "tablet", "tablets", "capsule", "capsules"};
-    for (const auto &t : norm_tokens(text)) if (kUnits.count(t)) return true;
+    static const std::set<std::string> kWords = {"mg", "ml", "mcg", "iu", "tablet", "tablets", "capsule", "capsules",
+        "medicine", "medicines", "medication", "medications", "pill", "pills", "dose", "doses", "dosage", "syrup",
+        "injection", "injections", "tab", "tabs"};
+    for (const auto &t : norm_tokens(text)) if (kWords.count(t)) return true;
+    for (const char *w : {"మందు", "మాత్ర", "డోస్"}) if (text.find(w) != std::string::npos) return true;
     return !names_in_question(text, names).empty();
 }
 

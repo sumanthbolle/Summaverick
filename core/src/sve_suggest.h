@@ -54,8 +54,22 @@ bool dose_missing_unit(const std::string &dose);
 // is checked with check_medicine (drop -> item discarded); a date on a medicine reminder is
 // flagged unless it is today_ymd or the quote names its weekday. Profile items without a quote
 // are dropped (a profile change must be stated in the recording). Topics/people are not included.
+// Reminder and profile-medicine text is built in code from the checked medicine fields (never the
+// model's words); other text that mentions a medicine gets "text" in check_fields. Dates naming a
+// weekday must be its nearest upcoming occurrence from today_ymd unless the quote says "next"/"వచ్చే".
+// Medicine reminders and profile medicines without a time from the routine get "times".
 std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id,
-                                    const json &routine, const std::string &today_ymd = "");
+                                    const json &routine, const std::string &today_ymd = "",
+                                    const std::string &lang = "en");
+
+// "Take Amlodipine 5 mg" / "Amlodipine 5 mg వేసుకోండి".
+std::string reminder_text(const std::string &name, const std::string &dose, const std::string &lang);
+// "Add medicine: Amlodipine 5 mg" etc. for add_medicine / update_medicine / stop_medicine.
+std::string profile_text(const std::string &change, const std::string &name, const std::string &dose,
+                         const std::string &lang);
+
+// Valid routine slots (wake, breakfast, lunch, dinner, bed -> "HH:MM") from a JSON object.
+json clean_routine(const json &routine);
 
 // Question -> words for a search: lowercased ASCII, stopwords and 1-letter words dropped.
 std::string keyword_query(const std::string &question);
@@ -81,10 +95,21 @@ std::string not_found_text(const std::string &lang);  // "te" -> Telugu, else En
 // recording and time. Empty when there is nothing to say. lang "te" -> Telugu templates.
 std::string medicine_answer(const json &medicines, const json &hits, const std::string &lang);
 
+// Search hits (with "text") that contain one of the names as a whole token run.
+json hits_naming(const json &hits, const std::vector<std::string> &names);
+
+// For a medicine question that names no medicine: the saved list under "Your saved medicines:",
+// followed by "Your recordings don't name a medicine for this question." Empty when no medicines.
+std::string medicine_list_answer(const json &medicines, const std::string &lang);
+
+// Removes summary sentences, key terms and quiz entries that mention a medicine. True if any removed.
+bool filter_topic_summary(json &summary, const std::vector<std::string> &names);
+
 // {"summary":str,"key_terms":[{"term","meaning"}],"quiz":[{"q","a"}]} with only valid entries.
 json sanitize_topic_summary(const json &j);
 
-// True when text mentions a dose unit (mg, ml, ...) or one of the given medicine names.
+// True when text mentions a dose unit (mg, ml, ...), a medicine word (tablet, medicine, pill, dose,
+// మందు, మాత్ర, డోస్, ...) or one of the given medicine names.
 bool mentions_medicine(const std::string &text, const std::vector<std::string> &names);
 
 }  // namespace sve

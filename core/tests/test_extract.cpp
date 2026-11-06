@@ -99,3 +99,15 @@ TEST(first_json_object_skips_prose) {
     CHECK_EQ(j["summary"].get<std::string>(), std::string("x"));
     CHECK(!first_json_object("no object here", j));
 }
+
+TEST(prompt_profile_has_routine_and_when_text) {
+    std::string p = extraction_prompt("", "", "2026-11-06");
+    CHECK(p.find("\"routine\":{\"wake|breakfast|lunch|dinner|bed\":\"HH:MM\"}|null") != std::string::npos);
+    CHECK(p.find("\"medicine\":{\"name\":\"\",\"dose\":\"\",\"when_text\":\"\"") != std::string::npos);
+    auto e = parse_extraction(R"({"profile":[{"change":"routine","routine":{"dinner":"21:00"},"quote":"q"},
+        {"change":"add_medicine","medicine":{"name":"A","when_text":"after dinner"}}]})");
+    CHECK(e.ok);
+    CHECK_EQ(e.profile.size(), (size_t)2);
+    CHECK_EQ(e.profile[0]["routine"]["dinner"].get<std::string>(), std::string("21:00"));
+    CHECK_EQ(e.profile[1]["medicine"]["when_text"].get<std::string>(), std::string("after dinner"));
+}
