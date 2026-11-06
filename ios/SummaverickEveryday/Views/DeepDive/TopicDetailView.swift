@@ -116,7 +116,7 @@ struct TopicDetailView: View {
                                 .font(.subheadline).foregroundStyle(Color.accentColor)
                                 .frame(minHeight: 44, alignment: .leading)
                         }
-                        .accessibilityLabel(Text("Open the recording: \(src.title)"))
+                        .accessibilityLabel(Text("Open the recording: \(src.title.isEmpty ? String(localized: "Recording") : src.title) at \(AssistantFormat.mmss(src.startSec))"))
                     }
                 }
                 .padding(.vertical, 4)

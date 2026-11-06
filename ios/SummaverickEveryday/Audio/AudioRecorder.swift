@@ -24,6 +24,20 @@ final class AudioRecorder {
         return dir
     }
 
+    /// Ask's voice questions: short-lived WAVs, deleted after transcription and swept at launch.
+    static var askVoiceDirectory: URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ask-voice", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Removes voice-question files left behind (e.g. the app was closed while transcribing).
+    nonisolated static func sweepAskVoice() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ask-voice", isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        for f in files { try? FileManager.default.removeItem(at: f) }
+    }
+
     func requestPermission() async -> Bool {
         if #available(iOS 17.0, *) {
             return await AVAudioApplication.requestRecordPermission()
@@ -52,9 +66,20 @@ final class AudioRecorder {
                 AVLinearPCMIsFloatKey: false,
                 AVLinearPCMIsBigEndianKey: false,
             ]
-            let r = try AVAudioRecorder(url: url, settings: settings)
+            let r: AVAudioRecorder
+            do {
+                r = try AVAudioRecorder(url: url, settings: settings)
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                throw error
+            }
             r.isMeteringEnabled = true
-            guard r.record() else { lastError = "Could not start recording."; return }
+            guard r.record() else {
+                r.deleteRecording()
+                try? FileManager.default.removeItem(at: url)   // no partial file left behind
+                lastError = "Could not start recording."
+                return
+            }
             recorder = r
             currentURL = url
             startDate = Date()

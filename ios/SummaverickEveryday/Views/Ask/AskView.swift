@@ -25,14 +25,17 @@ private struct AnswerFormRequest: Identifiable {
     let text: String
     let medicine: Bool
     let source: Source?
+    /// The one saved medicine a medicine answer names, if exactly one.
+    let medicineID: Int64?
 
     /// A card that exists only on this screen: the answer text, no times or dates (never invented).
+    /// A medicine reminder also has no repeat until the person picks one.
     var suggestion: Suggestion {
         var p = SuggestionPayload()
         p.text = text
         if kind == .reminder {
             p.times = []
-            p.repeat = "once"
+            p.repeat = medicine ? "" : "once"
         }
         return Suggestion(local: kind, payload: p, noteID: source?.noteID, startSec: source?.startSec)
     }
@@ -66,6 +69,7 @@ struct AskView: View {
     @State private var generating = false
     @State private var notice: AskNotice?
     @State private var profileLang = "en"
+    @State private var medicines: [Medicine] = []
 
     @State private var recorder = AudioRecorder()
     @State private var listening = false
@@ -292,6 +296,11 @@ struct AskView: View {
                     HStack(spacing: 10) { makeButtons(a) }
                     VStack(alignment: .leading, spacing: 8) { makeButtons(a) }
                 }
+                if namesSeveralMedicines(a) {
+                    Text("Make reminders from each medicine in your profile.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .padding(14)
@@ -310,8 +319,12 @@ struct AskView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.accentColor)
-        .accessibilityLabel(Text("Open the recording: \(title)"))
+        .accessibilityLabel(Text("Open the recording: \(title) at \(AssistantFormat.mmss(src.startSec))"))
     }
+
+    /// A medicine answer naming several medicines cannot become one reminder (it could not follow each
+    /// medicine's dose changes); the person makes one per medicine from the profile.
+    private func namesSeveralMedicines(_ a: AskAnswer) -> Bool { a.medicine && medicinesNamed(in: a.answer).count > 1 }
 
     @ViewBuilder
     private func makeButtons(_ a: AskAnswer) -> some View {
@@ -319,6 +332,7 @@ struct AskView: View {
             Label("Make reminder", systemImage: "bell").frame(minHeight: 44)
         }
         .buttonStyle(.bordered)
+        .disabled(namesSeveralMedicines(a))
         Button { openForm(.task, a) } label: {
             Label("Make to-do", systemImage: "checklist").frame(minHeight: 44)
         }
@@ -476,15 +490,23 @@ struct AskView: View {
 
     private func loadProfile() async {
         profileLang = await CoreEngine.shared.profile()?.lang == "te" ? "te" : "en"
+        medicines = await CoreEngine.shared.medicines()
+    }
+
+    /// Saved medicines named in a text (whole words, case-insensitive), like the core's own match.
+    private func medicinesNamed(in text: String) -> [Medicine] {
+        func tokens(_ s: String) -> [String] {
+            s.lowercased().split(whereSeparator: { !($0.isLetter || $0.isNumber || !$0.isASCII) }).map(String.init)
+        }
+        let hay = tokens(text)
+        return medicines.filter { m in
+            let n = tokens(m.name)
+            guard !n.isEmpty, n.count <= hay.count else { return false }
+            return (0...(hay.count - n.count)).contains { Array(hay[$0..<($0 + n.count)]) == n }
+        }
     }
 
     // MARK: voice question
-
-    private static var voiceDirectory: URL {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ask-voice", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
 
     private func beginVoice() {
         guard !listening, !transcribing, !generating else { return }
@@ -492,7 +514,7 @@ struct AskView: View {
         guard models.selectedInstalled else { notice = .needsModel; return }
         switch AVAudioApplication.shared.recordPermission {
         case .granted:
-            recorder.start(in: Self.voiceDirectory)
+            recorder.start(in: AudioRecorder.askVoiceDirectory)
             if recorder.isRecording {
                 listening = true
                 notice = nil
@@ -552,7 +574,10 @@ struct AskView: View {
     // MARK: make reminder / to-do
 
     private func openForm(_ kind: SuggestionKind, _ a: AskAnswer) {
-        formRequest = AnswerFormRequest(kind: kind, text: a.answer, medicine: a.medicine, source: a.sources.first)
+        if kind == .reminder && namesSeveralMedicines(a) { return }
+        let named = a.medicine ? medicinesNamed(in: a.answer) : []
+        formRequest = AnswerFormRequest(kind: kind, text: a.answer, medicine: a.medicine, source: a.sources.first,
+                                        medicineID: named.count == 1 ? named[0].id : nil)
     }
 
     private func savePending() {
@@ -571,7 +596,8 @@ struct AskView: View {
             if r.kind == .reminder {
                 _ = try await CoreEngine.shared.createReminder(
                     NewReminder(text: words, times: d.times, repeat: opt(d.repeatRule), startDate: nil,
-                                untilDate: d.untilDate, noteID: r.source?.noteID, startSec: r.source?.startSec))
+                                untilDate: d.untilDate, noteID: r.source?.noteID, startSec: r.source?.startSec,
+                                medicineID: r.medicineID))
             } else {
                 _ = try await CoreEngine.shared.createTask(
                     NewTask(text: words, who: opt(d.who), dueDate: d.dueDate, noteID: r.source?.noteID, startSec: r.source?.startSec))

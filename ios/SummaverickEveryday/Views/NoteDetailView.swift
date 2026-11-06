@@ -36,8 +36,16 @@ struct NoteDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable {
-        case summary = "Summary", notes = "Notes", questions = "Questions", transcript = "Transcript"
+        case summary, notes, questions, transcript
         var id: String { rawValue }
+        var title: LocalizedStringKey {
+            switch self {
+            case .summary: return "Summary"
+            case .notes: return "Notes"
+            case .questions: return "Questions"
+            case .transcript: return "Transcript"
+            }
+        }
     }
 
     init(noteID: Int64, startAt: Int? = nil) {
@@ -62,6 +70,13 @@ struct NoteDetailView: View {
         .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await load() } }
         .onChange(of: presenting) { _, open in PresentationGate.shared.set(gateKey, open) }
+        // Playback ending by itself resets the play button.
+        .task(id: playing) {
+            while playing && !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(400))
+                if player?.isPlaying != true { playing = false; player = nil }
+            }
+        }
         .onDisappear {
             saveTitle()
             stopPlayback()
@@ -100,7 +115,7 @@ struct NoteDetailView: View {
                     }
 
                     Picker("Section", selection: $tab) {
-                        ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(Tab.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
 
@@ -180,7 +195,12 @@ struct NoteDetailView: View {
                 case .transcript: return n.transcript
                 }
             }()
-            if let text, !text.isEmpty {
+            if let text, !text.isEmpty, tab == .transcript {
+                // What was heard, exactly: never read as markdown.
+                Text(verbatim: text)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let text, !text.isEmpty {
                 Text(markdown(text))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)

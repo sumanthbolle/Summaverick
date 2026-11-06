@@ -417,6 +417,22 @@
       },
       "comment": "Kind of profile change"
     },
+    "Choose how often it repeats before saving.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose how often it repeats before saving."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సేవ్ చేసే ముందు ఎంత తరచుగా రావాలో ఎంచుకోండి."
+          }
+        }
+      }
+    },
     "Copied from your recordings": {
       "localizations": {
         "en": {
@@ -1097,6 +1113,22 @@
         }
       }
     },
+    "Make reminders from each medicine in your profile.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make reminders from each medicine in your profile."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ ప్రొఫైల్‌లో ఉన్న ఒక్కో మందు నుంచి రిమైండర్ పెట్టండి."
+          }
+        }
+      }
+    },
     "Make the summary": {
       "localizations": {
         "te": {
@@ -1408,6 +1440,22 @@
         }
       }
     },
+    "Notes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్"
+          }
+        }
+      }
+    },
     "Nothing found": {
       "localizations": {
         "te": {
@@ -1509,6 +1557,22 @@
         }
       },
       "comment": "%@ is the recording title"
+    },
+    "Open the recording: %@ at %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the recording: %@ at %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ తెరవండి: %@, %@ దగ్గర"
+          }
+        }
+      }
     },
     "Open to-dos": {
       "localizations": {
@@ -1639,6 +1703,22 @@
         }
       },
       "comment": "Accessibility label of a warning icon next to a flagged field"
+    },
+    "Questions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questions"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రశ్నలు"
+          }
+        }
+      }
     },
     "Quiz": {
       "localizations": {
@@ -2169,6 +2249,22 @@
         }
       }
     },
+    "The end date is before today. Pick a later end date, or turn it off.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The end date is before today. Pick a later end date, or turn it off."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముగింపు తేదీ ఈ రోజు కంటే ముందుంది. తర్వాతి తేదీ ఎంచుకోండి, లేదా దాన్ని తీసేయండి."
+          }
+        }
+      }
+    },
     "The microphone is off": {
       "localizations": {
         "en": {
@@ -2405,6 +2501,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఏదైనా పదం సరిచేయడానికి ఆ భాగాన్ని నొక్కి పట్టుకోండి."
+          }
+        }
+      }
+    },
+    "Transcript": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాత ప్రతి"
           }
         }
       }

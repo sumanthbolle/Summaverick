@@ -156,7 +156,7 @@ struct QuoteBlock: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.accentColor)
-                .accessibilityLabel(Text("Open the recording: \(noteTitle ?? String(localized: "Recording"))"))
+                .accessibilityLabel(Text("Open the recording: \(noteTitle ?? String(localized: "Recording")) at \(AssistantFormat.mmss(suggestion.startSec ?? 0))"))
             }
         }
     }
@@ -550,7 +550,7 @@ struct SuggestionEditForm: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.font(.headline).disabled(timesProblem != nil || textMissing)
+                    Button("Save") { save() }.font(.headline).disabled(timesProblem != nil || textMissing || repeatMissing)
                 }
             }
             // The ▶ link opens the recording inside this sheet, so the edits are kept.
@@ -637,8 +637,12 @@ struct SuggestionEditForm: View {
         if draft.times != before.times && draft.times.contains(where: { ReminderScheduler.clock($0) == nil }) {
             return "Pick a time for each row, or remove it."
         }
+        // A reminder made here starts today: an end date before today would never ring (the core refuses it).
+        if answer != nil, s.kind == .reminder, let u = draft.untilDate, u < AssistantFormat.ymd(Date()) {
+            return "The end date is before today. Pick a later end date, or turn it off."
+        }
         // A new one-time reminder starts today; if every time has passed it would never ring.
-        if answer != nil, s.kind == .reminder, draft.repeatRule.isEmpty || draft.repeatRule == "once",
+        if answer != nil, s.kind == .reminder, draft.repeatRule == "once",
            draft.times.allSatisfy(Self.hasPassedToday) {
             return "That time has passed today. Pick a later time, or choose how often it repeats."
         }
@@ -649,6 +653,11 @@ struct SuggestionEditForm: View {
         guard let (h, m) = ReminderScheduler.clock(hhmm),
               let d = Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) else { return false }
         return d <= Date()
+    }
+
+    /// A medicine reminder from an answer has no repeat until the person picks one.
+    private var repeatMissing: Bool {
+        answer?.medicine == true && s.kind == .reminder && draft.repeatRule.isEmpty
     }
 
     /// A reminder or to-do the person makes from an answer needs words (the core refuses empty text).
@@ -679,7 +688,7 @@ struct SuggestionEditForm: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
-                    .accessibilityLabel(Text("Open the recording: \(title)"))
+                    .accessibilityLabel(Text("Open the recording: \(title) at \(AssistantFormat.mmss(s.startSec ?? 0))"))
                 }
             }
             if a.medicine {
@@ -728,6 +737,10 @@ struct SuggestionEditForm: View {
             .highlightedRow(flagged("times") && draft.times.isEmpty)
             if let problem = timesProblem {
                 Label(problem, systemImage: "exclamationmark.circle.fill")
+                    .font(.callout.weight(.medium)).foregroundStyle(.red)
+            }
+            if repeatMissing {
+                Label("Choose how often it repeats before saving.", systemImage: "exclamationmark.circle.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(.red)
             }
             Picker("Repeats", selection: $draft.repeatRule) {

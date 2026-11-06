@@ -10,6 +10,7 @@ struct SummaverickEverydayApp: App {
     init() {
         // Must be set before launch finishes so a tap that cold-starts the app is delivered.
         UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
+        AudioRecorder.sweepAskVoice()
     }
 
     var body: some Scene {
