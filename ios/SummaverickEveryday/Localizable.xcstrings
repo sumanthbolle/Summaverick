@@ -272,22 +272,6 @@
         }
       }
     },
-    "Ask Summaverick needs the Gemma 4 model. Your notes and recording still work.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ask Summaverick needs the Gemma 4 model. Your notes and recording still work."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ask Summaverickకి Gemma 4 మోడల్ కావాలి. మీ నోట్స్, రికార్డింగ్ ఎప్పటిలాగే పనిచేస్తాయి."
-          }
-        }
-      }
-    },
     "Ask Summaverick…": {
       "localizations": {
         "te": {
@@ -673,22 +657,6 @@
         }
       },
       "comment": "Field name inside 'Look again at: …'"
-    },
-    "Download the AI model in Settings first.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download the AI model in Settings first."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ముందు సెట్టింగ్స్‌లో AI మోడల్‌ను డౌన్‌లోడ్ చేయండి."
-          }
-        }
-      }
     },
     "Due": {
       "localizations": {
@@ -1258,16 +1226,6 @@
         }
       }
     },
-    "Needs Gemma 4": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gemma 4 కావాలి"
-          }
-        }
-      }
-    },
     "New recordings were added.": {
       "localizations": {
         "te": {
@@ -1583,16 +1541,6 @@
         }
       }
     },
-    "People you talk about appear here after your recordings are processed with Gemma 4.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మీరు మాట్లాడే వ్యక్తులు, మీ రికార్డింగ్‌లను Gemma 4 ప్రాసెస్ చేసిన తర్వాత ఇక్కడ కనిపిస్తారు."
-          }
-        }
-      }
-    },
     "Pick a date": {
       "localizations": {
         "te": {
@@ -1828,16 +1776,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "రిమైండర్లు"
-          }
-        }
-      }
-    },
-    "Reminders, to-dos and suggestions from your recordings need the Gemma 4 model. Your notes and recording still work.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మీ రికార్డింగ్‌ల నుండి రిమైండర్లు, చేయాల్సిన పనులు, సూచనలు రావాలంటే Gemma 4 మోడల్ కావాలి. మీ నోట్స్, రికార్డింగ్ మామూలుగానే పనిచేస్తాయి."
           }
         }
       }
@@ -2098,16 +2036,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "సూచన"
-          }
-        }
-      }
-    },
-    "Summaries, key terms and quizzes need the Gemma 4 model. Your recordings below still work.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "సారాంశాలు, ముఖ్యమైన పదాలు, క్విజ్‌లకు Gemma 4 మోడల్ కావాలి. కింద ఉన్న మీ రికార్డింగ్‌లు ఇప్పటికీ పని చేస్తాయి."
           }
         }
       }
@@ -2464,16 +2392,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "అంశాలు"
-          }
-        }
-      }
-    },
-    "Topics appear here after your recordings are processed with Gemma 4.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మీ రికార్డింగ్‌లను Gemma 4 ప్రాసెస్ చేసిన తర్వాత అంశాలు ఇక్కడ కనిపిస్తాయి."
           }
         }
       }
@@ -3472,17 +3390,6 @@
         }
       }
     },
-    "%@ listens to the recording itself, so Telugu, Hindi and mixed speech work in any language. Summary, notes and questions are written in the language above.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ రికార్డింగ్‌ను నేరుగా వింటుంది. అందుకే తెలుగు, హిందీ, కలగలిపిన మాటలు ఏ భాషలోనైనా పనిచేస్తాయి. సారాంశం, నోట్స్, ప్రశ్నలు పైన ఎంచుకున్న భాషలో వస్తాయి."
-          }
-        }
-      },
-      "comment": "%@ is the AI model name"
-    },
     "1 day": {
       "localizations": {
         "te": {
@@ -3524,42 +3431,12 @@
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "AI model (runs on this phone)": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI మోడల్ (ఈ ఫోన్‌లోనే నడుస్తుంది)"
-          }
-        }
-      }
-    },
-    "Allow microphone and speech recognition for Summaverick in Settings.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "సెట్టింగ్స్‌లో Summaverickకి మైక్రోఫోన్, మాట గుర్తింపు అనుమతి ఇవ్వండి."
-          }
-        }
-      }
-    },
     "Audio retention": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "ఆడియో ఎంత కాలం ఉంచాలి"
-          }
-        }
-      }
-    },
-    "Clearer notes and better Indian-language output. Needs a 6 GB+ iPhone/iPad.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "నోట్స్ ఇంకా స్పష్టంగా ఉంటాయి, భారతీయ భాషల్లో బాగా రాస్తుంది. 6 GB లేదా అంతకంటే ఎక్కువ మెమరీ ఉన్న iPhone/iPad కావాలి."
           }
         }
       }
@@ -3637,46 +3514,6 @@
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "Download %lld MB": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld MB డౌన్‌లోడ్ చేయండి"
-          }
-        }
-      }
-    },
-    "Download failed (HTTP %lld).": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "డౌన్‌లోడ్ కాలేదు (HTTP %lld)."
-          }
-        }
-      }
-    },
-    "Download the AI model in Settings, then tap Generate notes.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "సెట్టింగ్స్‌లో AI మోడల్‌ను డౌన్‌లోడ్ చేసి, తర్వాత 'నోట్స్ తయారు చేయి' నొక్కండి."
-          }
-        }
-      }
-    },
-    "Download the AI model once (about 640 MB) to get summaries and notes.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "సారాంశాలు, నోట్స్ కోసం AI మోడల్‌ను ఒక్కసారి డౌన్‌లోడ్ చేయండి (సుమారు 640 MB)."
-          }
-        }
-      }
-    },
     "Failed: %@": {
       "localizations": {
         "te": {
@@ -3687,16 +3524,6 @@
         }
       },
       "comment": "%@ is the reason"
-    },
-    "Fast on any iPhone from the last five years. Good English; basic Hindi.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "గత ఐదేళ్లలో వచ్చిన ఏ iPhone లోనైనా వేగంగా పనిచేస్తుంది. ఇంగ్లీష్ బాగా వస్తుంది; హిందీ కొద్దిగా."
-          }
-        }
-      }
     },
     "find reminders and tasks": {
       "localizations": {
@@ -3729,42 +3556,12 @@
         }
       }
     },
-    "Gemma 4 E4B (any language, hears audio)": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gemma 4 E4B (ఏ భాషైనా, ఆడియో వింటుంది)"
-          }
-        }
-      }
-    },
     "Keep recordings for": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "రికార్డింగ్‌లు ఎంత కాలం ఉంచాలి"
-          }
-        }
-      }
-    },
-    "Language": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "భాష"
-          }
-        }
-      }
-    },
-    "Language of recordings": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "రికార్డింగ్‌ల భాష"
           }
         }
       }
@@ -3785,16 +3582,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "మైక్రోఫోన్ అనుమతి కావాలి"
-          }
-        }
-      }
-    },
-    "No on-device speech languages found. Add a dictation language in Settings > General > Keyboard > Dictation.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఈ ఫోన్‌లో మాట గుర్తించే భాషలు ఏవీ లేవు. సెట్టింగ్స్ > జనరల్ > కీబోర్డ్ > డిక్టేషన్‌లో ఒక భాషను చేర్చండి."
           }
         }
       }
@@ -3849,53 +3636,12 @@
         }
       }
     },
-    "On-device speech recognition for %@ is not available on this iPhone. Open Settings > General > Keyboard > Dictation and add the language, then try again.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ కోసం ఈ iPhone లో మాట గుర్తింపు లేదు. సెట్టింగ్స్ > జనరల్ > కీబోర్డ్ > డిక్టేషన్ తెరిచి ఆ భాషను చేర్చి, మళ్ళీ ప్రయత్నించండి."
-          }
-        }
-      },
-      "comment": "%@ is a language name"
-    },
-    "Only languages that work fully on this iPhone are listed. Audio is never sent to a server.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఈ iPhone లో పూర్తిగా పనిచేసే భాషలు మాత్రమే ఇక్కడ ఉన్నాయి. ఆడియో ఎప్పుడూ ఏ సర్వర్‌కీ వెళ్లదు."
-          }
-        }
-      }
-    },
     "Privacy": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "గోప్యత"
-          }
-        }
-      }
-    },
-    "Qwen3 0.6B (recommended)": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qwen3 0.6B (సూచించినది)"
-          }
-        }
-      }
-    },
-    "Qwen3 1.7B (better quality)": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Qwen3 1.7B (మెరుగైన నాణ్యత)"
           }
         }
       }
@@ -4082,16 +3828,6 @@
         }
       }
     },
-    "Speech recognition permission was not granted.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మాట గుర్తింపుకు అనుమతి ఇవ్వలేదు."
-          }
-        }
-      }
-    },
     "Starting…": {
       "localizations": {
         "te": {
@@ -4152,16 +3888,6 @@
         }
       }
     },
-    "The recording could not be read.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "రికార్డింగ్‌ను చదవలేకపోయాం."
-          }
-        }
-      }
-    },
     "The selected AI model cannot listen to audio.": {
       "localizations": {
         "te": {
@@ -4172,43 +3898,12 @@
         }
       }
     },
-    "The speech recogniser is busy.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మాట గుర్తింపు ప్రస్తుతం పనిలో ఉంది."
-          }
-        }
-      }
-    },
-    "This phone has %@ GB of memory. Recommended: %@.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఈ ఫోన్‌లో %1$@ GB మెమరీ ఉంది. సూచించేది: %2$@."
-          }
-        }
-      },
-      "comment": "Memory size, then the recommended model name"
-    },
     "Transcribing… %lld%%": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "రాత ప్రతి తయారవుతోంది… %lld%%"
-          }
-        }
-      }
-    },
-    "Understands mixed languages such as Telugu with English terms and writes the notes. Large download; needs an 8 GB iPhone. Slower: roughly real time.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఇంగ్లీష్ పదాలు కలిసిన తెలుగు లాంటి మిశ్రమ భాషలను అర్థం చేసుకుని నోట్స్ రాస్తుంది. పెద్ద డౌన్‌లోడ్; 8 GB iPhone కావాలి. నెమ్మదిగా: రికార్డింగ్ ఎంత సేపో దాదాపు అంతే సమయం."
           }
         }
       }
@@ -4357,6 +4052,438 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఫోన్ లాక్ అయినప్పుడు ఆగిపోయింది. Summaverick ని తెరిచినప్పుడు మళ్లీ కొనసాగుతుంది."
+          }
+        }
+      }
+    },
+    "Allow the microphone for Summaverick in Settings.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow the microphone for Summaverick in Settings."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సెట్టింగ్స్‌లో Summaverickకి మైక్రోఫోన్ అనుమతి ఇవ్వండి."
+          }
+        }
+      }
+    },
+    "Download again": {
+      "comment": "Starts the AI download again (Settings, Today)",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download again"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మళ్లీ డౌన్‌లోడ్ చేయండి"
+          }
+        }
+      }
+    },
+    "Download failed": {
+      "comment": "The AI download stopped after several tries",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download failed"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "డౌన్‌లోడ్ కాలేదు"
+          }
+        }
+      }
+    },
+    "Downloading %lld%%": {
+      "comment": "Settings status of the AI download; %lld is percent done",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading %lld%%"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "డౌన్‌లోడ్ అవుతోంది %lld%%"
+          }
+        }
+      }
+    },
+    "Free up about %lld GB to download Summaverick's AI.": {
+      "comment": "%lld is whole gigabytes to free",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Free up about %lld GB to download Summaverick's AI."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick AIని డౌన్‌లోడ్ చేయడానికి సుమారు %lld GB ఖాళీ చేయండి."
+          }
+        }
+      }
+    },
+    "Getting Summaverick ready… %lld%%": {
+      "comment": "Download progress; %lld is percent done",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting Summaverick ready… %lld%%"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick సిద్ధమవుతోంది… %lld%%"
+          }
+        }
+      }
+    },
+    "Getting Summaverick ready… %lld%% · about %lld min left": {
+      "comment": "Download progress; first %lld is percent done, second is minutes left",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting Summaverick ready… %lld%% · about %lld min left"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick సిద్ధమవుతోంది… %lld%% · సుమారు %lld నిమిషాలు మిగిలాయి"
+          }
+        }
+      }
+    },
+    "Not downloaded": {
+      "comment": "The AI was removed to free space",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not downloaded"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా డౌన్‌లోడ్ చేయలేదు"
+          }
+        }
+      }
+    },
+    "Paused to let the phone cool down. It will continue automatically.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused to let the phone cool down. It will continue automatically."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ చల్లబడటానికి ఆపాం. అది తనంతట తానే కొనసాగుతుంది."
+          }
+        }
+      }
+    },
+    "Paused — no space": {
+      "comment": "The AI download needs more free storage",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused — no space"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆగింది — స్థలం లేదు"
+          }
+        }
+      }
+    },
+    "People you talk about appear here after your recordings are processed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "People you talk about appear here after your recordings are processed."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు మాట్లాడే వ్యక్తులు, మీ రికార్డింగ్‌లు ప్రాసెస్ అయిన తర్వాత ఇక్కడ కనిపిస్తారు."
+          }
+        }
+      }
+    },
+    "Ready": {
+      "comment": "The AI is downloaded",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సిద్ధం"
+          }
+        }
+      }
+    },
+    "Ready · %@": {
+      "comment": "Settings: the AI is downloaded; %@ is its size on disk, e.g. 5.5 GB",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready · %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సిద్ధం · %@"
+          }
+        }
+      }
+    },
+    "Remove Summaverick's AI?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Summaverick's AI?"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick AIని తీసివేయాలా?"
+          }
+        }
+      }
+    },
+    "Remove to free space": {
+      "comment": "Deletes the downloaded AI from the phone",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove to free space"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "స్థలం కోసం తీసివేయండి"
+          }
+        }
+      }
+    },
+    "Summaverick is still getting ready": {
+      "comment": "Shown where Ask and the assistant appear while the AI downloads",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick is still getting ready"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick ఇంకా సిద్ధమవుతోంది"
+          }
+        }
+      }
+    },
+    "Summaverick listens to the recording itself, so Telugu, Hindi and mixed speech all work. Summary, notes and questions are written in the language above.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick listens to the recording itself, so Telugu, Hindi and mixed speech all work. Summary, notes and questions are written in the language above."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick రికార్డింగ్‌ను నేరుగా వింటుంది. అందుకే తెలుగు, హిందీ, కలగలిపిన మాటలు అన్నీ పనిచేస్తాయి. సారాంశం, నోట్స్, ప్రశ్నలు పైన ఎంచుకున్న భాషలో వస్తాయి."
+          }
+        }
+      }
+    },
+    "Summaverick's AI": {
+      "comment": "Settings section about the on-device AI",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick's AI"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick AI"
+          }
+        }
+      }
+    },
+    "The phone is too warm. Try again when it has cooled down.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The phone is too warm. Try again when it has cooled down."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ బాగా వేడిగా ఉంది. చల్లబడిన తర్వాత మళ్లీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "This iPhone doesn't have enough memory for Summaverick's AI. You can still record and play back; notes need an iPhone with 6 GB of memory or more.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone doesn't have enough memory for Summaverick's AI. You can still record and play back; notes need an iPhone with 6 GB of memory or more."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ iPhoneలో Summaverick AIకి సరిపడా మెమరీ లేదు. మీరు రికార్డ్ చేసి వినవచ్చు; నోట్స్ కోసం 6 GB లేదా అంతకంటే ఎక్కువ మెమరీ ఉన్న iPhone కావాలి."
+          }
+        }
+      }
+    },
+    "Topics appear here after your recordings are processed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Topics appear here after your recordings are processed."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌లు ప్రాసెస్ అయిన తర్వాత అంశాలు ఇక్కడ కనిపిస్తాయి."
+          }
+        }
+      }
+    },
+    "Use mobile data for the download": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use mobile data for the download"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "డౌన్‌లోడ్‌కు మొబైల్ డేటా వాడండి"
+          }
+        }
+      }
+    },
+    "Waiting for Summaverick's AI to finish downloading": {
+      "comment": "On a recording made before the AI finished downloading",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Summaverick's AI to finish downloading"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick AI డౌన్‌లోడ్ పూర్తవడం కోసం వేచి ఉంది"
+          }
+        }
+      }
+    },
+    "Waiting for Wi-Fi": {
+      "comment": "The AI download only runs on Wi-Fi",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Wi-Fi"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wi-Fi కోసం వేచి ఉంది"
+          }
+        }
+      }
+    },
+    "Waiting for a connection": {
+      "comment": "The AI download has no network",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for a connection"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంటర్నెట్ కనెక్షన్ కోసం వేచి ఉంది"
+          }
+        }
+      }
+    },
+    "Your notes stay. New recordings wait until it is downloaded again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your notes stay. New recordings wait until it is downloaded again."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నోట్స్ అలాగే ఉంటాయి. మళ్లీ డౌన్‌లోడ్ చేసే వరకు కొత్త రికార్డింగ్‌లు వేచి ఉంటాయి."
           }
         }
       }
