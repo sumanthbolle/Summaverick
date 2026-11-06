@@ -150,3 +150,29 @@ TEST(context_system_prefixes_always_block) {
     CHECK(c.find("Ravi") != std::string::npos);
     CHECK(c.size() > 3 && c.substr(c.size() - 3) == "SYS");
 }
+
+TEST(transcription_vocab_line_from_saved_vocab) {
+    Store s(":memory:");
+    CHECK_EQ(sve::transcription_vocab_line(s), std::string());
+    s.add_medicine(json::parse(R"({"name":"Amlodipine","dose":"5 mg"})"));
+    s.add_memory("fact", "avoids salt", std::nullopt);
+    CHECK_EQ(sve::transcription_vocab_line(s), std::string());  // vocabulary only
+    s.add_memory("vocab", "Lakshmi", std::nullopt);
+    s.add_memory("vocab", "Dr Rao", std::nullopt);
+    CHECK_EQ(sve::transcription_vocab_line(s), std::string("Spell these words this way: Dr Rao, Lakshmi"));
+}
+
+TEST(transcription_vocab_line_budget_utf8) {
+    Store s(":memory:");
+    for (int i = 0; i < 200; i++)
+        s.add_memory("vocab", "\xE0\xB0\xA4\xE0\xB1\x86\xE0\xB0\xB2\xE0\xB1\x81" + std::to_string(i), std::nullopt);
+    std::string l = sve::transcription_vocab_line(s, 400);
+    CHECK(l.size() <= 400);
+    CHECK(valid_utf8_end(l));
+    CHECK(l.find("199") != std::string::npos);        // newest kept
+    CHECK(l.find("\x81" "0,") == std::string::npos);  // oldest dropped
+    Store t(":memory:");
+    t.add_memory("vocab", std::string(300, 'a') + "\xE0\xB0\xA4\xE0\xB0\xA4", std::nullopt);
+    std::string one = sve::transcription_vocab_line(t, 330);
+    CHECK(one.size() <= 330 && valid_utf8_end(one));
+}

@@ -15,6 +15,11 @@ std::string always_block(Store &store, size_t max_bytes = 2000);
 // `system` preceded by the always block as background (unchanged when nothing is known).
 std::string context_system(Store &store, const std::string &system);
 
+// "Spell these words this way: a, b" from saved vocabulary, newest first, whole terms within
+// max_bytes (UTF-8 safe). Vocabulary only: never medicines or doses, so the transcriber is not
+// nudged to hear a dose that was not said (spec §7.4). Empty when there is no vocabulary.
+std::string transcription_vocab_line(Store &store, size_t max_bytes = 400);
+
 struct Relevant {
     std::string block;
     json sources;  // [{"label":"S1","note_id":..,"start_sec":..,"title":..}], exactly the labels in block

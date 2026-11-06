@@ -131,6 +131,21 @@ std::string context_system(Store &store, const std::string &system) {
            "do not repeat it unless it is asked for):\n" + ab + "\n" + system;
 }
 
+std::string transcription_vocab_line(Store &store, size_t max_bytes) {
+    std::vector<std::string> vocab = texts(store.memory("vocab"));  // oldest first
+    const std::string head = "Spell these words this way: ";
+    std::string out;
+    for (size_t i = vocab.size(); i-- > 0;) {
+        std::string add = (out.empty() ? head : std::string(", ")) + vocab[i];
+        if (out.size() + add.size() > max_bytes) {
+            if (out.empty()) out = truncate_utf8(add, max_bytes);  // one very long term: cut it
+            break;
+        }
+        out += add;
+    }
+    return out.size() > head.size() ? out : std::string();
+}
+
 Relevant relevant(Store &store, const std::string &query, size_t max_bytes) {
     Selection sel = select_relevant(store, query);
     Relevant r;

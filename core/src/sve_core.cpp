@@ -258,6 +258,8 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
 
     const std::string sys =
         "You are a precise transcriber. Speakers often mix languages, for example Telugu with English words.";
+    // Words the person fixed earlier (spec §7.4), bounded so the audio prompt stays small.
+    const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
     std::string prev;
     const int total = (int)pieces.size();
     for (int i = 0; i < total; ++i) {
@@ -266,6 +268,7 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
             "\nTranscribe this audio exactly as spoken. Write each word in the script of the language it was spoken in: "
             "Telugu words in Telugu script, Hindi in Devanagari, English words in English. Do not translate. "
             "Output only the transcript.";
+        if (!vocab.empty()) instr += "\n" + vocab + ".";
         if (!prev.empty()) {
             // The tail of the previous piece keeps names and spellings consistent across the 28 s cuts.
             std::string tail = prev.size() > 400 ? prev.substr(prev.size() - 400) : prev;
