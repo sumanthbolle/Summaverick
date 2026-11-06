@@ -15,7 +15,7 @@ struct SummaverickEverydayApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                HomeView()
+                RootView()
                     .environment(settings)
                 if lock.isLocked {
                     LockScreen()

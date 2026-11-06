@@ -77,6 +77,10 @@
 			isa = PBXBuildFile;
 			fileRef = 393C976A09F0C61C5B20B9DE;
 		};
+		908F929CC6113FA25B46EE92 = {
+			isa = PBXBuildFile;
+			fileRef = 8108122AC683F0C05267E8CD;
+		};
 		9543CFE6FE3AF9374A448E0F = {
 			isa = PBXBuildFile;
 			fileRef = D58A3AD4F6AD27CF4A2AB3D8;
@@ -84,6 +88,10 @@
 		A14D701700FCEA89C5B0F439 = {
 			isa = PBXBuildFile;
 			fileRef = C30CC5397DAA09FBACA85197;
+		};
+		A98A4FF70B48BB38E9507E50 = {
+			isa = PBXBuildFile;
+			fileRef = 5B6316DBD705D039EA15B281;
 		};
 		B3682618E8A7DB35FCEEE996 = {
 			isa = PBXBuildFile;
@@ -108,6 +116,10 @@
 		DC70A4770243CC1CA714EEB5 = {
 			isa = PBXBuildFile;
 			fileRef = FDA9E084D501D8D1690658ED;
+		};
+		DD6F72C30ED5F9B5F7BCA8E3 = {
+			isa = PBXBuildFile;
+			fileRef = C0100A508E690127735ED8DF;
 		};
 		E374920B948422FA0FDEBA74 = {
 			isa = PBXBuildFile;
@@ -233,6 +245,13 @@
 			path = SummaverickEveryday/Security/AppLock.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		5B6316DBD705D039EA15B281 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RootView.swift;
+			path = SummaverickEveryday/Views/RootView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		6013C41549784B5FC55E61C4 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -259,6 +278,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = AssistantModels.swift;
 			path = SummaverickEveryday/Engine/AssistantModels.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		8108122AC683F0C05267E8CD = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SuggestionCard.swift;
+			path = SummaverickEveryday/Views/Today/SuggestionCard.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		8B7A0A18322F15224FEF40CC = {
@@ -322,6 +348,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_extract.h;
 			path = ../core/src/sve_extract.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		C0100A508E690127735ED8DF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = TodayView.swift;
+			path = SummaverickEveryday/Views/Today/TodayView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		C30CC5397DAA09FBACA85197 = {
@@ -503,6 +536,7 @@
 				25B8EA0EC84CD169EC13005D,
 				9808AA3855D4662F673FBFD8,
 				3A82B61681BFF18BB638B388,
+				F86C9C201E773F26CECBA845,
 				29A1CD6197C4EBF318C20726,
 				8C247BC7003BBE5F71E1479C,
 				FC581254F5C135DB22FD9C42,
@@ -516,6 +550,7 @@
 				E82D33A65EFEE2CA535089B0,
 				4E9F0134C12B9B82D2B2A856,
 				63A8A83C123E5491CBE9E84F,
+				5B6316DBD705D039EA15B281,
 				DCE021A147EA4FBC88B74354,
 			);
 			name = Views;
@@ -552,6 +587,15 @@
 				E5E3C7E62C1B0998F7D272BF,
 			);
 			name = Core;
+			sourceTree = "<group>";
+		};
+		F86C9C201E773F26CECBA845 = {
+			isa = PBXGroup;
+			children = (
+				8108122AC683F0C05267E8CD,
+				C0100A508E690127735ED8DF,
+			);
+			name = Views/Today;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -640,7 +684,10 @@
 				D37DDDF05FE4948E7F71270A,
 				F5DF4BFB0174304CA2197095,
 				E374920B948422FA0FDEBA74,
+				A98A4FF70B48BB38E9507E50,
 				8D4A6C6E4B479FCA91F91BA9,
+				908F929CC6113FA25B46EE92,
+				DD6F72C30ED5F9B5F7BCA8E3,
 				E3B6ED99E22E4B0C0EC884D9,
 				1D9397B49E2B55EDE5DC3560,
 				66567DD2A6C40F6BC6CB1C24,
