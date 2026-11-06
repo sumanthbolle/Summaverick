@@ -60,7 +60,7 @@ struct RootView: View {
     var body: some View {
         ZStack {
             tabContent(.today) { TodayView() }
-            tabContent(.deepDive) { HomeView() }
+            tabContent(.deepDive) { DeepDiveView() }
             tabContent(.ask) { AskPlaceholderView() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

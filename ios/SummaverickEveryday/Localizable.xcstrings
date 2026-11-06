@@ -1,6 +1,88 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%lld open to-dos": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld open to-do"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld open to-dos"
+                }
+              }
+            }
+          }
+        },
+        "te": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld పని మిగిలి ఉంది"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld పనులు మిగిలి ఉన్నాయి"
+                }
+              }
+            }
+          }
+        }
+      },
+      "comment": "Spoken label for the red badge on a topic row"
+    },
+    "%lld recordings": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld recording"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld recordings"
+                }
+              }
+            }
+          }
+        },
+        "te": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld రికార్డింగ్"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld రికార్డింగ్‌లు"
+                }
+              }
+            }
+          }
+        }
+      },
+      "comment": "Number of recordings under a topic or person"
+    },
     "%lld things need you today": {
       "comment": "Under the greeting; %lld is how many items need the person today",
       "localizations": {
@@ -73,6 +155,16 @@
         }
       }
     },
+    "All recordings of %@ move into %@. You can't undo this.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ లోని రికార్డింగ్‌లన్నీ %2$@ లోకి వెళ్తాయి. దీన్ని వెనక్కి తీసుకోలేరు."
+          }
+        }
+      }
+    },
     "Ask": {
       "localizations": {
         "te": {
@@ -134,6 +226,16 @@
         }
       }
     },
+    "Browse by": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇలా చూడండి"
+          }
+        }
+      }
+    },
     "Cancel": {
       "localizations": {
         "te": {
@@ -187,12 +289,32 @@
       },
       "comment": "Kind of profile change"
     },
+    "Could not make the summary.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశం తయారు చేయలేకపోయాం."
+          }
+        }
+      }
+    },
     "Could not save this. Please try again.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "దీన్ని సేవ్ చేయలేకపోయాం. దయచేసి మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Date": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తేదీ"
           }
         }
       }
@@ -207,16 +329,6 @@
         }
       },
       "comment": "Field name inside 'Look again at: …'"
-    },
-    "Date": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "తేదీ"
-          }
-        }
-      }
     },
     "Deep dive": {
       "localizations": {
@@ -259,6 +371,16 @@
         }
       }
     },
+    "Dose": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మోతాదు"
+          }
+        }
+      }
+    },
     "dose": {
       "localizations": {
         "te": {
@@ -269,16 +391,6 @@
         }
       },
       "comment": "Field name inside 'Look again at: …'"
-    },
-    "Dose": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మోతాదు"
-          }
-        }
-      }
     },
     "Due": {
       "localizations": {
@@ -300,6 +412,16 @@
         }
       },
       "comment": "%@ is a date"
+    },
+    "Due: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "గడువు: %@"
+          }
+        }
+      }
     },
     "Edit": {
       "localizations": {
@@ -436,16 +558,15 @@
         }
       }
     },
-    "how long": {
+    "Hides the answer": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఎన్ని రోజులు"
+            "value": "జవాబు దాచుతుంది"
           }
         }
-      },
-      "comment": "Field name inside 'Look again at: …'"
+      }
     },
     "How long": {
       "localizations": {
@@ -457,12 +578,12 @@
         }
       }
     },
-    "how often": {
+    "how long": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఎన్నిసార్లు"
+            "value": "ఎన్ని రోజులు"
           }
         }
       },
@@ -477,6 +598,17 @@
           }
         }
       }
+    },
+    "how often": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎన్నిసార్లు"
+          }
+        }
+      },
+      "comment": "Field name inside 'Look again at: …'"
     },
     "I understand": {
       "localizations": {
@@ -494,6 +626,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "గమనిక"
+          }
+        }
+      }
+    },
+    "Key terms": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముఖ్యమైన పదాలు"
+          }
+        }
+      }
+    },
+    "Latest: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇటీవలిది: %@"
           }
         }
       }
@@ -540,6 +692,16 @@
         }
       }
     },
+    "Medicine name": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందు పేరు"
+          }
+        }
+      }
+    },
     "medicine name": {
       "localizations": {
         "te": {
@@ -551,22 +713,63 @@
       },
       "comment": "Field name inside 'Look again at: …'"
     },
-    "Medicine name": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మందు పేరు"
-          }
-        }
-      }
-    },
     "Medicine reminder": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "మందు రిమైండర్"
+          }
+        }
+      }
+    },
+    "Merge": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కలపండి"
+          }
+        }
+      }
+    },
+    "Merge %@ into %@?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ను %2$@ లో కలపాలా?"
+          }
+        }
+      },
+      "comment": "First %@ is the topic being merged away, second is the one that stays"
+    },
+    "Merge into…": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీనిలో కలపండి…"
+          }
+        }
+      }
+    },
+    "More options": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మరిన్ని ఎంపికలు"
+          }
+        }
+      }
+    },
+    "Name": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పేరు"
           }
         }
       }
@@ -601,12 +804,32 @@
         }
       }
     },
+    "No notes yet": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా నోట్స్ లేవు"
+          }
+        }
+      }
+    },
     "No open to-dos.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "చేయాల్సిన పనులు ఏవీ లేవు."
+          }
+        }
+      }
+    },
+    "No people yet": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా వ్యక్తులు లేరు"
           }
         }
       }
@@ -627,6 +850,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఈరోజు గానీ, తర్వాతి 3 రోజుల్లో గానీ రిమైండర్లు లేవు."
+          }
+        }
+      }
+    },
+    "No summary yet.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా సారాంశం లేదు."
+          }
+        }
+      }
+    },
+    "No topics yet": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా అంశాలు లేవు"
           }
         }
       }
@@ -667,6 +910,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "పెట్టలేదు — దయచేసి సమయం ఎంచుకోండి"
+          }
+        }
+      }
+    },
+    "Nothing found": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఏదీ దొరకలేదు"
           }
         }
       }
@@ -763,6 +1016,36 @@
       },
       "comment": "%@ is the recording title"
     },
+    "Open to-dos": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మిగిలిన పనులు"
+          }
+        }
+      }
+    },
+    "People": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వ్యక్తులు"
+          }
+        }
+      }
+    },
+    "People you talk about appear here after your recordings are processed with Gemma 4.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు మాట్లాడే వ్యక్తులు, మీ రికార్డింగ్‌లను Gemma 4 ప్రాసెస్ చేసిన తర్వాత ఇక్కడ కనిపిస్తారు."
+          }
+        }
+      }
+    },
     "Pick a date": {
       "localizations": {
         "te": {
@@ -815,6 +1098,26 @@
       },
       "comment": "Accessibility label of a warning icon next to a flagged field"
     },
+    "Quiz": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "క్విజ్"
+          }
+        }
+      }
+    },
+    "Reading your recordings…": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌లను చదువుతోంది…"
+          }
+        }
+      }
+    },
     "Record": {
       "localizations": {
         "te": {
@@ -832,6 +1135,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "రికార్డింగ్"
+          }
+        }
+      }
+    },
+    "Recordings": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్‌లు"
           }
         }
       }
@@ -886,6 +1199,16 @@
         }
       }
     },
+    "Rename": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పేరు మార్చు"
+          }
+        }
+      }
+    },
     "Repeats": {
       "localizations": {
         "te": {
@@ -914,6 +1237,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "సేవ్ చేయండి"
+          }
+        }
+      }
+    },
+    "Search your notes": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నోట్స్‌లో వెతకండి"
           }
         }
       }
@@ -954,6 +1287,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "సెట్టింగ్‌లు"
+          }
+        }
+      }
+    },
+    "Shows the answer": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "జవాబు చూపిస్తుంది"
           }
         }
       }
@@ -1020,6 +1363,46 @@
         }
       }
     },
+    "Summaries, key terms and quizzes need the Gemma 4 model. Your recordings below still work.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశాలు, ముఖ్యమైన పదాలు, క్విజ్‌లకు Gemma 4 మోడల్ కావాలి. కింద ఉన్న మీ రికార్డింగ్‌లు ఇప్పటికీ పని చేస్తాయి."
+          }
+        }
+      }
+    },
+    "Summary": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశం"
+          }
+        }
+      }
+    },
+    "Tap a question to see the answer.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "జవాబు చూడడానికి ప్రశ్నను తాకండి."
+          }
+        }
+      }
+    },
+    "Tap Record to capture a lecture, a meeting or a thought. Notes are written on this phone and never leave it.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పాఠం, సమావేశం లేదా మీ ఆలోచనను రికార్డ్ చేయడానికి రికార్డ్ నొక్కండి. నోట్స్ ఈ ఫోన్‌లోనే తయారవుతాయి, బయటకు వెళ్లవు."
+          }
+        }
+      }
+    },
     "the recorded words": {
       "localizations": {
         "te": {
@@ -1052,6 +1435,16 @@
       },
       "comment": "Field name inside 'Look again at: …'"
     },
+    "There is nothing else to merge into.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కలపడానికి వేరే ఏదీ లేదు."
+          }
+        }
+      }
+    },
     "This came from a deleted recording.": {
       "localizations": {
         "te": {
@@ -1072,6 +1465,16 @@
         }
       }
     },
+    "Time": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సమయం"
+          }
+        }
+      }
+    },
     "time": {
       "localizations": {
         "te": {
@@ -1083,12 +1486,12 @@
       },
       "comment": "Field name inside 'Look again at: …'"
     },
-    "Time": {
+    "Timeline": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సమయం"
+            "value": "కాలక్రమం"
           }
         }
       }
@@ -1124,6 +1527,46 @@
         }
       }
     },
+    "Topics": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అంశాలు"
+          }
+        }
+      }
+    },
+    "Topics appear here after your recordings are processed with Gemma 4.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌లను Gemma 4 ప్రాసెస్ చేసిన తర్వాత అంశాలు ఇక్కడ కనిపిస్తాయి."
+          }
+        }
+      }
+    },
+    "Try a different word.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వేరే పదం ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Try again": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మళ్లీ ప్రయత్నించండి"
+          }
+        }
+      }
+    },
     "Twice a day": {
       "localizations": {
         "te": {
@@ -1134,6 +1577,16 @@
         }
       },
       "comment": "How often a reminder repeats"
+    },
+    "Type a new name.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొత్త పేరు రాయండి."
+          }
+        }
+      }
     },
     "Until": {
       "localizations": {
@@ -1187,6 +1640,16 @@
         }
       }
     },
+    "When to take it": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎప్పుడు వేసుకోవాలి"
+          }
+        }
+      }
+    },
     "when to take it": {
       "localizations": {
         "te": {
@@ -1197,16 +1660,6 @@
         }
       },
       "comment": "Field name inside 'Look again at: …'"
-    },
-    "When to take it": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఎప్పుడు వేసుకోవాలి"
-          }
-        }
-      }
     },
     "Who": {
       "localizations": {

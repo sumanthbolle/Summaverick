@@ -12,7 +12,7 @@ struct RecordingPulseView: View {
     private let particleCount = 72
 
     var body: some View {
-        TimelineView(.animation(paused: !active)) { timeline in
+        SwiftUI.TimelineView(.animation(paused: !active)) { timeline in
             Canvas(rendersAsynchronously: true) { ctx, size in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let center = CGPoint(x: size.width / 2, y: size.height / 2)

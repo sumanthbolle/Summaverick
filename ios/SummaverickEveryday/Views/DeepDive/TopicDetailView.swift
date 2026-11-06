@@ -1,0 +1,228 @@
+// One topic or person: a combined summary of its recordings, key terms, a quiz, open to-dos and the
+// recordings themselves. The summary is written by Gemma and cached by the core.
+import SwiftUI
+
+struct TopicDetailView: View {
+    let route: TopicRoute
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(Router.self) private var router
+    @Environment(AppSettings.self) private var settings
+
+    @State private var models = ModelManager.shared
+    @State private var name: String
+    @State private var topic: Topic?
+    @State private var notes: [TopicNote] = []
+    @State private var tasks: [TaskItem] = []
+    @State private var summary: TopicSummary?
+    @State private var loadingSummary = false
+    @State private var summaryError: String?
+    @State private var revealed: Set<Int> = []
+    @State private var request: TopicEditRequest?
+
+    init(route: TopicRoute) {
+        self.route = route
+        _name = State(initialValue: route.name)
+    }
+
+    private var canSummarise: Bool { models.selected.hearsAudio && models.selectedInstalled }
+
+    var body: some View {
+        List {
+            summarySection
+            if let s = summary, !s.keyTerms.isEmpty { keyTermsSection(s.keyTerms) }
+            if let s = summary, !s.quiz.isEmpty { quizSection(s.quiz) }
+            if !tasks.isEmpty { tasksSection }
+            recordingsSection
+        }
+        .navigationTitle(Text(verbatim: name))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    if let t = currentTopic {
+                        Button { request = .rename(t) } label: { Label("Rename", systemImage: "pencil") }
+                        Button { request = .merge(t) } label: { Label("Merge into…", systemImage: "arrow.triangle.merge") }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle").frame(minWidth: 44, minHeight: 44)
+                }
+                .accessibilityLabel(Text("More options"))
+            }
+        }
+        .topicEditing(request: $request, gateKey: "deepdive.topic.\(route.id)") { removed in
+            if removed?.id == route.id { dismiss() } else { Task { await reload() } }
+        }
+        .task { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await reload() } }
+        .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await reload() } }
+        .onChange(of: scenePhase) { _, p in if p == .active { Task { await reload() } } }
+    }
+
+    /// The topic as the list last saw it, or a stand-in built from the route.
+    private var currentTopic: Topic? { topic }
+
+    // MARK: sections
+
+    @ViewBuilder
+    private var summarySection: some View {
+        Section {
+            if !canSummarise {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Needs Gemma 4", systemImage: "sparkles").font(.headline)
+                    Text("Summaries, key terms and quizzes need the Gemma 4 model. Your recordings below still work.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    Button("Open Settings") { router.showSettings = true }
+                        .buttonStyle(.bordered).frame(minHeight: 44)
+                }
+                .padding(.vertical, 4)
+            } else if let s = summary {
+                VStack(alignment: .leading, spacing: 10) {
+                    if s.summary.isEmpty {
+                        Text("No summary yet.").foregroundStyle(.secondary)
+                    } else {
+                        Text(verbatim: s.summary).font(.body)
+                    }
+                    ForEach(s.sources) { src in
+                        NavigationLink(value: src.noteID) {
+                            Text(verbatim: "▶ \(src.title.isEmpty ? String(localized: "Recording") : src.title) @\(AssistantFormat.mmss(src.startSec))")
+                                .font(.subheadline).foregroundStyle(Color.accentColor)
+                                .frame(minHeight: 44, alignment: .leading)
+                        }
+                        .accessibilityLabel(Text("Open the recording: \(src.title)"))
+                    }
+                }
+                .padding(.vertical, 4)
+            } else if let err = summaryError {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Could not make the summary.", systemImage: "exclamationmark.triangle.fill").font(.headline)
+                    Text(verbatim: err).font(.footnote).foregroundStyle(.secondary)
+                    Button("Try again") { Task { await loadSummary() } }
+                        .buttonStyle(.borderedProminent).frame(minHeight: 44)
+                }
+                .padding(.vertical, 4)
+            } else {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("Reading your recordings…").foregroundStyle(.secondary)
+                }
+                .frame(minHeight: 44)
+            }
+        } header: {
+            Text("Summary")
+        }
+    }
+
+    private func keyTermsSection(_ terms: [KeyTerm]) -> some View {
+        Section("Key terms") {
+            ForEach(terms, id: \.self) { t in
+                (Text(verbatim: t.term).bold() + Text(verbatim: " — \(t.meaning)"))
+                    .font(.body).padding(.vertical, 2)
+            }
+        }
+    }
+
+    private func quizSection(_ quiz: [QuizItem]) -> some View {
+        Section {
+            ForEach(Array(quiz.enumerated()), id: \.offset) { i, item in
+                let open = revealed.contains(i)
+                Button {
+                    if open { revealed.remove(i) } else { revealed.insert(i) }
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top) {
+                            Text(verbatim: item.q).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 8)
+                            Image(systemName: open ? "chevron.up" : "chevron.down")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                        if open {
+                            Text(verbatim: item.a).font(.body).foregroundStyle(.secondary)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+                    .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text(open ? "Hides the answer" : "Shows the answer"))
+            }
+        } header: {
+            Text("Quiz")
+        } footer: {
+            Text("Tap a question to see the answer.")
+        }
+    }
+
+    private var tasksSection: some View {
+        Section("Open to-dos") {
+            ForEach(tasks) { t in
+                let row = VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: t.text).font(.body)
+                    if let due = t.dueDate, !due.isEmpty {
+                        Text("Due: \(AssistantFormat.day(due))").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(minHeight: 44, alignment: .leading)
+                if let id = t.noteID, !t.fromDeleted {
+                    NavigationLink(value: id) { row }
+                } else {
+                    row
+                }
+            }
+        }
+    }
+
+    private var recordingsSection: some View {
+        Section("Recordings") {
+            ForEach(notes) { n in
+                NavigationLink(value: n.id) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(verbatim: n.title).font(.headline).lineLimit(2)
+                        if let s = n.shortSummary, !s.isEmpty {
+                            Text(verbatim: s).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                        if let c = n.createdAt {
+                            Text(Date(timeIntervalSince1970: TimeInterval(c)), style: .date)
+                                .font(.caption).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .frame(minHeight: 44, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    // MARK: loading
+
+    private func reload() async {
+        let e = CoreEngine.shared
+        let all = await e.topics(kind: route.kind)
+        guard let t = all.first(where: { $0.id == route.id }) else { dismiss(); return }   // merged away
+        topic = t
+        name = t.name
+        notes = await e.topicNotes(route.id)
+        let ids = Set(notes.map(\.id))
+        tasks = await e.tasks(openOnly: true).filter { $0.noteID.map(ids.contains) ?? false }
+        await loadSummary()
+    }
+
+    /// The core caches the summary, so this is quick unless a recording joined the topic since.
+    /// An old summary stays on screen while a new one is made.
+    private func loadSummary() async {
+        guard canSummarise, !loadingSummary else { return }
+        loadingSummary = true
+        defer { loadingSummary = false }
+        summaryError = nil
+        do {
+            let s = try await CoreEngine.shared.topicSummary(route.id, lang: settings.notesLanguage)
+            if Task.isCancelled { return }
+            if s != summary { revealed = [] }
+            summary = s
+        } catch {
+            if Task.isCancelled { return }
+            if summary == nil { summaryError = error.localizedDescription }
+        }
+    }
+}

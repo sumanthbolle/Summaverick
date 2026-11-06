@@ -228,13 +228,15 @@ struct TopicSummary: Codable, Equatable {
     var keyTerms: [KeyTerm]
     var quiz: [QuizItem]
     var lang: String?
+    /// Where the core's verbatim medicine quotes (appended to `summary`) came from; empty otherwise.
+    var sources: [Source]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         summary = c.lenient(.summary) ?? ""; keyTerms = c.lenient(.keyTerms) ?? []
-        quiz = c.lenient(.quiz) ?? []; lang = c.lenient(.lang)
+        quiz = c.lenient(.quiz) ?? []; lang = c.lenient(.lang); sources = c.lenient(.sources) ?? []
     }
-    enum CodingKeys: String, CodingKey { case summary, quiz, lang, keyTerms = "key_terms" }
+    enum CodingKeys: String, CodingKey { case summary, quiz, lang, sources, keyTerms = "key_terms" }
 }
 
 // MARK: - memory, insight
