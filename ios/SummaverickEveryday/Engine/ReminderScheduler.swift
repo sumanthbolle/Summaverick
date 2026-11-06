@@ -29,6 +29,13 @@ struct PlannedRequest: Equatable {
     }
 }
 
+/// Schedules local notifications for active reminders.
+///
+/// Open-ended reminders (no until_date, already started) use one repeating trigger per time.
+/// Bounded ones (a future start_date or any until_date) get one-shot requests over a short horizon:
+/// 7 days of daily times, or the next 4 weekly occurrences. Each resync (launch, `.assistantChanged`,
+/// app becomes active) tops these up. LIMIT: a bounded course stops alerting if the app is not
+/// opened for 7 days (daily) or about 4 weeks (weekly).
 @MainActor
 @Observable
 final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
@@ -56,12 +63,17 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
         defer { syncing = false }
         repeat {
             dirty = false
-            let reminders = await CoreEngine.shared.reminders(activeOnly: true)
+            let reminders: [Reminder]
+            do {
+                reminders = try await CoreEngine.shared.remindersStrict(activeOnly: true)
+            } catch {
+                // Never wipe a working schedule because the read failed.
+                NSLog("ReminderScheduler: reminder read failed, schedule left untouched: %@", "\(error)")
+                continue
+            }
             let planned = Self.plan(reminders, now: Date(), calendar: .current)
             let center = UNUserNotificationCenter.current()
-            let pending = await center.pendingNotificationRequests()
-            let old = pending.map(\.identifier).filter { $0.hasPrefix(Self.prefix) }
-            center.removePendingNotificationRequests(withIdentifiers: old)
+            // Add or replace first (same identifier replaces), so there is never a gap.
             for p in planned {
                 let content = UNMutableNotificationContent()
                 content.title = "Summaverick"
@@ -75,14 +87,23 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
                     NSLog("ReminderScheduler: could not add %@: %@", p.identifier, "\(error)")
                 }
             }
+            let keep = Set(planned.map(\.identifier))
+            let pending = await center.pendingNotificationRequests()
+            let stale = pending.map(\.identifier).filter { $0.hasPrefix(Self.prefix) && !keep.contains($0) }
+            center.removePendingNotificationRequests(withIdentifiers: stale)
         } while dirty
     }
 
     // MARK: planning (pure)
 
+    /// Horizon for bounded schedules: this many days of daily times, or this many weekly occurrences.
+    nonisolated static let dailyHorizonDays = 7
+    nonisolated static let weeklyOccurrences = 4
+
     nonisolated static func plan(_ reminders: [Reminder], now: Date, calendar: Calendar) -> [PlannedRequest] {
         let today = calendar.startOfDay(for: now)
-        var out: [PlannedRequest] = []
+        var repeating: [PlannedRequest] = []
+        var oneShots: [PlannedRequest] = []
         var seen = Set<String>()
 
         for r in reminders where r.active {
@@ -100,51 +121,77 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
             }
             let kind = r.repeat ?? "once"
             let weekday = calendar.component(.weekday, from: start)
+            let base = max(start, today)
+            let bounded = start > today || untilEnd != nil
+
+            func make(_ id: String, _ c: DateComponents, _ repeats: Bool, _ fire: Date) -> PlannedRequest {
+                PlannedRequest(identifier: id, body: r.text, components: c, repeats: repeats, fireDate: fire,
+                               reminderID: r.id, noteID: r.noteID, startSec: r.startSec, fromDeleted: r.fromDeleted)
+            }
+            func shot(_ d: Date, _ h: Int, _ m: Int, _ hhmm: String) -> PlannedRequest? {
+                var c = calendar.dateComponents([.year, .month, .day], from: d)
+                c.hour = h; c.minute = m
+                guard let f = calendar.date(from: c), f > now else { return nil }
+                if let end = untilEnd, f >= end { return nil }
+                let ymd = String(format: "%04d%02d%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+                return make("\(prefix)\(r.id).\(ymd).\(hhmm)", c, false, f)
+            }
 
             for t in r.times {
                 guard let (h, m) = clock(t) else { NSLog("ReminderScheduler: reminder %lld bad time '%@', skipped", r.id, t); continue }
-                let id = "\(prefix)\(r.id).\(t)"
-                guard seen.insert(id).inserted else { continue }
-
+                let hhmm = String(format: "%02d:%02d", h, m)
                 var comps = DateComponents(); comps.hour = h; comps.minute = m
-                var repeats = false
-                var fire: Date?
-
-                func oneShot(_ day: Date) -> Date? {
-                    var c = calendar.dateComponents([.year, .month, .day], from: day)
-                    c.hour = h; c.minute = m
-                    guard let d = calendar.date(from: c), d > now else { return nil }
-                    comps = c
-                    return d
-                }
 
                 switch kind {
                 case "daily", "twice_daily":
-                    if start > today {
-                        fire = oneShot(start)   // cannot express "daily from a future date"; re-synced when it arrives
+                    if bounded {
+                        for k in 0..<dailyHorizonDays {
+                            guard let d = calendar.date(byAdding: .day, value: k, to: base),
+                                  let p = shot(d, h, m, hhmm), seen.insert(p.identifier).inserted else { continue }
+                            oneShots.append(p)
+                        }
                     } else {
-                        repeats = true
-                        fire = calendar.nextDate(after: now, matching: comps, matchingPolicy: .nextTime)
+                        let id = "\(prefix)\(r.id).\(hhmm)"
+                        if seen.insert(id).inserted,
+                           let f = calendar.nextDate(after: now, matching: comps, matchingPolicy: .nextTime) {
+                            repeating.append(make(id, comps, true, f))
+                        }
                     }
                 case "weekly":
-                    if start > today {
-                        fire = oneShot(start)
+                    if bounded {
+                        var found = 0, k = 0
+                        while found < weeklyOccurrences && k < 7 * (weeklyOccurrences + 2) {
+                            defer { k += 1 }
+                            guard let d = calendar.date(byAdding: .day, value: k, to: base),
+                                  calendar.component(.weekday, from: d) == weekday else { continue }
+                            if let end = untilEnd, d >= end { break }
+                            // Occurrences already past today don't count toward the horizon.
+                            guard let p = shot(d, h, m, hhmm) else { continue }
+                            found += 1
+                            if seen.insert(p.identifier).inserted { oneShots.append(p) }
+                        }
                     } else {
+                        let id = "\(prefix)\(r.id).\(hhmm)"
                         comps.weekday = weekday
-                        repeats = true
-                        fire = calendar.nextDate(after: now, matching: comps, matchingPolicy: .nextTime)
+                        if seen.insert(id).inserted,
+                           let f = calendar.nextDate(after: now, matching: comps, matchingPolicy: .nextTime) {
+                            repeating.append(make(id, comps, true, f))
+                        }
                     }
                 default: // "once" and anything unknown
-                    fire = oneShot(start)
+                    if let p = shot(base, h, m, hhmm), seen.insert(p.identifier).inserted { oneShots.append(p) }
                 }
-                guard let f = fire else { continue }
-                if let end = untilEnd, f >= end { continue }
-                out.append(PlannedRequest(identifier: id, body: r.text, components: comps, repeats: repeats, fireDate: f,
-                                          reminderID: r.id, noteID: r.noteID, startSec: r.startSec, fromDeleted: r.fromDeleted))
             }
         }
-        out.sort { $0.fireDate != $1.fireDate ? $0.fireDate < $1.fireDate : $0.identifier < $1.identifier }
-        return Array(out.prefix(maxRequests))
+        let byDate: (PlannedRequest, PlannedRequest) -> Bool = {
+            $0.fireDate != $1.fireDate ? $0.fireDate < $1.fireDate : $0.identifier < $1.identifier
+        }
+        // Repeating triggers are kept first, then the soonest one-shots.
+        let all = repeating.sorted(by: byDate) + oneShots.sorted(by: byDate)
+        if all.count > maxRequests {
+            NSLog("ReminderScheduler: %d requests planned, cap dropped %d", all.count, all.count - maxRequests)
+        }
+        return Array(all.prefix(maxRequests))
     }
 
     nonisolated static func clock(_ s: String) -> (Int, Int)? {

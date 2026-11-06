@@ -74,6 +74,15 @@ extension CoreEngine {
 
     // MARK: reminders and tasks
 
+    /// Like `reminders`, but throws when the engine is unavailable, the call fails, or the JSON does not decode,
+    /// so callers can tell "no reminders" from "could not read".
+    func remindersStrict(activeOnly: Bool = false) throws -> [Reminder] {
+        guard ctx != nil else { throw AssistantError.failed("read reminders (engine not ready)") }
+        guard let json = take(sve_reminders_json(ctx, activeOnly ? 1 : 0)) else { throw AssistantError.failed("read reminders") }
+        guard let rows = decode([Reminder].self, json) else { throw AssistantError.badJSON }
+        return rows
+    }
+
     func reminders(activeOnly: Bool = false) -> [Reminder] { list(Reminder.self, sve_reminders_json(ctx, activeOnly ? 1 : 0)) }
     func setReminderActive(_ id: Int64, _ active: Bool) { _ = sve_reminder_set_active(ctx, id, active ? 1 : 0) }
     func tasks(openOnly: Bool = false) -> [TaskItem] { list(TaskItem.self, sve_tasks_json(ctx, openOnly ? 1 : 0)) }
