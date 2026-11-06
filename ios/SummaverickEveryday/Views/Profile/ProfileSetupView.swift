@@ -12,13 +12,13 @@ struct ProfileSetupView: View {
     @State private var name = ""
     @State private var lang: String?
     @State private var routine = Routine.defaults
-    @State private var savedRoutine: Routine?
     @State private var medicines: [Medicine] = []
     @State private var editing: MedicineEditing?
     @State private var deleting: Medicine?
     @State private var toast: String?
     @State private var saving = false
     @State private var errorShown = false
+    @State private var deleteFailed = false
 
     private let stepCount = 4
 
@@ -40,7 +40,8 @@ struct ProfileSetupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Later") { dismiss() }.frame(minWidth: 44, minHeight: 44)
+                    // From the medicines step on the profile is saved, so leaving still asks for notifications.
+                    Button("Later") { step >= 3 ? finish() : dismiss() }.frame(minWidth: 44, minHeight: 44)
                 }
                 if step > 0 && step < 3 {
                     ToolbarItem(placement: .confirmationAction) {
@@ -52,12 +53,18 @@ struct ProfileSetupView: View {
                 Button("OK", role: .cancel) {}
             }
             .sheet(item: $editing) { e in
-                MedicineForm(original: e.medicine, routine: savedRoutine) { _ in
+                MedicineForm(original: e.medicine) { _ in
                     toast = ProfileActions.savedMedicineToast
                     Task { await reloadMedicines() }
                 }
             }
-            .medicineDeleteConfirmation($deleting) { Task { await reloadMedicines() } }
+            .medicineDeleteConfirmation($deleting) { ok in
+                if !ok { deleteFailed = true }
+                Task { await reloadMedicines() }
+            }
+            .alert("Could not delete this. Please try again.", isPresented: $deleteFailed) {
+                Button("OK", role: .cancel) {}
+            }
             .toast($toast)
         }
         .interactiveDismissDisabled(saving)
@@ -98,7 +105,7 @@ struct ProfileSetupView: View {
     private var languageStep: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                header("Which language do you prefer?", "Summaverick answers and writes reminders in this language.")
+                header("Which language do you prefer?", "Summaverick talks to you in this language where it can. Some messages are in English for now.")
                 VStack(spacing: 10) {
                     ForEach(ProfileLanguage.all, id: \.code) { l in
                         Button { lang = l.code } label: {
@@ -216,7 +223,6 @@ struct ProfileSetupView: View {
         Task {
             do {
                 try await CoreEngine.shared.setProfile(profile)
-                savedRoutine = profile.routine
                 await ProfileActions.changed()
                 saving = false
                 step = 3

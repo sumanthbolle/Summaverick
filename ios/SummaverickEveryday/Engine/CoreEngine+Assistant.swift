@@ -48,6 +48,10 @@ extension CoreEngine {
 
     @discardableResult func deleteMedicine(_ id: Int64) -> Bool { sve_medicine_delete(ctx, id) == 0 }
 
+    /// Routine times implied by the words of "when" (the core's one keyword table, against the saved
+    /// routine). [] when there is no keyword or no routine time for it.
+    func resolveTimes(_ when: String) -> [String] { decode([String].self, take(sve_resolve_times(ctx, when))) ?? [] }
+
     /// Deletes everything the assistant stored (profile, medicines, memory, reminders, tasks, topics,
     /// suggestions, insights, transcript pieces). Notes are deleted separately; the caller resyncs reminders.
     func wipeAssistant() throws {

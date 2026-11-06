@@ -346,7 +346,10 @@ struct SuggestionCard: View {
 
     private func yes() {
         resumeDraft = nil
-        if s.isFlagged {
+        // A reminder needs a time; the core refuses one without. Ask for it in the form instead.
+        if s.kind == .reminder && (s.payload.times ?? []).allSatisfy({ ReminderScheduler.clock($0) == nil }) {
+            showEdit = true
+        } else if s.isFlagged {
             pendingEdit = nil
             confirmFlagged = true
         } else {

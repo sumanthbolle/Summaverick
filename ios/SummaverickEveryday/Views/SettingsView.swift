@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
@@ -6,6 +7,10 @@ struct SettingsView: View {
     @State private var models = ModelManager.shared
     @State private var languages: [SpeechLanguage] = []
     @State private var confirmWipe = false
+    @State private var wipeFailed = false
+    @State private var wipeBusy = false
+    @State private var wiping = false
+    @State private var pipeline = ProcessingPipeline.shared
 
     var body: some View {
         @Bindable var settings = settings
@@ -73,7 +78,16 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Button("Delete all notes and recordings", role: .destructive) { confirmWipe = true }
+                    Button(role: .destructive) {
+                        if pipeline.isBusy { wipeBusy = true } else { confirmWipe = true }
+                    } label: {
+                        HStack {
+                            Text("Delete everything")
+                            if wiping { Spacer(); ProgressView() }
+                        }
+                        .frame(minHeight: 44)
+                    }
+                    .disabled(wiping)
                 } footer: {
                     Text("Summaverick Everyday \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · core \(String(cString: sve_version()))")
                 }
@@ -86,7 +100,14 @@ struct SettingsView: View {
             } message: {
                 Text("All notes and recordings are deleted, and so are your profile, medicines, reminders and everything Summaverick has learned. This cannot be undone.")
             }
-            .onChange(of: confirmWipe) { _, open in PresentationGate.shared.set("settingsWipe", open) }
+            .alert("Could not delete everything. Try again.", isPresented: $wipeFailed) {
+                Button("Retry", role: .destructive) { wipe() }
+                Button("Cancel", role: .cancel) {}
+            }
+            .alert("Summaverick is still working on a recording. Try again when it has finished.", isPresented: $wipeBusy) {
+                Button("OK", role: .cancel) {}
+            }
+            .onChange(of: confirmWipe || wipeFailed || wipeBusy) { _, open in PresentationGate.shared.set("settingsWipe", open) }
         }
     }
 
@@ -96,17 +117,28 @@ struct SettingsView: View {
 
     /// Deletes the notes and their audio, then everything the assistant stored (profile, medicines,
     /// memory, reminders, tasks, topics, insights), then removes every scheduled reminder.
+    /// Any failure (a note left, or the core refusing) shows "Could not delete everything" with Retry.
     private func wipe() {
+        guard !wiping else { return }
+        guard !pipeline.isBusy else { wipeBusy = true; return }
+        wiping = true
         Task {
             let engine = CoreEngine.shared
             for n in await engine.notes(limit: 10_000) {
                 if let full = await engine.note(n.id), let p = full.audio_path { try? FileManager.default.removeItem(atPath: p) }
                 await engine.deleteNote(n.id)
             }
-            do { try await engine.wipeAssistant() } catch { NSLog("Settings: assistant wipe failed: %@", "\(error)") }
+            var ok = await engine.notes(limit: 1).isEmpty
+            do { try await engine.wipeAssistant() } catch {
+                NSLog("Settings: assistant wipe failed: %@", "\(error)")
+                ok = false
+            }
             await ReminderScheduler.shared.resync()   // no active reminders left: removes every scheduled one
+            UNUserNotificationCenter.current().removeAllDeliveredNotifications()
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
+            wiping = false
+            if !ok { wipeFailed = true }
         }
     }
 }

@@ -74,30 +74,6 @@ extension Routine {
     }
 }
 
-/// Times for a medicine from the words of "when", using the person's routine. Only a keyword gives a time;
-/// with no keyword (or no routine time for it) nothing is returned. Never invents a time.
-enum MedicineTimes {
-    static func prefill(when text: String, routine: Routine?) -> [String] {
-        guard let routine else { return [] }
-        let w = text.lowercased()
-        func has(_ words: String...) -> Bool { words.contains { w.contains($0) } }
-        var slots: [RoutineSlot] = []
-        let breakfast = has("breakfast"), lunch = has("lunch", "మధ్యాహ్నం"), dinner = has("dinner")
-        let bed = has("bed", "నిద్ర")
-        if breakfast { slots.append(.breakfast) }
-        else if has("morning", "ఉదయం") { slots.append(.wake) }       // general morning, no meal named
-        if lunch { slots.append(.lunch) }
-        if dinner { slots.append(.dinner) }
-        else if !bed && has("night", "రాత్రి") { slots.append(.dinner) }
-        if bed { slots.append(.bed) }
-        var out: [String] = []
-        for s in slots {
-            if let t = routine[s], ReminderScheduler.clock(t) != nil, !out.contains(t) { out.append(t) }
-        }
-        return out.sorted()
-    }
-}
-
 /// One routine time: a time picker when set, or a "Set time" button when not. Never invents a value
 /// unless the person taps (it then starts at the slot's default).
 struct RoutineRow: View {
@@ -190,7 +166,6 @@ enum ProfileActions {
 /// Add or edit one medicine: name (required), dose, when, times, repeat (must be picked), until date.
 struct MedicineForm: View {
     let original: Medicine?
-    let routine: Routine?
     /// Called after a successful save, with the medicine id.
     let onSaved: (Int64) -> Void
 
@@ -310,11 +285,16 @@ struct MedicineForm: View {
         untilDate = (m.untilDate?.isEmpty ?? true) ? nil : m.untilDate
     }
 
+    /// Times from the saved routine for the words of "when" (the core's keyword table). Never invents
+    /// a time: no keyword, no time. Stops once the person has touched the times.
     private func refill(_ text: String) {
         guard started, !timesTouched else { return }
-        let t = MedicineTimes.prefill(when: text, routine: routine)
-        times = t
-        fromRoutine = Set(t)
+        Task {
+            let t = await CoreEngine.shared.resolveTimes(text)
+            guard text == when, !timesTouched else { return }   // a newer edit wins
+            times = t
+            fromRoutine = Set(t)
+        }
     }
 
     private func timeBinding(_ i: Int) -> Binding<Date> {
@@ -423,7 +403,8 @@ struct MedicineEditing: Identifiable {
 
 extension View {
     /// The confirmation shown before a medicine is deleted, and the delete itself.
-    func medicineDeleteConfirmation(_ target: Binding<Medicine?>, onDeleted: @escaping () -> Void) -> some View {
+    /// onDeleted(false): the delete failed; the caller shows an error.
+    func medicineDeleteConfirmation(_ target: Binding<Medicine?>, onDeleted: @escaping (Bool) -> Void) -> some View {
         confirmationDialog(
             Text("Delete \(target.wrappedValue?.name ?? "")?"),
             isPresented: Binding(get: { target.wrappedValue != nil }, set: { if !$0 { target.wrappedValue = nil } }),
@@ -432,9 +413,9 @@ extension View {
         ) { m in
             Button("Delete medicine", role: .destructive) {
                 Task {
-                    await CoreEngine.shared.deleteMedicine(m.id)
+                    let ok = await CoreEngine.shared.deleteMedicine(m.id)
                     await ProfileActions.changed()
-                    onDeleted()
+                    onDeleted(ok)
                 }
             }
             Button("Cancel", role: .cancel) {}

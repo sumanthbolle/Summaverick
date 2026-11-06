@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var toast: String?
     @State private var saving = false
     @State private var errorShown = false
+    @State private var deleteFailed = false
     @State private var ready = false
 
     var body: some View {
@@ -33,7 +34,7 @@ struct ProfileView: View {
                 } label: { Text("Preferred language") }
                 .frame(minHeight: 44)
             } footer: {
-                Text("Summaverick answers and writes reminders in this language.")
+                Text("Summaverick talks to you in this language where it can. Some messages are in English for now.")
             }
 
             Section {
@@ -58,9 +59,8 @@ struct ProfileView: View {
                 if medicines.isEmpty {
                     Text("No medicines yet.").foregroundStyle(.secondary).frame(minHeight: 44)
                 }
-                MedicinesList(medicines: medicines, onEdit: { editing = MedicineEditing(medicine: $0) },
-                              onDelete: { deleting = $0 })
-                Button { editing = MedicineEditing(medicine: nil) } label: {
+                MedicinesList(medicines: medicines, onEdit: { openForm($0) }, onDelete: { deleting = $0 })
+                Button { openForm(nil) } label: {
                     Label("Add a medicine", systemImage: "plus.circle.fill").frame(minHeight: 44)
                 }
             } header: { Text("Medicines") } footer: {
@@ -70,21 +70,24 @@ struct ProfileView: View {
         .navigationTitle(Text("Profile"))
         .task { await load() }
         .sheet(item: $editing) { e in
-            MedicineForm(original: e.medicine, routine: currentRoutine) { _ in
+            MedicineForm(original: e.medicine) { _ in
                 toast = ProfileActions.savedMedicineToast
                 Task { await reloadMedicines() }
             }
         }
-        .medicineDeleteConfirmation($deleting) { Task { await reloadMedicines() } }
+        .medicineDeleteConfirmation($deleting) { ok in
+            if !ok { deleteFailed = true }
+            Task { await reloadMedicines() }
+        }
+        .alert("Could not delete this. Please try again.", isPresented: $deleteFailed) {
+            Button("OK", role: .cancel) {}
+        }
         .alert("Could not save this. Please try again.", isPresented: $errorShown) {
             Button("OK", role: .cancel) {}
         }
-        .onChange(of: errorShown) { _, open in PresentationGate.shared.set("profileError", open) }
+        .onChange(of: errorShown || deleteFailed) { _, open in PresentationGate.shared.set("profileError", open) }
         .toast($toast)
     }
-
-    /// The routine the person sees now (saved or not), for timing a new medicine.
-    private var currentRoutine: Routine? { cleaned(routine) }
 
     private var edited: Profile {
         var p = loaded ?? Profile()
@@ -120,18 +123,32 @@ struct ProfileView: View {
 
     private func save() {
         guard !saving else { return }
+        Task { _ = await saveProfile() }
+    }
+
+    @discardableResult
+    private func saveProfile() async -> Bool {
         saving = true
+        defer { saving = false }
         let p = edited
+        do {
+            try await CoreEngine.shared.setProfile(p)
+            loaded = p
+            await ProfileActions.changed()
+            toast = String(localized: "Profile saved.")
+            return true
+        } catch {
+            errorShown = true
+            return false
+        }
+    }
+
+    /// The form times medicines from the saved routine, so unsaved profile edits are saved first.
+    private func openForm(_ m: Medicine?) {
+        guard !saving else { return }
         Task {
-            do {
-                try await CoreEngine.shared.setProfile(p)
-                loaded = p
-                await ProfileActions.changed()
-                toast = String(localized: "Profile saved.")
-            } catch {
-                errorShown = true
-            }
-            saving = false
+            if changed, !(await saveProfile()) { return }
+            editing = MedicineEditing(medicine: m)
         }
     }
 }

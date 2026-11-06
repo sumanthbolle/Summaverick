@@ -24,6 +24,7 @@ struct LearnedView: View {
     @State private var draft = ""
     @State private var deleting: MemoryItem?
     @State private var errorShown = false
+    @State private var deleteFailed = false
     @State private var loaded = false
 
     var body: some View {
@@ -58,7 +59,10 @@ struct LearnedView: View {
         .alert("Could not save this. Please try again.", isPresented: $errorShown) {
             Button("OK", role: .cancel) {}
         }
-        .onChange(of: deleting != nil || errorShown) { _, open in PresentationGate.shared.set("learned", open) }
+        .alert("Could not delete this. Please try again.", isPresented: $deleteFailed) {
+            Button("OK", role: .cancel) {}
+        }
+        .onChange(of: deleting != nil || errorShown || deleteFailed) { _, open in PresentationGate.shared.set("learned", open) }
     }
 
     @ViewBuilder
@@ -126,7 +130,7 @@ struct LearnedView: View {
 
     private func delete(_ item: MemoryItem) {
         Task {
-            await CoreEngine.shared.deleteMemory(item.id)
+            guard await CoreEngine.shared.deleteMemory(item.id) else { deleteFailed = true; return }
             if editingID == item.id { editingID = nil }
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
             await reload()

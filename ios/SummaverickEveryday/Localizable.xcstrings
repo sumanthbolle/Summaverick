@@ -2904,16 +2904,6 @@
         }
       }
     },
-    "Delete all notes and recordings": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "అన్ని నోట్స్, రికార్డింగ్‌లు తొలగించండి"
-          }
-        }
-      }
-    },
     "Delete everything on this phone?": {
       "localizations": {
         "te": {
@@ -3313,16 +3303,6 @@
       },
       "comment": "Setup progress, e.g. Step 1 of 4"
     },
-    "Summaverick answers and writes reminders in this language.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Summaverick ఈ భాషలోనే జవాబులు, రిమైండర్లు రాస్తుంది."
-          }
-        }
-      }
-    },
     "Summaverick uses these to understand you. Edit or delete anything.": {
       "localizations": {
         "te": {
@@ -3454,6 +3434,66 @@
         }
       },
       "comment": "%@ is a date"
+    },
+    "Could not delete everything. Try again.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్నీ తొలగించలేకపోయాం. మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Could not delete this. Please try again.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీన్ని తొలగించలేకపోయాం. దయచేసి మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Delete everything": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్నీ తొలగించండి"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మళ్ళీ ప్రయత్నించండి"
+          }
+        }
+      }
+    },
+    "Summaverick is still working on a recording. Try again when it has finished.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick ఇంకా ఒక రికార్డింగ్ మీద పని చేస్తోంది. అది పూర్తయ్యాక మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Summaverick talks to you in this language where it can. Some messages are in English for now.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వీలైనచోట Summaverick మీతో ఈ భాషలోనే మాట్లాడుతుంది. ప్రస్తుతానికి కొన్ని సందేశాలు ఇంగ్లీష్‌లో ఉంటాయి."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
