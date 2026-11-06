@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <set>
 
 namespace sve {
 namespace {
@@ -140,11 +141,31 @@ bool name_ok(const std::string &value, const std::string &quote) {
     return name_window_match(q, nf);
 }
 
-bool field_ok(const std::string &value, const std::vector<std::string> &q) {
+std::string unit_key(const std::string &t) {
+    static const char *kPlural[] = {"tablets", "drops", "capsules", "caps", "tabs"};
+    for (auto *p : kPlural)
+        if (t == p) return t.substr(0, t.size() - 1);
+    return t;
+}
+
+bool is_number(const std::string &t) { return !t.empty() && t[0] >= '0' && t[0] <= '9'; }
+
+// True when the quote has more than one distinct number directly before the dose's unit.
+bool ambiguous_dose(const std::vector<std::string> &v, const std::vector<std::string> &q) {
+    if (v.empty() || is_number(v.back())) return false;
+    std::string unit = unit_key(v.back());
+    std::set<std::string> nums;
+    for (size_t i = 1; i < q.size(); ++i)
+        if (is_number(q[i - 1]) && unit_key(q[i]) == unit) nums.insert(q[i - 1]);
+    return nums.size() > 1;
+}
+
+bool field_ok(const std::string &value, const std::vector<std::string> &q, bool is_dose) {
     if (blank(value)) return true;
     std::vector<std::string> v = tokens(value);
     if (v.empty()) return false;  // non-empty but nothing verifiable
-    return contains_run(q, v);
+    if (!contains_run(q, v)) return false;
+    return !(is_dose && ambiguous_dose(v, q));
 }
 
 }  // namespace
@@ -164,7 +185,7 @@ MedCheck check_medicine(const MedFields &f, const std::string &quote) {
     bool name_bad = false, dose_bad = false;
     for (auto &e : fs) {
         bool is_name = std::strcmp(e.n, "name") == 0;
-        if (is_name ? (blank(*e.v) || name_ok(*e.v, quote)) : field_ok(*e.v, q)) continue;
+        if (is_name ? (blank(*e.v) || name_ok(*e.v, quote)) : field_ok(*e.v, q, !std::strcmp(e.n, "dose"))) continue;
         r.fields.push_back(e.n);
         if (!std::strcmp(e.n, "name")) name_bad = true;
         if (!std::strcmp(e.n, "dose")) dose_bad = true;

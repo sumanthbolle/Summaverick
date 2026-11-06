@@ -145,3 +145,14 @@ TEST(name_window_and_unsplit_tokens) {
     MedFields g{"Tab Amlodipine", "", "", "", ""};
     CHECK_EQ(check_medicine(g, "Amlodipine 5 mg").status, std::string("ok"));
 }
+
+TEST(ambiguous_dose_units) {
+    dose_check("10 mg", "5 mg - 10 mg");
+    dose_check("5 mg", "5 mg - 10 mg");
+    dose_check("650 mg", "500 mg or 650 mg");
+    dose_check("1 tablet", "1 tablet now and 2 tablets at night");
+    MedFields f{"", "5 mg", "", "", ""};
+    CHECK(!has(check_medicine(f, "Amlodipine 5 mg once a day, review in 5 days"), "dose"));
+    MedFields g{"", "2 tablets", "", "", ""};
+    CHECK(!has(check_medicine(g, "2 tablets twice a day for 5 days"), "dose"));
+}
