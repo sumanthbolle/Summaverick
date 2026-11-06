@@ -31,11 +31,29 @@ final class ProcessingPipeline {
             case .failed(let e): return String(localized: "Failed: \(e)")
             }
         }
+        /// True while the model is working (not idle, done or failed).
+        var isWorking: Bool {
+            switch self { case .idle, .done, .failed: return false; default: return true }
+        }
     }
 
     private(set) var stage: Stage = .idle {
-        didSet { if case .failed(let msg) = stage, let id = activeNoteID { lastFailure[id] = msg } }
+        didSet {
+            guard case .failed(let msg) = stage, let id = activeNoteID else { return }
+            if wentToBackground {
+                // iOS stops the AI model (it runs on the GPU) once the app is in the background, so a
+                // failure after the phone locked is an interruption, not a real error. Resume it later.
+                interrupted.insert(id)
+                lastFailure[id] = String(localized: "Paused when the phone locked. It will continue when you open Summaverick.")
+            } else {
+                lastFailure[id] = msg
+            }
+        }
     }
+    /// Notes whose processing was cut off by the app going to the background; resumed on return.
+    private(set) var interrupted: Set<Int64> = []
+    private var wentToBackground = false
+    @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
     private(set) var activeNoteID: Int64?
     /// Last failure message per note, so the note screen can show why nothing was generated.
     private(set) var lastFailure: [Int64: String] = [:]
@@ -251,12 +269,31 @@ final class ProcessingPipeline {
     }
 
     private func beginBackground() {
+        wentToBackground = false
+        // Keep the screen on while the model works: a locked phone stops GPU work and the run fails.
+        UIApplication.shared.isIdleTimerDisabled = true
+        if backgroundObserver == nil {
+            backgroundObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if self?.isBusy == true { self?.wentToBackground = true } }
+            }
+        }
         bgTask = UIApplication.shared.beginBackgroundTask(withName: "sve.process") { [weak self] in
             self?.endBackground()
         }
     }
     private func endBackground() {
+        UIApplication.shared.isIdleTimerDisabled = false
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
+    }
+
+    /// Re-runs notes that were cut off while the app was in the background, one at a time.
+    /// Called when the app becomes active again.
+    func resumeInterrupted() async {
+        while !isBusy, let id = interrupted.sorted().first {
+            interrupted.remove(id)
+            await regenerate(noteID: id)
+        }
     }
 
     private static let titleFormatter: DateFormatter = {

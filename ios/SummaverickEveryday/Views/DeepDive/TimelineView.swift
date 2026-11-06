@@ -79,7 +79,13 @@ struct StatusBanner: View {
         HStack(spacing: 10) {
             if case .failed = stage { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
             else { ProgressView().controlSize(.small) }
-            Text(stage.label).font(.footnote).lineLimit(2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(stage.label).font(.footnote).lineLimit(2)
+                if stage.isWorking {
+                    Text("Keep Summaverick open until your notes are written.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Spacer()
         }
         .padding(.horizontal).padding(.vertical, 8)

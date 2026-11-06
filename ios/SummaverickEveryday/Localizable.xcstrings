@@ -4328,6 +4328,38 @@
           }
         }
       }
+    },
+    "Keep Summaverick open until your notes are written.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Summaverick open until your notes are written."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ తయారయ్యే వరకు Summaverick ని తెరిచే ఉంచండి."
+          }
+        }
+      }
+    },
+    "Paused when the phone locked. It will continue when you open Summaverick.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused when the phone locked. It will continue when you open Summaverick."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ లాక్ అయినప్పుడు ఆగిపోయింది. Summaverick ని తెరిచినప్పుడు మళ్లీ కొనసాగుతుంది."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -37,6 +37,7 @@ struct SummaverickEverydayApp: App {
                 case .active:
                     lock.unlockIfNeeded()
                     Task { await ReminderScheduler.shared.resync() }
+                    Task { await ProcessingPipeline.shared.resumeInterrupted() }
                 default: break
                 }
             }
