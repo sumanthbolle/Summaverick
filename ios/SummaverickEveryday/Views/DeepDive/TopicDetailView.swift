@@ -85,10 +85,13 @@ struct TopicDetailView: View {
                         .frame(minHeight: 44)
                     } else if summaryBusy {
                         busyView
-                    } else if summaryError != nil {
+                    } else if let err = summaryError {
                         VStack(alignment: .leading, spacing: 6) {
                             Label("Could not refresh the summary.", systemImage: "exclamationmark.triangle.fill")
                                 .font(.subheadline).foregroundStyle(.orange)
+                            if err == tooWarmMessage {
+                                Text(verbatim: err).font(.footnote).foregroundStyle(.secondary)
+                            }
                             Button("Try again") { Task { await loadSummary() } }
                                 .buttonStyle(.bordered).frame(minHeight: 44)
                         }
@@ -241,6 +244,8 @@ struct TopicDetailView: View {
         tasks = await e.tasks(openOnly: true).filter { $0.noteID.map(ids.contains) ?? false }
     }
 
+    private var tooWarmMessage: String { String(localized: "The phone is too warm. Try again when it has cooled down.") }
+
     /// Only called on first open and from the Refresh / Try again buttons: making a summary occupies the
     /// core for a while, so background changes never trigger it. An old summary stays while a new one is made.
     private func loadSummary() async {
@@ -250,6 +255,8 @@ struct TopicDetailView: View {
         loadingSummary = true
         defer { loadingSummary = false }
         summaryError = nil
+        // Writing the summary is a model run: not while the phone is too hot.
+        guard !Heat.isTooHot(ProcessInfo.processInfo.thermalState) else { summaryError = tooWarmMessage; return }
         do {
             let s = try await CoreEngine.shared.topicSummary(route.id, lang: settings.notesLanguage)
             if Task.isCancelled { return }

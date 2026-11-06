@@ -62,20 +62,24 @@ final class ProcessingPipeline {
     @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
     @ObservationIgnored private var thermalObserver: NSObjectProtocol?
     @ObservationIgnored private var resuming = false
-    /// Set by the app from its scene phase: model work only starts while the app is in front.
-    @ObservationIgnored var appIsActive = false
+    /// Model work only starts while the app is in front. Read directly: a flag set from the scene
+    /// phase can be late at cold launch.
+    private var appIsActive: Bool { UIApplication.shared.applicationState == .active }
+    /// Claimed synchronously by regenerate / findReminders before their first await, so two runs
+    /// can never start at once.
+    private(set) var starting = false
     /// Notes the "AI is ready" pass already ran once, so a silent recording is not re-run every launch.
     @ObservationIgnored private var autoTried: Set<Int64> = Set((UserDefaults.standard.array(forKey: "pipeline.autoTried") as? [Int64]) ?? [])
     private(set) var activeNoteID: Int64?
     /// Last failure message per note, so the note screen can show why nothing was generated.
     private(set) var lastFailure: [Int64: String] = [:]
-    var isBusy: Bool { stage.isWorking }
+    var isBusy: Bool { starting || stage.isWorking }
 
     private var bgTask: UIBackgroundTaskIdentifier = .invalid
 
     static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
-    private static var tooHot: Bool { Heat.isTooHot(ProcessInfo.processInfo.thermalState) }
+    nonisolated private static var tooHot: Bool { Heat.isTooHot(ProcessInfo.processInfo.thermalState) }
 
     private init() {
         // Cooled down: carry on with the notes that were paused for heat.
@@ -151,8 +155,14 @@ final class ProcessingPipeline {
 
     /// Re-runs the AI stage for an existing note (resume after interruption, or after a model change).
     func regenerate(noteID: Int64) async {
-        guard !isBusy, let note = await CoreEngine.shared.note(noteID) else { return }
+        guard !isBusy else { return }
+        starting = true
+        defer { starting = false }
+        guard let note = await CoreEngine.shared.note(noteID) else { return }
         guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
+        // Already finished (for example queued twice): nothing to do, and no duplicate suggestions.
+        guard WaitingNotes.needsWork(hasTranscript: !(note.transcript ?? "").isEmpty,
+                                     outputs: OutputKind.allCases.map { note.output($0) != nil }) else { return }
         beginBackground()
         defer { endBackground() }
         activeNoteID = noteID
@@ -265,6 +275,8 @@ final class ProcessingPipeline {
     /// only, with the same busy guard as a recording.
     func findReminders(noteID: Int64) async {
         guard !isBusy else { return }
+        starting = true
+        defer { starting = false }
         guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
         beginBackground()
         defer { endBackground() }
@@ -348,7 +360,7 @@ final class ProcessingPipeline {
                                     hasAudio: AudioRecorder.existingAudioPath(note.audio_path) != nil,
                                     hasTranscript: !(note.transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
         }
-        let ids = WaitingNotes.toProcess(candidates, alreadyTried: autoTried)
+        let ids = WaitingNotes.toProcess(candidates, alreadyTried: autoTried, running: isBusy ? activeNoteID : nil)
         if !ids.isEmpty { NSLog("[sve] %ld notes waiting for the AI", ids.count) }
         interrupted.formUnion(ids)
         await resumeInterrupted()

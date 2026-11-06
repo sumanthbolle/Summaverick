@@ -102,6 +102,9 @@ final class ModelManager: NSObject {
     @ObservationIgnored private var restarting = false
     @ObservationIgnored private var failures = 0
     @ObservationIgnored private var retryTask: Task<Void, Never>?
+    /// Tasks started from scratch (no resume data): replaced if resume data for that file turns up late.
+    @ObservationIgnored private var freshTaskIDs: Set<Int> = []
+    @ObservationIgnored private nonisolated let throttle = ProgressThrottle()
     @ObservationIgnored private let pathMonitor = NWPathMonitor()
     /// Handed over by the app delegate when iOS wakes the app for finished background downloads.
     @ObservationIgnored var backgroundCompletionHandler: (() -> Void)?
@@ -115,7 +118,7 @@ final class ModelManager: NSObject {
     private override init() {
         allowCellular = UserDefaults.standard.bool(forKey: Keys.cellular)
         super.init()
-        isReady = spec.parts.allSatisfy { present($0) }
+        isReady = Self.deviceSupported && spec.parts.allSatisfy { present($0) }
     }
 
     // MARK: files
@@ -137,7 +140,8 @@ final class ModelManager: NSObject {
     private func present(_ part: ModelPart) -> Bool { (Self.size(Self.fileURL(part)) ?? 0) > 10_000_000 }
 
     private func refreshReady() {
-        let ready = spec.parts.allSatisfy { present($0) }
+        // A phone below the memory line never uses the model, even one left from an older version.
+        let ready = Self.deviceSupported && spec.parts.allSatisfy { present($0) }
         let became = ready && !isReady
         isReady = ready
         if became {
@@ -148,6 +152,10 @@ final class ModelManager: NSObject {
             NotificationCenter.default.post(name: .aiReady, object: nil)
         }
     }
+
+    /// Some model file is on disk (also on an unsupported phone, from an older version), so
+    /// "Remove to free space" has something to remove.
+    var hasFiles: Bool { spec.parts.contains { present($0) } }
 
     /// Loads the model into the core (no-op when it is already loaded).
     func loadIntoCore() async throws {
@@ -249,6 +257,10 @@ final class ModelManager: NSObject {
                     if t.state == .suspended { t.resume() }
                 }
                 if !self.tasks.isEmpty { self.phase = .downloading }
+                // Results for tasks that ended while the app was closed (with their resume data) are
+                // delivered separately and in no fixed order; give them a moment before starting
+                // anything new, so a download resumes instead of starting over.
+                try? await Task.sleep(for: .seconds(2))
                 self.attached = true
                 self.startIfNeeded()
             }
@@ -293,6 +305,7 @@ final class ModelManager: NSObject {
                 try? FileManager.default.removeItem(at: Self.resumeURL(part))
             } else {
                 task = s.downloadTask(with: part.url)
+                freshTaskIDs.insert(task.taskIdentifier)
             }
             task.taskDescription = part.key
             tasks[part.key] = task
@@ -362,6 +375,7 @@ final class ModelManager: NSObject {
     /// forget the task that is running now.
     private func forget(_ key: String, taskID: Int) {
         if tasks[key]?.taskIdentifier == taskID { tasks[key] = nil }
+        freshTaskIDs.remove(taskID)
     }
 
     private func finished(key: String, taskID: Int) {
@@ -379,7 +393,19 @@ final class ModelManager: NSObject {
         forget(key, taskID: taskID)
         if let part = spec.parts.first(where: { $0.key == key }) {
             if let resumeData {
-                if !current && tasks[key] != nil { return }   // a newer task already runs for this file
+                if !current, let running = tasks[key] {
+                    // Late resume data for a file that is already downloading again.
+                    guard freshTaskIDs.contains(running.taskIdentifier) else { return }   // that one resumed: keep it
+                    // It started over from 0: swap it for the resumed download.
+                    NSLog("[sve] model download %@: late resume data, resuming instead of starting over", key)
+                    tasks[key] = nil
+                    freshTaskIDs.remove(running.taskIdentifier)
+                    bytes[key] = nil
+                    running.cancel()
+                    try? resumeData.write(to: Self.resumeURL(part), options: .atomic)
+                    startIfNeeded()
+                    return
+                }
                 try? resumeData.write(to: Self.resumeURL(part), options: .atomic)
             } else if !cancelled && !systemCancelled {
                 try? FileManager.default.removeItem(at: Self.resumeURL(part))   // cannot resume: start over
@@ -387,8 +413,15 @@ final class ModelManager: NSObject {
             }
         }
         if systemCancelled {
-            NSLog("[sve] model download %@ stopped by the system; resuming", key)
-            if retryTask == nil { startIfNeeded() }
+            NSLog("[sve] model download %@ stopped by the system; resuming in 10 s", key)
+            if retryTask == nil {
+                retryTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(10))
+                    guard !Task.isCancelled, let self else { return }
+                    self.retryTask = nil
+                    self.startIfNeeded()
+                }
+            }
             return
         }
         if cancelled { return }
@@ -422,7 +455,8 @@ final class ModelManager: NSObject {
 extension ModelManager: URLSessionDownloadDelegate {
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                                 didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard let key = downloadTask.taskDescription, totalBytesExpectedToWrite > 0 else { return }
+        guard let key = downloadTask.taskDescription, totalBytesExpectedToWrite > 0,
+              throttle.allow(key, final: totalBytesWritten >= totalBytesExpectedToWrite) else { return }
         Task { @MainActor in self.progressed(key: key, done: totalBytesWritten, total: totalBytesExpectedToWrite) }
     }
 
@@ -492,6 +526,19 @@ extension ModelManager: URLSessionDownloadDelegate {
 
     nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         Task { @MainActor in self.finishBackgroundEvents() }
+    }
+}
+
+/// Lets through at most about two progress updates a second per file (plus the last one).
+final class ProgressThrottle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last: [String: TimeInterval] = [:]
+    func allow(_ key: String, final: Bool) -> Bool {
+        let now = ProcessInfo.processInfo.systemUptime
+        lock.lock(); defer { lock.unlock() }
+        guard final || now - (last[key] ?? 0) >= 0.5 else { return false }
+        last[key] = now
+        return true
     }
 }
 

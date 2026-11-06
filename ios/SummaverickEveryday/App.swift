@@ -31,10 +31,7 @@ struct SummaverickEverydayApp: App {
             }
             .task { await ReminderScheduler.shared.resync() }
             .task { await PiecesBackfill.runOnce() }   // older notes become searchable by Ask (one time)
-            .task {
-                ProcessingPipeline.shared.appIsActive = UIApplication.shared.applicationState == .active
-                await ProcessingPipeline.shared.processWaitingNotes()
-            }
+            .task { await ProcessingPipeline.shared.processWaitingNotes() }
             // The AI finished downloading: write the notes for recordings made while it downloaded.
             .onReceive(NotificationCenter.default.publisher(for: .aiReady)) { _ in
                 Task { await ProcessingPipeline.shared.processWaitingNotes() }
@@ -43,7 +40,6 @@ struct SummaverickEverydayApp: App {
                 Task { await ReminderScheduler.shared.resync() }
             }
             .onChange(of: scenePhase) { _, phase in
-                ProcessingPipeline.shared.appIsActive = phase == .active
                 switch phase {
                 case .background: lock.lockIfNeeded()
                 case .active:

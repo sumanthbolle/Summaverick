@@ -98,11 +98,17 @@ enum WaitingNotes {
         let hasTranscript: Bool
     }
 
-    /// Notes to process once the AI is ready: audio still there, no transcript yet, and not already
-    /// tried automatically (so a silent recording is not re-run at every launch). Oldest first.
-    static func toProcess(_ notes: [Candidate], alreadyTried: Set<Int64>) -> [Int64] {
-        notes.filter { $0.hasAudio && !$0.hasTranscript && !alreadyTried.contains($0.id) }
+    /// Notes to process once the AI is ready: audio still there, no transcript yet, not already
+    /// tried automatically (so a silent recording is not re-run at every launch) and not the note
+    /// being processed right now. Oldest first.
+    static func toProcess(_ notes: [Candidate], alreadyTried: Set<Int64>, running: Int64? = nil) -> [Int64] {
+        notes.filter { $0.hasAudio && !$0.hasTranscript && !alreadyTried.contains($0.id) && $0.id != running }
             .map(\.id)
             .sorted()
+    }
+
+    /// A queued note still needs the model unless it has a transcript and all three outputs.
+    static func needsWork(hasTranscript: Bool, outputs: [Bool]) -> Bool {
+        !(hasTranscript && outputs.count == 3 && outputs.allSatisfy { $0 })
     }
 }

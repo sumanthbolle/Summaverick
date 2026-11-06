@@ -97,6 +97,12 @@ struct SettingsView: View {
         Section("Summaverick's AI") {
             if status == .unsupported {
                 Text(AIStatus.unsupportedMessage).font(.footnote).foregroundStyle(.secondary)
+                if models.hasFiles {   // left from an older version; never used on this phone
+                    Button("Remove to free space", role: .destructive) {
+                        if pipeline.isBusy { wipeBusy = true } else { confirmRemoveAI = true }
+                    }
+                    .frame(minHeight: 44)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Label(status.settingsLine, systemImage: status.symbol).frame(minHeight: 44, alignment: .leading)
