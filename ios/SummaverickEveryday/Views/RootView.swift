@@ -164,6 +164,9 @@ private struct RootTabBar: View {
         }
         .padding(.top, 4)
         .padding(.bottom, 2)
+        // Keep the bar at its natural height. Without this the record slot's Color.clear stretches to
+        // the full screen and the .bar material behind it frosts every tab.
+        .fixedSize(horizontal: false, vertical: true)
         .background {
             Rectangle().fill(.bar).ignoresSafeArea(edges: .bottom)
                 .overlay(alignment: .top) { Divider() }
@@ -190,7 +193,7 @@ private struct RootTabBar: View {
     /// raised part still takes taps.
     private var recordButton: some View {
         Color.clear
-            .frame(maxWidth: .infinity, minHeight: 49)
+            .frame(maxWidth: .infinity, minHeight: 49, maxHeight: 49)
             .overlay(alignment: .bottom) {
                 Button(action: onRecord) {
                     VStack(spacing: 3) {
