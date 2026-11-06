@@ -434,6 +434,56 @@ struct Suggestion: Identifiable, Codable, Equatable {
     }
 }
 
+extension Suggestion {
+    /// A card that exists only on this screen (never in the core), e.g. the Edit form opened by
+    /// "Make reminder" on an Ask answer. id 0, no check flags.
+    init(local kind: SuggestionKind, payload: SuggestionPayload, quote: String? = nil, noteID: Int64? = nil, startSec: Int? = nil) {
+        id = 0; self.kind = kind; status = nil; self.payload = payload; self.quote = quote
+        self.noteID = noteID; self.startSec = startSec; medicineID = nil
+        checkStatus = nil; checkFields = []; createdAt = nil
+    }
+}
+
+// MARK: - the person's own rows (sve_reminder_create / sve_task_create)
+
+/// A reminder the person made themselves. nil keys are sent as JSON null (the core treats them as not set).
+struct NewReminder: Encodable, Equatable {
+    var text: String
+    var times: [String]
+    var `repeat`: String?
+    var startDate: String?
+    var untilDate: String?
+    var noteID: Int64?
+    var startSec: Int?
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(text, forKey: .text); try c.encode(times, forKey: .times)
+        try c.encode(self.repeat, forKey: .repeat); try c.encode(startDate, forKey: .startDate)
+        try c.encode(untilDate, forKey: .untilDate); try c.encode(noteID, forKey: .noteID); try c.encode(startSec, forKey: .startSec)
+    }
+    enum CodingKeys: String, CodingKey {
+        case text, times, `repeat`
+        case startDate = "start_date", untilDate = "until_date", noteID = "note_id", startSec = "start_sec"
+    }
+}
+
+/// A to-do the person made themselves.
+struct NewTask: Encodable, Equatable {
+    var text: String
+    var who: String?
+    var dueDate: String?
+    var noteID: Int64?
+    var startSec: Int?
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(text, forKey: .text); try c.encode(who, forKey: .who); try c.encode(dueDate, forKey: .dueDate)
+        try c.encode(noteID, forKey: .noteID); try c.encode(startSec, forKey: .startSec)
+    }
+    enum CodingKeys: String, CodingKey { case text, who, dueDate = "due_date", noteID = "note_id", startSec = "start_sec" }
+}
+
 /// Result of accepting a suggestion (sve_suggestion_accept).
 enum AcceptResult: Equatable {
     case created(Int64)       // > 0: id of the new row (or the deleted medicine's id for stop_medicine)

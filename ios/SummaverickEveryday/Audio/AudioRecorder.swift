@@ -32,7 +32,8 @@ final class AudioRecorder {
         }
     }
 
-    func start() {
+    /// directory: where the WAV goes (default: the recordings folder). Ask's voice questions use a temp folder.
+    func start(in directory: URL? = nil) {
         guard !isRecording else { return }
         lastError = nil
         do {
@@ -41,7 +42,7 @@ final class AudioRecorder {
             try session.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
             try session.setActive(true)
 
-            let url = AudioRecorder.recordingsDirectory
+            let url = (directory ?? AudioRecorder.recordingsDirectory)
                 .appendingPathComponent("rec-\(Int(Date().timeIntervalSince1970)).wav")
             let settings: [String: Any] = [
                 AVFormatIDKey: Int(kAudioFormatLinearPCM),

@@ -88,6 +88,25 @@ extension CoreEngine {
     func tasks(openOnly: Bool = false) -> [TaskItem] { list(TaskItem.self, sve_tasks_json(ctx, openOnly ? 1 : 0)) }
     func setTaskDone(_ id: Int64, _ done: Bool) { _ = sve_task_set_done(ctx, id, done ? 1 : 0) }
 
+    /// Creates a reminder the person made themselves (their own edit, applied directly). Returns its id.
+    /// Throws if it cannot be encoded or the core refuses it (no text, no valid time, bad date).
+    func createReminder(_ r: NewReminder) throws -> Int64 {
+        guard ctx != nil else { throw AssistantError.failed("save the reminder (engine not ready)") }
+        guard let json = encodeJSON(r) else { throw AssistantError.badJSON }
+        let id = sve_reminder_create(ctx, json)
+        guard id > 0 else { throw AssistantError.failed("save the reminder") }
+        return id
+    }
+
+    /// Creates a to-do the person made themselves. Returns its id. Throws on encode failure or refusal.
+    func createTask(_ t: NewTask) throws -> Int64 {
+        guard ctx != nil else { throw AssistantError.failed("save the to-do (engine not ready)") }
+        guard let json = encodeJSON(t) else { throw AssistantError.badJSON }
+        let id = sve_task_create(ctx, json)
+        guard id > 0 else { throw AssistantError.failed("save the to-do") }
+        return id
+    }
+
     // MARK: topics
 
     /// kind: "topic", "person", or nil for both.
