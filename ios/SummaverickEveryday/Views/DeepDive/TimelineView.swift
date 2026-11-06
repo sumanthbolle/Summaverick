@@ -44,6 +44,7 @@ struct TimelineView: View {
             }
             await reload()
             NotificationCenter.default.post(name: .notesChanged, object: nil)
+            NotificationCenter.default.post(name: .assistantChanged, object: nil)   // resync notifications now
         }
     }
 }
