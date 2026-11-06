@@ -79,6 +79,53 @@ TEST(non_ascii_only_name_not_vacuous) {
     MedFields f{"పారాసిటమాల్", "", "", "", ""};
     CHECK_EQ(check_medicine(f, "come back").status, std::string("check"));
 }
+static void dose_check(const char *dose, const char *quote) {
+    MedFields f{"", dose, "", "", ""};
+    MedCheck c = check_medicine(f, quote);
+    CHECK_EQ(c.status, std::string("check"));
+    CHECK_EQ(c.fields.size(), (size_t)1);
+    CHECK(has(c, "dose"));
+}
+TEST(fractions_ranges_leading_dot_are_check) {
+    dose_check("2 tablets", "take 1/2 tablets at night");
+    dose_check("5 mg", "take .5 mg");
+    dose_check("5 mg", "2,5 mg");
+    dose_check("10 mg", "5-10 mg daily");
+    dose_check("2 tablets", "1-2 tablets");
+}
+TEST(schedule_and_leading_dot_pass) {
+    MedFields f{"", "1-0-1", "", "", ""};
+    CHECK_EQ(check_medicine(f, "tablet 1-0-1 daily").status, std::string("ok"));
+    MedFields g{"", "0.5 mg", "", "", ""};
+    CHECK_EQ(check_medicine(g, "take .5 mg").status, std::string("ok"));
+}
+static void name_check(const char *name, const char *quote) {
+    MedFields f{name, "", "", "", ""};
+    MedCheck c = check_medicine(f, quote);
+    CHECK_EQ(c.status, std::string("check"));
+    CHECK_EQ(c.fields.size(), (size_t)1);
+    CHECK(has(c, "name"));
+}
+TEST(wrong_formulation_name_is_check) {
+    name_check("Vitamin D3", "vitamin B12 daily");
+    name_check("Telma AM", "Telma H 40 daily");
+    name_check("Metformin SR", "Metformin 500 twice");
+}
+TEST(filler_ignored_in_name) {
+    MedFields f{"Tab Amlodipine", "", "", "", ""};
+    CHECK_EQ(check_medicine(f, "Amlodipine 5 mg").status, std::string("ok"));
+    MedFields g{"Tab", "", "", "", ""};
+    CHECK_EQ(check_medicine(g, "tab 5 mg").status, std::string("ok"));  // contiguous run
+    CHECK_EQ(check_medicine(g, "5 mg").status, std::string("check"));
+}
+TEST(punctuation_only_field_fails) {
+    MedFields f{"", "-", "", "", ""};
+    CHECK(has(check_medicine(f, "take - daily"), "dose"));
+    MedFields g{"", "/", "", "", ""};
+    CHECK_EQ(check_medicine(g, "1/2").status, std::string("check"));
+    MedFields h{"", "  ", "", "", ""};
+    CHECK_EQ(check_medicine(h, "x").status, std::string("ok"));
+}
 TEST(normalize_basic) {
     CHECK_EQ(normalize_for_match("  Take,  TWO\ttablets. "), std::string("take 2 tablets"));
     CHECK_EQ(normalize_for_match(""), std::string(""));

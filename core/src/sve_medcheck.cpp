@@ -40,7 +40,7 @@ const char *map_word(const std::string &t) {
         {"\xE0\xB0\x90\xE0\xB0\xA6\xE0\xB1\x81", "5"},                              // ఐదు
     };
     for (auto &e : kMap)
-        if (e.d && t == e.w) return e.d;
+        if (t == e.w) return e.d;
     return nullptr;
 }
 
@@ -58,9 +58,16 @@ std::vector<std::string> tokens(const std::string &raw) {
     for (size_t i = 0; i < s.size(); ++i) {
         unsigned char c = (unsigned char)s[i];
         Cls k = classify(c);
-        if (k == SEP && c == '.' && curc == DIGIT && !cur.empty() && i + 1 < s.size() &&
-            classify((unsigned char)s[i + 1]) == DIGIT) {
-            cur += '.';  // decimal point between digits
+        bool next_digit = i + 1 < s.size() && classify((unsigned char)s[i + 1]) == DIGIT;
+        if (k == SEP && next_digit && curc == DIGIT && !cur.empty() &&
+            (c == '.' || c == '/' || c == '-' || c == ',')) {
+            cur += (char)c;  // decimal, fraction, range, schedule: one number token
+            continue;
+        }
+        if (k == SEP && c == '.' && next_digit) {  // leading-dot decimal: ".5" -> "0.5"
+            flush();
+            cur = "0.";
+            curc = DIGIT;
             continue;
         }
         if (k == SEP) { flush(); curc = SEP; continue; }
@@ -84,23 +91,31 @@ bool contains_run(const std::vector<std::string> &hay, const std::vector<std::st
     return false;
 }
 
-bool ascii_alpha_token(const std::string &t) {
-    for (unsigned char c : t) if (!(c >= 'a' && c <= 'z')) return false;
-    return !t.empty();
+bool is_filler(const std::string &t) {
+    static const char *kFiller[] = {"tab", "tabs", "tablet", "tablets", "cap", "caps",
+                                    "capsule", "capsules", "syp", "syrup", "inj", "injection"};
+    for (auto *f : kFiller) if (t == f) return true;
+    return false;
+}
+
+bool blank(const std::string &v) {
+    for (unsigned char c : v) if (c != ' ' && c != '\t' && c != '\n' && c != '\r') return false;
+    return true;
 }
 
 bool field_ok(const std::string &value, const std::vector<std::string> &q, bool is_name) {
+    if (blank(value)) return true;
     std::vector<std::string> v = tokens(value);
-    if (v.empty()) return true;
+    if (v.empty()) return false;  // non-empty but nothing verifiable
     if (contains_run(q, v)) return true;
     if (!is_name) return false;
     bool any = false;
     for (auto &t : v) {
-        if (t.size() < 4 || !ascii_alpha_token(t)) continue;
+        if (is_filler(t)) continue;
         any = true;
         if (!contains_run(q, {t})) return false;
     }
-    return any;  // a name with no long ASCII token cannot pass this way
+    return any;
 }
 
 }  // namespace
@@ -124,7 +139,7 @@ MedCheck check_medicine(const MedFields &f, const std::string &quote) {
         if (!std::strcmp(e.n, "name")) name_bad = true;
         if (!std::strcmp(e.n, "dose")) dose_bad = true;
     }
-    bool both = !tokens(f.name).empty() && !tokens(f.dose).empty();
+    bool both = !blank(f.name) && !blank(f.dose);
     if (both && name_bad && dose_bad) r.status = "drop";
     else r.status = r.fields.empty() ? "ok" : "check";
     return r;
