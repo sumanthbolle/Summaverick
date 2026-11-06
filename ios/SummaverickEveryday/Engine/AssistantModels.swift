@@ -457,10 +457,12 @@ struct NewReminder: Encodable, Equatable {
     var startSec: Int?
     /// The saved medicine this reminder is for, so its dose change, stop or delete reaches it.
     var medicineID: Int64?
+    /// The words it was made from (the Ask answer); the core checks medicineID against them.
+    var sourceText: String?
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(medicineID, forKey: .medicineID)
+        try c.encode(medicineID, forKey: .medicineID); try c.encode(sourceText, forKey: .sourceText)
         try c.encode(text, forKey: .text); try c.encode(times, forKey: .times)
         try c.encode(self.repeat, forKey: .repeat); try c.encode(startDate, forKey: .startDate)
         try c.encode(untilDate, forKey: .untilDate); try c.encode(noteID, forKey: .noteID); try c.encode(startSec, forKey: .startSec)
@@ -468,7 +470,7 @@ struct NewReminder: Encodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case text, times, `repeat`
         case startDate = "start_date", untilDate = "until_date", noteID = "note_id", startSec = "start_sec"
-        case medicineID = "medicine_id"
+        case medicineID = "medicine_id", sourceText = "source_text"
     }
 }
 

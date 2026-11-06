@@ -10,7 +10,8 @@ import UserNotifications
 private struct AskTurn: Identifiable {
     enum Phase {
         case waiting
-        case answered(AskAnswer)
+        /// named: saved medicine ids the core finds in a medicine answer ([] otherwise); nil = could not tell.
+        case answered(AskAnswer, named: [Int64]?)
         case failed
     }
     let id = UUID()
@@ -69,7 +70,6 @@ struct AskView: View {
     @State private var generating = false
     @State private var notice: AskNotice?
     @State private var profileLang = "en"
-    @State private var medicines: [Medicine] = []
 
     @State private var recorder = AudioRecorder()
     @State private var listening = false
@@ -238,8 +238,8 @@ struct AskView: View {
             switch turn.state {
             case .waiting:
                 TypingIndicator()
-            case .answered(let a):
-                answerView(a)
+            case .answered(let a, let named):
+                answerView(a, turn: turn.id, named: named)
             case .failed:
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Could not answer this. Please try again.", systemImage: "exclamationmark.triangle.fill")
@@ -260,7 +260,7 @@ struct AskView: View {
         isTelugu ? "మీ రికార్డింగ్‌లలో ఇది నేను వినలేదు." : "I didn't hear that in your recordings."
     }
 
-    private func answerView(_ a: AskAnswer) -> some View {
+    private func answerView(_ a: AskAnswer, turn: UUID, named: [Int64]?) -> some View {
         let shown = a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? notFoundText : a.answer
         let quoted = a.medicine && shown == a.answer
         return VStack(alignment: .leading, spacing: 10) {
@@ -293,10 +293,10 @@ struct AskView: View {
 
             if !a.notFound && !a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) { makeButtons(a) }
-                    VStack(alignment: .leading, spacing: 8) { makeButtons(a) }
+                    HStack(spacing: 10) { makeButtons(a, turn: turn, named: named) }
+                    VStack(alignment: .leading, spacing: 8) { makeButtons(a, turn: turn, named: named) }
                 }
-                if namesSeveralMedicines(a) {
+                if !canMakeReminder(a, named) {
                     Text("Make reminders from each medicine in your profile.")
                         .font(.footnote).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -323,17 +323,22 @@ struct AskView: View {
     }
 
     /// A medicine answer naming several medicines cannot become one reminder (it could not follow each
-    /// medicine's dose changes); the person makes one per medicine from the profile.
-    private func namesSeveralMedicines(_ a: AskAnswer) -> Bool { a.medicine && medicinesNamed(in: a.answer).count > 1 }
+    /// medicine's dose changes); the person makes one per medicine from the profile. Nor can one whose
+    /// medicines the core could not read.
+    private func canMakeReminder(_ a: AskAnswer, _ named: [Int64]?) -> Bool {
+        guard a.medicine else { return true }
+        guard let named else { return false }
+        return named.count <= 1
+    }
 
     @ViewBuilder
-    private func makeButtons(_ a: AskAnswer) -> some View {
-        Button { openForm(.reminder, a) } label: {
+    private func makeButtons(_ a: AskAnswer, turn: UUID, named: [Int64]?) -> some View {
+        Button { Task { await openForm(.reminder, a, turn: turn) } } label: {
             Label("Make reminder", systemImage: "bell").frame(minHeight: 44)
         }
         .buttonStyle(.bordered)
-        .disabled(namesSeveralMedicines(a))
-        Button { openForm(.task, a) } label: {
+        .disabled(!canMakeReminder(a, named))
+        Button { Task { await openForm(.task, a, turn: turn) } } label: {
             Label("Make to-do", systemImage: "checklist").frame(minHeight: 44)
         }
         .buttonStyle(.bordered)
@@ -469,7 +474,7 @@ struct AskView: View {
             do {
                 try await loadSelectedModel()
                 let a = try await CoreEngine.shared.ask(q)
-                update(id, .answered(a))
+                update(id, .answered(a, named: await namedMedicines(a)))
             } catch {
                 NSLog("[sve] ask failed: %@", String(describing: error))
                 update(id, .failed)
@@ -490,20 +495,6 @@ struct AskView: View {
 
     private func loadProfile() async {
         profileLang = await CoreEngine.shared.profile()?.lang == "te" ? "te" : "en"
-        medicines = await CoreEngine.shared.medicines()
-    }
-
-    /// Saved medicines named in a text (whole words, case-insensitive), like the core's own match.
-    private func medicinesNamed(in text: String) -> [Medicine] {
-        func tokens(_ s: String) -> [String] {
-            s.lowercased().split(whereSeparator: { !($0.isLetter || $0.isNumber || !$0.isASCII) }).map(String.init)
-        }
-        let hay = tokens(text)
-        return medicines.filter { m in
-            let n = tokens(m.name)
-            guard !n.isEmpty, n.count <= hay.count else { return false }
-            return (0...(hay.count - n.count)).contains { Array(hay[$0..<($0 + n.count)]) == n }
-        }
     }
 
     // MARK: voice question
@@ -573,11 +564,26 @@ struct AskView: View {
 
     // MARK: make reminder / to-do
 
-    private func openForm(_ kind: SuggestionKind, _ a: AskAnswer) {
-        if kind == .reminder && namesSeveralMedicines(a) { return }
-        let named = a.medicine ? medicinesNamed(in: a.answer) : []
+    /// The core's medicine match for a medicine answer ([] for others); nil when it could not be read.
+    private func namedMedicines(_ a: AskAnswer) async -> [Int64]? {
+        guard a.medicine else { return [] }
+        do { return try await CoreEngine.shared.medicinesNamed(a.answer) } catch {
+            NSLog("[sve] medicines named failed: %@", String(describing: error))
+            return nil
+        }
+    }
+
+    /// Checks the medicines again (the profile may have changed since the answer), then opens the form.
+    private func openForm(_ kind: SuggestionKind, _ a: AskAnswer, turn: UUID) async {
+        var medicineID: Int64?
+        if kind == .reminder && a.medicine {
+            let named = await namedMedicines(a)
+            update(turn, .answered(a, named: named))
+            guard canMakeReminder(a, named) else { return }
+            medicineID = named?.first
+        }
         formRequest = AnswerFormRequest(kind: kind, text: a.answer, medicine: a.medicine, source: a.sources.first,
-                                        medicineID: named.count == 1 ? named[0].id : nil)
+                                        medicineID: medicineID)
     }
 
     private func savePending() {
@@ -597,7 +603,7 @@ struct AskView: View {
                 _ = try await CoreEngine.shared.createReminder(
                     NewReminder(text: words, times: d.times, repeat: opt(d.repeatRule), startDate: nil,
                                 untilDate: d.untilDate, noteID: r.source?.noteID, startSec: r.source?.startSec,
-                                medicineID: r.medicineID))
+                                medicineID: r.medicineID, sourceText: r.text))
             } else {
                 _ = try await CoreEngine.shared.createTask(
                     NewTask(text: words, who: opt(d.who), dueDate: d.dueDate, noteID: r.source?.noteID, startSec: r.source?.startSec))

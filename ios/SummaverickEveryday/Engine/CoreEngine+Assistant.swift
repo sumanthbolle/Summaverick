@@ -98,6 +98,15 @@ extension CoreEngine {
         return id
     }
 
+    /// Ids of the saved medicines named in a text, by the core's own matcher (the one sve_reminder_create
+    /// checks against). Throws when the core cannot answer.
+    func medicinesNamed(_ text: String) throws -> [Int64] {
+        guard ctx != nil else { throw AssistantError.failed("read medicines (engine not ready)") }
+        guard let json = take(sve_medicines_named(ctx, text)) else { throw AssistantError.failed("read medicines") }
+        guard let ids = decode([Int64].self, json) else { throw AssistantError.badJSON }
+        return ids
+    }
+
     /// Creates a to-do the person made themselves. Returns its id. Throws on encode failure or refusal.
     func createTask(_ t: NewTask) throws -> Int64 {
         guard ctx != nil else { throw AssistantError.failed("save the to-do (engine not ready)") }
