@@ -179,6 +179,10 @@ extension CoreEngine {
         return Int(n)
     }
 
+    /// Whether extraction has run on this note (core flag "extracted.<id>", or the note already has
+    /// suggestions or topics). An error counts as yes, so the button is never offered on a guess.
+    func noteExtracted(_ noteID: Int64) -> Bool { sve_note_extracted(ctx, noteID) != 0 }
+
     func latestInsight() -> Insight? { decode(Insight.self, take(sve_insight_latest(ctx))) }
     /// At most one per calendar day; nil when there is nothing new.
     func generateInsight(noteID: Int64) -> Insight? { decode(Insight.self, take(sve_insight_generate(ctx, noteID))) }

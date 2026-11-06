@@ -174,7 +174,8 @@ final class ProcessingPipeline {
         let assistant = mm.selected.hearsAudio
         if assistant {
             if await engine.pieces(id).isEmpty {   // note from before pieces existed
-                await engine.setPieces(id, [TranscriptPiece(startSec: 0, text: transcript)])
+                let dur = await engine.note(id)?.duration_seconds ?? 0
+                await engine.setPieces(id, PiecesBackfill.pieces(transcript: transcript, durationSeconds: dur))
             }
             stage = .extracting
             do {
@@ -211,6 +212,44 @@ final class ProcessingPipeline {
         stage = .done
     }
 
+    /// "Find reminders and tasks" on a note that was never extracted (an older recording): extraction
+    /// only, with the same busy guard as a recording. Needs an audio-capable model (Gemma 4).
+    func findReminders(noteID: Int64) async {
+        guard !isBusy else { return }
+        let mm = ModelManager.shared
+        guard mm.selected.hearsAudio else { return }
+        beginBackground()
+        defer { endBackground() }
+        activeNoteID = noteID
+        lastFailure[noteID] = nil
+        guard mm.selectedInstalled else {
+            stage = .failed(String(localized: "Download the AI model in Settings first.")); return
+        }
+        let engine = CoreEngine.shared
+        guard let note = await engine.note(noteID), let t = note.transcript,
+              !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            stage = .failed(String(localized: "No speech was detected in the recording.")); return
+        }
+        do {
+            try await loadSelectedModel()
+        } catch {
+            stage = .failed(error.localizedDescription); return
+        }
+        if await engine.pieces(noteID).isEmpty {
+            await engine.setPieces(noteID, PiecesBackfill.pieces(transcript: t, durationSeconds: note.duration_seconds))
+        }
+        stage = .extracting
+        do {
+            let n = try await engine.extract(noteID: noteID)
+            NSLog("[sve] extract added %d suggestions", n)
+            stage = .done
+        } catch {
+            NSLog("[sve] extract failed: %@", String(describing: error))
+            stage = .failed(error.localizedDescription)
+        }
+        NotificationCenter.default.post(name: .assistantChanged, object: nil)
+    }
+
     private func beginBackground() {
         bgTask = UIApplication.shared.beginBackgroundTask(withName: "sve.process") { [weak self] in
             self?.endBackground()
@@ -229,4 +268,89 @@ final class ProcessingPipeline {
 
 extension Notification.Name {
     static let notesChanged = Notification.Name("sve.notesChanged")
+}
+
+/// Transcript pieces for notes recorded before pieces existed, so Ask and Deep dive can search them.
+enum PiecesBackfill {
+    /// Pieces are at most this many Unicode scalars (stricter than characters), so each fits one
+    /// extraction window whole (core/tests/test_suggest.cpp backfill_pieces_fit_extraction_windows).
+    static let maxScalars = 1_500
+    private static let doneKey = "backfill.pieces.v1"
+
+    /// Splits at sentence boundaries into pieces of at most maxScalars; a longer sentence is cut at
+    /// spaces (or hard, as a last resort). start_sec is estimated in proportion to the duration.
+    static func pieces(transcript: String, durationSeconds: Int64) -> [TranscriptPiece] {
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return [] }
+        var sentences: [String] = []
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: [.bySentences, .substringNotRequired]) { _, _, enclosing, _ in
+            sentences.append(String(text[enclosing]))
+        }
+        if sentences.isEmpty { sentences = [text] }
+        var chunks: [String] = []
+        var cur = ""
+        func flush() {
+            let c = cur.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !c.isEmpty { chunks.append(c) }
+            cur = ""
+        }
+        for s in sentences.flatMap(split) {
+            if cur.unicodeScalars.count + s.unicodeScalars.count > maxScalars { flush() }
+            cur += s
+        }
+        flush()
+        let total = max(1, chunks.reduce(0) { $0 + $1.unicodeScalars.count })
+        var offset = 0
+        return chunks.map { c in
+            let start = Int(Double(offset) / Double(total) * Double(max(0, durationSeconds)))
+            offset += c.unicodeScalars.count
+            return TranscriptPiece(startSec: start, text: c)
+        }
+    }
+
+    /// A sentence longer than maxScalars, cut at the last space before the limit when there is one
+    /// (else at a character boundary). Never cuts inside a character.
+    private static func split(_ sentence: String) -> [String] {
+        guard sentence.unicodeScalars.count > maxScalars else { return [sentence] }
+        var out: [String] = []
+        var cur = ""
+        var n = 0
+        for ch in sentence {
+            let k = ch.unicodeScalars.count
+            if n + k > maxScalars, let sp = cur.lastIndex(of: " "), sp > cur.startIndex {
+                let tail = String(cur[cur.index(after: sp)...])
+                out.append(String(cur[...sp]))
+                cur = tail
+                n = tail.unicodeScalars.count
+            }
+            if n + k > maxScalars, !cur.isEmpty {
+                out.append(cur)
+                cur = ""
+                n = 0
+            }
+            cur.append(ch)
+            n += k
+        }
+        if !cur.isEmpty { out.append(cur) }
+        return out
+    }
+
+    /// One-time at launch: every note with a transcript and no pieces gets pieces. Marked done only
+    /// when every note was handled, so a failure is retried at the next launch.
+    @MainActor
+    static func runOnce() async {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: doneKey) else { return }
+        let engine = CoreEngine.shared
+        var allOK = true, any = false
+        for n in await engine.notes(limit: 10_000) {
+            guard await engine.pieces(n.id).isEmpty, let note = await engine.note(n.id),
+                  let t = note.transcript else { continue }
+            let ps = pieces(transcript: t, durationSeconds: note.duration_seconds)
+            guard !ps.isEmpty else { continue }
+            if await engine.setPieces(n.id, ps) { any = true } else { allOK = false }
+        }
+        if allOK { d.set(true, forKey: doneKey) }
+        if any { NotificationCenter.default.post(name: .assistantChanged, object: nil) }
+    }
 }

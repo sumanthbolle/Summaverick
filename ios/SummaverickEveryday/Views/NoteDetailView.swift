@@ -33,6 +33,8 @@ struct NoteDetailView: View {
     @State private var errorMessage: String?
     @State private var toast: String?
     @State private var gateKey = "note.\(UUID().uuidString)"
+    /// Extraction has run on this note (true until loaded, so the button never flashes).
+    @State private var extracted = true
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -69,6 +71,7 @@ struct NoteDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await load() } }
+        .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await load() } }
         .onChange(of: presenting) { _, open in PresentationGate.shared.set(gateKey, open) }
         // Playback ending by itself resets the play button.
         .task(id: playing) {
@@ -127,6 +130,18 @@ struct NoteDetailView: View {
                         } label: { Label("Generate notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
                         .buttonStyle(.borderedProminent)
                         .disabled(pipeline.isBusy || !(hasTranscript || hasAudio))
+                    }
+
+                    if showFindReminders {
+                        Button {
+                            Task {
+                                await pipeline.findReminders(noteID: noteID)
+                                await load()
+                            }
+                        } label: { Label("Find reminders and tasks", systemImage: "checklist").frame(maxWidth: .infinity) }
+                        .buttonStyle(.bordered)
+                        .frame(minHeight: 44)
+                        .disabled(pipeline.isBusy)
                     }
 
                     askSection
@@ -305,6 +320,11 @@ struct NoteDetailView: View {
     private var hasTranscript: Bool { !(note?.transcript ?? "").isEmpty }
     private var hasAudio: Bool { audioPath != nil }
 
+    /// Older recordings never went through extraction: offer it once, with an audio-capable model only.
+    private var showFindReminders: Bool {
+        ModelManager.shared.selected.hearsAudio && !extracted && hasTranscript && !isThisNoteBusy
+    }
+
     private var needsGeneration: Bool {
         guard let n = note else { return false }
         return n.short_summary == nil || n.detailed_notes == nil || n.revision_questions == nil
@@ -350,6 +370,7 @@ struct NoteDetailView: View {
         let previous = note
         let n = await CoreEngine.shared.note(noteID)
         let ps = await CoreEngine.shared.pieces(noteID)
+        extracted = await CoreEngine.shared.noteExtracted(noteID)
         note = n
         pieces = ps
         loaded = true

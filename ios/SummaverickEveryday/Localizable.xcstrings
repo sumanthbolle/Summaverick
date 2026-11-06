@@ -4296,6 +4296,22 @@
           }
         }
       }
+    },
+    "Find reminders and tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find reminders and tasks"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్లు, పనులు వెతకండి"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

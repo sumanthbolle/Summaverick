@@ -27,6 +27,7 @@ struct SummaverickEverydayApp: App {
                 await Retention.applyPolicy(maxAgeDays: settings.retentionDays)
             }
             .task { await ReminderScheduler.shared.resync() }
+            .task { await PiecesBackfill.runOnce() }   // older notes become searchable by Ask (one time)
             .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in
                 Task { await ReminderScheduler.shared.resync() }
             }
