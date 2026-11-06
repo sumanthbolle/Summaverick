@@ -471,7 +471,7 @@ static void run_api_direct(sve_ctx *ctx) {
     int64_t mid = sve_medicine_save(ctx, R"({"name":"Cilacar","dose":"10 mg","when":"after dinner"})");
     int64_t other = sve_medicine_save(ctx, R"({"name":"Glycomet","dose":"500 mg","when":"after breakfast"})");
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
-    std::string mj = R"({"text":"my night BP tablet","times":["21:00"],"repeat":"daily","medicine_id":)" + std::to_string(mid) + "}";
+    std::string mj = R"({"text":"my night BP tablet","times":["21:00"],"repeat":"daily","source_text":"Take Cilacar 10 mg after dinner.","medicine_id":)" + std::to_string(mid) + "}";
     int64_t e1 = sve_reminder_create(ctx, mj.c_str());
     expect(e1 > 0 && rem(e1)["medicine_id"] == mid, "explicit medicine_id kept on an edited-wording reminder");
     sve_medicine_save(ctx, (R"({"id":)" + std::to_string(mid) + R"(,"dose":"20 mg"})").c_str());
@@ -482,7 +482,7 @@ static void run_api_direct(sve_ctx *ctx) {
     expect(sve_suggestion_accept(ctx, add_sugg(ctx, stop), nullptr) == mid && rem(e2).is_null(),
            "stopping the medicine removes the linked Ask reminder");
     int64_t mid2 = sve_medicine_save(ctx, R"({"name":"Cilacar","dose":"10 mg","when":"after dinner"})");
-    int64_t e3 = sve_reminder_create(ctx, (R"({"text":"tablet","times":["21:00"],"repeat":"daily","medicine_id":)" + std::to_string(mid2) + "}").c_str());
+    int64_t e3 = sve_reminder_create(ctx, (R"({"text":"Cilacar tablet","times":["21:00"],"repeat":"daily","medicine_id":)" + std::to_string(mid2) + "}").c_str());
     sve_medicine_delete(ctx, mid2);
     expect(e3 > 0 && rem(e3).is_null(), "deleting the medicine removes the linked Ask reminder");
     int64_t auto1 = sve_reminder_create(ctx, R"({"text":"Take Glycomet 500 mg after breakfast","times":["08:30"],"repeat":"daily"})");
@@ -491,6 +491,24 @@ static void run_api_direct(sve_ctx *ctx) {
     int64_t two = sve_reminder_create(ctx, R"({"text":"Glycomet and Cilacar","times":["08:30"],"repeat":"daily"})");
     expect(two > 0 && rem(two)["medicine_id"].is_null(), "text naming two medicines stays unlinked");
     expect(sve_reminder_create(ctx, R"({"text":"x","times":["08:30"],"medicine_id":99999})") < 0, "unknown medicine_id rejected");
+    int64_t cil = take(sve_medicines_named(ctx, "Cilacar"))[0].get<int64_t>();
+    auto withId = [&](const char *text, const char *source, int64_t id) {
+        json j = {{"text", text}, {"times", {"21:00"}}, {"repeat", "daily"}, {"medicine_id", id}};
+        if (source) j["source_text"] = source;
+        return sve_reminder_create(ctx, j.dump().c_str());
+    };
+    expect(withId("Take Glycomet after breakfast", nullptr, cil) < 0, "explicit id with text naming another medicine rejected");
+    expect(withId("my tablets", "Take Cilacar at night and Glycomet in the morning.", cil) < 0, "explicit id with a two-medicine source rejected");
+    expect(withId("my tablet", nullptr, cil) < 0, "explicit id with words naming no medicine rejected");
+    int64_t okid = withId("my night tablet", "Take Cilacar 10 mg after dinner.", cil);
+    expect(okid > 0 && rem(okid)["medicine_id"] == cil, "explicit id matching the one named medicine accepted");
+    expect(withId("x", nullptr, cil) < 0 && sve_reminder_create(ctx, (R"({"text":"Cilacar","times":["21:00"],"source_text":5,"medicine_id":)" + std::to_string(cil) + "}").c_str()) < 0,
+           "non-string source_text rejected");
+    sve_medicine_save(ctx, R"({"name":"Telma 40","dose":"1 tablet"})");
+    json tn = take(sve_medicines_named(ctx, "Take Telma40 daily"));
+    expect(tn.is_array() && tn.size() == 1, "sve_medicines_named matches Telma40 to Telma 40");
+    expect(take(sve_medicines_named(ctx, "walk every evening")) == json::array() && sve_medicines_named(ctx, nullptr) == nullptr,
+           "sve_medicines_named: none -> [], NULL text -> NULL");
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
 }
 

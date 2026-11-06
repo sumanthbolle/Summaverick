@@ -168,13 +168,18 @@ char *sve_reminders_json(sve_ctx *ctx, int active_only);
 int   sve_reminder_set_active(sve_ctx *ctx, int64_t id, int active);
 /* Creates a reminder the person made themselves (e.g. "Make reminder" on an Ask answer; their own edit,
  * applied directly, no suggestion). json: {"text","times":["HH:MM",…],"repeat","start_date","until_date",
- * "note_id","start_sec","medicine_id"}. Requires non-empty text and at least one time; every time must be a valid HH:MM.
+ * "note_id","start_sec","medicine_id","source_text"}. Requires non-empty text and at least one time; every time must be a valid HH:MM.
  * repeat daily|twice_daily|weekly|once (missing/empty = "once"); start_date YYYY-MM-DD (missing/empty =
  * today); until_date YYYY-MM-DD or missing, not before start_date; note_id/start_sec optional (a note that
- * no longer exists is dropped with its start_sec). medicine_id optional; if given it must exist (else -1). If
- * not given and the text names exactly one saved medicine, the reminder is linked to it (dose change, stop and
- * delete of that medicine then reach it). Returns the reminder id, negative on bad input or error. */
+ * no longer exists is dropped with its start_sec). source_text optional: the words it was made from (e.g. the
+ * Ask answer). medicine_id optional; if given it must exist and be the only saved medicine named in
+ * text + source_text (see sve_medicines_named), else -1. If not given and the text names exactly one saved
+ * medicine, the reminder is linked to it (dose change, stop and delete of that medicine then reach it).
+ * Returns the reminder id, negative on bad input or error. */
 int64_t sve_reminder_create(sve_ctx *ctx, const char *json);
+/* Ids of the saved medicines named in text (whole words, after the core's medicine normalisation: Telugu
+ * digits, number words, "Telma40" = "Telma 40"), as a JSON array, e.g. [3]. NULL on error. */
+char *sve_medicines_named(sve_ctx *ctx, const char *text);
 /* [{"id","text","who","due_date","done","note_id","start_sec","from_deleted","created_at"}] */
 char *sve_tasks_json(sve_ctx *ctx, int open_only);
 int   sve_task_set_done(sve_ctx *ctx, int64_t id, int done);

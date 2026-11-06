@@ -676,10 +676,14 @@ int64_t sve_reminder_create(sve_ctx *ctx, const char *js) {
         json row = sve::direct_reminder_row(parse(js), today_iso());
         if (!row.is_object()) return -1;
         json meds = st.medicines();
+        json in = parse(js);
+        auto src = in.find("source_text");
+        if (src != in.end() && !src->is_null() && !src->is_string()) return -1;
+        std::string source = src != in.end() && src->is_string() ? src->get<std::string>() : "";
         if (!row["medicine_id"].is_null()) {
-            // An explicit medicine must exist.
+            // An explicit medicine must be the only one the words name, so no other medicine's change is missed.
             int64_t mid = row["medicine_id"].get<int64_t>();
-            if (std::none_of(meds.begin(), meds.end(), [&](const json &m) { return jint(m, "id", 0) == mid; })) return -1;
+            if (sve::medicines_named(jstr(row, "text") + "\n" + source, meds) != std::vector<int64_t>{mid}) return -1;
         } else {
             // Linked by id when the words name exactly one saved medicine, so a later dose change, stop or
             // delete reaches it even after the wording is edited. Two or more named: left unlinked.
@@ -689,6 +693,13 @@ int64_t sve_reminder_create(sve_ctx *ctx, const char *js) {
         drop_missing_note(st, row);
         int64_t id = st.add_reminder(row);
         return id > 0 ? id : -1;
+    });
+}
+
+char *sve_medicines_named(sve_ctx *ctx, const char *text) {
+    return guard<char *>("sve_medicines_named", nullptr, [&]() -> char * {
+        if (!ctx || !text) return nullptr;
+        return dump(json(sve::medicines_named(text, ctx->store->medicines())));
     });
 }
 

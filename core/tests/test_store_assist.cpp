@@ -1,4 +1,5 @@
 #include "check.h"
+#include <algorithm>
 #include "sve_store.h"
 #include "sve_suggest.h"
 
@@ -244,6 +245,9 @@ TEST(reminder_create_direct_medicine_link) {
     s.add_medicine(json::parse(R"({"name":"Telma","dose":"40 mg"})"));
     CHECK_EQ(sve::medicines_named("Metformin and Telma at night", s.medicines()).size(), (size_t)2);
     CHECK(sve::medicines_named("walk every evening", s.medicines()).empty());
+    int64_t t40 = s.add_medicine(json::parse(R"({"name":"Telma 40","dose":"1 tablet"})"));
+    std::vector<int64_t> hit = sve::medicines_named("Take Telma40 every morning", s.medicines());
+    CHECK(std::find(hit.begin(), hit.end(), t40) != hit.end());
 }
 
 TEST(task_create_direct) {
