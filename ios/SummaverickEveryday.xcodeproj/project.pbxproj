@@ -113,6 +113,10 @@
 			isa = PBXBuildFile;
 			fileRef = 892E4DF51BC5A1D8EB706A7A;
 		};
+		CC6072ABC305C2EE3EDCFF78 = {
+			isa = PBXBuildFile;
+			fileRef = ADEEFA19D57BA7D03687B2E4;
+		};
 		CE05B940BCBE599A11AE22E8 = {
 			isa = PBXBuildFile;
 			fileRef = 171A4CC9E4CFD6CB1704585A;
@@ -133,6 +137,10 @@
 			isa = PBXBuildFile;
 			fileRef = C0100A508E690127735ED8DF;
 		};
+		E0F7CCE6E724B4A99DCD35CB = {
+			isa = PBXBuildFile;
+			fileRef = 62C33D8D9F694DDB9C315DDC;
+		};
 		E374920B948422FA0FDEBA74 = {
 			isa = PBXBuildFile;
 			fileRef = 63A8A83C123E5491CBE9E84F;
@@ -145,6 +153,10 @@
 			isa = PBXBuildFile;
 			fileRef = 0A726C07BA65E563FB374790;
 		};
+		EAE1FEBFAD37F08A0E5AF91D = {
+			isa = PBXBuildFile;
+			fileRef = 92BE6C4CC02BDF7B9FDAE1B6;
+		};
 		ECB5419178B062460383B28A = {
 			isa = PBXBuildFile;
 			fileRef = EAF88B4A3FB9A8689FADBD2C;
@@ -152,6 +164,10 @@
 		F5DF4BFB0174304CA2197095 = {
 			isa = PBXBuildFile;
 			fileRef = 4E9F0134C12B9B82D2B2A856;
+		};
+		F7662F48E1C4D62499CCA46C = {
+			isa = PBXBuildFile;
+			fileRef = 495D5704B2E625A6B8DE2E7E;
 		};
 /* End PBXBuildFile section */
 
@@ -247,6 +263,13 @@
 			path = SummaverickEveryday/Audio/AudioRecorder.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		495D5704B2E625A6B8DE2E7E = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = LearnedView.swift;
+			path = SummaverickEveryday/Views/Profile/LearnedView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		4E9F0134C12B9B82D2B2A856 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -294,6 +317,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = "CoreEngine+Assistant.swift";
 			path = "SummaverickEveryday/Engine/CoreEngine+Assistant.swift";
+			sourceTree = SOURCE_ROOT;
+		};
+		62C33D8D9F694DDB9C315DDC = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ProfileParts.swift;
+			path = SummaverickEveryday/Views/Profile/ProfileParts.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		63A8A83C123E5491CBE9E84F = {
@@ -359,6 +389,13 @@
 			path = SummaverickEveryday/Views/DeepDive/TimelineView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		92BE6C4CC02BDF7B9FDAE1B6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ProfileSetupView.swift;
+			path = SummaverickEveryday/Views/Profile/ProfileSetupView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		931FE6600998F3EFAA62977F = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -378,6 +415,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_prompts.h;
 			path = ../core/src/sve_prompts.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		ADEEFA19D57BA7D03687B2E4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ProfileView.swift;
+			path = SummaverickEveryday/Views/Profile/ProfileView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		B05E051B8E13E602C77A96F0 = {
@@ -592,6 +636,7 @@
 				BECA9321D0D66DAD007659AB,
 				3A82B61681BFF18BB638B388,
 				14170FB9E149C3DD932A78DD,
+				DA0A32E81D9A4713BC65BFBC,
 				F86C9C201E773F26CECBA845,
 				29A1CD6197C4EBF318C20726,
 				8C247BC7003BBE5F71E1479C,
@@ -626,6 +671,17 @@
 				40CF89C460C8558DF1531E3B,
 			);
 			name = Audio;
+			sourceTree = "<group>";
+		};
+		DA0A32E81D9A4713BC65BFBC = {
+			isa = PBXGroup;
+			children = (
+				495D5704B2E625A6B8DE2E7E,
+				62C33D8D9F694DDB9C315DDC,
+				92BE6C4CC02BDF7B9FDAE1B6,
+				ADEEFA19D57BA7D03687B2E4,
+			);
+			name = Views/Profile;
 			sourceTree = "<group>";
 		};
 		DA3EB179D6EE613492F299B1 = {
@@ -751,6 +807,10 @@
 				7145186EECA51AD6A675CA64,
 				25A6412A3165EE7261515DB6,
 				F5DF4BFB0174304CA2197095,
+				F7662F48E1C4D62499CCA46C,
+				E0F7CCE6E724B4A99DCD35CB,
+				EAE1FEBFAD37F08A0E5AF91D,
+				CC6072ABC305C2EE3EDCFF78,
 				E374920B948422FA0FDEBA74,
 				A98A4FF70B48BB38E9507E50,
 				8D4A6C6E4B479FCA91F91BA9,

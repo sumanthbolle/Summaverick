@@ -54,16 +54,20 @@ struct Routine: Codable, Equatable {
     var lunch: String?
     var dinner: String?
     var bed: String?
+    /// Free text: "classes or work", e.g. "college 9 to 4".
+    var classes: String?
 
-    init(wake: String? = nil, breakfast: String? = nil, lunch: String? = nil, dinner: String? = nil, bed: String? = nil) {
+    init(wake: String? = nil, breakfast: String? = nil, lunch: String? = nil, dinner: String? = nil, bed: String? = nil,
+         classes: String? = nil) {
         self.wake = wake; self.breakfast = breakfast; self.lunch = lunch; self.dinner = dinner; self.bed = bed
+        self.classes = classes
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         wake = c.lenient(.wake); breakfast = c.lenient(.breakfast); lunch = c.lenient(.lunch)
-        dinner = c.lenient(.dinner); bed = c.lenient(.bed)
+        dinner = c.lenient(.dinner); bed = c.lenient(.bed); classes = c.lenient(.classes)
     }
-    enum CodingKeys: String, CodingKey { case wake, breakfast, lunch, dinner, bed }
+    enum CodingKeys: String, CodingKey { case wake, breakfast, lunch, dinner, bed, classes }
 }
 
 struct Profile: Codable, Equatable {

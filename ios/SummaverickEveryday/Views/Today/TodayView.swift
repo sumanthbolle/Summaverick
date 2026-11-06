@@ -51,6 +51,7 @@ struct TodayView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var pipeline = ProcessingPipeline.shared
     @State private var models = ModelManager.shared
+    @State private var lock = AppLock.shared
 
     @State private var loaded = false
     @State private var suggestions: [Suggestion] = []
@@ -64,6 +65,7 @@ struct TodayView: View {
     @State private var errorMessage: String?
     @State private var notificationsOff = false
     @State private var now = Date()
+    @State private var showSetup = false
 
     var body: some View {
         NavigationStack {
@@ -110,6 +112,8 @@ struct TodayView: View {
             .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await reload() } }
             .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await reload() } } }
             .onChange(of: notificationsOff || errorMessage != nil) { _, open in PresentationGate.shared.set("today", open) }
+            .sheet(isPresented: $showSetup, onDismiss: { Task { await reload() } }) { ProfileSetupView() }
+            .onChange(of: lock.isLocked) { _, _ in offerSetupIfNeeded() }
             .alert("Notifications are off", isPresented: $notificationsOff) {
                 Button("Open Settings") {
                     if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
@@ -122,7 +126,8 @@ struct TodayView: View {
     }
 
     private var isFailed: Bool { if case .failed = pipeline.stage { return true } else { return false } }
-    private var needsProfile: Bool { (profile?.name ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+    /// No profile saved yet (setup was closed with "Later", or never finished the routine step).
+    private var needsProfile: Bool { profile == nil }
     private var errorShown: Binding<Bool> {
         Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
     }
@@ -359,7 +364,7 @@ struct TodayView: View {
     }
 
     private var setupProfileCard: some View {
-        Button { router.showSettings = true } label: {
+        Button { showSetup = true } label: {
             HStack(spacing: 12) {
                 Image(systemName: "person.crop.circle.badge.plus").font(.largeTitle).foregroundStyle(Color.accentColor)
                     .accessibilityHidden(true)
@@ -412,6 +417,16 @@ struct TodayView: View {
         staleIDs.formIntersection(s.map(\.id))
         now = Date()
         loaded = true
+        offerSetupIfNeeded()
+    }
+
+    /// Opens the setup sheet once per launch while there is no profile, never over the lock screen or
+    /// another sheet. The card stays on Today as the way back in.
+    private func offerSetupIfNeeded() {
+        guard loaded, profile == nil, !ProfileSetupView.shownThisLaunch, !lock.isLocked, !router.showSettings,
+              router.openNote == nil, PresentationGate.shared.open.isEmpty else { return }
+        ProfileSetupView.shownThisLaunch = true
+        showSetup = true
     }
 
     /// After any change: reschedule notifications, then tell the rest of the app (which also reloads this view).

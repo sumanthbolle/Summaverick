@@ -2787,6 +2787,673 @@
           }
         }
       }
+    },
+    "A name is needed to save.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సేవ్ చేయడానికి మందు పేరు కావాలి."
+          }
+        }
+      }
+    },
+    "Add them here and Summaverick will offer a reminder on Today. Nothing rings until you say Yes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇక్కడ చేర్చండి. Summaverick ఈరోజు పేజీలో రిమైండర్ సూచిస్తుంది. మీరు అవును అనే వరకు ఏదీ మోగదు."
+          }
+        }
+      }
+    },
+    "All notes and recordings are deleted, and so are your profile, medicines, reminders and everything Summaverick has learned. This cannot be undone.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్ని నోట్స్, రికార్డింగ్‌లు తొలగిపోతాయి. మీ ప్రొఫైల్, మందులు, రిమైండర్లు, Summaverick నేర్చుకున్నవన్నీ కూడా తొలగిపోతాయి. ఇది తిరిగి తీసుకురాలేము."
+          }
+        }
+      }
+    },
+    "Back": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వెనక్కి"
+          }
+        }
+      },
+      "comment": "Setup: go to the previous step"
+    },
+    "Bedtime": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నిద్రపోయే సమయం"
+          }
+        }
+      },
+      "comment": "Routine time"
+    },
+    "Choose": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎంచుకోండి"
+          }
+        }
+      },
+      "comment": "Repeat picker: nothing chosen yet"
+    },
+    "Classes or work (optional)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "క్లాసులు లేదా పని (ఐచ్ఛికం)"
+          }
+        }
+      }
+    },
+    "Clear %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ తీసివేయండి"
+          }
+        }
+      },
+      "comment": "%@ is a routine time name, e.g. Dinner"
+    },
+    "Delete %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ తొలగించండి"
+          }
+        }
+      },
+      "comment": "%@ is a medicine name"
+    },
+    "Delete %@?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ తొలగించాలా?"
+          }
+        }
+      },
+      "comment": "%@ is a medicine name"
+    },
+    "Delete all": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్నీ తొలగించండి"
+          }
+        }
+      }
+    },
+    "Delete all notes and recordings": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్ని నోట్స్, రికార్డింగ్‌లు తొలగించండి"
+          }
+        }
+      }
+    },
+    "Delete everything on this phone?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లో ఉన్నవన్నీ తొలగించాలా?"
+          }
+        }
+      }
+    },
+    "Delete medicine": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందు తొలగించండి"
+          }
+        }
+      }
+    },
+    "Delete this?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీన్ని తొలగించాలా?"
+          }
+        }
+      }
+    },
+    "Delete “%@”": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” తొలగించండి"
+          }
+        }
+      },
+      "comment": "%@ is a remembered word or fact"
+    },
+    "Do you take any medicines?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు ఏమైనా మందులు వేసుకుంటారా?"
+          }
+        }
+      }
+    },
+    "Dose, e.g. 5 mg": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మోతాదు, ఉదా. 5 mg"
+          }
+        }
+      }
+    },
+    "Edit medicine": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందు మార్చండి"
+          }
+        }
+      }
+    },
+    "Edit this medicine": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ మందు వివరాలు మార్చండి"
+          }
+        }
+      }
+    },
+    "Edit “%@”": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” మార్చండి"
+          }
+        }
+      },
+      "comment": "%@ is a remembered word or fact"
+    },
+    "English": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంగ్లీష్"
+          }
+        }
+      }
+    },
+    "Telugu": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తెలుగు"
+          }
+        }
+      }
+    },
+    "Hindi": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "హిందీ"
+          }
+        }
+      }
+    },
+    "Tamil": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తమిళం"
+          }
+        }
+      }
+    },
+    "Kannada": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కన్నడ"
+          }
+        }
+      }
+    },
+    "Malayalam": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మలయాళం"
+          }
+        }
+      }
+    },
+    "Facts": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "విషయాలు"
+          }
+        }
+      },
+      "comment": "Group of facts Summaverick remembers"
+    },
+    "From your routine: %@ — change if needed": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ దినచర్య నుండి: %@ — కావాలంటే మార్చండి"
+          }
+        }
+      },
+      "comment": "%@ is a time, e.g. 8:00 PM"
+    },
+    "Its reminders will stop and be removed.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీని రిమైండర్లు ఆగిపోయి, తొలగిపోతాయి."
+          }
+        }
+      }
+    },
+    "Later": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తర్వాత"
+          }
+        }
+      },
+      "comment": "Close the setup without saving"
+    },
+    "Medicines": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందులు"
+          }
+        }
+      }
+    },
+    "Next": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముందుకు"
+          }
+        }
+      },
+      "comment": "Setup: go to the next step"
+    },
+    "No facts yet. They appear when you say Yes to one on Today.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా విషయాలు లేవు. ఈరోజు పేజీలో మీరు అవును అన్నప్పుడు ఇక్కడ కనిపిస్తాయి."
+          }
+        }
+      }
+    },
+    "No medicines yet.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా మందులు లేవు."
+          }
+        }
+      }
+    },
+    "No preferences yet. They appear when you say Yes to one on Today.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా ఇష్టాలు లేవు. ఈరోజు పేజీలో మీరు అవును అన్నప్పుడు ఇక్కడ కనిపిస్తాయి."
+          }
+        }
+      }
+    },
+    "No time yet. Add one, or the reminder on Today will ask you for it.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా సమయం పెట్టలేదు. ఇప్పుడు చేర్చండి, లేదా ఈరోజు పేజీలోని రిమైండర్ మిమ్మల్ని అడుగుతుంది."
+          }
+        }
+      }
+    },
+    "No words yet. When you fix a word in a recording, it is added here.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా పదాలు లేవు. రికార్డింగ్‌లో ఒక పదాన్ని మీరు సరిచేసినప్పుడు అది ఇక్కడ చేరుతుంది."
+          }
+        }
+      }
+    },
+    "Preferences": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ ఇష్టాలు"
+          }
+        }
+      },
+      "comment": "Group of preferences Summaverick remembers"
+    },
+    "Preferred language": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీకు నచ్చిన భాష"
+          }
+        }
+      }
+    },
+    "Profile": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రొఫైల్"
+          }
+        }
+      }
+    },
+    "Profile saved.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రొఫైల్ సేవ్ అయింది."
+          }
+        }
+      }
+    },
+    "Reminders like “after dinner” use these times.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“రాత్రి భోజనం తర్వాత” లాంటి రిమైండర్లు ఈ సమయాలను వాడతాయి."
+          }
+        }
+      }
+    },
+    "Reminders like “after dinner” use these times. Change any of them.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“రాత్రి భోజనం తర్వాత” లాంటి రిమైండర్లు ఈ సమయాలను వాడతాయి. ఏదైనా మార్చుకోవచ్చు."
+          }
+        }
+      }
+    },
+    "Save profile": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రొఫైల్ సేవ్ చేయండి"
+          }
+        }
+      }
+    },
+    "Saved. Check Today to turn on the reminder.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సేవ్ అయింది. రిమైండర్ ఆన్ చేయడానికి ఈరోజు పేజీ చూడండి."
+          }
+        }
+      }
+    },
+    "Saving a medicine offers a reminder on Today. Nothing rings until you say Yes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందు సేవ్ చేస్తే ఈరోజు పేజీలో రిమైండర్ సూచన వస్తుంది. మీరు అవును అనే వరకు ఏదీ మోగదు."
+          }
+        }
+      }
+    },
+    "Set time for %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ కి సమయం పెట్టండి"
+          }
+        }
+      },
+      "comment": "%@ is a routine time name, e.g. Dinner"
+    },
+    "Set up Summaverick": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick సెట్ చేయండి"
+          }
+        }
+      }
+    },
+    "Skip this step": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ దశ వదిలేయండి"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దశ %1$lld / %2$lld"
+          }
+        }
+      },
+      "comment": "Setup progress, e.g. Step 1 of 4"
+    },
+    "Summaverick answers and writes reminders in this language.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick ఈ భాషలోనే జవాబులు, రిమైండర్లు రాస్తుంది."
+          }
+        }
+      }
+    },
+    "Summaverick uses these to understand you. Edit or delete anything.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మిమ్మల్ని అర్థం చేసుకోవడానికి Summaverick వీటిని వాడుతుంది. ఏదైనా మార్చవచ్చు లేదా తొలగించవచ్చు."
+          }
+        }
+      }
+    },
+    "Text": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇక్కడ రాయండి"
+          }
+        }
+      },
+      "comment": "Placeholder for editing a remembered item"
+    },
+    "What Summaverick has learned": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick నేర్చుకున్నవి"
+          }
+        }
+      }
+    },
+    "What does your day look like?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రోజు ఎలా గడుస్తుంది?"
+          }
+        }
+      }
+    },
+    "What should Summaverick call you?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick మిమ్మల్ని ఏమని పిలవాలి?"
+          }
+        }
+      }
+    },
+    "When, e.g. after dinner": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎప్పుడు, ఉదా. రాత్రి భోజనం తర్వాత"
+          }
+        }
+      }
+    },
+    "Which language do you prefer?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీకు ఏ భాష ఇష్టం?"
+          }
+        }
+      }
+    },
+    "Words to spell this way": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇలా రాయాల్సిన పదాలు"
+          }
+        }
+      }
+    },
+    "Your day": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ దినచర్య"
+          }
+        }
+      }
+    },
+    "Your name": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ పేరు"
+          }
+        }
+      }
+    },
+    "Your name is used in greetings and to understand your recordings.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పలకరించడానికి, మీ రికార్డింగ్‌లు అర్థం చేసుకోవడానికి మీ పేరు వాడతాం."
+          }
+        }
+      }
+    },
+    "e.g. college 9 to 4": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఉదా. కాలేజీ 9 నుండి 4 వరకు"
+          }
+        }
+      }
+    },
+    "until %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ వరకు"
+          }
+        }
+      },
+      "comment": "%@ is a date"
     }
   },
   "version": "1.0"

@@ -11,6 +11,15 @@ struct SettingsView: View {
         @Bindable var settings = settings
         NavigationStack {
             Form {
+                Section {
+                    NavigationLink { ProfileView() } label: {
+                        Label("Profile", systemImage: "person.crop.circle").frame(minHeight: 44)
+                    }
+                    NavigationLink { LearnedView() } label: {
+                        Label("What Summaverick has learned", systemImage: "brain.head.profile").frame(minHeight: 44)
+                    }
+                }
+
                 if models.selected.hearsAudio {
                     Section("Notes language") {
                         Picker("Notes language", selection: $settings.notesLanguage) {
