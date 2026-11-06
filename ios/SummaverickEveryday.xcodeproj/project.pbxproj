@@ -57,6 +57,10 @@
 			isa = PBXBuildFile;
 			fileRef = 3C94D64FE92A566816D76B43;
 		};
+		74F26ED096628426F957DD0E = {
+			isa = PBXBuildFile;
+			fileRef = FC685B2FB5E51229E33B1F2C;
+		};
 		7CD85F6783D894B9047A2C67 = {
 			isa = PBXBuildFile;
 			fileRef = EE7D0A38215CFAEEF0A0E2BE;
@@ -397,6 +401,13 @@
 			path = SummaverickEveryday/Assets.xcassets;
 			sourceTree = SOURCE_ROOT;
 		};
+		FC685B2FB5E51229E33B1F2C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ReminderScheduler.swift;
+			path = SummaverickEveryday/Engine/ReminderScheduler.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		FDA9E084D501D8D1690658ED = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -477,6 +488,7 @@
 				3E8C99285C2BD28FE0ECE99B,
 				B05E051B8E13E602C77A96F0,
 				2E361774B975154A11567968,
+				FC685B2FB5E51229E33B1F2C,
 			);
 			name = Engine;
 			sourceTree = "<group>";
@@ -621,6 +633,7 @@
 				B3682618E8A7DB35FCEEE996,
 				5997944FB95EF3E94D57974F,
 				5809D5B858D8CE07F8518B8C,
+				74F26ED096628426F957DD0E,
 				E38796377CD701DE27D4E42D,
 				8FB71A3DAC10CCF263B21175,
 				9543CFE6FE3AF9374A448E0F,

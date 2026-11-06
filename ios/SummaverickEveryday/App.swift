@@ -1,10 +1,16 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct SummaverickEverydayApp: App {
     @State private var settings = AppSettings.shared
     @State private var lock = AppLock.shared
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        // Must be set before launch finishes so a tap that cold-starts the app is delivered.
+        UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -19,10 +25,16 @@ struct SummaverickEverydayApp: App {
             .task {
                 await Retention.applyPolicy(maxAgeDays: settings.retentionDays)
             }
+            .task { await ReminderScheduler.shared.resync() }
+            .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in
+                Task { await ReminderScheduler.shared.resync() }
+            }
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
                 case .background: lock.lockIfNeeded()
-                case .active: lock.unlockIfNeeded()
+                case .active:
+                    lock.unlockIfNeeded()
+                    Task { await ReminderScheduler.shared.resync() }
                 default: break
                 }
             }
