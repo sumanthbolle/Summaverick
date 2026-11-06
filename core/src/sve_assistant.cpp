@@ -563,6 +563,10 @@ int sve_suggestion_reject(sve_ctx *ctx, int64_t id) {
 
 // ---------------------------------------------------------------- profile and medicines
 
+int sve_assistant_wipe(sve_ctx *ctx) {
+    return guard("sve_assistant_wipe", -1, [&] { return ctx && ctx->store->wipe_assistant() ? 0 : -1; });
+}
+
 char *sve_profile_get(sve_ctx *ctx) {
     return guard<char *>("sve_profile_get", nullptr, [&]() -> char * {
         if (!ctx) return nullptr;

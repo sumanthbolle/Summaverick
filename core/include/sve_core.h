@@ -206,6 +206,13 @@ int   sve_memory_delete(sve_ctx *ctx, int64_t id);
 /* Adds a vocabulary word the person fixed (applied directly). Returns its id (existing id if known). */
 int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
 
+/* Deletes everything the assistant stored, in one transaction: the profile, medicines, memory (vocabulary,
+ * preferences, facts), reminders, tasks, topics and their note links, suggestions, decisions, insights,
+ * transcript pieces, and the settings keys the assistant created ("profile", "insight.last_date").
+ * Notes and other settings are kept; the host deletes notes and cancels scheduled notifications.
+ * Returns 0, or -1 on error (nothing deleted). */
+int   sve_assistant_wipe(sve_ctx *ctx);
+
 /* Ask across all recordings: {"answer":"","sources":[{"note_id":0,"start_sec":0,"title":""}],
  * "not_found":false,"medicine":false}. Medicine questions are answered in code from the profile and quoted
  * transcript pieces, never generated. Answers are in the profile language. */

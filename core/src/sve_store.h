@@ -95,6 +95,11 @@ public:
     json latest_insight();
     bool dismiss_insight(int64_t id);
 
+    // Deletes everything the assistant stored, in one transaction: profile and other assistant settings,
+    // medicines, memory, reminders, tasks, topics and links, suggestions, decisions, insights, transcript
+    // pieces. Notes and other settings are kept (the host deletes notes). Not nested in begin().
+    bool wipe_assistant();
+
 private:
     bool exec(const char *sql);
     json query_rows(const char *sql, const std::vector<json> &binds);

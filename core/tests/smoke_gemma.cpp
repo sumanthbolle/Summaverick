@@ -512,6 +512,29 @@ static void run_api_direct(sve_ctx *ctx) {
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
 }
 
+// Delete all: everything the assistant stored goes, the notes stay for the host to delete.
+static void run_api_wipe(sve_ctx *ctx) {
+    sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"te","routine":{"dinner":"20:00"}})");
+    int64_t mid = sve_medicine_save(ctx, R"({"name":"Amlodipine","dose":"5 mg","when":"after dinner","repeat":"daily"})");
+    json pend = take(sve_suggestions_json(ctx, "pending"));
+    if (!pend.empty()) sve_suggestion_accept(ctx, pend[0]["id"], nullptr);
+    sve_vocab_add(ctx, "Amlodipine");
+    sve_task_create(ctx, R"({"text":"Buy tablets"})");
+    int64_t note = make_note(ctx, json::parse(R"([{"start_sec":0,"text":"Amlodipine after dinner."}])"), "Before wipe");
+    sve_setting_set(ctx, "insight.last_date", "2026-11-06");
+    expect(mid > 0 && !take(sve_reminders_json(ctx, 0)).empty() && !take(sve_memory_json(ctx, "")).empty(), "wipe: data before");
+    expect(sve_assistant_wipe(ctx) == 0, "sve_assistant_wipe returns 0");
+    expect(take(sve_profile_get(ctx)).is_null() && take(sve_medicines_json(ctx)).empty() &&
+           take(sve_reminders_json(ctx, 0)).empty() && take(sve_tasks_json(ctx, 0)).empty() &&
+           take(sve_memory_json(ctx, "")).empty() && take(sve_suggestions_json(ctx, "")).empty() &&
+           take(sve_topics_json(ctx, "")).empty() && take(sve_insight_latest(ctx)).is_null() &&
+           take(sve_note_pieces(ctx, note)).empty(), "wipe clears profile, medicines, reminders, tasks, memory, cards, topics, pieces");
+    char *last = sve_setting_get(ctx, "insight.last_date");
+    expect(last == nullptr, "wipe clears insight.last_date");
+    sve_free_string(last);
+    expect(sve_assistant_wipe(nullptr) < 0, "wipe refuses a null context");
+}
+
 static int run_api(sve_ctx *ctx) {
     sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
     json prof = take(sve_profile_get(ctx));
@@ -574,6 +597,7 @@ static int run_api(sve_ctx *ctx) {
     expect(sve_topic_summary(ctx, 12345, "en", nullptr, nullptr) == nullptr, "unknown topic -> NULL");
     run_api_fixes(ctx);
     run_api_direct(ctx);
+    run_api_wipe(ctx);
     return 0;
 }
 

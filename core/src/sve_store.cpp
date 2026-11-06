@@ -625,6 +625,21 @@ bool Store::dismiss_insight(int64_t id) {
     return run("UPDATE insights SET dismissed=1 WHERE id=?", {id}) && sqlite3_changes(db_) > 0;
 }
 
+// Settings keys the assistant writes (sve_assistant.cpp). Other keys (host and device settings) stay.
+static const char *kAssistantSettings[] = {"profile", "insight.last_date"};
+
+bool Store::wipe_assistant() {
+    // Children before parents, so no foreign key blocks a delete; the FTS triggers clean the indexes.
+    static const char *kTables[] = {"suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
+                                    "medicines", "decisions", "insights", "transcript_pieces"};
+    if (!exec("BEGIN")) return false;
+    bool ok = true;
+    for (const char *t : kTables) ok = ok && run((std::string("DELETE FROM ") + t).c_str(), {});
+    for (const char *k : kAssistantSettings) ok = ok && run("DELETE FROM settings WHERE key=?", {k});
+    if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
+    return exec("COMMIT");
+}
+
 std::string json_escape(const std::string &s) {
     std::string o;
     o.reserve(s.size() + 8);

@@ -273,3 +273,47 @@ TEST(task_create_direct) {
                             R"({"text":"x","note_id":-4})", R"([1])"})
         CHECK(direct_task_row(json::parse(bad)).is_null());
 }
+
+TEST(wipe_clears_everything) {
+    Store s(":memory:");
+    int64_t note = mk(s, "Doctor visit");
+    CHECK(s.set_pieces(note, json::parse(R"([{"start_sec":0,"text":"Take Amlodipine after dinner"}])")));
+    CHECK(s.setting_set("profile", R"({"name":"Lakshmi","lang":"te"})"));
+    CHECK(s.setting_set("insight.last_date", "2026-11-06"));
+    CHECK(s.setting_set("notes.lang", "en"));   // not the assistant's: kept
+    int64_t med = s.add_medicine(json::parse(R"({"name":"Amlodipine","dose":"5 mg","times":["20:00"]})"));
+    CHECK(med > 0);
+    CHECK(s.add_reminder(json::parse("{\"text\":\"Amlodipine\",\"times\":[\"20:00\"],\"medicine_id\":" + std::to_string(med) + "}")) > 0);
+    CHECK(s.add_reminder(json::parse("{\"text\":\"call\",\"times\":[\"09:00\"],\"note_id\":" + std::to_string(note) + "}")) > 0);
+    CHECK(s.add_task(json::parse(R"({"text":"submit"})")) > 0);
+    int64_t topic = s.upsert_topic("topic", "Health");
+    CHECK(topic > 0 && s.link_topic(note, topic));
+    CHECK(s.add_suggestion(json::parse(R"({"kind":"task","payload":{"text":"x"}})")) > 0);
+    CHECK(s.add_memory("vocab", "Amlodipine", std::nullopt) > 0);
+    CHECK(s.add_memory("fact", "Lives in Guntur", note) > 0);
+    CHECK(s.log_decision("reminder", "decision", "", "yes"));
+    CHECK(s.add_insight("Walk more", note) > 0);
+
+    CHECK(s.wipe_assistant());
+
+    CHECK(!s.setting_get("profile"));
+    CHECK(!s.setting_get("insight.last_date"));
+    CHECK_EQ(s.setting_get("notes.lang").value_or(""), std::string("en"));
+    CHECK(s.medicines().empty());
+    CHECK(s.reminders(false).empty());
+    CHECK(s.tasks(false).empty());
+    CHECK(s.topics("").empty());
+    CHECK(s.topic_notes(topic).empty());
+    CHECK(s.suggestions("").empty());
+    CHECK(s.memory("").empty());
+    CHECK(s.search_memory("Amlodipine", 5).empty());
+    CHECK(s.decisions("", "", 10).empty());
+    CHECK(s.latest_insight().is_null());
+    CHECK(s.pieces(note).empty());
+    CHECK(s.search_pieces("Amlodipine", 5).empty());
+    CHECK(s.get(note).has_value());   // notes themselves are the host's to delete
+    // The store still works afterwards.
+    CHECK(s.add_medicine(json::parse(R"({"name":"Telma"})")) > 0);
+    CHECK(s.wipe_assistant());
+    CHECK(s.medicines().empty());
+}
