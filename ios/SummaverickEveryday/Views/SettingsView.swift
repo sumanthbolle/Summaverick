@@ -11,20 +11,27 @@ struct SettingsView: View {
         @Bindable var settings = settings
         NavigationStack {
             Form {
-                Section("Language of recordings") {
-                    if languages.isEmpty {
-                        Text("No on-device speech languages found. Add a dictation language in Settings > General > Keyboard > Dictation.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    } else {
-                        Picker("Language", selection: $settings.languageID) {
-                            ForEach(languages) { Text($0.name).tag($0.id) }
+                if models.selected.hearsAudio {
+                    Section("Notes language") {
+                        Picker("Notes language", selection: $settings.notesLanguage) {
+                            Text("English").tag("en"); Text("Telugu").tag("te"); Text("Hindi").tag("hi")
+                            Text("Tamil").tag("ta"); Text("Kannada").tag("kn"); Text("Malayalam").tag("ml")
                         }
-                        Text("Only languages that work fully on this iPhone are listed. Audio is never sent to a server.")
+                        Text("\(models.selected.name) listens to the recording itself, so Telugu, Hindi and mixed speech work in any language. Summary, notes and questions are written in the language above.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    if models.selected.hearsAudio {
-                        Text("\(models.selected.name) listens to the recording itself, so Telugu, Hindi and mixed speech work whatever is picked here. Notes are written in the language above.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    Section("Language of recordings") {
+                        if languages.isEmpty {
+                            Text("No on-device speech languages found. Add a dictation language in Settings > General > Keyboard > Dictation.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        } else {
+                            Picker("Language", selection: $settings.languageID) {
+                                ForEach(languages) { Text($0.name).tag($0.id) }
+                            }
+                            Text("Only languages that work fully on this iPhone are listed. Audio is never sent to a server.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                 }
 

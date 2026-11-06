@@ -41,12 +41,15 @@ final class AppSettings {
     var retentionDays: Int { didSet { d.set(retentionDays, forKey: "retentionDays") } }
     var requireUnlock: Bool { didSet { d.set(requireUnlock, forKey: "requireUnlock") } }
     var consentAcknowledged: Bool { didSet { d.set(consentAcknowledged, forKey: "consentAck") } }
+    /// Language the summary, notes and questions are written in when an audio-capable model is used.
+    var notesLanguage: String { didSet { d.set(notesLanguage, forKey: "notesLang") } }
 
     private init() {
         languageID = d.string(forKey: "lang") ?? ""
         retentionDays = d.object(forKey: "retentionDays") as? Int ?? 7
         requireUnlock = d.bool(forKey: "requireUnlock")
         consentAcknowledged = d.bool(forKey: "consentAck")
+        notesLanguage = d.string(forKey: "notesLang") ?? "en"
     }
 
     /// Resolves the chosen language against what this device can do on-device.

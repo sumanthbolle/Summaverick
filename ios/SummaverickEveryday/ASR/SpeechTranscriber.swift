@@ -50,8 +50,8 @@ final class SpeechTranscriber {
         return sorted.map { SpeechLanguage(locale: $0) }
     }
 
-    /// Transcribes a WAV/CAF file in ~55 s chunks. progress: 0…1.
-    func transcribe(fileURL: URL, locale: Locale, progress: @escaping (Double) -> Void) async throws -> String {
+    /// Transcribes a WAV/CAF file in ~55 s chunks, one piece per chunk (start = index * 55). progress: 0…1.
+    func transcribe(fileURL: URL, locale: Locale, progress: @escaping (Double) -> Void) async throws -> [TranscriptPiece] {
         guard let recognizer = SFSpeechRecognizer(locale: locale) else {
             throw TranscribeError.notAvailableOnDevice(locale.identifier)
         }
@@ -64,14 +64,14 @@ final class SpeechTranscriber {
         // Only remove temp chunk files, never the original recording (short files are passed through as-is).
         defer { chunks.filter { $0 != fileURL }.forEach { try? FileManager.default.removeItem(at: $0) } }
 
-        var pieces: [String] = []
+        var pieces: [TranscriptPiece] = []
         for (i, chunk) in chunks.enumerated() {
             try Task.checkCancellation()
             let text = try await recognizeChunk(chunk, recognizer: recognizer)
-            if !text.isEmpty { pieces.append(text) }
+            if !text.isEmpty { pieces.append(TranscriptPiece(startSec: Int(Double(i) * SpeechTranscriber.chunkSeconds), text: text)) }
             progress(Double(i + 1) / Double(chunks.count))
         }
-        return pieces.joined(separator: "\n")
+        return pieces
     }
 
     private func recognizeChunk(_ url: URL, recognizer: SFSpeechRecognizer) async throws -> String {

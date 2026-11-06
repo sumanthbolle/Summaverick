@@ -71,7 +71,7 @@ enum CoreError: LocalizedError {
 actor CoreEngine {
     static let shared = CoreEngine()
 
-    private var ctx: OpaquePointer?
+    var ctx: OpaquePointer?
     private(set) var loadedModelPath: String?
 
     static var databaseURL: URL {
@@ -89,13 +89,13 @@ actor CoreEngine {
         if ctx == nil { NSLog("sve_init failed") }
     }
 
-    private func take(_ p: UnsafeMutablePointer<CChar>?) -> String? {
+    func take(_ p: UnsafeMutablePointer<CChar>?) -> String? {
         guard let p else { return nil }
         defer { sve_free_string(p) }
         return String(cString: p)
     }
 
-    private func decode<T: Decodable>(_ type: T.Type, _ json: String?) -> T? {
+    func decode<T: Decodable>(_ type: T.Type, _ json: String?) -> T? {
         guard let json, let data = json.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
@@ -140,7 +140,7 @@ actor CoreEngine {
     // MARK: generation
 
     /// Progress box passed through the C callback as an opaque pointer.
-    private final class ProgressBox {
+    final class ProgressBox {
         let onProgress: (String, Int, Int) -> Void
         let isCancelled: () -> Bool
         init(onProgress: @escaping (String, Int, Int) -> Void, isCancelled: @escaping () -> Bool) {
@@ -148,7 +148,7 @@ actor CoreEngine {
         }
     }
 
-    private static let progressTrampoline: sve_progress_cb = { phase, done, total, user in
+    static let progressTrampoline: sve_progress_cb = { phase, done, total, user in
         guard let user else { return 0 }
         let box = Unmanaged<ProgressBox>.fromOpaque(user).takeUnretainedValue()
         box.onProgress(phase.map { String(cString: $0) } ?? "", Int(done), Int(total))

@@ -14,6 +14,7 @@ final class ProcessingPipeline {
         case idle
         case transcribing(Double)
         case loadingModel
+        case extracting
         case generating(OutputKind, String, Int, Int)   // kind, phase, done, total
         case done
         case failed(String)
@@ -23,6 +24,7 @@ final class ProcessingPipeline {
             case .idle: return ""
             case .transcribing(let p): return "Transcribing… \(Int(p * 100))%"
             case .loadingModel: return "Loading AI model…"
+            case .extracting: return "Finding reminders and tasks…"
             case .generating(let k, let phase, let d, let t):
                 return phase == "chunk" && t > 1 ? "Reading part \(d + 1) of \(t) for \(k.title.lowercased())…" : "Writing \(k.title.lowercased())…"
             case .done: return "Done"
@@ -53,7 +55,8 @@ final class ProcessingPipeline {
 
         let engine = CoreEngine.shared
         let title = "Recording " + Self.titleFormatter.string(from: Date())
-        let id = await engine.createNote(title: title, lang: language.shortCode, audioPath: audio.path, transcript: nil, durationSeconds: duration)
+        let noteLang = notesLang(fallback: language.shortCode)
+        let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
         guard id > 0 else { stage = .failed("Could not save the note."); return nil }
         activeNoteID = id
         NotificationCenter.default.post(name: .notesChanged, object: nil)
@@ -61,14 +64,16 @@ final class ProcessingPipeline {
         // 1. transcript
         lastFailure[id] = nil
         stage = .transcribing(0)
-        let transcript: String
+        let pieces: [TranscriptPiece]
         do {
-            transcript = try await transcribe(audio, language: language)
+            pieces = try await transcribe(audio, language: language)
         } catch {
             NSLog("[sve] transcription failed: %@", String(describing: error))
             stage = .failed(error.localizedDescription)
             return id
         }
+        let transcript = Self.joined(pieces)
+        await engine.setPieces(id, pieces)
         await engine.setTranscript(id, transcript)
         NotificationCenter.default.post(name: .notesChanged, object: nil)
         if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -77,7 +82,7 @@ final class ProcessingPipeline {
         }
 
         // 2. notes
-        await generateOutputs(noteID: id, transcript: transcript, lang: language.shortCode, setTitle: true)
+        await generateOutputs(noteID: id, transcript: transcript, lang: noteLang, setTitle: true)
         return id
     }
 
@@ -97,8 +102,10 @@ final class ProcessingPipeline {
             }
             let lang = SpeechTranscriber.onDeviceLanguages().first { $0.shortCode == note.lang } ?? AppSettings.shared.language
             stage = .transcribing(0)
+            var pieces: [TranscriptPiece] = []
             do {
-                t = try await transcribe(URL(fileURLWithPath: path), language: lang)
+                pieces = try await transcribe(URL(fileURLWithPath: path), language: lang)
+                t = Self.joined(pieces)
             } catch {
                 NSLog("[sve] transcription failed: %@", String(describing: error))
                 stage = .failed(error.localizedDescription); return
@@ -106,27 +113,38 @@ final class ProcessingPipeline {
             if t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 stage = .failed("No speech was detected in the recording."); return
             }
+            await CoreEngine.shared.setPieces(noteID, pieces)
             await CoreEngine.shared.setTranscript(noteID, t)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
-        await generateOutputs(noteID: noteID, transcript: t, lang: note.lang, setTitle: note.title.hasPrefix("Recording "))
+        await generateOutputs(noteID: noteID, transcript: t, lang: notesLang(fallback: note.lang), setTitle: note.title.hasPrefix("Recording "))
     }
 
     /// Audio → text. An audio-capable model (Gemma 4) hears the recording itself, so any language mix works;
     /// otherwise Apple's on-device recogniser is used for the chosen language.
-    private func transcribe(_ audio: URL, language: SpeechLanguage) async throws -> String {
+    private func transcribe(_ audio: URL, language: SpeechLanguage) async throws -> [TranscriptPiece] {
         let mm = ModelManager.shared
         let spec = mm.selected
         if spec.hearsAudio && mm.isInstalled(spec) {
             try await loadSelectedModel()
             stage = .transcribing(0)
-            return try await CoreEngine.shared.transcribeAudio(path: audio.path) { done, total in
+            return try await CoreEngine.shared.transcribeAudioPieces(path: audio.path) { done, total in
                 Task { @MainActor in self.stage = .transcribing(total > 0 ? Double(done) / Double(total) : 0) }
             }
         }
         return try await transcriber.transcribe(fileURL: audio, locale: language.locale) { p in
             Task { @MainActor in self.stage = .transcribing(p) }
         }
+    }
+
+    private static func joined(_ pieces: [TranscriptPiece]) -> String {
+        pieces.map(\.text).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Notes are written in the Notes language when the model hears audio; otherwise in the recording's language.
+    private func notesLang(fallback: String) -> String {
+        let mm = ModelManager.shared
+        return mm.selected.hearsAudio && mm.isInstalled(mm.selected) ? AppSettings.shared.notesLanguage : fallback
     }
 
     private func loadSelectedModel() async throws {
@@ -151,6 +169,23 @@ final class ProcessingPipeline {
             return
         }
 
+        // Reminders, tasks and profile changes first, so they are ready even if note writing is interrupted.
+        // A failure here never fails the notes.
+        let assistant = mm.selected.hearsAudio
+        if assistant {
+            if await engine.pieces(id).isEmpty {   // note from before pieces existed
+                await engine.setPieces(id, [TranscriptPiece(startSec: 0, text: transcript)])
+            }
+            stage = .extracting
+            do {
+                let n = try await engine.extract(noteID: id)
+                NSLog("[sve] extract added %d suggestions", n)
+            } catch {
+                NSLog("[sve] extract failed: %@", String(describing: error))
+            }
+            NotificationCenter.default.post(name: .assistantChanged, object: nil)
+        }
+
         if setTitle, let t = await engine.suggestTitle(transcript: transcript, lang: lang) {
             await engine.setTitle(id, t)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
@@ -168,6 +203,10 @@ final class ProcessingPipeline {
                 stage = .failed(error.localizedDescription)
                 return
             }
+        }
+        if assistant {
+            _ = await engine.generateInsight(noteID: id)
+            NotificationCenter.default.post(name: .assistantChanged, object: nil)
         }
         stage = .done
     }

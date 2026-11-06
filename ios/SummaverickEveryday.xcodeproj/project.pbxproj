@@ -41,6 +41,10 @@
 			isa = PBXBuildFile;
 			fileRef = FC581254F5C135DB22FD9C42;
 		};
+		53208D279FD7D4526A01C523 = {
+			isa = PBXBuildFile;
+			fileRef = 69DFE9A274CA05C81C452276;
+		};
 		5809D5B858D8CE07F8518B8C = {
 			isa = PBXBuildFile;
 			fileRef = 2E361774B975154A11567968;
@@ -56,6 +60,10 @@
 		7CD85F6783D894B9047A2C67 = {
 			isa = PBXBuildFile;
 			fileRef = EE7D0A38215CFAEEF0A0E2BE;
+		};
+		7DF93800DB3C9D1EB735C3CD = {
+			isa = PBXBuildFile;
+			fileRef = 618A438B4C8E5391746526C9;
 		};
 		8D4A6C6E4B479FCA91F91BA9 = {
 			isa = PBXBuildFile;
@@ -228,11 +236,25 @@
 			path = ../core/src/sve_medcheck.h;
 			sourceTree = SOURCE_ROOT;
 		};
+		618A438B4C8E5391746526C9 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = "CoreEngine+Assistant.swift";
+			path = "SummaverickEveryday/Engine/CoreEngine+Assistant.swift";
+			sourceTree = SOURCE_ROOT;
+		};
 		63A8A83C123E5491CBE9E84F = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
 			name = RecordView.swift;
 			path = SummaverickEveryday/Views/RecordView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		69DFE9A274CA05C81C452276 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AssistantModels.swift;
+			path = SummaverickEveryday/Engine/AssistantModels.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		8B7A0A18322F15224FEF40CC = {
@@ -450,6 +472,8 @@
 		68491ED0F099EABFEEBED4FC = {
 			isa = PBXGroup;
 			children = (
+				69DFE9A274CA05C81C452276,
+				618A438B4C8E5391746526C9,
 				3E8C99285C2BD28FE0ECE99B,
 				B05E051B8E13E602C77A96F0,
 				2E361774B975154A11567968,
@@ -592,6 +616,8 @@
 				19EE52EB9A963AD707F9115D,
 				DB8B42E9546B01810DFCAE5A,
 				1970E5A56D56F7BC7ACE9401,
+				53208D279FD7D4526A01C523,
+				7DF93800DB3C9D1EB735C3CD,
 				B3682618E8A7DB35FCEEE996,
 				5997944FB95EF3E94D57974F,
 				5809D5B858D8CE07F8518B8C,
