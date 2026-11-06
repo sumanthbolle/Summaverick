@@ -30,6 +30,12 @@ enum AssistantFormat {
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 
+    /// "Twice a day" with other than two distinct readable times would ring the wrong number of
+    /// times a day (the core flags such cards on "times"); forms block Save until it has two.
+    static func twiceDailyNeedsTwoTimes(_ repeatRule: String?, _ times: [String]) -> Bool {
+        repeatRule == "twice_daily" && Set(times.filter { ReminderScheduler.clock($0) != nil }).count != 2
+    }
+
     static func repeatLabel(_ r: String?) -> String? {
         guard let r, !r.isEmpty else { return nil }
         switch r {
@@ -640,6 +646,7 @@ struct SuggestionEditForm: View {
         if draft.times != before.times && draft.times.contains(where: { ReminderScheduler.clock($0) == nil }) {
             return "Pick a time for each row, or remove it."
         }
+        if AssistantFormat.twiceDailyNeedsTwoTimes(draft.repeatRule, draft.times) { return "Twice a day needs two times." }
         // A reminder made here starts today: an end date before today would never ring (the core refuses it).
         if answer != nil, s.kind == .reminder, let u = draft.untilDate, u < AssistantFormat.ymd(Date()) {
             return "The end date is before today. Pick a later end date, or turn it off."

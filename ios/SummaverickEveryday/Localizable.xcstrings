@@ -4280,6 +4280,22 @@
     "Summaverick Everyday %@ · core %@": {
       "comment": "App and core version numbers",
       "shouldTranslate": false
+    },
+    "Twice a day needs two times.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Twice a day needs two times."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రోజుకు రెండుసార్లు అంటే రెండు సమయాలు కావాలి."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -560,6 +560,22 @@ static void run_api_wipe(sve_ctx *ctx) {
     expect(sve_assistant_wipe(nullptr) < 0, "wipe refuses a null context");
 }
 
+// Final review fixes: twice a day needs two times; repeat/until edits replace the old reminder;
+// names from cards the person said No to stay known; an empty-times Yes writes nothing.
+static void run_api_final(sve_ctx *ctx) {
+    sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+    auto card = [&](int64_t id) { for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) if (s["medicine_id"] == id) return s; return json(); };
+    // I-2
+    int64_t t1 = sve_medicine_save(ctx, R"({"id":0,"name":"Glycomet","dose":"500 mg","when":"after dinner","repeat":"twice_daily"})");
+    json c1 = card(t1);
+    expect(t1 > 0 && c1["payload"]["times"] == json::array({"20:00"}) && c1["check_status"] == "check" && has_field(c1, "times"),
+           "twice_daily with one time: card flagged on times");
+    int64_t t2 = sve_medicine_save(ctx, R"({"id":0,"name":"Telma","dose":"40 mg","times":["08:00","20:00"],"repeat":"twice_daily"})");
+    expect(card(t2)["check_status"] == "ok", "twice_daily with two times: card ok");
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+}
+
 static int run_api(sve_ctx *ctx) {
     sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
     json prof = take(sve_profile_get(ctx));
@@ -623,6 +639,7 @@ static int run_api(sve_ctx *ctx) {
     run_api_fixes(ctx);
     run_api_direct(ctx);
     run_api_times(ctx);
+    run_api_final(ctx);
     run_api_wipe(ctx);
     return 0;
 }

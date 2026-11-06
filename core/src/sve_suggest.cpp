@@ -245,6 +245,10 @@ std::string sanitize_repeat(const std::string &s) {
     return "";
 }
 
+bool twice_daily_mismatch(const std::string &repeat, const json &times) {
+    return repeat == "twice_daily" && valid_times(times).size() != 2;
+}
+
 std::vector<std::string> valid_times(const json &arr) {
     std::vector<std::string> out;
     if (!arr.is_array()) return out;
@@ -467,6 +471,7 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
             out.push_back(finish(b, {{"text", text}, {"who", nullptr}, {"due_date", due}}));
             continue;
         }
+        if (twice_daily_mismatch(rep, json(times))) b.fields.push_back("times");  // twice a day needs two times
         const bool strict = !med.is_null();
         json start = date_field(it, "start_date", b.fields, strict, today, true);
         json until = date_field(it, "until_date", b.fields, strict, today, false);

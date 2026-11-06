@@ -619,3 +619,31 @@ TEST(profile_card_dose_differing_from_saved_is_check) {
     CHECK_EQ(w[0]["check_status"].get<std::string>(), std::string("ok"));
     CHECK(!has(w[1]["check_fields"], "dose"));
 }
+
+TEST(twice_daily_with_one_time_is_check) {
+    CHECK(twice_daily_mismatch("twice_daily", json::array({"20:00"})));
+    CHECK(twice_daily_mismatch("twice_daily", json::array()));
+    CHECK(twice_daily_mismatch("twice_daily", json::array({"08:00", "14:00", "20:00"})));
+    CHECK(!twice_daily_mismatch("twice_daily", json::array({"08:00", "20:00"})));
+    CHECK(!twice_daily_mismatch("daily", json::array({"20:00"})));
+    const json pieces = json::parse(R"([{"start_sec":0,"text":"Take Amlodipine 5 mg twice daily after dinner."}])");
+    Extracted e = ex(R"({"reminders":[{"text":"Take Amlodipine 5 mg","when_text":"after dinner","times":[],
+        "repeat":"twice_daily","quote":"Take Amlodipine 5 mg twice daily after dinner.","start_sec":0,
+        "medicine":{"name":"Amlodipine","dose":"5 mg","frequency":"twice daily","duration":""}}]})");
+    auto v = build_suggestions(e, pieces, 7, kRoutine);
+    CHECK_EQ(v.size(), (size_t)1);
+    CHECK_EQ(v[0]["payload"]["times"], json::array({"20:00"}));
+    CHECK_EQ(v[0]["check_status"].get<std::string>(), std::string("check"));
+    CHECK(has(v[0]["check_fields"], "times"));
+}
+
+TEST(twice_daily_with_two_times_is_ok) {
+    const json pieces = json::parse(R"([{"start_sec":0,"text":"Take Metformin 500 mg twice daily after breakfast and after dinner."}])");
+    Extracted e = ex(R"({"reminders":[{"text":"Take Metformin 500 mg","when_text":"after breakfast and after dinner","times":[],
+        "repeat":"twice_daily","quote":"Take Metformin 500 mg twice daily after breakfast and after dinner.","start_sec":0,
+        "medicine":{"name":"Metformin","dose":"500 mg","frequency":"twice daily","duration":""}}]})");
+    auto v = build_suggestions(e, pieces, 7, kRoutine);
+    CHECK_EQ(v.size(), (size_t)1);
+    CHECK_EQ(v[0]["payload"]["times"], json::array({"08:00", "20:00"}));
+    CHECK(!has(v[0]["check_fields"], "times"));
+}

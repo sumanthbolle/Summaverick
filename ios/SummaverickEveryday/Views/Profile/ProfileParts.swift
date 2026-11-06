@@ -247,6 +247,9 @@ struct MedicineForm: View {
                         if repeatRule == nil {
                             Text("Choose how often it repeats before saving.").foregroundStyle(.red)
                         }
+                        if twiceDailyShort {
+                            Text("Twice a day needs two times.").foregroundStyle(.red)
+                        }
                     }
                 }
             }
@@ -268,7 +271,11 @@ struct MedicineForm: View {
         .onDisappear { PresentationGate.shared.set("medicineForm", false) }
     }
 
-    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && repeatRule != nil }
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && repeatRule != nil && !twiceDailyShort
+    }
+
+    private var twiceDailyShort: Bool { AssistantFormat.twiceDailyNeedsTwoTimes(repeatRule, times) }
 
     private var hasUntil: Binding<Bool> {
         Binding(get: { untilDate != nil },

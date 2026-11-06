@@ -168,10 +168,11 @@ void propose_medicine_reminder(sve::Store &st, int64_t med_id, const std::string
                     {"until_date", med.contains("until_date") ? med["until_date"] : json(nullptr)},
                     {"medicine", {{"name", name}, {"dose", dose}, {"when_text", jstr(med, "when_text")},
                                   {"frequency", ""}, {"duration", ""}}}};
-    bool no_time = sve::valid_times(times).empty();
+    // No time, or "twice a day" without exactly two times: the person must look at the times.
+    bool bad_times = sve::valid_times(times).empty() || sve::twice_daily_mismatch(jstr(med, "repeat"), times);
     st.add_suggestion({{"kind", "reminder"}, {"payload", payload}, {"quote", quote}, {"note_id", note_id},
-                       {"start_sec", start_sec}, {"medicine_id", med_id}, {"check_status", no_time ? "check" : "ok"},
-                       {"check_fields", no_time ? json::array({"times"}) : json::array()}});
+                       {"start_sec", start_sec}, {"medicine_id", med_id}, {"check_status", bad_times ? "check" : "ok"},
+                       {"check_fields", bad_times ? json::array({"times"}) : json::array()}});
 }
 
 // Medicine row fields from a JSON object (person's input or an accepted payload). Times default to the

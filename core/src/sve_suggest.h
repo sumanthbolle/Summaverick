@@ -28,6 +28,9 @@ bool date_matches_weekday(const std::string &ymd, const std::string &quote);
 std::string sanitize_repeat(const std::string &s);  // daily|twice_daily|weekly|once, else ""
 // Valid "HH:MM" strings from a JSON array (others dropped, duplicates removed).
 std::vector<std::string> valid_times(const json &arr);
+// True when repeat is "twice_daily" but the times are not exactly two valid ones: the schedule
+// would ring a different number of times a day than the person was told ("Please check" on times).
+bool twice_daily_mismatch(const std::string &repeat, const json &times);
 
 // Times implied by meal/day words in when_text ("after dinner" -> routine dinner), sorted.
 std::vector<std::string> resolve_times(const std::string &when_text, const json &routine);
