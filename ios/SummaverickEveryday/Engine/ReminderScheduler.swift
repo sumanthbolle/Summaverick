@@ -120,7 +120,6 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
                 untilEnd = calendar.date(byAdding: .day, value: 1, to: d)
             }
             let kind = r.repeat ?? "once"
-            let weekday = calendar.component(.weekday, from: start)
             let base = max(start, today)
             let bounded = start > today || untilEnd != nil
             // A "once" reminder fires only on its own date: start_date, else the day it was created
@@ -128,6 +127,9 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
             // deactivate fired once-reminders, so a past date must stay silent.
             let onceDay: Date = r.startDate != nil ? start
                 : (r.createdAt.map { calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0))) } ?? today)
+            // Weekly reminders repeat on their anchor day's weekday: start_date, else the day they were created
+            // (same anchor as "once"). Never today's weekday, or the day would move with every resync.
+            let weekday = calendar.component(.weekday, from: onceDay)
 
             func make(_ id: String, _ c: DateComponents, _ repeats: Bool, _ fire: Date) -> PlannedRequest {
                 PlannedRequest(identifier: id, body: r.text, components: c, repeats: repeats, fireDate: fire,
