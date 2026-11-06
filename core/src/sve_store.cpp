@@ -430,6 +430,11 @@ bool Store::set_suggestion_status(int64_t id, const std::string &status) {
     return run("UPDATE suggestions SET status=? WHERE id=?", {status, id}) && sqlite3_changes(db_) > 0;
 }
 
+bool Store::set_suggestion_check(int64_t id, const std::string &check_status, const json &check_fields) {
+    return run("UPDATE suggestions SET check_status=?, check_fields=? WHERE id=?", {check_status, jtext(check_fields), id}) &&
+           sqlite3_changes(db_) > 0;
+}
+
 json Store::suggestion(int64_t id) {
     json r = query_rows((std::string("SELECT ") + kSuggestionCols + " FROM suggestions WHERE id=?").c_str(), {id});
     return r.empty() ? json(nullptr) : r[0];

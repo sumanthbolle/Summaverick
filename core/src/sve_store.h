@@ -59,6 +59,7 @@ public:
     json suggestions(const std::string &status);
     bool set_suggestion_status(int64_t id, const std::string &status);
     json suggestion(int64_t id);
+    bool set_suggestion_check(int64_t id, const std::string &check_status, const json &check_fields);
 
     int64_t add_reminder(const json &r);
     json reminders(bool active_only);

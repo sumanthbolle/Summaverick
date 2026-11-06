@@ -137,6 +137,45 @@ static json active_named(sve_ctx *ctx, const char *name) {
 }
 
 
+
+static json med_named(sve_ctx *ctx, const char *name) {
+    for (const auto &m : take(sve_medicines_json(ctx))) if (m["name"] == name) return m;
+    return nullptr;
+}
+
+// Fix round 3: a stale "ok" card never overwrites a dose the person entered later.
+static void run_api_fixes3(sve_ctx *ctx, int64_t note) {
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+    auto card = [&](const char *dose) {
+        return json{{"kind", "reminder"}, {"note_id", note}, {"start_sec", 0}, {"quote", std::string("Take Cardace ") + dose + " after dinner"},
+                    {"check_status", "ok"}, {"check_fields", json::array()},
+                    {"payload", {{"text", std::string("Take Cardace ") + dose}, {"when_text", "after dinner"}, {"times", {"21:30"}},
+                                 {"repeat", "daily"}, {"medicine", {{"name", "cardace"}, {"dose", dose}, {"when_text", "after dinner"}}}}}};
+    };
+    // Recording proposes 25 mg; the person then types 50 mg; the old card is superseded and cannot apply.
+    int64_t old_card = add_sugg(ctx, card("25 mg"));
+    int64_t cid = sve_medicine_save(ctx, R"({"name":"Cardace","dose":"50 mg","when":"after dinner"})");
+    expect(ctx->store->suggestion(old_card)["status"] == "superseded", "typing the medicine supersedes the recording's card");
+    expect(sve_suggestion_accept(ctx, old_card, nullptr) < 0, "superseded card cannot be accepted");
+    json own = pending_kind(ctx, "reminder");
+    expect(own.size() == 1 && sve_suggestion_accept(ctx, own[0]["id"], nullptr) > 0, "person's own card accepted");
+    expect(med_named(ctx, "Cardace")["dose"] == "50 mg" && active_named(ctx, "Cardace 50 mg").size() == 1, "50 mg kept and active");
+
+    // A stale pending "ok" card accepted unedited -> -2, re-flagged, still pending, nothing changed.
+    int64_t stale = add_sugg(ctx, card("25 mg"));
+    expect(sve_suggestion_accept(ctx, stale, nullptr) == -2, "stale card returns -2");
+    json st = ctx->store->suggestion(stale);
+    bool dose_flag = false;
+    for (const auto &f : st["check_fields"]) dose_flag = dose_flag || f == "dose";
+    expect(st["status"] == "pending" && st["check_status"] == "check" && dose_flag, "stale card re-flagged on dose and kept pending");
+    expect(med_named(ctx, "Cardace")["dose"] == "50 mg" && active_named(ctx, "Cardace 50 mg").size() == 1, "nothing applied");
+    // After the warning, Yes applies; the saved name is kept.
+    expect(sve_suggestion_accept(ctx, stale, nullptr) > 0, "flagged card accepted on second Yes");
+    json cm = med_named(ctx, "Cardace");
+    expect(cm.is_object() && cm["id"] == cid && cm["dose"] == "25 mg", "accepted dose applied, saved name kept");
+    expect(med_named(ctx, "cardace").is_null(), "no rename to the payload's spelling");
+}
+
 // Fix round 2: accepted dose updates the saved medicine; editing a dose turns old reminders off;
 // stop supersedes pending cards; Ask quotes medicine pieces first and medicine facts.
 static void run_api_fixes2(sve_ctx *ctx, int64_t note) {
@@ -188,6 +227,7 @@ static void run_api_fixes2(sve_ctx *ctx, int64_t note) {
     printf("--- ask fact\n%s\n", f.dump(2).c_str());
     expect(f.is_object() && f["medicine"] == true && contains(f["answer"], "Take the iron tablet with orange juice"),
            "medicine fact quoted verbatim");
+    run_api_fixes3(ctx, note);
 }
 
 // Fix round 1: recording-born reminders link to the medicine; stop/update/delete turn them off;

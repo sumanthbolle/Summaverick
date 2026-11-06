@@ -184,11 +184,22 @@ bool quote_has_hour(const std::string &quote, const std::string &hhmm) {
         {"ఆరు", 6}, {"ఏడు", 7}, {"ఎనిమిది", 8}, {"తొమ్మిది", 9}, {"పది", 10}, {"పదకొండు", 11}, {"పన్నెండు", 12}};
     int h = std::stoi(hhmm.substr(0, 2));
     auto hour_ok = [&](int v) { return v == h || (v >= 1 && v <= 12 && v % 12 == h % 12); };
-    for (const auto &t : norm_tokens(quote)) {
+    std::vector<std::string> q = norm_tokens(quote);
+    for (size_t i = 0; i < q.size(); ++i) {
+        const std::string &t = q[i];
         if (!t.empty() && t[0] >= '0' && t[0] <= '9') {
             size_t k = 0;
             while (k < t.size() && t[k] >= '0' && t[k] <= '9' && k < 4) ++k;
-            if (hour_ok(std::stoi(t.substr(0, k)))) return true;
+            int v = std::stoi(t.substr(0, k));
+            // "9 am" / "9 a.m." / "9pm": the stated half of the day must match
+            std::string next = i + 1 < q.size() ? q[i + 1] : "", after = i + 2 < q.size() ? q[i + 2] : "";
+            bool am = next == "am" || (next == "a" && after == "m");
+            bool pm = next == "pm" || (next == "p" && after == "m");
+            if (v >= 1 && v <= 12 && (am || pm)) {
+                if ((v % 12) + (pm ? 12 : 0) == h) return true;
+                continue;
+            }
+            if (hour_ok(v)) return true;
         }
         for (const auto &w : kTe) if (t == w.w && hour_ok(w.v)) return true;
     }

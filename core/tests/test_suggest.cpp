@@ -567,3 +567,15 @@ TEST(dose_differing_from_saved_medicine_is_check) {
     json same = json::parse(R"([{"id":1,"name":"amlodipine","dose":"5mg"}])");
     CHECK_EQ(build_suggestions(e, kPieces, 7, kRoutine, "", "en", {"Amlodipine"}, same)[0]["check_status"].get<std::string>(), std::string("ok"));
 }
+
+TEST(routine_hour_respects_am_pm) {
+    CHECK(quote_has_hour("dinner at 9 pm", "21:00"));
+    CHECK(quote_has_hour("dinner at 9pm", "21:00"));
+    CHECK(quote_has_hour("dinner at 21:00", "21:00"));
+    CHECK(!quote_has_hour("dinner at 9 am", "21:00"));
+    CHECK(!quote_has_hour("walk at 9 a.m.", "21:00"));
+    CHECK(quote_has_hour("walk at 9 am", "09:00"));
+    CHECK(!quote_has_hour("walk at 9 pm", "09:00"));
+    CHECK(quote_has_hour("lunch at 12 pm", "12:00"));
+    CHECK(quote_has_hour("dinner at 9", "21:00"));  // no am/pm: hour only
+}

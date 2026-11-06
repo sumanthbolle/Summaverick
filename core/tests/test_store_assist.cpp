@@ -165,3 +165,13 @@ TEST(search_pieces_matches_any_word_ranked) {
     // note search keeps AND semantics
     CHECK_EQ(s.list("doctor zebra", 10).size(), (size_t)0);
 }
+
+TEST(suggestion_check_can_be_reflagged) {
+    Store s(":memory:");
+    int64_t id = s.add_suggestion(json::parse(R"({"kind":"reminder","payload":{},"check_status":"ok","check_fields":[]})"));
+    CHECK(s.set_suggestion_check(id, "check", json::array({"dose"})));
+    json r = s.suggestion(id);
+    CHECK_EQ(r["check_status"].get<std::string>(), std::string("check"));
+    CHECK_EQ(r["check_fields"], json::array({"dose"}));
+    CHECK(!s.set_suggestion_check(9999, "check", json::array()));
+}
