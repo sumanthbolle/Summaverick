@@ -77,7 +77,7 @@ final class AudioRecorder {
             guard r.record() else {
                 r.deleteRecording()
                 try? FileManager.default.removeItem(at: url)   // no partial file left behind
-                lastError = "Could not start recording."
+                lastError = String(localized: "Could not start recording.")
                 return
             }
             recorder = r

@@ -1547,17 +1547,6 @@
         }
       }
     },
-    "Open the recording: %@": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "రికార్డింగ్ తెరవండి: %@"
-          }
-        }
-      },
-      "comment": "%@ is the recording title"
-    },
     "Open the recording: %@ at %@": {
       "localizations": {
         "en": {
@@ -2773,20 +2762,8 @@
       }
     },
     "· %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "· %@"
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "· %@"
-          }
-        }
-      }
+      "comment": "Separator before a value",
+      "shouldTranslate": false
     },
     "A name is needed to save.": {
       "localizations": {
@@ -3494,6 +3471,815 @@
           }
         }
       }
+    },
+    "%@ listens to the recording itself, so Telugu, Hindi and mixed speech work in any language. Summary, notes and questions are written in the language above.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ రికార్డింగ్‌ను నేరుగా వింటుంది. అందుకే తెలుగు, హిందీ, కలగలిపిన మాటలు ఏ భాషలోనైనా పనిచేస్తాయి. సారాంశం, నోట్స్, ప్రశ్నలు పైన ఎంచుకున్న భాషలో వస్తాయి."
+          }
+        }
+      },
+      "comment": "%@ is the AI model name"
+    },
+    "1 day": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 రోజు"
+          }
+        }
+      }
+    },
+    "30 days": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 రోజులు"
+          }
+        }
+      }
+    },
+    "7 days": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 రోజులు"
+          }
+        }
+      }
+    },
+    "accept the suggestion": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సూచనను ఒప్పుకోవడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "AI model (runs on this phone)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI మోడల్ (ఈ ఫోన్‌లోనే నడుస్తుంది)"
+          }
+        }
+      }
+    },
+    "Allow microphone and speech recognition for Summaverick in Settings.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సెట్టింగ్స్‌లో Summaverickకి మైక్రోఫోన్, మాట గుర్తింపు అనుమతి ఇవ్వండి."
+          }
+        }
+      }
+    },
+    "Audio retention": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆడియో ఎంత కాలం ఉంచాలి"
+          }
+        }
+      }
+    },
+    "Clearer notes and better Indian-language output. Needs a 6 GB+ iPhone/iPad.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ ఇంకా స్పష్టంగా ఉంటాయి, భారతీయ భాషల్లో బాగా రాస్తుంది. 6 GB లేదా అంతకంటే ఎక్కువ మెమరీ ఉన్న iPhone/iPad కావాలి."
+          }
+        }
+      }
+    },
+    "Could not %@.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ కుదరలేదు."
+          }
+        }
+      },
+      "comment": "%@ is an action such as \"save the reminder\""
+    },
+    "Could not load the AI model at %@.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ దగ్గర ఉన్న AI మోడల్‌ను తెరవలేకపోయాం."
+          }
+        }
+      },
+      "comment": "%@ is a file path"
+    },
+    "Could not open the notes database.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ డేటాబేస్ తెరవలేకపోయాం."
+          }
+        }
+      }
+    },
+    "Could not read the assistant's reply.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అసిస్టెంట్ జవాబును చదవలేకపోయాం."
+          }
+        }
+      }
+    },
+    "Could not save the note.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్‌ను సేవ్ చేయలేకపోయాం."
+          }
+        }
+      }
+    },
+    "Could not start recording.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ మొదలవ్వలేదు."
+          }
+        }
+      }
+    },
+    "delete the assistant data": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అసిస్టెంట్ డేటాను తొలగించడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "Download %lld MB": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld MB డౌన్‌లోడ్ చేయండి"
+          }
+        }
+      }
+    },
+    "Download failed (HTTP %lld).": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "డౌన్‌లోడ్ కాలేదు (HTTP %lld)."
+          }
+        }
+      }
+    },
+    "Download the AI model in Settings, then tap Generate notes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సెట్టింగ్స్‌లో AI మోడల్‌ను డౌన్‌లోడ్ చేసి, తర్వాత 'నోట్స్ తయారు చేయి' నొక్కండి."
+          }
+        }
+      }
+    },
+    "Download the AI model once (about 640 MB) to get summaries and notes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశాలు, నోట్స్ కోసం AI మోడల్‌ను ఒక్కసారి డౌన్‌లోడ్ చేయండి (సుమారు 640 MB)."
+          }
+        }
+      }
+    },
+    "Failed: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కాలేదు: %@"
+          }
+        }
+      },
+      "comment": "%@ is the reason"
+    },
+    "Fast on any iPhone from the last five years. Good English; basic Hindi.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "గత ఐదేళ్లలో వచ్చిన ఏ iPhone లోనైనా వేగంగా పనిచేస్తుంది. ఇంగ్లీష్ బాగా వస్తుంది; హిందీ కొద్దిగా."
+          }
+        }
+      }
+    },
+    "find reminders and tasks": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్లు, పనులు వెతకడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "Finding reminders and tasks…": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్లు, పనులు వెతుకుతోంది…"
+          }
+        }
+      }
+    },
+    "Forever": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎప్పటికీ"
+          }
+        }
+      }
+    },
+    "Gemma 4 E4B (any language, hears audio)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemma 4 E4B (ఏ భాషైనా, ఆడియో వింటుంది)"
+          }
+        }
+      }
+    },
+    "Keep recordings for": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్‌లు ఎంత కాలం ఉంచాలి"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "భాష"
+          }
+        }
+      }
+    },
+    "Language of recordings": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్‌ల భాష"
+          }
+        }
+      }
+    },
+    "Loading AI model…": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI మోడల్ తెరుస్తోంది…"
+          }
+        }
+      }
+    },
+    "Microphone access needed": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మైక్రోఫోన్ అనుమతి కావాలి"
+          }
+        }
+      }
+    },
+    "No on-device speech languages found. Add a dictation language in Settings > General > Keyboard > Dictation.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లో మాట గుర్తించే భాషలు ఏవీ లేవు. సెట్టింగ్స్ > జనరల్ > కీబోర్డ్ > డిక్టేషన్‌లో ఒక భాషను చేర్చండి."
+          }
+        }
+      }
+    },
+    "No speech was detected in the recording.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్‌లో మాటలు ఏవీ వినిపించలేదు."
+          }
+        }
+      }
+    },
+    "No transcript and the audio is no longer available.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాత ప్రతి లేదు, ఆడియో కూడా ఇప్పుడు లేదు."
+          }
+        }
+      }
+    },
+    "Not recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డ్ చేయడం లేదు"
+          }
+        }
+      }
+    },
+    "Note not found.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్ దొరకలేదు."
+          }
+        }
+      }
+    },
+    "Notes language": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ భాష"
+          }
+        }
+      }
+    },
+    "On-device speech recognition for %@ is not available on this iPhone. Open Settings > General > Keyboard > Dictation and add the language, then try again.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ కోసం ఈ iPhone లో మాట గుర్తింపు లేదు. సెట్టింగ్స్ > జనరల్ > కీబోర్డ్ > డిక్టేషన్ తెరిచి ఆ భాషను చేర్చి, మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      },
+      "comment": "%@ is a language name"
+    },
+    "Only languages that work fully on this iPhone are listed. Audio is never sent to a server.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ iPhone లో పూర్తిగా పనిచేసే భాషలు మాత్రమే ఇక్కడ ఉన్నాయి. ఆడియో ఎప్పుడూ ఏ సర్వర్‌కీ వెళ్లదు."
+          }
+        }
+      }
+    },
+    "Privacy": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "గోప్యత"
+          }
+        }
+      }
+    },
+    "Qwen3 0.6B (recommended)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3 0.6B (సూచించినది)"
+          }
+        }
+      }
+    },
+    "Qwen3 1.7B (better quality)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3 1.7B (మెరుగైన నాణ్యత)"
+          }
+        }
+      }
+    },
+    "Raw audio is deleted after this period to save space. Transcripts and notes are kept until you delete them.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "స్థలం ఆదా చేయడానికి ఈ కాలం తర్వాత ఆడియో తొలగిపోతుంది. రాత ప్రతులు, నోట్స్ మీరు తొలగించే వరకు ఉంటాయి."
+          }
+        }
+      }
+    },
+    "read medicines": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందుల వివరాలు చదవడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "read medicines (engine not ready)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందుల వివరాలు చదవడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "read reminders": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్లు చదవడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "read reminders (engine not ready)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్లు చదవడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "Reading part %lld of %lld for %@…": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%3$@ కోసం %2$lld భాగాల్లో %1$lldవ భాగం చదువుతోంది…"
+          }
+        }
+      },
+      "comment": "Part number, total parts, output name such as notes"
+    },
+    "Recording on this phone. Lock the screen if you like; recording continues.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లో రికార్డ్ అవుతోంది. కావాలంటే స్క్రీన్ లాక్ చేయండి; రికార్డింగ్ ఆగదు."
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తీసివేయి"
+          }
+        }
+      }
+    },
+    "Require Face ID / passcode to open": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తెరవడానికి Face ID / పాస్‌కోడ్ అడగాలి"
+          }
+        }
+      }
+    },
+    "Revision questions": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రివిజన్ ప్రశ్నలు"
+          }
+        }
+      },
+      "comment": "Heading in the shared notes file"
+    },
+    "save the medicine": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మందును సేవ్ చేయడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "save the profile": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రొఫైల్‌ను సేవ్ చేయడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "save the reminder": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్‌ను సేవ్ చేయడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "save the reminder (engine not ready)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్‌ను సేవ్ చేయడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "save the to-do": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పనిని సేవ్ చేయడం"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "save the to-do (engine not ready)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పనిని సేవ్ చేయడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+          }
+        }
+      },
+      "comment": "Used in 'Could not %@.'"
+    },
+    "Show recording reminder": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ గురించి గుర్తు చేయి"
+          }
+        }
+      }
+    },
+    "Speech recognition permission was not granted.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మాట గుర్తింపుకు అనుమతి ఇవ్వలేదు."
+          }
+        }
+      }
+    },
+    "Starting…": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మొదలవుతోంది…"
+          }
+        }
+      }
+    },
+    "Stop and make notes": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆపి నోట్స్ తయారు చేయి"
+          }
+        }
+      }
+    },
+    "Summaverick has no account, no analytics and no server. The only network use is downloading the AI model.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverickకి అకౌంట్ లేదు, విశ్లేషణలు లేవు, సర్వర్ లేదు. AI మోడల్ డౌన్‌లోడ్ చేయడానికి మాత్రమే ఇంటర్నెట్ వాడుతుంది."
+          }
+        }
+      }
+    },
+    "Summaverick is locked": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick లాక్ అయి ఉంది"
+          }
+        }
+      }
+    },
+    "The AI model could not produce an answer.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI మోడల్ జవాబు ఇవ్వలేకపోయింది."
+          }
+        }
+      }
+    },
+    "The AI model could not transcribe the recording.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI మోడల్ రికార్డింగ్‌ను రాయలేకపోయింది."
+          }
+        }
+      }
+    },
+    "The recording could not be read.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్‌ను చదవలేకపోయాం."
+          }
+        }
+      }
+    },
+    "The selected AI model cannot listen to audio.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎంచుకున్న AI మోడల్ ఆడియో వినలేదు."
+          }
+        }
+      }
+    },
+    "The speech recogniser is busy.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మాట గుర్తింపు ప్రస్తుతం పనిలో ఉంది."
+          }
+        }
+      }
+    },
+    "This phone has %@ GB of memory. Recommended: %@.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లో %1$@ GB మెమరీ ఉంది. సూచించేది: %2$@."
+          }
+        }
+      },
+      "comment": "Memory size, then the recommended model name"
+    },
+    "Transcribing… %lld%%": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాత ప్రతి తయారవుతోంది… %lld%%"
+          }
+        }
+      }
+    },
+    "Understands mixed languages such as Telugu with English terms and writes the notes. Large download; needs an 8 GB iPhone. Slower: roughly real time.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంగ్లీష్ పదాలు కలిసిన తెలుగు లాంటి మిశ్రమ భాషలను అర్థం చేసుకుని నోట్స్ రాస్తుంది. పెద్ద డౌన్‌లోడ్; 8 GB iPhone కావాలి. నెమ్మదిగా: రికార్డింగ్ ఎంత సేపో దాదాపు అంతే సమయం."
+          }
+        }
+      }
+    },
+    "Unlock": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్‌లాక్ చేయి"
+          }
+        }
+      }
+    },
+    "Unlock your notes": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నోట్స్ అన్‌లాక్ చేయండి"
+          }
+        }
+      }
+    },
+    "Writing %@…": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ రాస్తోంది…"
+          }
+        }
+      },
+      "comment": "%@ is summary, notes or questions"
+    },
+    "Your personal note-taker. Everything stays on this device.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ సొంత నోట్స్ సహాయకుడు. అంతా ఈ ఫోన్‌లోనే ఉంటుంది."
+          }
+        }
+      }
+    },
+    "— Made with Summaverick Everyday, on this device.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "— ఈ ఫోన్‌లోనే Summaverick Everydayతో తయారైంది."
+          }
+        }
+      },
+      "comment": "Last line of the shared notes file"
+    },
+    "%lld": {
+      "comment": "Badge count",
+      "shouldTranslate": false
+    },
+    " Everyday": {
+      "comment": "Brand name",
+      "shouldTranslate": false
+    },
+    "Summaverick": {
+      "comment": "Brand name",
+      "shouldTranslate": false
+    },
+    "Summaverick Everyday %@ · core %@": {
+      "comment": "App and core version numbers",
+      "shouldTranslate": false
     }
   },
   "version": "1.0"

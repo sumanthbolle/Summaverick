@@ -313,10 +313,10 @@ struct NoteDetailView: View {
     private var shareText: String? {
         guard let n = note else { return nil }
         var s = "# \(n.title)\n\n"
-        if let x = n.short_summary { s += "## Summary\n\(x)\n\n" }
+        if let x = n.short_summary { s += "## \(String(localized: "Summary"))\n\(x)\n\n" }
         if let x = n.detailed_notes { s += x + "\n\n" }
-        if let x = n.revision_questions { s += "## Revision questions\n\(x)\n\n" }
-        s += "— Made with Summaverick Everyday, on this device."
+        if let x = n.revision_questions { s += "## \(String(localized: "Revision questions"))\n\(x)\n\n" }
+        s += String(localized: "— Made with Summaverick Everyday, on this device.")
         return s
     }
 

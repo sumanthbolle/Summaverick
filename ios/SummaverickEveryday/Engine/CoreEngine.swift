@@ -7,9 +7,9 @@ enum OutputKind: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .shortSummary: return "Summary"
-        case .detailedNotes: return "Notes"
-        case .revisionQuestions: return "Questions"
+        case .shortSummary: return String(localized: "Summary")
+        case .detailedNotes: return String(localized: "Notes")
+        case .revisionQuestions: return String(localized: "Questions")
         }
     }
     var cKind: sve_output_kind { sve_output_kind(UInt32(rawValue)) }
@@ -57,12 +57,12 @@ enum CoreError: LocalizedError {
     case initFailed, modelLoadFailed(String), generationFailed, notFound, audioModelNotLoaded, transcriptionFailed
     var errorDescription: String? {
         switch self {
-        case .initFailed: return "Could not open the notes database."
-        case .modelLoadFailed(let p): return "Could not load the AI model at \(p)."
-        case .generationFailed: return "The AI model could not produce an answer."
-        case .notFound: return "Note not found."
-        case .audioModelNotLoaded: return "The selected AI model cannot listen to audio."
-        case .transcriptionFailed: return "The AI model could not transcribe the recording."
+        case .initFailed: return String(localized: "Could not open the notes database.")
+        case .modelLoadFailed(let p): return String(localized: "Could not load the AI model at \(p).")
+        case .generationFailed: return String(localized: "The AI model could not produce an answer.")
+        case .notFound: return String(localized: "Note not found.")
+        case .audioModelNotLoaded: return String(localized: "The selected AI model cannot listen to audio.")
+        case .transcriptionFailed: return String(localized: "The AI model could not transcribe the recording.")
         }
     }
 }

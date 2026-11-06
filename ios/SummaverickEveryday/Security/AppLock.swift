@@ -33,10 +33,10 @@ final class AppLock {
         authenticating = true
         defer { authenticating = false }
         let ctx = LAContext()
-        ctx.localizedCancelTitle = "Cancel"
+        ctx.localizedCancelTitle = String(localized: "Cancel")
         do {
             // .deviceOwnerAuthentication falls back to the phone passcode when biometrics are unavailable.
-            let ok = try await ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock your notes")
+            let ok = try await ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: String(localized: "Unlock your notes"))
             if ok { withAnimation { isLocked = false } }
         } catch {
             // stay locked

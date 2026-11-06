@@ -20,10 +20,10 @@ enum TranscribeError: LocalizedError {
     case notAuthorized, notAvailableOnDevice(String), audioUnreadable, recognizerBusy
     var errorDescription: String? {
         switch self {
-        case .notAuthorized: return "Speech recognition permission was not granted."
-        case .notAvailableOnDevice(let l): return "On-device speech recognition for \(l) is not available on this iPhone. Open Settings > General > Keyboard > Dictation and add the language, then try again."
-        case .audioUnreadable: return "The recording could not be read."
-        case .recognizerBusy: return "The speech recogniser is busy."
+        case .notAuthorized: return String(localized: "Speech recognition permission was not granted.")
+        case .notAvailableOnDevice(let l): return String(localized: "On-device speech recognition for \(l) is not available on this iPhone. Open Settings > General > Keyboard > Dictation and add the language, then try again.")
+        case .audioUnreadable: return String(localized: "The recording could not be read.")
+        case .recognizerBusy: return String(localized: "The speech recogniser is busy.")
         }
     }
 }

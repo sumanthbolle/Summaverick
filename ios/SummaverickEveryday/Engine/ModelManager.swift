@@ -22,19 +22,19 @@ struct ModelSpec: Identifiable, Hashable {
 enum ModelCatalog {
     // Official Qwen GGUFs (Apache 2.0). Q4_K_M keeps RAM low; Q8_0 is noticeably better if the phone has the headroom.
     static let all: [ModelSpec] = [
-        ModelSpec(id: "qwen3-0.6b-q8", name: "Qwen3 0.6B (recommended)", fileName: "Qwen3-0.6B-Q8_0.gguf",
+        ModelSpec(id: "qwen3-0.6b-q8", name: String(localized: "Qwen3 0.6B (recommended)"), fileName: "Qwen3-0.6B-Q8_0.gguf",
                   url: URL(string: "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf")!,
-                  approxMB: 640, minRAMGB: 3, notes: "Fast on any iPhone from the last five years. Good English; basic Hindi."),
+                  approxMB: 640, minRAMGB: 3, notes: String(localized: "Fast on any iPhone from the last five years. Good English; basic Hindi.")),
         // Qwen only publishes Q8_0 for 1.7B (1.8 GB); the Q4_K_M build (1.1 GB) is from unsloth's official-weights conversion.
-        ModelSpec(id: "qwen3-1.7b-q4", name: "Qwen3 1.7B (better quality)", fileName: "Qwen3-1.7B-Q4_K_M.gguf",
+        ModelSpec(id: "qwen3-1.7b-q4", name: String(localized: "Qwen3 1.7B (better quality)"), fileName: "Qwen3-1.7B-Q4_K_M.gguf",
                   url: URL(string: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf")!,
-                  approxMB: 1100, minRAMGB: 6, notes: "Clearer notes and better Indian-language output. Needs a 6 GB+ iPhone/iPad."),
+                  approxMB: 1100, minRAMGB: 6, notes: String(localized: "Clearer notes and better Indian-language output. Needs a 6 GB+ iPhone/iPad.")),
         // Google Gemma 4 E4B (Apache 2.0). Hears the audio itself, so it understands Telugu, Hindi and mixed
         // speech that Apple's recogniser cannot. Weights: unsloth Q4_K_M; audio projector: ggml-org Q8_0.
-        ModelSpec(id: "gemma4-e4b-q4", name: "Gemma 4 E4B (any language, hears audio)", fileName: "gemma-4-E4B-it-Q4_K_M.gguf",
+        ModelSpec(id: "gemma4-e4b-q4", name: String(localized: "Gemma 4 E4B (any language, hears audio)"), fileName: "gemma-4-E4B-it-Q4_K_M.gguf",
                   url: URL(string: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf")!,
                   approxMB: 5500, minRAMGB: 8,
-                  notes: "Understands mixed languages such as Telugu with English terms and writes the notes. Large download; needs an 8 GB iPhone. Slower: roughly real time.",
+                  notes: String(localized: "Understands mixed languages such as Telugu with English terms and writes the notes. Large download; needs an 8 GB iPhone. Slower: roughly real time."),
                   mmprojFileName: "mmproj-gemma-4-E4B-it-Q8_0.gguf",
                   mmprojURL: URL(string: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf")!,
                   contextTokens: 8192),
@@ -163,7 +163,7 @@ extension ModelManager: URLSessionDownloadDelegate {
         let spec = ModelCatalog.all.first { $0.id == key.replacingOccurrences(of: "#mmproj", with: "") }
         var moveError: String?
         if let http = downloadTask.response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            moveError = "Download failed (HTTP \(http.statusCode))."
+            moveError = String(localized: "Download failed (HTTP \(http.statusCode)).")
         } else if let spec, let name = isProjector ? spec.mmprojFileName : spec.fileName {
             let dest = ModelManager.modelsDirectory.appendingPathComponent(name)
             do {

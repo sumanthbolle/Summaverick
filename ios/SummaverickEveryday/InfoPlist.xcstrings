@@ -1,0 +1,63 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSFaceIDUsageDescription": {
+      "comment": "Permission prompt text from Info.plist",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock your notes."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నోట్స్ అన్‌లాక్ చేయడానికి."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "comment": "Permission prompt text from Info.plist",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick records lectures, meetings and notes only when you press Record. Audio never leaves this device."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు రికార్డ్ నొక్కినప్పుడు మాత్రమే Summaverick పాఠాలు, సమావేశాలు, నోట్స్ రికార్డ్ చేస్తుంది. ఆడియో ఈ ఫోన్ దాటి ఎక్కడికీ వెళ్లదు."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "comment": "Permission prompt text from Info.plist",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech is converted to text on this device using Apple's on-device recogniser. Nothing is sent to a server."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple మాట గుర్తింపుతో మాటలు ఈ ఫోన్‌లోనే అక్షరాలుగా మారతాయి. ఏదీ సర్వర్‌కు వెళ్లదు."
+          }
+        }
+      }
+    },
+    "CFBundleDisplayName": {
+      "shouldTranslate": false
+    }
+  },
+  "version": "1.0"
+}

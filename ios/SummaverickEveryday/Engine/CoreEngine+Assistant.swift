@@ -7,8 +7,8 @@ extension CoreEngine {
         case failed(String), badJSON
         var errorDescription: String? {
             switch self {
-            case .failed(let what): return "Could not \(what)."
-            case .badJSON: return "Could not read the assistant's reply."
+            case .failed(let what): return String(localized: "Could not \(what).", comment: "%@ is an action such as \"save the reminder\"")
+            case .badJSON: return String(localized: "Could not read the assistant's reply.")
             }
         }
     }
@@ -31,7 +31,7 @@ extension CoreEngine {
     func profile() -> Profile? { decode(Profile.self, take(sve_profile_get(ctx))) }
 
     func setProfile(_ p: Profile) throws {
-        guard let json = encodeJSON(p), sve_profile_set(ctx, json) == 0 else { throw AssistantError.failed("save the profile") }
+        guard let json = encodeJSON(p), sve_profile_set(ctx, json) == 0 else { throw AssistantError.failed(String(localized: "save the profile")) }
     }
 
     // MARK: medicines
@@ -42,7 +42,7 @@ extension CoreEngine {
     func saveMedicine(_ m: Medicine) throws -> Int64 {
         guard let json = encodeJSON(m) else { throw AssistantError.badJSON }
         let id = sve_medicine_save(ctx, json)
-        guard id > 0 else { throw AssistantError.failed("save the medicine") }
+        guard id > 0 else { throw AssistantError.failed(String(localized: "save the medicine")) }
         return id
     }
 
@@ -55,7 +55,7 @@ extension CoreEngine {
     /// Deletes everything the assistant stored (profile, medicines, memory, reminders, tasks, topics,
     /// suggestions, insights, transcript pieces). Notes are deleted separately; the caller resyncs reminders.
     func wipeAssistant() throws {
-        guard sve_assistant_wipe(ctx) == 0 else { throw AssistantError.failed("delete the assistant data") }
+        guard sve_assistant_wipe(ctx) == 0 else { throw AssistantError.failed(String(localized: "delete the assistant data")) }
     }
 
     // MARK: suggestions
@@ -76,7 +76,7 @@ extension CoreEngine {
         case 1...: return .created(r)
         case 0: return .applied
         case -2: return .staleReflagged
-        default: throw AssistantError.failed("accept the suggestion")
+        default: throw AssistantError.failed(String(localized: "accept the suggestion"))
         }
     }
 
@@ -87,8 +87,8 @@ extension CoreEngine {
     /// Like `reminders`, but throws when the engine is unavailable, the call fails, or the JSON does not decode,
     /// so callers can tell "no reminders" from "could not read".
     func remindersStrict(activeOnly: Bool = false) throws -> [Reminder] {
-        guard ctx != nil else { throw AssistantError.failed("read reminders (engine not ready)") }
-        guard let json = take(sve_reminders_json(ctx, activeOnly ? 1 : 0)) else { throw AssistantError.failed("read reminders") }
+        guard ctx != nil else { throw AssistantError.failed(String(localized: "read reminders (engine not ready)")) }
+        guard let json = take(sve_reminders_json(ctx, activeOnly ? 1 : 0)) else { throw AssistantError.failed(String(localized: "read reminders")) }
         guard let rows = decode([Reminder].self, json) else { throw AssistantError.badJSON }
         return rows
     }
@@ -101,28 +101,28 @@ extension CoreEngine {
     /// Creates a reminder the person made themselves (their own edit, applied directly). Returns its id.
     /// Throws if it cannot be encoded or the core refuses it (no text, no valid time, bad date).
     func createReminder(_ r: NewReminder) throws -> Int64 {
-        guard ctx != nil else { throw AssistantError.failed("save the reminder (engine not ready)") }
+        guard ctx != nil else { throw AssistantError.failed(String(localized: "save the reminder (engine not ready)")) }
         guard let json = encodeJSON(r) else { throw AssistantError.badJSON }
         let id = sve_reminder_create(ctx, json)
-        guard id > 0 else { throw AssistantError.failed("save the reminder") }
+        guard id > 0 else { throw AssistantError.failed(String(localized: "save the reminder")) }
         return id
     }
 
     /// Ids of the saved medicines named in a text, by the core's own matcher (the one sve_reminder_create
     /// checks against). Throws when the core cannot answer.
     func medicinesNamed(_ text: String) throws -> [Int64] {
-        guard ctx != nil else { throw AssistantError.failed("read medicines (engine not ready)") }
-        guard let json = take(sve_medicines_named(ctx, text)) else { throw AssistantError.failed("read medicines") }
+        guard ctx != nil else { throw AssistantError.failed(String(localized: "read medicines (engine not ready)")) }
+        guard let json = take(sve_medicines_named(ctx, text)) else { throw AssistantError.failed(String(localized: "read medicines")) }
         guard let ids = decode([Int64].self, json) else { throw AssistantError.badJSON }
         return ids
     }
 
     /// Creates a to-do the person made themselves. Returns its id. Throws on encode failure or refusal.
     func createTask(_ t: NewTask) throws -> Int64 {
-        guard ctx != nil else { throw AssistantError.failed("save the to-do (engine not ready)") }
+        guard ctx != nil else { throw AssistantError.failed(String(localized: "save the to-do (engine not ready)")) }
         guard let json = encodeJSON(t) else { throw AssistantError.badJSON }
         let id = sve_task_create(ctx, json)
-        guard id > 0 else { throw AssistantError.failed("save the to-do") }
+        guard id > 0 else { throw AssistantError.failed(String(localized: "save the to-do")) }
         return id
     }
 
@@ -175,7 +175,7 @@ extension CoreEngine {
         let box = progressBox(onProgress)
         let user = Unmanaged.passUnretained(box).toOpaque()
         let n = sve_extract(ctx, noteID, CoreEngine.progressTrampoline, user)
-        guard n >= 0 else { throw AssistantError.failed("find reminders and tasks") }
+        guard n >= 0 else { throw AssistantError.failed(String(localized: "find reminders and tasks")) }
         return Int(n)
     }
 

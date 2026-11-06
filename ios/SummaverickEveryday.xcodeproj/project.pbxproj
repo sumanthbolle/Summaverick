@@ -141,6 +141,10 @@
 			isa = PBXBuildFile;
 			fileRef = 62C33D8D9F694DDB9C315DDC;
 		};
+		E1A865BA6F70AD42A421A43D = {
+			isa = PBXBuildFile;
+			fileRef = 69021175FE455DA46F1832CA;
+		};
 		E374920B948422FA0FDEBA74 = {
 			isa = PBXBuildFile;
 			fileRef = 63A8A83C123E5491CBE9E84F;
@@ -331,6 +335,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = RecordView.swift;
 			path = SummaverickEveryday/Views/RecordView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		69021175FE455DA46F1832CA = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			name = InfoPlist.xcstrings;
+			path = SummaverickEveryday/InfoPlist.xcstrings;
 			sourceTree = SOURCE_ROOT;
 		};
 		69DFE9A274CA05C81C452276 = {
@@ -641,6 +652,7 @@
 				29A1CD6197C4EBF318C20726,
 				8C247BC7003BBE5F71E1479C,
 				FC581254F5C135DB22FD9C42,
+				69021175FE455DA46F1832CA,
 				892E4DF51BC5A1D8EB706A7A,
 			);
 			name = SummaverickEveryday;
@@ -779,6 +791,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				334316FE5AD49DBFE79A28C1,
+				E1A865BA6F70AD42A421A43D,
 				B939673027A07B580BF6B7A1,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

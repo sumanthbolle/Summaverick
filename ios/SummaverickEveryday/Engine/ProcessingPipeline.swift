@@ -22,13 +22,13 @@ final class ProcessingPipeline {
         var label: String {
             switch self {
             case .idle: return ""
-            case .transcribing(let p): return "Transcribing… \(Int(p * 100))%"
-            case .loadingModel: return "Loading AI model…"
-            case .extracting: return "Finding reminders and tasks…"
+            case .transcribing(let p): return String(localized: "Transcribing… \(Int(p * 100))%")
+            case .loadingModel: return String(localized: "Loading AI model…")
+            case .extracting: return String(localized: "Finding reminders and tasks…")
             case .generating(let k, let phase, let d, let t):
-                return phase == "chunk" && t > 1 ? "Reading part \(d + 1) of \(t) for \(k.title.lowercased())…" : "Writing \(k.title.lowercased())…"
-            case .done: return "Done"
-            case .failed(let e): return "Failed: \(e)"
+                return phase == "chunk" && t > 1 ? String(localized: "Reading part \(d + 1) of \(t) for \(k.title.lowercased())…") : String(localized: "Writing \(k.title.lowercased())…")
+            case .done: return String(localized: "Done")
+            case .failed(let e): return String(localized: "Failed: \(e)")
             }
         }
     }
@@ -57,7 +57,7 @@ final class ProcessingPipeline {
         let title = "Recording " + Self.titleFormatter.string(from: Date())
         let noteLang = notesLang(fallback: language.shortCode)
         let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
-        guard id > 0 else { stage = .failed("Could not save the note."); return nil }
+        guard id > 0 else { stage = .failed(String(localized: "Could not save the note.")); return nil }
         activeNoteID = id
         NotificationCenter.default.post(name: .notesChanged, object: nil)
 
@@ -77,7 +77,7 @@ final class ProcessingPipeline {
         await engine.setTranscript(id, transcript)
         NotificationCenter.default.post(name: .notesChanged, object: nil)
         if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            stage = .failed("No speech was detected in the recording.")
+            stage = .failed(String(localized: "No speech was detected in the recording."))
             return id
         }
 
@@ -98,7 +98,7 @@ final class ProcessingPipeline {
         var t = note.transcript ?? ""
         if t.isEmpty {
             guard let path = note.audio_path, FileManager.default.fileExists(atPath: path) else {
-                stage = .failed("No transcript and the audio is no longer available."); return
+                stage = .failed(String(localized: "No transcript and the audio is no longer available.")); return
             }
             let lang = SpeechTranscriber.onDeviceLanguages().first { $0.shortCode == note.lang } ?? AppSettings.shared.language
             stage = .transcribing(0)
@@ -111,7 +111,7 @@ final class ProcessingPipeline {
                 stage = .failed(error.localizedDescription); return
             }
             if t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                stage = .failed("No speech was detected in the recording."); return
+                stage = .failed(String(localized: "No speech was detected in the recording.")); return
             }
             await CoreEngine.shared.setPieces(noteID, pieces)
             await CoreEngine.shared.setTranscript(noteID, t)
@@ -159,7 +159,7 @@ final class ProcessingPipeline {
         let engine = CoreEngine.shared
         let mm = ModelManager.shared
         guard mm.selectedInstalled else {
-            stage = .failed("Download the AI model in Settings, then tap Generate notes.")
+            stage = .failed(String(localized: "Download the AI model in Settings, then tap Generate notes."))
             return
         }
         do {
