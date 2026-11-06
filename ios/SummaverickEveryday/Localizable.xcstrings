@@ -208,6 +208,16 @@
       },
       "comment": "Field name inside 'Look again at: …'"
     },
+    "Date": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తేదీ"
+          }
+        }
+      }
+    },
     "Deep dive": {
       "localizations": {
         "te": {
@@ -641,6 +651,16 @@
         }
       }
     },
+    "Not set — please pick a date": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పెట్టలేదు — దయచేసి తేదీ ఎంచుకోండి"
+          }
+        }
+      }
+    },
     "Not set — please pick a time": {
       "localizations": {
         "te": {
@@ -742,6 +762,16 @@
         }
       },
       "comment": "%@ is the recording title"
+    },
+    "Pick a date": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తేదీ ఎంచుకోండి"
+          }
+        }
+      }
     },
     "Pick a time": {
       "localizations": {
@@ -884,6 +914,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "సేవ్ చేయండి"
+          }
+        }
+      }
+    },
+    "Set date": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ తేదీ పెట్టండి"
           }
         }
       }

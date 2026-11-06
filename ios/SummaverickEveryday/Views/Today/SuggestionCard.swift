@@ -454,13 +454,20 @@ struct SuggestionEditForm: View {
     let onSave: (SuggestionPayload?, Set<String>, SuggestionDraft) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppSettings.self) private var settings
+    @Environment(Router.self) private var router
     @State private var draft: SuggestionDraft
     /// Frozen when the form opens, so a reload behind the sheet never changes what "unchanged" means.
     @State private var original: Suggestion
     @State private var before: SuggestionDraft
-    /// Index of the time being picked in the picker sheet; == times.count means a new time.
-    @State private var pickingIndex: Int?
-    @State private var pickedTime = Date()
+    /// What the picker sheet is choosing. A time index == times.count means a new time.
+    private enum Picking: Identifiable, Hashable {
+        case time(Int), until, due
+        var id: Self { self }
+    }
+    @State private var picking: Picking?
+    /// The wheel's starting position only; nothing is written until the person confirms.
+    @State private var pickedDate = Date()
     @State private var openNoteID: Int64?
 
     /// resume: earlier unsaved values to start from. Changes are always measured against the suggestion itself.
@@ -509,12 +516,11 @@ struct SuggestionEditForm: View {
                 if s.kind == .task {
                     Section {
                         labeled("Who", $draft.who, "who")
-                        Toggle("Has a due date", isOn: hasDate($draft.dueDate))
+                        Toggle("Has a due date", isOn: hasDate($draft.dueDate, .due))
                             .frame(minHeight: 44)
                             .highlightedRow(flagged("due_date"))
-                        if draft.dueDate != nil {
-                            DatePicker("Due", selection: dateValue($draft.dueDate), displayedComponents: .date)
-                                .frame(minHeight: 44)
+                        if let v = draft.dueDate {
+                            dateRow("Due", v, $draft.dueDate, .due)
                                 .highlightedRow(flagged("due_date"))
                         }
                     } header: { fieldHeader("To do", flagged("due_date")) }
@@ -529,53 +535,86 @@ struct SuggestionEditForm: View {
                 }
             }
             // The ▶ link opens the recording inside this sheet, so the edits are kept.
-            .navigationDestination(item: $openNoteID) { NoteDetailView(noteID: $0) }
-            .sheet(isPresented: pickerShown) { timePickerSheet }
+            .navigationDestination(item: $openNoteID) { id in
+                NoteDetailView(noteID: id).environment(settings).environment(router)
+            }
+            .sheet(item: $picking) { pickerSheet($0) }
         }
     }
 
-    private var pickerShown: Binding<Bool> {
-        Binding(get: { pickingIndex != nil }, set: { if !$0 { pickingIndex = nil } })
-    }
-
-    /// The person chooses a time here and confirms it; nothing is written until "Set time".
-    private var timePickerSheet: some View {
-        NavigationStack {
-            DatePicker("Time", selection: $pickedTime, displayedComponents: .hourAndMinute)
+    /// The person chooses a time or date here and confirms it; nothing is written until "Set".
+    private func pickerSheet(_ what: Picking) -> some View {
+        let isTime: Bool = { if case .time = what { return true } else { return false } }()
+        return NavigationStack {
+            DatePicker(isTime ? "Time" : "Date", selection: $pickedDate,
+                       displayedComponents: isTime ? .hourAndMinute : .date)
                 .datePickerStyle(.wheel)
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
                 .padding()
-                .navigationTitle("Pick a time")
+                .navigationTitle(isTime ? "Pick a time" : "Pick a date")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { pickingIndex = nil } }
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { picking = nil } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Set time") {
-                            if let i = pickingIndex {
-                                let c = Calendar.current.dateComponents([.hour, .minute], from: pickedTime)
-                                let v = String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
-                                if i < draft.times.count { draft.times[i] = v } else { draft.times.append(v) }
-                            }
-                            pickingIndex = nil
-                        }
-                        .font(.headline)
+                        Button(isTime ? "Set time" : "Set date") { confirmPick(what) }.font(.headline)
                     }
                 }
         }
         .presentationDetents([.medium])
     }
 
+    private func confirmPick(_ what: Picking) {
+        switch what {
+        case .time(let i):
+            let c = Calendar.current.dateComponents([.hour, .minute], from: pickedDate)
+            let v = String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+            if i < draft.times.count { draft.times[i] = v } else { draft.times.append(v) }
+        case .until: draft.untilDate = AssistantFormat.ymd(pickedDate)
+        case .due: draft.dueDate = AssistantFormat.ymd(pickedDate)
+        }
+        picking = nil
+    }
+
     private func pickTime(at i: Int) {
         // The wheel starts at the current time; it is only a starting position, never saved unless confirmed.
-        pickedTime = Date()
-        pickingIndex = i
+        pickedDate = Date()
+        picking = .time(i)
+    }
+
+    private func pickDate(_ what: Picking) {
+        pickedDate = Date()
+        picking = what
+    }
+
+    /// A readable date gets an inline picker; an unreadable one is shown as it is and must be picked.
+    @ViewBuilder
+    private func dateRow(_ title: LocalizedStringKey, _ value: String, _ binding: Binding<String?>, _ what: Picking) -> some View {
+        if ReminderScheduler.day(value, .current) != nil {
+            DatePicker(title, selection: dateValue(binding), displayedComponents: .date)
+                .frame(minHeight: 44)
+        } else {
+            Button { pickDate(what) } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Not set — please pick a date", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.primary)
+                    if !value.isEmpty {
+                        Text(verbatim: "“\(value)”").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityHint(Text("Pick a date"))
+        }
     }
 
     /// Why Save is blocked for a reminder's times, or nil.
     private var timesProblem: LocalizedStringKey? {
         guard hasSchedule else { return nil }
-        if draft.times.isEmpty { return "Add at least one time before saving." }
+        // A profile medicine (e.g. "as needed") may have no times; a reminder may not.
+        if s.kind == .reminder && draft.times.isEmpty { return "Add at least one time before saving." }
         if draft.times != before.times && draft.times.contains(where: { ReminderScheduler.clock($0) == nil }) {
             return "Pick a time for each row, or remove it."
         }
@@ -627,12 +666,11 @@ struct SuggestionEditForm: View {
                 }
             }
             .frame(minHeight: 44)
-            Toggle("Has an end date", isOn: hasDate($draft.untilDate))
+            Toggle("Has an end date", isOn: hasDate($draft.untilDate, .until))
                 .frame(minHeight: 44)
                 .highlightedRow(flagged("until_date"))
-            if draft.untilDate != nil {
-                DatePicker("Until", selection: dateValue($draft.untilDate), displayedComponents: .date)
-                    .frame(minHeight: 44)
+            if let v = draft.untilDate {
+                dateRow("Until", v, $draft.untilDate, .until)
                     .highlightedRow(flagged("until_date"))
             }
         } header: { fieldHeader("When", flagged("times") || flagged("until_date")) }
@@ -669,11 +707,15 @@ struct SuggestionEditForm: View {
         }
     }
 
-    private func hasDate(_ v: Binding<String?>) -> Binding<Bool> {
+    /// Turning the toggle on opens the picker; the date is set only when the person confirms one.
+    private func hasDate(_ v: Binding<String?>, _ what: Picking) -> Binding<Bool> {
         Binding(get: { v.wrappedValue != nil },
-                set: { v.wrappedValue = $0 ? (v.wrappedValue ?? AssistantFormat.ymd(Date())) : nil })
+                set: { on in
+                    if !on { v.wrappedValue = nil } else if v.wrappedValue == nil { pickDate(what) }
+                })
     }
 
+    /// Only used for dates that parse (see dateRow).
     private func dateValue(_ v: Binding<String?>) -> Binding<Date> {
         Binding(get: { v.wrappedValue.flatMap { ReminderScheduler.day($0, .current) } ?? Date() },
                 set: { v.wrappedValue = AssistantFormat.ymd($0) })
