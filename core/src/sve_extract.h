@@ -25,6 +25,10 @@ struct Extracted {
 // Never throws. On any failure ok=false and every array is empty.
 Extracted parse_extraction(const std::string &model_output);
 
+// First balanced {...} in text that parses as a JSON object (fences and prose around it ignored).
+// Never throws.
+bool first_json_object(const std::string &text, nlohmann::json &out);
+
 // pieces: [{"start_sec":int,"text":str,...}, ...] -> "[t=<sec>] <text>\n" per piece.
 std::string pieces_with_markers(const nlohmann::json &pieces);
 

@@ -326,3 +326,53 @@ TEST(mentions_medicine_detects_units_and_names) {
     CHECK(mentions_medicine("Remember your amlodipine", {"Amlodipine"}));
     CHECK(!mentions_medicine("Revise the ETF quiz before Friday", {"Amlodipine"}));
 }
+
+TEST(weekday_names_checked_against_dates) {
+    CHECK_EQ(weekday_name("2026-11-06"), std::string("Friday"));
+    CHECK_EQ(weekday_name("2026-11-07"), std::string("Saturday"));
+    CHECK_EQ(weekday_name("bad"), std::string(""));
+    CHECK(date_matches_weekday("2026-11-07", "Bring the report on Saturday"));
+    CHECK(!date_matches_weekday("2026-11-09", "Bring the report on Saturday"));
+    CHECK(date_matches_weekday("2026-11-07", "శనివారం report తీసుకురండి"));
+    CHECK(!date_matches_weekday("2026-11-08", "శనివారం report తీసుకురండి"));
+    CHECK(date_matches_weekday("2026-11-09", "come back in two weeks"));      // nothing to compare
+    CHECK(date_matches_weekday("2026-11-09", "Saturday or Monday"));          // ambiguous: not judged
+}
+
+TEST(task_date_on_wrong_weekday_is_check) {
+    Extracted e = ex(R"({"tasks":[{"text":"Bring blood test report","due_date":"2026-11-14","quote":"Bring your blood test report on Saturday","start_sec":56},
+        {"text":"Bring blood test report","due_date":"2026-11-10","quote":"Bring your blood test report on Saturday","start_sec":56}],
+        "reminders":[{"text":"Bring report","repeat":"once","start_date":"2026-11-08","quote":"Bring your blood test report on Saturday","start_sec":56}]})");
+    auto v = build_suggestions(e, kPieces, 7, kRoutine);
+    CHECK_EQ(v.size(), (size_t)3);
+    json r = find_kind(v, "reminder");
+    CHECK_EQ(r["payload"]["start_date"].get<std::string>(), std::string("2026-11-08"));
+    CHECK(has(r["check_fields"], "start_date"));
+    int ok = 0, check = 0;
+    for (const auto &s : v) if (s["kind"] == "task") (s["check_status"] == "ok" ? ok : check)++;
+    CHECK_EQ(ok, 1);     // 2026-11-14 is a Saturday
+    CHECK_EQ(check, 1);  // 2026-11-10 is a Tuesday
+}
+
+TEST(medicine_dates_need_confirmation) {
+    const char *src = R"({"reminders":[{"text":"Take Amlodipine 5 mg","when_text":"after dinner","repeat":"daily","start_date":"%s",
+        "quote":"Take Amlodipine 5 mg once a day after dinner.","start_sec":28,"medicine":{"name":"Amlodipine","dose":"5 mg"}}]})";
+    char buf[512];
+    snprintf(buf, sizeof buf, src, "2026-11-07");
+    auto v = build_suggestions(ex(buf), kPieces, 7, kRoutine, "2026-11-06");
+    CHECK_EQ(v.size(), (size_t)1);
+    CHECK(has(v[0]["check_fields"], "start_date"));  // not said: "Please check"
+    snprintf(buf, sizeof buf, src, "2026-11-06");
+    v = build_suggestions(ex(buf), kPieces, 7, kRoutine, "2026-11-06");
+    CHECK_EQ(v[0]["check_status"].get<std::string>(), std::string("ok"));  // today is harmless
+}
+
+TEST(vocab_terms_are_short) {
+    auto v = build_suggestions(ex(R"({"vocab":["Salt less than one teaspoon a day","blood test","Telma AM 40"]})"), kPieces, 7, kRoutine);
+    CHECK_EQ(v.size(), (size_t)2);
+}
+
+TEST(profile_without_quote_is_dropped) {
+    auto v = build_suggestions(ex(R"({"profile":[{"change":"routine","detail":"dinner 20:00","quote":"","start_sec":0}]})"), kPieces, 7, kRoutine);
+    CHECK(v.empty());
+}

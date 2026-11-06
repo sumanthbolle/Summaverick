@@ -3,6 +3,7 @@
 #include "sve_core.h"
 #include "sve_internal.h"
 #include "sve_prompts.h"
+#include "sve_context.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -14,6 +15,7 @@
 #include <thread>
 #include <vector>
 
+using sve::reduce_to_fit;
 using sve::split_text;
 using sve::strip_thinking;
 
@@ -93,46 +95,6 @@ int sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, 
 void sve_unload_llm(sve_ctx *ctx) { if (ctx) { sve_unload_audio(ctx); ctx->llm.reset(); } }
 int sve_llm_loaded(const sve_ctx *ctx) { return ctx && ctx->llm ? 1 : 0; }
 
-namespace {
-
-// Reduce a long transcript to bullet points that fit the context budget (hierarchical).
-// Returns false on cancel/error. from_bullets is set when any reduction happened.
-// final_budget: max tokens of material the final prompt may contain.
-bool reduce_to_fit(sve::Llm &llm, const std::string &lang, std::string material, int final_budget,
-                   std::string &out, bool &from_bullets, sve_progress_cb cb, void *user) {
-    from_bullets = false;
-    const std::string sys = sve::system_prompt(lang);
-    // Per‑chunk extraction needs room for the chunk, ~150 tokens of scaffolding and its own output.
-    const int chunk_out = std::max(120, std::min(400, llm.n_ctx / 5));
-    const int chunk_budget = std::max(128, llm.n_ctx - chunk_out - 150 - 32);
-    final_budget = std::max(128, std::min(final_budget, chunk_budget));
-
-    for (int round = 0; round < 4; ++round) {
-        int ntok = llm.count_tokens(material);
-        if (ntok <= final_budget) { out = material; return true; }
-
-        double chars_per_tok = (double)material.size() / std::max(1, ntok);
-        // Split by chunk_budget (as large as the context allows) so we make as few model calls as possible.
-        size_t target_chars = (size_t)std::max(200.0, chunk_budget * chars_per_tok * 0.9);
-        std::vector<std::string> parts = split_text(material, target_chars);
-
-        std::string bullets;
-        int total = (int)parts.size();
-        for (int i = 0; i < total; ++i) {
-            std::string prompt = llm.apply_template(sys, sve::chunk_prompt(parts[i], i, total));
-            std::string piece;
-            if (!llm.complete(prompt, chunk_out, piece, cb, user, "chunk", i, total)) return false;
-            bullets += strip_thinking(piece);
-            bullets += "\n";
-        }
-        material = bullets;
-        from_bullets = true;
-    }
-    out = material;
-    return true;
-}
-
-} // namespace
 
 char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang_c,
                    sve_progress_cb cb, void *user) {
@@ -142,12 +104,15 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
     std::string text(transcript);
     if (strip_thinking(text).empty()) return dup_str("");
 
+    // The always block (profile, vocabulary) goes in front of every system prompt (spec §7.3).
+    const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang));
     const int max_out = std::max(160, std::min(700, llm.n_ctx / 4));
-    const int budget = llm.n_ctx - max_out - 350; // prompt scaffolding ≈ 350 tokens (reduce_to_fit floors this)
+    // prompt scaffolding ≈ 250 tokens plus the system prompt (reduce_to_fit floors this)
+    const int budget = llm.n_ctx - max_out - 250 - llm.count_tokens(sys);
 
     std::string material;
     bool from_bullets = false;
-    if (!reduce_to_fit(llm, lang, text, budget, material, from_bullets, cb, user)) return nullptr;
+    if (!reduce_to_fit(llm, sys, text, budget, material, from_bullets, cb, user)) return nullptr;
 
     std::string userp, prefix;
     switch (kind) {
@@ -156,7 +121,7 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
         case SVE_OUT_REVISION_QUESTIONS: userp = sve::revision_questions_prompt(material, from_bullets); break;
         default: return nullptr;
     }
-    std::string prompt = llm.apply_template(sve::system_prompt(lang), userp);
+    std::string prompt = llm.apply_template(sys, userp);
     std::string out;
     if (!llm.complete(prompt, max_out, out, cb, user, "final", 0, 1)) return nullptr;
     out = strip_thinking(out);
@@ -170,11 +135,12 @@ char *sve_ask(sve_ctx *ctx, const char *context_text, const char *question, cons
     if (!ctx || !ctx->llm || !context_text || !question) return nullptr;
     sve::Llm &llm = *ctx->llm;
     std::string lang = lang_c ? lang_c : "en";
+    const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang));
     const int max_out = std::max(96, std::min(300, llm.n_ctx / 6));
     std::string material;
     bool fb = false;
-    if (!reduce_to_fit(llm, lang, context_text, llm.n_ctx - max_out - 400, material, fb, cb, user)) return nullptr;
-    std::string prompt = llm.apply_template(sve::system_prompt(lang), sve::ask_prompt(material, question));
+    if (!reduce_to_fit(llm, sys, context_text, llm.n_ctx - max_out - 300 - llm.count_tokens(sys), material, fb, cb, user)) return nullptr;
+    std::string prompt = llm.apply_template(sys, sve::ask_prompt(material, question));
     std::string out;
     if (!llm.complete(prompt, max_out, out, cb, user, "final", 0, 1)) return nullptr;
     return dup_str(strip_thinking(out));
@@ -187,7 +153,8 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang_c
         excerpt.resize(1200);
         while (!excerpt.empty() && (static_cast<unsigned char>(excerpt.back()) & 0xC0) == 0x80) excerpt.pop_back();
     }
-    std::string prompt = ctx->llm->apply_template(sve::system_prompt(lang_c ? lang_c : "en"), sve::title_prompt(excerpt));
+    std::string prompt = ctx->llm->apply_template(sve::context_system(*ctx->store, sve::system_prompt(lang_c ? lang_c : "en")),
+                                                  sve::title_prompt(excerpt));
     std::string out;
     if (!ctx->llm->complete(prompt, 24, out, nullptr, nullptr, "final", 0, 1)) return nullptr;
     out = strip_thinking(out);
@@ -261,13 +228,15 @@ void sve_unload_audio(sve_ctx *ctx) {
 
 int sve_audio_loaded(const sve_ctx *ctx) { return ctx && ctx->mtmd ? 1 : 0; }
 
-char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user) {
-    if (!ctx || !ctx->llm || !ctx->mtmd || !wav_path) return nullptr;
+// Transcribes in ~28 s pieces; each result is (piece start in whole seconds, text). False on failure/cancel.
+static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user,
+                              std::vector<std::pair<int64_t, std::string>> &result) {
+    if (!ctx || !ctx->llm || !ctx->mtmd || !wav_path) return false;
     sve::Llm &llm = *ctx->llm;
     std::vector<float> pcm;
-    if (!read_wav16k(wav_path, pcm)) { sve_logf(2, "could not read %s", wav_path); return nullptr; }
+    if (!read_wav16k(wav_path, pcm)) { sve_logf(2, "could not read %s", wav_path); return false; }
     const int rate = mtmd_get_audio_sample_rate(ctx->mtmd);
-    if (rate > 0 && rate != 16000) { sve_logf(2, "projector wants %d Hz audio", rate); return nullptr; }
+    if (rate > 0 && rate != 16000) { sve_logf(2, "projector wants %d Hz audio", rate); return false; }
 
     // Gemma 4 takes at most ~30 s per clip. Cut at the quietest point near 28 s so words are not split.
     const size_t target = 28 * 16000, search = 3 * 16000, win = 1600;
@@ -289,10 +258,10 @@ char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb c
 
     const std::string sys =
         "You are a precise transcriber. Speakers often mix languages, for example Telugu with English words.";
-    std::string out, prev;
+    std::string prev;
     const int total = (int)pieces.size();
     for (int i = 0; i < total; ++i) {
-        if (cb && cb("chunk", i, total, user)) return nullptr;
+        if (cb && cb("chunk", i, total, user)) return false;
         std::string instr = std::string(mtmd_get_marker(ctx->mtmd)) +
             "\nTranscribe this audio exactly as spoken. Write each word in the script of the language it was spoken in: "
             "Telugu words in Telugu script, Hindi in Devanagari, English words in English. Do not translate. "
@@ -319,22 +288,49 @@ char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb c
         if (rc == 0) rc = mtmd_helper_eval_chunks(ctx->mtmd, llm.ctx, chunks, 0, 0, (int32_t)llama_n_batch(llm.ctx), true, &n_past);
         mtmd_input_chunks_free(chunks);
         mtmd_bitmap_free(bmp);
-        if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", i + 1, total, rc); return nullptr; }
+        if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", i + 1, total, rc); return false; }
 
         std::string piece;
         int room = std::min(768, llm.n_ctx - (int)n_past - 4);
-        if (!llm.generate(room, true, piece, cb, user, "chunk", i, total)) return nullptr;
+        if (!llm.generate(room, true, piece, cb, user, "chunk", i, total)) return false;
         piece = strip_thinking(piece);
-        if (!piece.empty()) { out += piece; out += "\n"; prev = piece; }
+        if (!piece.empty()) { result.push_back({(int64_t)(pieces[i].first / 16000), piece}); prev = piece; }
     }
     if (cb) cb("final", total, total, user);
-    return dup_str(strip_thinking(out));
+    return true;
+}
+
+char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user) {
+    try {
+        std::vector<std::pair<int64_t, std::string>> pieces;
+        if (!transcribe_pieces(ctx, wav_path, cb, user, pieces)) return nullptr;
+        std::string out;
+        for (const auto &p : pieces) { out += p.second; out += "\n"; }
+        return dup_str(strip_thinking(out));
+    } catch (const std::exception &e) {
+        sve_logf(2, "transcribe failed: %s", e.what());
+        return nullptr;
+    }
+}
+
+char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user) {
+    try {
+        std::vector<std::pair<int64_t, std::string>> pieces;
+        if (!transcribe_pieces(ctx, wav_path, cb, user, pieces)) return nullptr;
+        sve::json arr = sve::json::array();
+        for (const auto &p : pieces) arr.push_back({{"start_sec", p.first}, {"text", p.second}});
+        return dup_str(arr.dump());
+    } catch (const std::exception &e) {
+        sve_logf(2, "transcribe failed: %s", e.what());
+        return nullptr;
+    }
 }
 #else
 int sve_load_audio(sve_ctx *, const char *) { return -1; }
 void sve_unload_audio(sve_ctx *) {}
 int sve_audio_loaded(const sve_ctx *) { return 0; }
 char *sve_transcribe_audio(sve_ctx *, const char *, sve_progress_cb, void *) { return nullptr; }
+char *sve_transcribe_audio_pieces(sve_ctx *, const char *, sve_progress_cb, void *) { return nullptr; }
 #endif
 
 // ---------------------------------------------------------------- notes API

@@ -1,5 +1,6 @@
 #include "sve_llm.h"
 #include "sve_internal.h"
+#include "sve_prompts.h"
 
 #include <algorithm>
 #include <cstring>
@@ -80,7 +81,7 @@ std::string Llm::apply_template(const std::string &system, const std::string &us
 // Prompt → completion. Clears KV memory first, so every call is independent.
 // Returns false on cancel or error.
 bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &out,
-              sve_progress_cb cb, void *user, const char *phase, int done, int total) {
+              sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy) {
     out.clear();
     llama_memory_clear(llama_get_memory(ctx), true);
 
@@ -100,7 +101,7 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
         if (llama_decode(ctx, batch) != 0) { sve_logf(2, "decode failed during prefill"); return false; }
         if (cb && cb(phase, done, total, user)) return false;
     }
-    return generate(max_new_tokens, false, out, cb, user, phase, done, total);
+    return generate(max_new_tokens, greedy, out, cb, user, phase, done, total);
 }
 
 // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
@@ -177,6 +178,40 @@ std::vector<std::string> split_text(const std::string &text, size_t target_chars
         pos = end;
     }
     return parts;
+}
+
+bool reduce_to_fit(Llm &llm, const std::string &sys, std::string material, int final_budget,
+                   std::string &out, bool &from_bullets, sve_progress_cb cb, void *user) {
+    from_bullets = false;
+    // Per-chunk extraction needs room for the chunk, the system prompt, ~80 tokens of scaffolding
+    // and its own output.
+    const int chunk_out = std::max(120, std::min(400, llm.n_ctx / 5));
+    const int chunk_budget = std::max(128, llm.n_ctx - chunk_out - llm.count_tokens(sys) - 80 - 32);
+    final_budget = std::max(128, std::min(final_budget, chunk_budget));
+
+    for (int round = 0; round < 4; ++round) {
+        int ntok = llm.count_tokens(material);
+        if (ntok <= final_budget) { out = material; return true; }
+
+        double chars_per_tok = (double)material.size() / std::max(1, ntok);
+        // Split by chunk_budget (as large as the context allows) so we make as few model calls as possible.
+        size_t target_chars = (size_t)std::max(200.0, chunk_budget * chars_per_tok * 0.9);
+        std::vector<std::string> parts = split_text(material, target_chars);
+
+        std::string bullets;
+        int total = (int)parts.size();
+        for (int i = 0; i < total; ++i) {
+            std::string prompt = llm.apply_template(sys, chunk_prompt(parts[i], i, total));
+            std::string piece;
+            if (!llm.complete(prompt, chunk_out, piece, cb, user, "chunk", i, total)) return false;
+            bullets += strip_thinking(piece);
+            bullets += "\n";
+        }
+        material = bullets;
+        from_bullets = true;
+    }
+    out = material;
+    return true;
 }
 
 } // namespace sve

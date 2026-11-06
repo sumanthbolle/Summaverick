@@ -12,6 +12,9 @@ std::string truncate_utf8(const std::string &s, size_t max_bytes);
 // preferences, when over budget; truncate_utf8 as the last resort. Empty if nothing known.
 std::string always_block(Store &store, size_t max_bytes = 2000);
 
+// `system` preceded by the always block as background (unchanged when nothing is known).
+std::string context_system(Store &store, const std::string &system);
+
 struct Relevant {
     std::string block;
     json sources;  // [{"label":"S1","note_id":..,"start_sec":..,"title":..}], exactly the labels in block

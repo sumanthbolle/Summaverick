@@ -141,3 +141,12 @@ TEST(always_block_malformed_profile_and_sparse_medicine) {
     CHECK(b.find("- Metformin daily\n") != std::string::npos);
     CHECK(b.find("1 mg") == std::string::npos);
 }
+
+TEST(context_system_prefixes_always_block) {
+    Store s(":memory:");
+    CHECK_EQ(sve::context_system(s, "SYS"), std::string("SYS"));
+    s.setting_set("profile", R"({"name":"Ravi"})");
+    std::string c = sve::context_system(s, "SYS");
+    CHECK(c.find("Ravi") != std::string::npos);
+    CHECK(c.size() > 3 && c.substr(c.size() - 3) == "SYS");
+}

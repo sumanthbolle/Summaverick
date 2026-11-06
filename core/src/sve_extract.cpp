@@ -16,7 +16,7 @@ std::string extraction_prompt(const std::string &context_block,
          "What is known about the person:\n" + context_block + "\n\n"
          "JSON shape (every key in English, exactly as written):\n"
          "{\"reminders\":[{\"text\":\"\",\"when_text\":\"\",\"times\":[\"HH:MM\"],"
-         "\"repeat\":\"once|daily|twice_daily|weekly\",\"until_date\":\"YYYY-MM-DD|null\","
+         "\"repeat\":\"once|daily|twice_daily|weekly\",\"start_date\":\"YYYY-MM-DD|null\",\"until_date\":\"YYYY-MM-DD|null\","
          "\"quote\":\"\",\"start_sec\":0,"
          "\"medicine\":{\"name\":\"\",\"dose\":\"\",\"frequency\":\"\",\"duration\":\"\"}|null}],"
          "\"tasks\":[{\"text\":\"\",\"who\":\"\",\"due_date\":\"YYYY-MM-DD|null\",\"quote\":\"\",\"start_sec\":0}],"
@@ -27,6 +27,14 @@ std::string extraction_prompt(const std::string &context_block,
          "\"facts\":[{\"text\":\"\",\"quote\":\"\",\"start_sec\":0}],"
          "\"topics\":[\"name\"],"
          "\"people\":[\"name\"]}\n\n"
+         "What goes where:\n"
+         "- \"reminders\": something to do at a time of day or on a schedule, above all taking a medicine.\n"
+         "- \"tasks\": a one-time thing to do, such as bringing, buying, calling or submitting something, "
+         "with \"due_date\" when a day is said.\n"
+         "- \"facts\": advice or information worth remembering, such as a diet instruction or a test result.\n"
+         "- \"profile\": a change to the listener's own medicines or daily routine stated in the transcript. "
+         "Never propose what is already in the context above.\n"
+         "- \"people\": other people named in the recording, not the person this assistant is for.\n\n"
          "Rules:\n"
          "- Write every \"text\" and \"detail\" field in the person's preferred language from the context above. "
          "Keys and the fixed values (repeat, change) stay in English.\n"
@@ -35,6 +43,11 @@ std::string extraction_prompt(const std::string &context_block,
          "Other people's medicines and tasks never go into \"profile\": only the listener's own.\n"
          "- \"quote\" must be copied word-for-word from the transcript.\n"
          "- Each \"quote\" covers exactly one medicine: the shortest sentence that states it.\n"
+         "- \"when_text\" is the words of the quote that say when (for example \"after dinner\"), copied exactly. "
+         "\"medicine.frequency\" and \"medicine.duration\" are also copied exactly from the quote "
+         "(for example \"once a day\", \"for 5 days\"), or left empty.\n"
+         "- \"start_date\" only when the recording says the day to start (\"from today\" means today's date); "
+         "otherwise null.\n"
          "- \"start_sec\" is the number in the [t=SEC] marker of the transcript line the quote is in.\n"
          "- \"medicine.dose\" is written as \"<number> <unit>\" only, for example \"5 mg\" or \"2 tablets\", "
          "with nothing else.\n"
@@ -76,6 +89,10 @@ static bool first_object(const std::string &s, json &out) {
         } catch (...) {}
     }
     return false;
+}
+
+bool first_json_object(const std::string &text, json &out) {
+    try { return first_object(text, out); } catch (...) { return false; }
 }
 
 // Array under key, keeping only objects (want_obj) or only strings.

@@ -43,6 +43,8 @@ find_package(SQLite3 REQUIRED)
 
 add_library(svecore STATIC
   src/sve_core.cpp
+  src/sve_assistant.cpp
+  src/sve_suggest.cpp
   src/sve_llm.cpp
   src/sve_extract.cpp
   src/sve_context.cpp

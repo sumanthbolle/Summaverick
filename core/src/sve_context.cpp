@@ -124,6 +124,13 @@ std::string always_block(Store &store, size_t max_bytes) {
     return truncate_utf8(out, max_bytes);
 }
 
+std::string context_system(Store &store, const std::string &system) {
+    std::string ab = always_block(store);
+    if (ab.empty()) return system;
+    return "Background about the person you work for (use it for names, spellings and preferences; "
+           "do not repeat it unless it is asked for):\n" + ab + "\n" + system;
+}
+
 Relevant relevant(Store &store, const std::string &query, size_t max_bytes) {
     Selection sel = select_relevant(store, query);
     Relevant r;

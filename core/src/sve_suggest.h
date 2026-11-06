@@ -17,8 +17,14 @@ int64_t jint(const json &o, const char *key, int64_t dflt);       // integer (or
 json jarr(const json &o, const char *key);                        // array, else []
 json jobj(const json &o, const char *key);                        // object, else null
 
+std::string trim_copy(const std::string &s);  // without surrounding whitespace
+
 bool valid_hhmm(const std::string &s);   // "HH:MM", 00..23 / 00..59
 bool valid_ymd(const std::string &s);    // "YYYY-MM-DD"
+// "Monday".."Sunday" for a valid YYYY-MM-DD, else "".
+std::string weekday_name(const std::string &ymd);
+// False only when the quote names exactly one weekday (English or Telugu) and the date falls on another.
+bool date_matches_weekday(const std::string &ymd, const std::string &quote);
 std::string sanitize_repeat(const std::string &s);  // daily|twice_daily|weekly|once, else ""
 // Valid "HH:MM" strings from a JSON array (others dropped, duplicates removed).
 std::vector<std::string> valid_times(const json &arr);
@@ -45,9 +51,11 @@ bool dose_missing_unit(const std::string &dose);
 
 // Builds pending suggestion records (kind, payload, quote, note_id, start_sec, check_status,
 // check_fields) from extraction output. Every quote is located in `pieces`; every medicine
-// is checked with check_medicine (drop -> item discarded). Topics/people are not included.
+// is checked with check_medicine (drop -> item discarded); a date on a medicine reminder is
+// flagged unless it is today_ymd or the quote names its weekday. Profile items without a quote
+// are dropped (a profile change must be stated in the recording). Topics/people are not included.
 std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id,
-                                    const json &routine);
+                                    const json &routine, const std::string &today_ymd = "");
 
 // Question -> words for a search: lowercased ASCII, stopwords and 1-letter words dropped.
 std::string keyword_query(const std::string &question);

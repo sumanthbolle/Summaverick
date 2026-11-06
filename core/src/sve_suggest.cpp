@@ -80,6 +80,8 @@ json str_or_null(const std::string &s) { return s.empty() ? json(nullptr) : json
 
 }  // namespace
 
+std::string trim_copy(const std::string &s) { return trim(s); }
+
 bool valid_hhmm(const std::string &s) {
     if (s.size() != 5 || s[2] != ':' || !digits(s, 0, 2) || !digits(s, 3, 2)) return false;
     return std::stoi(s.substr(0, 2)) < 24 && std::stoi(s.substr(3, 2)) < 60;
@@ -89,6 +91,35 @@ bool valid_ymd(const std::string &s) {
     if (s.size() != 10 || s[4] != '-' || s[7] != '-' || !digits(s, 0, 4) || !digits(s, 5, 2) || !digits(s, 8, 2)) return false;
     int m = std::stoi(s.substr(5, 2)), d = std::stoi(s.substr(8, 2));
     return m >= 1 && m <= 12 && d >= 1 && d <= 31;
+}
+
+std::string weekday_name(const std::string &ymd) {
+    if (!valid_ymd(ymd)) return "";
+    static const char *kNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};  // Sakamoto
+    int y = std::stoi(ymd.substr(0, 4)), m = std::stoi(ymd.substr(5, 2)), d = std::stoi(ymd.substr(8, 2));
+    if (m < 3) y -= 1;
+    return kNames[(y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7];
+}
+
+namespace {
+// Weekday names ("Saturday") said in the quote, in English or Telugu.
+std::set<std::string> named_weekdays(const std::string &quote) {
+    static const struct { const char *en, *te, *name; } kDays[] = {
+        {"sunday", "ఆదివారం", "Sunday"}, {"monday", "సోమవారం", "Monday"}, {"tuesday", "మంగళవారం", "Tuesday"},
+        {"wednesday", "బుధవారం", "Wednesday"}, {"thursday", "గురువారం", "Thursday"},
+        {"friday", "శుక్రవారం", "Friday"}, {"saturday", "శనివారం", "Saturday"}};
+    std::vector<std::string> q = norm_tokens(quote);
+    std::set<std::string> named;
+    for (const auto &k : kDays)
+        if (std::find(q.begin(), q.end(), k.en) != q.end() || quote.find(k.te) != std::string::npos) named.insert(k.name);
+    return named;
+}
+}  // namespace
+
+bool date_matches_weekday(const std::string &ymd, const std::string &quote) {
+    std::set<std::string> named = named_weekdays(quote);
+    return named.size() != 1 || weekday_name(ymd) == *named.begin();
 }
 
 std::string sanitize_repeat(const std::string &s) {
@@ -244,6 +275,19 @@ bool check_med(const json &item, const std::string &when_text, std::vector<std::
     return true;
 }
 
+// Valid date or null; flagged when the quote names a different weekday. strict (medicines): also
+// flagged unless the date is today or the quote names its weekday.
+json date_field(const json &item, const char *key, std::vector<std::string> &fields, bool strict = false,
+                const std::string &today = "") {
+    std::string d = jstr(item, key);
+    if (!valid_ymd(d)) return nullptr;
+    std::string q = jstr(item, "quote");
+    bool ok = date_matches_weekday(d, q);
+    if (ok && strict && d != today) ok = named_weekdays(q).size() == 1;
+    if (!ok) fields.push_back(key);
+    return d;
+}
+
 json finish(Base &b, const json &payload) {
     std::vector<std::string> u;
     for (auto &f : b.fields) if (std::find(u.begin(), u.end(), f) == u.end()) u.push_back(f);
@@ -255,7 +299,8 @@ json finish(Base &b, const json &payload) {
 
 }  // namespace
 
-std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id, const json &routine) {
+std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id, const json &routine,
+                                    const std::string &today) {
     std::vector<json> out;
     for (const auto &it : e.reminders) {
         Base b = base_for("reminder", it, pieces, note_id);
@@ -272,23 +317,25 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
         if (text.empty() && !med.is_null() && !jstr(med, "name").empty())
             text = trim(jstr(med, "name") + " " + jstr(med, "dose"));
         if (text.empty()) continue;
-        std::string until = jstr(it, "until_date");
+        const bool strict = !med.is_null();
+        json start = date_field(it, "start_date", b.fields, strict, today);
+        json until = date_field(it, "until_date", b.fields, strict, today);
         out.push_back(finish(b, {{"text", text}, {"when_text", when}, {"times", times},
                                  {"repeat", str_or_null(sanitize_repeat(jstr(it, "repeat")))},
-                                 {"until_date", valid_ymd(until) ? json(until) : json(nullptr)}, {"medicine", med}}));
+                                 {"start_date", start}, {"until_date", until}, {"medicine", med}}));
     }
     for (const auto &it : e.tasks) {
         std::string text = trim(jstr(it, "text"));
         if (text.empty()) continue;
         Base b = base_for("task", it, pieces, note_id);
-        std::string due = jstr(it, "due_date");
-        out.push_back(finish(b, {{"text", text}, {"who", str_or_null(trim(jstr(it, "who")))},
-                                 {"due_date", valid_ymd(due) ? json(due) : json(nullptr)}}));
+        json due = date_field(it, "due_date", b.fields);
+        out.push_back(finish(b, {{"text", text}, {"who", str_or_null(trim(jstr(it, "who")))}, {"due_date", due}}));
     }
     for (const auto &it : e.profile) {
         std::string change = jstr(it, "change");
         bool is_med = change == "add_medicine" || change == "update_medicine" || change == "stop_medicine";
         if (!is_med && change != "routine") continue;
+        if (trim(jstr(it, "quote")).empty()) continue;  // not stated in the recording
         Base b = base_for("profile", it, pieces, note_id);
         std::string when = trim(jstr(it, "when_text"));
         json med;
@@ -308,7 +355,7 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
     }
     for (const auto &v : e.vocab) {
         std::string t = v.is_string() ? trim(v.get<std::string>()) : "";
-        if (t.empty() || t.size() > 60) continue;
+        if (t.empty() || t.size() > 60 || std::count(t.begin(), t.end(), ' ') > 2) continue;  // terms, not sentences
         out.push_back({{"kind", "vocab"}, {"payload", {{"text", t}}}, {"quote", nullptr}, {"note_id", note_id},
                        {"start_sec", nullptr}, {"check_status", nullptr}, {"check_fields", json::array()}});
     }

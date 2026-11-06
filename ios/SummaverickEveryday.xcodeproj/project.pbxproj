@@ -93,6 +93,10 @@
 			isa = PBXBuildFile;
 			fileRef = 8E2A14BEAEE07F5369F65BB8;
 		};
+		DC70A4770243CC1CA714EEB5 = {
+			isa = PBXBuildFile;
+			fileRef = FDA9E084D501D8D1690658ED;
+		};
 		E374920B948422FA0FDEBA74 = {
 			isa = PBXBuildFile;
 			fileRef = 63A8A83C123E5491CBE9E84F;
@@ -100,6 +104,10 @@
 		E38796377CD701DE27D4E42D = {
 			isa = PBXBuildFile;
 			fileRef = 520311627B984B6D041E58B4;
+		};
+		E3B6ED99E22E4B0C0EC884D9 = {
+			isa = PBXBuildFile;
+			fileRef = 0A726C07BA65E563FB374790;
 		};
 		F5DF4BFB0174304CA2197095 = {
 			isa = PBXBuildFile;
@@ -122,6 +130,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0A726C07BA65E563FB374790 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_assistant.cpp;
+			path = ../core/src/sve_assistant.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
 		171A4CC9E4CFD6CB1704585A = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -318,6 +333,13 @@
 			path = SummaverickEveryday/Views/SettingsView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		E5E3C7E62C1B0998F7D272BF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_suggest.h;
+			path = ../core/src/sve_suggest.h;
+			sourceTree = SOURCE_ROOT;
+		};
 		E6FD595D542BBAD86BA1B59B = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -351,6 +373,13 @@
 			lastKnownFileType = folder.assetcatalog;
 			name = Assets.xcassets;
 			path = SummaverickEveryday/Assets.xcassets;
+			sourceTree = SOURCE_ROOT;
+		};
+		FDA9E084D501D8D1690658ED = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_suggest.cpp;
+			path = ../core/src/sve_suggest.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXFileReference section */
@@ -467,6 +496,7 @@
 		DA3EB179D6EE613492F299B1 = {
 			isa = PBXGroup;
 			children = (
+				0A726C07BA65E563FB374790,
 				9E2ACA831A68C5FC7568EFA9,
 				E6FD595D542BBAD86BA1B59B,
 				3C94D64FE92A566816D76B43,
@@ -482,6 +512,8 @@
 				A2C4910B70238965992017BD,
 				171A4CC9E4CFD6CB1704585A,
 				D3DFAF817EC8F3EB79853B54,
+				FDA9E084D501D8D1690658ED,
+				E5E3C7E62C1B0998F7D272BF,
 			);
 			name = Core;
 			sourceTree = "<group>";
@@ -570,6 +602,7 @@
 				F5DF4BFB0174304CA2197095,
 				E374920B948422FA0FDEBA74,
 				8D4A6C6E4B479FCA91F91BA9,
+				E3B6ED99E22E4B0C0EC884D9,
 				1D9397B49E2B55EDE5DC3560,
 				66567DD2A6C40F6BC6CB1C24,
 				7CD85F6783D894B9047A2C67,
@@ -577,6 +610,7 @@
 				02B6E8042D07B8525DD08CA0,
 				DACFC767C169503E4AB3CA4F,
 				CE05B940BCBE599A11AE22E8,
+				DC70A4770243CC1CA714EEB5,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

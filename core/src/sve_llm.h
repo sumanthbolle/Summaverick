@@ -29,8 +29,9 @@ struct Llm {
     // Wrap (system,user) in the model's chat template. Falls back to a ChatML-style layout.
     std::string apply_template(const std::string &system, const std::string &user) const;
     // Prompt -> completion. Clears KV memory first, so every call is independent. False on cancel or error.
+    // greedy = deterministic sampling (assistant JSON and answers); notes keep the sampled default.
     bool complete(const std::string &prompt, int max_new_tokens, std::string &out,
-                  sve_progress_cb cb, void *user, const char *phase, int done, int total);
+                  sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy = false);
     // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
     bool generate(int max_new_tokens, bool greedy, std::string &out,
                   sve_progress_cb cb, void *user, const char *phase, int done, int total);
@@ -40,5 +41,11 @@ struct Llm {
 std::string strip_thinking(std::string s);
 // Split text into pieces of ~target_chars, cutting at paragraph/sentence boundaries.
 std::vector<std::string> split_text(const std::string &text, size_t target_chars);
+
+// Reduce long material to bullet points that fit final_budget tokens (hierarchical, per-chunk
+// calls with `system` as the system prompt). from_bullets is set when any reduction happened.
+// False on cancel/error.
+bool reduce_to_fit(Llm &llm, const std::string &system, std::string material, int final_budget,
+                   std::string &out, bool &from_bullets, sve_progress_cb cb, void *user);
 
 } // namespace sve

@@ -92,3 +92,10 @@ TEST(telugu_roundtrip) {
     CHECK_EQ(e.facts[0]["text"].get<std::string>(), std::string("మీరు రోజూ మాత్ర వేసుకోండి"));
     CHECK_EQ(e.topics[0].get<std::string>(), std::string("ఆరోగ్యం"));
 }
+
+TEST(first_json_object_skips_prose) {
+    json j;
+    CHECK(first_json_object("Sure {not json} ```json\n{\"summary\":\"x\"}\n```", j));
+    CHECK_EQ(j["summary"].get<std::string>(), std::string("x"));
+    CHECK(!first_json_object("no object here", j));
+}

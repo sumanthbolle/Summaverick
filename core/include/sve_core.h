@@ -90,6 +90,9 @@ int  sve_audio_loaded(const sve_ctx *ctx);
  * Progress phase "chunk" with done/total = pieces. Returns transcript, or NULL on failure/cancel. */
 char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user);
 
+/* Same as sve_transcribe_audio, as JSON pieces: [{"start_sec":0,"text":"…"},…] (start in whole seconds). */
+char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user);
+
 /* ---- notes store ------------------------------------------------------- */
 
 /* Creates a note. audio_path/transcript may be NULL. Returns new id (>0) or negative error. */
@@ -116,6 +119,81 @@ char *sve_notes_list_json(sve_ctx *ctx, const char *query, int limit);
 char *sve_notes_audio_older_than_json(sve_ctx *ctx, int max_age_days);
 int   sve_note_clear_audio(sve_ctx *ctx, int64_t id);
 int   sve_note_clear_transcript(sve_ctx *ctx, int64_t id);
+
+/* ---- personal assistant (Gemma 4) --------------------------------------
+ * JSON in/out. Rows use the store's column names; NULL columns are JSON null. Functions returning
+ * char* return NULL on error. Nothing proposed by the model is saved until sve_suggestion_accept. */
+
+/* Transcript pieces of a note. pieces_json: [{"start_sec":0,"text":"…"}]. Replaces existing pieces. */
+int   sve_note_set_pieces(sve_ctx *ctx, int64_t note_id, const char *pieces_json);
+/* [{"idx":0,"start_sec":0,"text":"…"}] */
+char *sve_note_pieces(sve_ctx *ctx, int64_t note_id);
+
+/* Runs extraction on a note's pieces (greedy, windowed for long recordings). Adds pending suggestions
+ * (reminders, tasks, profile changes, vocabulary, facts), each quote and medicine checked in code; links
+ * topics and people directly. Returns the number of suggestions added (0 if the model output was unusable),
+ * negative on error or cancel. Pending suggestions from an earlier run on the same note become "superseded". */
+int   sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user);
+
+/* Suggestions with status ("pending", "accepted", "rejected"; NULL/"" = all):
+ * [{"id","kind":"reminder|task|profile|vocab|fact","status","payload":{…},"quote","note_id","start_sec",
+ *   "medicine_id","check_status":"ok|check"|null,"check_fields":["dose",…],"created_at"}] */
+char *sve_suggestions_json(sve_ctx *ctx, const char *status);
+/* Accepts a pending suggestion. edited_payload_json (NULL = as proposed) overrides payload keys and is
+ * recorded for learning. Creates the row: reminder -> reminder id, task -> task id, profile -> medicine id
+ * (stop_medicine: the deleted medicine's id, 0 if none matched; routine: memory id), vocab/fact -> memory id.
+ * Negative on error (unknown id, not pending, bad JSON). */
+int64_t sve_suggestion_accept(sve_ctx *ctx, int64_t id, const char *edited_payload_json);
+int   sve_suggestion_reject(sve_ctx *ctx, int64_t id);
+
+/* Profile: {"name","lang":"en|te","style","routine":{"wake","breakfast","lunch","dinner","bed":"HH:MM"}}.
+ * Get returns "null" when unset. Set takes a JSON object (the person's own edit, applied directly). */
+char *sve_profile_get(sve_ctx *ctx);
+int   sve_profile_set(sve_ctx *ctx, const char *json);
+
+/* [{"id","name","dose","when_text","times":["20:00"],"repeat":"daily|twice_daily|weekly|once","until_date","created_at"}] */
+char *sve_medicines_json(sve_ctx *ctx);
+/* Saves a medicine the person typed ({"id":0 = new, "name", "dose", "when_text"|"when", "times", "repeat",
+ * "until_date"}) and adds a pending reminder suggestion for it. Returns the medicine id, negative on error. */
+int64_t sve_medicine_save(sve_ctx *ctx, const char *json);
+/* Deletes a medicine and its reminders and suggestions. */
+int   sve_medicine_delete(sve_ctx *ctx, int64_t id);
+
+/* [{"id","text","times","repeat","start_date","until_date","note_id","start_sec","medicine_id","from_deleted","active","created_at"}] */
+char *sve_reminders_json(sve_ctx *ctx, int active_only);
+int   sve_reminder_set_active(sve_ctx *ctx, int64_t id, int active);
+/* [{"id","text","who","due_date","done","note_id","start_sec","from_deleted","created_at"}] */
+char *sve_tasks_json(sve_ctx *ctx, int open_only);
+int   sve_task_set_done(sve_ctx *ctx, int64_t id, int done);
+
+/* kind "topic" | "person" | NULL/"" = both:
+ * [{"id","kind","name","summary","summary_stale","note_count","open_tasks","last_title"}] */
+char *sve_topics_json(sve_ctx *ctx, const char *kind);
+/* [{"id","title","created_at","short_summary"}] newest first */
+char *sve_topic_notes_json(sve_ctx *ctx, int64_t topic_id);
+int   sve_topic_rename(sve_ctx *ctx, int64_t topic_id, const char *name);
+int   sve_topic_merge(sve_ctx *ctx, int64_t from_id, int64_t into_id);
+/* {"summary":"","key_terms":[{"term":"","meaning":""}],"quiz":[{"q":"","a":""}],"lang":"en"} from the
+ * topic's notes; cached until a new recording joins the topic or another lang is asked for. */
+char *sve_topic_summary(sve_ctx *ctx, int64_t topic_id, const char *lang, sve_progress_cb cb, void *user);
+
+/* kind "fact" | "preference" | "vocab" | NULL/"" = all: [{"id","kind","text","note_id","created_at"}] */
+char *sve_memory_json(sve_ctx *ctx, const char *kind);
+int   sve_memory_update(sve_ctx *ctx, int64_t id, const char *text);
+int   sve_memory_delete(sve_ctx *ctx, int64_t id);
+/* Adds a vocabulary word the person fixed (applied directly). Returns its id (existing id if known). */
+int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
+
+/* Ask across all recordings: {"answer":"","sources":[{"note_id":0,"start_sec":0,"title":""}],
+ * "not_found":false,"medicine":false}. Medicine questions are answered in code from the profile and quoted
+ * transcript pieces, never generated. Answers are in the profile language. */
+char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, void *user);
+
+/* At most one insight per calendar day, from recent notes and open tasks: {"id":0,"text":""} or "null". */
+char *sve_insight_generate(sve_ctx *ctx, int64_t note_id);
+/* Newest undismissed {"id","text","note_id","dismissed","created_at"} or "null". */
+char *sve_insight_latest(sve_ctx *ctx);
+int   sve_insight_dismiss(sve_ctx *ctx, int64_t id);
 
 /* ---- device settings (small key/value store, used by the device web UI and the apps) ---- */
 int   sve_setting_set(sve_ctx *ctx, const char *key, const char *value);

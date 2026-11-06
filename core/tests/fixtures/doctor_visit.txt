@@ -1,0 +1,5 @@
+[t=0] Doctor: నమస్కారం Lakshmi గారు, కూర్చోండి. మీ BP కొంచెం ఎక్కువగా ఉంది, 150 over 95.
+[t=28] ఈ రోజు నుంచి Amlodipine 5 mg once a day after dinner వేసుకోండి. రోజుకు ఒక్క tablet మాత్రమే.
+[t=56] Saturday నాడు మీ blood test report తీసుకుని రండి, అప్పుడు మళ్ళీ చూద్దాం.
+[t=84] ఉప్పు బాగా తగ్గించాలి. Salt less than one teaspoon a day. Pickles రెండు వారాలు తినకూడదు, no pickles for two weeks.
+[t=112] సరే డాక్టర్ గారు, thank you. Saturday వస్తాను.
