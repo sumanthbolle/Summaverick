@@ -91,6 +91,13 @@ struct TopicDetailView: View {
                         .frame(minHeight: 44)
                     } else if summaryBusy {
                         busyView
+                    } else if summaryError != nil {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Could not refresh the summary.", systemImage: "exclamationmark.triangle.fill")
+                                .font(.subheadline).foregroundStyle(.orange)
+                            Button("Try again") { Task { await loadSummary() } }
+                                .buttonStyle(.bordered).frame(minHeight: 44)
+                        }
                     } else if topic?.summaryStale == 1 {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("New recordings were added.").font(.subheadline).foregroundStyle(.secondary)
@@ -254,9 +261,10 @@ struct TopicDetailView: View {
             if Task.isCancelled { return }
             if s != summary { revealed = [] }
             summary = s
+            topic?.summaryStale = 0   // the core cleared it
         } catch {
             if Task.isCancelled { return }
-            if summary == nil { summaryError = error.localizedDescription }
+            summaryError = error.localizedDescription
         }
     }
 }

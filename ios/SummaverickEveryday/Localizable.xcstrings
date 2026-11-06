@@ -309,6 +309,16 @@
         }
       }
     },
+    "Could not refresh the summary.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశాన్ని కొత్తది చేయలేకపోయాం."
+          }
+        }
+      }
+    },
     "Could not save this. Please try again.": {
       "localizations": {
         "te": {
