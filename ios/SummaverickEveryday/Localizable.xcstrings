@@ -4312,6 +4312,22 @@
           }
         }
       }
+    },
+    "From your profile and your recordings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From your profile and your recordings"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ ప్రొఫైల్ నుంచి, మీ రికార్డింగ్‌ల నుంచి"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

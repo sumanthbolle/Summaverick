@@ -267,7 +267,7 @@ struct AskView: View {
             if quoted {
                 // Built in the core from saved facts and recorded words: shown exactly, in full.
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("Copied from your recordings", systemImage: "quote.opening")
+                    Label(AssistantFormat.medicineAnswerLabel(shown), systemImage: "quote.opening")
                         .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                     HStack(alignment: .top, spacing: 10) {
                         RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)

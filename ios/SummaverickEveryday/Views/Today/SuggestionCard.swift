@@ -36,6 +36,14 @@ enum AssistantFormat {
         repeatRule == "twice_daily" && Set(times.filter { ReminderScheduler.clock($0) != nil }).count != 2
     }
 
+    /// Label above a medicine answer built in the core: it starts with the profile section when the
+    /// person's saved medicines are part of it (core medicine_answer, en and te headers).
+    static func medicineAnswerLabel(_ answer: String) -> LocalizedStringKey {
+        let t = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fromProfile = t.hasPrefix("From your profile:") || t.hasPrefix("మీ ప్రొఫైల్ నుండి:")
+        return fromProfile ? "From your profile and your recordings" : "Copied from your recordings"
+    }
+
     static func repeatLabel(_ r: String?) -> String? {
         guard let r, !r.isEmpty else { return nil }
         switch r {
@@ -679,7 +687,7 @@ struct SuggestionEditForm: View {
     private func answerSection(_ a: AnswerContext) -> some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Text(a.medicine ? "Copied from your recordings" : "Summaverick's answer")
+                Text(a.medicine ? AssistantFormat.medicineAnswerLabel(a.text) : "Summaverick's answer")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                 HStack(alignment: .top, spacing: 10) {
                     RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)
