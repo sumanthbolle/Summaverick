@@ -112,6 +112,8 @@ struct AskView: View {
         }
         .task { await loadProfile() }
         .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await loadProfile() } }
+        // "Delete everything": answers on screen (medicine answers too) go with the data.
+        .onReceive(NotificationCenter.default.publisher(for: .assistantWiped)) { _ in turns.removeAll() }
         .onAppear { takeDraft() }
         .onChange(of: router.askDraft) { _, _ in takeDraft() }
         .onChange(of: recorder.elapsed) { _, t in if listening && t >= Self.maxVoiceSeconds { endVoice() } }

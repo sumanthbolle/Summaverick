@@ -135,6 +135,7 @@ struct SettingsView: View {
             }
             await ReminderScheduler.shared.resync()   // no active reminders left: removes every scheduled one
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+            NotificationCenter.default.post(name: .assistantWiped, object: nil)
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
             wiping = false

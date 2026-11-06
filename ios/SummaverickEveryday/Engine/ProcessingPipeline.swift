@@ -268,6 +268,8 @@ final class ProcessingPipeline {
 
 extension Notification.Name {
     static let notesChanged = Notification.Name("sve.notesChanged")
+    /// Posted after "Delete everything": screens drop what they hold in memory (Ask's chat).
+    static let assistantWiped = Notification.Name("sve.assistantWiped")
 }
 
 /// Transcript pieces for notes recorded before pieces existed, so Ask and Deep dive can search them.
