@@ -628,8 +628,20 @@ int sve_medicine_delete(sve_ctx *ctx, int64_t id) {
         std::string name;
         for (const auto &m : ctx->store->medicines()) if (jint(m, "id", 0) == id) name = jstr(m, "name");
         if (name.empty()) return -1;
-        deactivate_medicine_reminders(*ctx->store, id, name);  // also recording-born ones that only name it
-        return ctx->store->delete_medicine(id) ? 0 : -1;
+        sve::Store &st = *ctx->store;
+        // The row, its reminders and its pending cards go together. Recording cards have no medicine_id
+        // (the FK cascade misses them), so they are superseded by name here: an old card must not
+        // recreate the medicine at the recording's dose after the person deleted it.
+        if (!st.begin()) return -1;
+        try {
+            deactivate_medicine_reminders(st, id, name);  // also recording-born ones that only name it
+            supersede_medicine_suggestions(st, id, name);
+            if (!st.delete_medicine(id) || !st.commit()) { st.rollback(); return -1; }
+        } catch (...) {
+            st.rollback();
+            throw;
+        }
+        return 0;
     });
 }
 

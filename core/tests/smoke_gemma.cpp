@@ -230,6 +230,19 @@ static void run_api_fixes4(sve_ctx *ctx, int64_t note) {
     json pr = pending_kind(ctx, "reminder");
     expect(active_named(ctx, "Telmikind").empty() && pr.size() == 1 && contains(pr[0]["payload"], "80 mg"),
            "old reminder off, new 80 mg reminder proposed");
+
+    // Round 5: deleting the medicine supersedes the recording's pending cards for it (medicine_id NULL).
+    if (!pr.empty()) sve_suggestion_accept(ctx, pr[0]["id"], nullptr);
+    int64_t rec_r = add_sugg(ctx, rcard("Telmikind", "80 mg", "ok", json::array()));
+    int64_t rec_p = add_sugg(ctx, pcard("add_medicine", "telmikind", "80 mg", "ok", json::array()));
+    expect(active_named(ctx, "Telmikind 80 mg").size() == 1 && ctx->store->suggestion(rec_r)["medicine_id"].is_null(),
+           "setup: active 80 mg reminder and unlinked recording cards");
+    expect(sve_medicine_delete(ctx, tid) == 0, "medicine deleted");
+    expect(ctx->store->suggestion(rec_r)["status"] == "superseded" && ctx->store->suggestion(rec_p)["status"] == "superseded",
+           "delete supersedes the recording's reminder and profile cards");
+    expect(sve_suggestion_accept(ctx, rec_r, nullptr) < 0 && sve_suggestion_accept(ctx, rec_p, nullptr) < 0,
+           "old cards cannot be accepted after the delete");
+    expect(med_named(ctx, "Telmikind").is_null() && active_named(ctx, "Telmikind").empty(), "no medicine row, no active reminder");
 }
 
 // Fix round 3: a stale "ok" card never overwrites a dose the person entered later.
