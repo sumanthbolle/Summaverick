@@ -108,13 +108,13 @@ std::string truncate_utf8(const std::string &s, size_t max_bytes) {
     return s.substr(0, n);
 }
 
-std::string always_block(Store &store, size_t max_bytes) {
+std::string always_block(Store &store, size_t max_bytes, bool medicines) {
     json profile;
     if (auto p = store.setting_get("profile")) {
         profile = json::parse(*p, nullptr, false);
         if (profile.is_discarded()) profile = json();
     }
-    json meds = store.medicines();
+    json meds = medicines ? store.medicines() : json::array();
     std::vector<std::string> prefs = texts(store.memory("preference"));
     std::vector<std::string> vocab = texts(store.memory("vocab"));
     size_t pf = 0, vf = 0;
@@ -124,8 +124,8 @@ std::string always_block(Store &store, size_t max_bytes) {
     return truncate_utf8(out, max_bytes);
 }
 
-std::string context_system(Store &store, const std::string &system) {
-    std::string ab = always_block(store);
+std::string context_system(Store &store, const std::string &system, bool medicines) {
+    std::string ab = always_block(store, 2000, medicines);
     if (ab.empty()) return system;
     return "Background about the person you work for (use it for names, spellings and preferences; "
            "do not repeat it unless it is asked for):\n" + ab + "\n" + system;

@@ -104,8 +104,9 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
     std::string text(transcript);
     if (strip_thinking(text).empty()) return dup_str("");
 
-    // The always block (profile, vocabulary) goes in front of every system prompt (spec §7.3).
-    const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang));
+    // The always block (profile, vocabulary) goes in front of every system prompt (spec §7.3), here
+    // without the medicines: notes are free text and must not pick up the profile's doses (spec §4).
+    const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
     const int max_out = std::max(160, std::min(700, llm.n_ctx / 4));
     // prompt scaffolding ≈ 250 tokens plus the system prompt (reduce_to_fit floors this)
     const int budget = llm.n_ctx - max_out - 250 - llm.count_tokens(sys);
@@ -153,7 +154,7 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang_c
         excerpt.resize(1200);
         while (!excerpt.empty() && (static_cast<unsigned char>(excerpt.back()) & 0xC0) == 0x80) excerpt.pop_back();
     }
-    std::string prompt = ctx->llm->apply_template(sve::context_system(*ctx->store, sve::system_prompt(lang_c ? lang_c : "en")),
+    std::string prompt = ctx->llm->apply_template(sve::context_system(*ctx->store, sve::system_prompt(lang_c ? lang_c : "en"), false),
                                                   sve::title_prompt(excerpt));
     std::string out;
     if (!ctx->llm->complete(prompt, 24, out, nullptr, nullptr, "final", 0, 1)) return nullptr;

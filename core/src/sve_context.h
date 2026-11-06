@@ -10,10 +10,12 @@ std::string truncate_utf8(const std::string &s, size_t max_bytes);
 
 // Profile, routine, medicines, preferences, vocab. Drops oldest vocab, then oldest
 // preferences, when over budget; truncate_utf8 as the last resort. Empty if nothing known.
-std::string always_block(Store &store, size_t max_bytes = 2000);
+// medicines = false leaves out the Medicines section (notes, titles, summaries: free text that
+// is shown without a medicine check must not be handed the person's doses; spec §4).
+std::string always_block(Store &store, size_t max_bytes = 2000, bool medicines = true);
 
 // `system` preceded by the always block as background (unchanged when nothing is known).
-std::string context_system(Store &store, const std::string &system);
+std::string context_system(Store &store, const std::string &system, bool medicines = true);
 
 // "Spell these words this way: a, b" from saved vocabulary, newest first, whole terms within
 // max_bytes (UTF-8 safe). Vocabulary only: never medicines or doses, so the transcriber is not

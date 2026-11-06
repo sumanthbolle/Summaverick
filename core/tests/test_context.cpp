@@ -176,3 +176,24 @@ TEST(transcription_vocab_line_budget_utf8) {
     std::string one = sve::transcription_vocab_line(t, 330);
     CHECK(one.size() <= 330 && valid_utf8_end(one));
 }
+
+TEST(notes_block_has_no_medicine_line) {
+    Store s(":memory:");
+    s.setting_set("profile", R"({"name":"Ravi","routine":{"dinner":"20:00"}})");
+    s.add_medicine(json::parse(R"({"name":"Amlodipine","dose":"5 mg","when_text":"after dinner","times":["20:00"],"repeat":"daily"})"));
+    s.add_memory("vocab", "Dr Rao", std::nullopt);
+    std::string full = sve::always_block(s);
+    CHECK(full.find("Amlodipine") != std::string::npos);
+    std::string notes = sve::always_block(s, 2000, false);
+    CHECK(notes.find("Medicines") == std::string::npos);
+    CHECK(notes.find("Amlodipine") == std::string::npos);
+    CHECK(notes.find("5 mg") == std::string::npos);
+    CHECK(notes.find("Ravi") != std::string::npos);
+    CHECK(notes.find("Dr Rao") != std::string::npos);
+    std::string sys = sve::context_system(s, "SYS", false);
+    CHECK(sys.find("Amlodipine") == std::string::npos && sys.find("Ravi") != std::string::npos);
+    CHECK(sve::context_system(s, "SYS").find("Amlodipine") != std::string::npos);  // Ask, extraction: full block
+    Store m(":memory:");
+    m.add_medicine(json::parse(R"({"name":"Metformin","dose":"500 mg"})"));
+    CHECK_EQ(sve::context_system(m, "SYS", false), std::string("SYS"));  // only medicines known: nothing added
+}
