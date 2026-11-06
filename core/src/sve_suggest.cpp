@@ -834,10 +834,10 @@ json direct_reminder_row(const json &in, const std::string &today) {
     if (!opt_text(in, "start_date", start) || !opt_text(in, "until_date", until)) return nullptr;
     if (start.empty()) start = today;
     if (!valid_ymd(start) || (!until.empty() && (!valid_ymd(until) || until < start))) return nullptr;
-    json note, sec;
-    if (!source_fields(in, note, sec)) return nullptr;
+    json note, sec, med;
+    if (!source_fields(in, note, sec) || !opt_whole(in, "medicine_id", 1, med)) return nullptr;
     return {{"text", text}, {"times", times}, {"repeat", rep}, {"start_date", start},
-            {"until_date", str_or_null(until)}, {"note_id", note}, {"start_sec", sec}, {"medicine_id", nullptr}};
+            {"until_date", str_or_null(until)}, {"note_id", note}, {"start_sec", sec}, {"medicine_id", med}};
 }
 
 json direct_task_row(const json &in) {
@@ -849,6 +849,17 @@ json direct_task_row(const json &in) {
     json note, sec;
     if (!source_fields(in, note, sec)) return nullptr;
     return {{"text", text}, {"who", str_or_null(who)}, {"due_date", str_or_null(due)}, {"note_id", note}, {"start_sec", sec}};
+}
+
+std::vector<int64_t> medicines_named(const std::string &text, const json &medicines) {
+    std::vector<int64_t> out;
+    if (!medicines.is_array()) return out;
+    for (const auto &m : medicines) {
+        std::string name = jstr(m, "name");
+        int64_t id = jint(m, "id", 0);
+        if (id > 0 && !trim(name).empty() && !names_in_question(text, {name}).empty()) out.push_back(id);
+    }
+    return out;
 }
 
 }  // namespace sve

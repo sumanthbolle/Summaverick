@@ -465,6 +465,33 @@ static void run_api_direct(sve_ctx *ctx) {
     sve_reminder_set_active(ctx, rid, 0);
     sve_reminder_set_active(ctx, r2, 0);
     sve_task_set_done(ctx, tid, 1);
+
+    // Medicine reminders from Ask are linked by id, so edited wording does not lose them.
+    auto rem = [&](int64_t id) { for (const auto &r : take(sve_reminders_json(ctx, 0))) if (r["id"] == id) return r; return json(); };
+    int64_t mid = sve_medicine_save(ctx, R"({"name":"Cilacar","dose":"10 mg","when":"after dinner"})");
+    int64_t other = sve_medicine_save(ctx, R"({"name":"Glycomet","dose":"500 mg","when":"after breakfast"})");
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+    std::string mj = R"({"text":"my night BP tablet","times":["21:00"],"repeat":"daily","medicine_id":)" + std::to_string(mid) + "}";
+    int64_t e1 = sve_reminder_create(ctx, mj.c_str());
+    expect(e1 > 0 && rem(e1)["medicine_id"] == mid, "explicit medicine_id kept on an edited-wording reminder");
+    sve_medicine_save(ctx, (R"({"id":)" + std::to_string(mid) + R"(,"dose":"20 mg"})").c_str());
+    expect(rem(e1)["active"] == false, "dose change turns off the linked Ask reminder");
+    int64_t e2 = sve_reminder_create(ctx, mj.c_str());
+    json stop = {{"kind", "profile"}, {"quote", "Stop Cilacar"}, {"check_status", "ok"},
+                 {"payload", {{"change", "stop_medicine"}, {"text", "Stop medicine: Cilacar"}, {"medicine", {{"name", "Cilacar"}}}}}};
+    expect(sve_suggestion_accept(ctx, add_sugg(ctx, stop), nullptr) == mid && rem(e2).is_null(),
+           "stopping the medicine removes the linked Ask reminder");
+    int64_t mid2 = sve_medicine_save(ctx, R"({"name":"Cilacar","dose":"10 mg","when":"after dinner"})");
+    int64_t e3 = sve_reminder_create(ctx, (R"({"text":"tablet","times":["21:00"],"repeat":"daily","medicine_id":)" + std::to_string(mid2) + "}").c_str());
+    sve_medicine_delete(ctx, mid2);
+    expect(e3 > 0 && rem(e3).is_null(), "deleting the medicine removes the linked Ask reminder");
+    int64_t auto1 = sve_reminder_create(ctx, R"({"text":"Take Glycomet 500 mg after breakfast","times":["08:30"],"repeat":"daily"})");
+    expect(rem(auto1)["medicine_id"] == other, "text naming exactly one medicine links it");
+    sve_medicine_save(ctx, R"({"name":"Cilacar","dose":"10 mg","when":"after dinner"})");
+    int64_t two = sve_reminder_create(ctx, R"({"text":"Glycomet and Cilacar","times":["08:30"],"repeat":"daily"})");
+    expect(two > 0 && rem(two)["medicine_id"].is_null(), "text naming two medicines stays unlinked");
+    expect(sve_reminder_create(ctx, R"({"text":"x","times":["08:30"],"medicine_id":99999})") < 0, "unknown medicine_id rejected");
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
 }
 
 static int run_api(sve_ctx *ctx) {

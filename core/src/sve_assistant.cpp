@@ -672,10 +672,22 @@ void drop_missing_note(sve::Store &st, json &row) {
 int64_t sve_reminder_create(sve_ctx *ctx, const char *js) {
     return guard<int64_t>("sve_reminder_create", -1, [&]() -> int64_t {
         if (!ctx) return -1;
+        sve::Store &st = *ctx->store;
         json row = sve::direct_reminder_row(parse(js), today_iso());
         if (!row.is_object()) return -1;
-        drop_missing_note(*ctx->store, row);
-        int64_t id = ctx->store->add_reminder(row);
+        json meds = st.medicines();
+        if (!row["medicine_id"].is_null()) {
+            // An explicit medicine must exist.
+            int64_t mid = row["medicine_id"].get<int64_t>();
+            if (std::none_of(meds.begin(), meds.end(), [&](const json &m) { return jint(m, "id", 0) == mid; })) return -1;
+        } else {
+            // Linked by id when the words name exactly one saved medicine, so a later dose change, stop or
+            // delete reaches it even after the wording is edited. Two or more named: left unlinked.
+            std::vector<int64_t> named = sve::medicines_named(jstr(row, "text"), meds);
+            if (named.size() == 1) row["medicine_id"] = named[0];
+        }
+        drop_missing_note(st, row);
+        int64_t id = st.add_reminder(row);
         return id > 0 ? id : -1;
     });
 }

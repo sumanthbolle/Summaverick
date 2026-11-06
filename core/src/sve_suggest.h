@@ -128,10 +128,13 @@ bool mentions_medicine(const std::string &text, const std::vector<std::string> &
 // invalid entry rejects the whole input), repeat (daily|twice_daily|weekly|once; missing/empty -> "once"),
 // start_date (YYYY-MM-DD; missing/empty -> today), until_date (YYYY-MM-DD or missing/empty; not before
 // start_date), note_id (integer > 0 or missing/null), start_sec (integer >= 0 or missing/null; dropped
-// without note_id). Returns the row for Store::add_reminder, or null when the input is not acceptable.
+// without note_id), medicine_id (integer > 0 or missing/null; existence is checked by the caller).
+// Returns the row for Store::add_reminder, or null when the input is not acceptable.
 json direct_reminder_row(const json &in, const std::string &today);
 // Task keys: text (required, trimmed), who (optional string), due_date (YYYY-MM-DD or missing/empty),
 // note_id, start_sec (as for reminders). Returns the row for Store::add_task, or null.
 json direct_task_row(const json &in);
+// Ids of the medicines (rows of Store::medicines) whose name appears in text as a whole token run.
+std::vector<int64_t> medicines_named(const std::string &text, const json &medicines);
 
 }  // namespace sve

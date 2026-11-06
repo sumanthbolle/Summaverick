@@ -168,10 +168,12 @@ char *sve_reminders_json(sve_ctx *ctx, int active_only);
 int   sve_reminder_set_active(sve_ctx *ctx, int64_t id, int active);
 /* Creates a reminder the person made themselves (e.g. "Make reminder" on an Ask answer; their own edit,
  * applied directly, no suggestion). json: {"text","times":["HH:MM",…],"repeat","start_date","until_date",
- * "note_id","start_sec"}. Requires non-empty text and at least one time; every time must be a valid HH:MM.
+ * "note_id","start_sec","medicine_id"}. Requires non-empty text and at least one time; every time must be a valid HH:MM.
  * repeat daily|twice_daily|weekly|once (missing/empty = "once"); start_date YYYY-MM-DD (missing/empty =
  * today); until_date YYYY-MM-DD or missing, not before start_date; note_id/start_sec optional (a note that
- * no longer exists is dropped with its start_sec). Returns the reminder id, negative on bad input or error. */
+ * no longer exists is dropped with its start_sec). medicine_id optional; if given it must exist (else -1). If
+ * not given and the text names exactly one saved medicine, the reminder is linked to it (dose change, stop and
+ * delete of that medicine then reach it). Returns the reminder id, negative on bad input or error. */
 int64_t sve_reminder_create(sve_ctx *ctx, const char *json);
 /* [{"id","text","who","due_date","done","note_id","start_sec","from_deleted","created_at"}] */
 char *sve_tasks_json(sve_ctx *ctx, int open_only);

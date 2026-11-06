@@ -224,6 +224,28 @@ TEST(reminder_create_direct) {
         CHECK(direct_reminder_row(json::parse(bad), today).is_null());
 }
 
+// An Ask-made reminder keeps an explicit medicine_id, so the medicine's cascade reaches it.
+TEST(reminder_create_direct_medicine_link) {
+    using sve::direct_reminder_row;
+    Store s(":memory:");
+    int64_t a = s.add_medicine(json::parse(R"({"name":"Amlodipine","dose":"5 mg","times":["20:00"],"repeat":"daily"})"));
+    int64_t m = s.add_medicine(json::parse(R"({"name":"Metformin","dose":"500 mg","times":["08:00"],"repeat":"daily"})"));
+    json row = direct_reminder_row(json::parse("{\"text\":\"my evening tablet\",\"times\":[\"20:00\"],\"repeat\":\"daily\",\"medicine_id\":" +
+                                               std::to_string(a) + "}"), "2026-11-06");
+    CHECK(row.is_object());
+    CHECK_EQ(row["medicine_id"].get<int64_t>(), a);
+    CHECK(s.add_reminder(row) > 0);
+    CHECK(s.delete_medicine(a));
+    CHECK_EQ(s.reminders(false).size(), (size_t)0);   // FK cascade, whatever the wording
+    for (const char *bad : {R"({"text":"x","times":["09:00"],"medicine_id":0})", R"({"text":"x","times":["09:00"],"medicine_id":"2"})"})
+        CHECK(direct_reminder_row(json::parse(bad), "2026-11-06").is_null());
+    json meds = s.medicines();
+    CHECK_EQ(sve::medicines_named("Take Metformin after food", meds), std::vector<int64_t>({m}));
+    s.add_medicine(json::parse(R"({"name":"Telma","dose":"40 mg"})"));
+    CHECK_EQ(sve::medicines_named("Metformin and Telma at night", s.medicines()).size(), (size_t)2);
+    CHECK(sve::medicines_named("walk every evening", s.medicines()).empty());
+}
+
 TEST(task_create_direct) {
     using sve::direct_task_row;
     Store s(":memory:");
