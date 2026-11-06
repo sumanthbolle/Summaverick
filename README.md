@@ -24,6 +24,44 @@ ios/    SwiftUI app — recording, Apple on-device speech recognition, UI. Thin 
 
 The core was compiled and run on Linux against llama.cpp `c6a0ff1` (2026‑11‑04) and whisper.cpp master with Qwen3‑0.6B‑Q8_0: summary, notes, revision questions, question answering and the long‑transcript chunk‑and‑merge path all produce grounded output (see `core/README.md` for the sample run). The iOS layer could not be compiled here (no Xcode on Linux), so expect to fix a handful of compiler nits on first build.
 
+## Personal assistant
+
+With the Gemma 4 E4B model selected, the app also works as a personal assistant for students, children and older people who speak Telugu, English or a mix of the two. All of it runs on the phone.
+
+- **Today** greets you and lists today's reminders, open to-dos and one insight a day drawn from your recordings.
+- **Deep dive** groups recordings by topic and by person. Each topic has a summary, key terms and a short quiz, and every point links back to the moment in the recording it came from.
+- **Ask** answers questions, typed or spoken, from your own recordings only. Each answer links to its source, and if the recordings do not contain the answer the app says so.
+- **Suggestions wait for Yes.** After a recording, reminders, to-dos and facts appear as cards on Today. Nothing is saved and no reminder rings until you tap Yes. Edit lets you change a card first; No discards it.
+- **Medicine checks.** A medicine suggestion is compared with the doctor's exact words and with the medicines in your profile. If the name, dose or time does not match, the card shows a yellow "Please check" banner and asks "Save anyway?" before saving. Answers about medicines quote the recording rather than rephrasing it.
+- **Learning memory.** The app remembers words you save and offers a preference when you make the same correction more than once, such as moving a reminder time. Review or delete these under Profile → What Summaverick has learned.
+
+With a Qwen model selected, notes still work, but Today and Ask show "Needs Gemma 4".
+
+### Tests
+
+The core tests need only `clang++` and SQLite, which come with the Xcode command-line tools:
+
+```bash
+bash core/tests/run.sh                 # unit tests: store, extraction, medicine checks, learning
+bash core/tests/smoke_gemma.sh api     # C API checks; no model needed
+```
+
+The model smoke tests link against Homebrew's llama.cpp (`brew install llama.cpp`) and run Gemma 4 E4B. Point them at the model and audio projector files:
+
+```bash
+export SVE_GEMMA=$(ls ~/.cache/huggingface/hub/models--unsloth--gemma-4-E4B-it-GGUF/snapshots/*/gemma-4-E4B-it-Q4_K_M.gguf)
+export SVE_MMPROJ=$(ls ~/.cache/huggingface/hub/models--ggml-org--gemma-4-E4B-it-GGUF/snapshots/*/mmproj-gemma-4-E4B-it-Q8_0.gguf)
+
+bash core/tests/smoke_gemma.sh extract                            # suggestions, Ask, topic summary, insight
+SVE_TEST_WAV=clip.wav bash core/tests/smoke_gemma.sh transcribe   # 16 kHz mono WAV to transcript
+```
+
+`extract` reads `core/tests/fixtures/doctor_visit.txt` unless `SVE_FIXTURE` names another file. Its `EXPECT-OK` and `EXPECT-MISS` lines are for a person to read; model output varies, so review it rather than treating a miss as a hard failure. After an iOS build, `python3 ios/tools/check_strings.py <derived-data-dir>` confirms that every string in the app is in the catalog with a Telugu value.
+
+### Signing
+
+The app needs one entitlement, Increased Memory Limit (`com.apple.developer.kernel.increased-memory-limit`), so that the 5 GB Gemma model fits in memory. It is the only extra entitlement a personal Apple team supports, so the app is built to need nothing else. Adding other capabilities in Xcode will break signing with a personal team.
+
 ## Build the iOS app (on your Mac)
 
 Requirements: Xcode 16+, an iPhone/iPad on iOS 17+, [Homebrew](https://brew.sh).
