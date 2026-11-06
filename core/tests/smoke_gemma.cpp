@@ -136,6 +136,60 @@ static json active_named(sve_ctx *ctx, const char *name) {
     return out;
 }
 
+
+// Fix round 2: accepted dose updates the saved medicine; editing a dose turns old reminders off;
+// stop supersedes pending cards; Ask quotes medicine pieces first and medicine facts.
+static void run_api_fixes2(sve_ctx *ctx, int64_t note) {
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+
+    // 5: saved Losar 25 mg; a recording says 50 mg; Yes updates the saved medicine.
+    int64_t los = sve_medicine_save(ctx, R"({"name":"Losar","dose":"25 mg","when":"after breakfast"})");
+    for (const auto &s : pending_kind(ctx, "reminder")) sve_suggestion_reject(ctx, s["id"]);
+    json rem = {{"kind", "reminder"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Take Losar 50 mg after dinner"}, {"check_status", "check"},
+                {"check_fields", {"dose"}},
+                {"payload", {{"text", "Take Losar 50 mg"}, {"when_text", "after dinner"}, {"times", {"21:30"}}, {"repeat", "daily"},
+                             {"medicine", {{"name", "Losar"}, {"dose", "50 mg"}, {"when_text", "after dinner"}}}}}};
+    expect(sve_suggestion_accept(ctx, add_sugg(ctx, rem), nullptr) > 0, "accept reminder with a new dose");
+    json lm;
+    for (const auto &m : take(sve_medicines_json(ctx))) if (m["id"] == los) lm = m;
+    expect(lm.is_object() && lm["dose"] == "50 mg" && lm["when_text"] == "after dinner" && lm["times"] == json::array({"21:30"}),
+           "saved medicine takes the accepted dose and time");
+    expect(active_named(ctx, "Losar").size() == 1 && active_named(ctx, "Losar 50 mg").size() == 1, "one active Losar reminder");
+
+    // 6: editing the dose turns the old reminder off at once; rejecting the new card leaves none.
+    sve_medicine_save(ctx, (R"({"id":)" + std::to_string(los) + R"(,"dose":"100 mg"})").c_str());
+    expect(active_named(ctx, "Losar").empty(), "dose edit turns off the old reminder immediately");
+    json pr = pending_kind(ctx, "reminder");
+    expect(pr.size() == 1 && contains(pr[0]["payload"], "100 mg"), "dose edit proposes a new reminder");
+    if (!pr.empty()) sve_suggestion_reject(ctx, pr[0]["id"]);
+    expect(active_named(ctx, "Losar").empty(), "rejecting the new card leaves no active reminder");
+
+    // 7: stop supersedes pending reminder cards for the medicine (by id and by name).
+    sve_medicine_save(ctx, (R"({"id":)" + std::to_string(los) + R"(,"dose":"25 mg"})").c_str());  // pending card by id
+    json byname = rem;
+    byname["payload"]["medicine"]["dose"] = "25 mg";
+    int64_t bn = add_sugg(ctx, byname);  // pending card by name only
+    json stop = {{"kind", "profile"}, {"note_id", note}, {"quote", "Stop Losar"}, {"check_status", "ok"},
+                 {"payload", {{"change", "stop_medicine"}, {"text", "Stop medicine: Losar"}, {"medicine", {{"name", "Losar"}}}}}};
+    sve_suggestion_accept(ctx, add_sugg(ctx, stop), nullptr);
+    expect(pending_kind(ctx, "reminder").empty() && ctx->store->suggestion(bn)["status"] == "superseded",
+           "stop supersedes pending reminder cards for it");
+
+    // 8: medicine pieces first, at most 3; a medicine fact also triggers the verbatim route.
+    json night = json::parse(R"([{"start_sec":0,"text":"Walk for ten minutes at night."},{"start_sec":28,"text":"Read a book at night."},
+        {"start_sec":56,"text":"Sleep early at night."},{"start_sec":84,"text":"Drink warm milk at night."},{"start_sec":112,"text":"Take Nitrest 10 mg at night."}])");
+    make_note(ctx, night, "Evening plan");
+    json a = take(sve_assistant_ask(ctx, "Plans for night time?", nullptr, nullptr));
+    printf("--- ask night\n%s\n", a.dump(2).c_str());
+    expect(a.is_object() && a["medicine"] == true && a["sources"].size() <= 3 && contains(a["answer"], "Take Nitrest 10 mg at night.") &&
+           a["sources"].size() > 0, "medicine piece quoted first, at most 3");
+    ctx->store->add_memory("fact", "Take the iron tablet with orange juice", std::nullopt);
+    json f = take(sve_assistant_ask(ctx, "Anything about orange juice?", nullptr, nullptr));
+    printf("--- ask fact\n%s\n", f.dump(2).c_str());
+    expect(f.is_object() && f["medicine"] == true && contains(f["answer"], "Take the iron tablet with orange juice"),
+           "medicine fact quoted verbatim");
+}
+
 // Fix round 1: recording-born reminders link to the medicine; stop/update/delete turn them off;
 // Ask never generates over medicine material; routine changes; times check; transactions.
 static void run_api_fixes(sve_ctx *ctx) {
@@ -228,6 +282,8 @@ static void run_api_fixes(sve_ctx *ctx) {
     int64_t bid = add_sugg(ctx, bad);
     expect(sve_suggestion_accept(ctx, bid, nullptr) < 0 && ctx->store->suggestion(bid)["status"] == "pending",
            "failed accept leaves the suggestion pending");
+    ctx->store->set_suggestion_status(bid, "rejected");
+    run_api_fixes2(ctx, note);
 }
 
 static int run_api(sve_ctx *ctx) {

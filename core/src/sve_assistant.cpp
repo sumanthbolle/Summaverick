@@ -109,6 +109,20 @@ const char *kSafety =
     "times or dates. Never give medical advice; only repeat what was recorded or entered. If you are unsure "
     "or it is not there, say so.";
 
+json medicine_row(sve::Store &st, int64_t id) {
+    for (const auto &m : st.medicines()) if (jint(m, "id", 0) == id) return m;
+    return nullptr;
+}
+
+// Supersedes pending reminder suggestions for a medicine, matched by id or normalized name.
+void supersede_medicine_suggestions(sve::Store &st, int64_t med_id, const std::string &name) {
+    std::string n = sve::normalize_for_match(name);
+    for (const auto &s : st.suggestions("pending"))
+        if (jstr(s, "kind") == "reminder" && ((med_id > 0 && jint(s, "medicine_id", -1) == med_id) ||
+            (!n.empty() && sve::normalize_for_match(jstr(jobj(payload_of(s), "medicine"), "name")) == n)))
+            st.set_suggestion_status(jint(s, "id", 0), "superseded");
+}
+
 // Turns off active reminders for a medicine: linked by id, or (recording-born, unlinked) naming it.
 void deactivate_medicine_reminders(sve::Store &st, int64_t med_id, const std::string &name) {
     for (const auto &r : st.reminders(true)) {
@@ -202,6 +216,15 @@ int64_t accept_reminder(sve::Store &st, const json &s, const json &p) {
         }
         med_id = id;
     }
+    if (!name.empty()) {
+        // The person confirmed this dose: a saved medicine with another dose takes the accepted values.
+        json row = medicine_row(st, med_id.get<int64_t>());
+        std::string dose = jstr(med, "dose");
+        if (row.is_object() && !dose.empty() && sve::normalize_for_match(jstr(row, "dose")) != sve::normalize_for_match(dose)) {
+            json m;
+            if (!medicine_fields(st, medicine_input(p), m) || !st.update_medicine(med_id.get<int64_t>(), m)) return -1;
+        }
+    }
     std::string text = name.empty() ? jstr(p, "text") : sve::reminder_text(name, jstr(med, "dose"), lang_of(st));
     if (text.empty()) return -1;
     std::vector<std::string> times = sve::valid_times(jarr(p, "times"));
@@ -233,6 +256,7 @@ int64_t accept_profile(sve::Store &st, const json &s, const json &p) {
     int64_t existing = find_medicine(st, name);
     if (change == "stop_medicine") {
         deactivate_medicine_reminders(st, existing, name);
+        supersede_medicine_suggestions(st, existing, name);
         if (!existing) return 0;
         return st.delete_medicine(existing) ? existing : -1;
     }
@@ -396,7 +420,8 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         for (const auto &s : st.suggestions("pending"))
             if (jstr(s, "kind") == "vocab") known_vocab.push_back(lower(jstr(payload_of(s), "text")));
         int added = 0;
-        for (const auto &s : sve::build_suggestions(merged, pieces, note_id, jobj(profile_of(st), "routine"), today_iso(), lang_of(st))) {
+        for (const auto &s : sve::build_suggestions(merged, pieces, note_id, jobj(profile_of(st), "routine"), today_iso(),
+                                                          lang_of(st), known_med_names(st), st.medicines())) {
             if (jstr(s, "kind") == "vocab") {
                 std::string t = lower(jstr(payload_of(s), "text"));
                 if (std::find(known_vocab.begin(), known_vocab.end(), t) != known_vocab.end()) continue;
@@ -459,7 +484,8 @@ int64_t sve_suggestion_accept(sve_ctx *ctx, int64_t id, const char *edited_paylo
             throw;
         }
         if (row < 0) { st.rollback(); return -1; }
-        return st.commit() ? row : -1;
+        if (!st.commit()) { st.rollback(); return -1; }
+        return row;
     });
 }
 
@@ -512,8 +538,14 @@ int64_t sve_medicine_save(sve_ctx *ctx, const char *js) {
             if (id <= 0) return -1;
         } else if (m.contains("name") && jstr(m, "name").empty()) {
             return -1;
-        } else if (!m.empty() && !st.update_medicine(id, m)) {
-            return -1;
+        } else {
+            json old = medicine_row(st, id);
+            if (!old.is_object() || (!m.empty() && !st.update_medicine(id, m))) return -1;
+            json now = medicine_row(st, id);
+            // A new dose or time makes the old reminders wrong: turn them off now, before the new card.
+            if (sve::normalize_for_match(jstr(old, "dose")) != sve::normalize_for_match(jstr(now, "dose")) ||
+                jarr(old, "times") != jarr(now, "times"))
+                deactivate_medicine_reminders(st, id, jstr(old, "name"));
         }
         // Quote = what the person typed, so the card shows their own words.
         std::string quote;
@@ -666,21 +698,36 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
 
         std::string kq = sve::keyword_query(q);
         sve::Relevant rel = sve::relevant(st, kq.empty() ? q : kq, 6000);
-        if (rel.sources.empty()) return dump(ask_result(sve::not_found_text(lang), json::array(), true, false));
-        // Retrieved material that mentions a medicine (even an unknown name) is quoted, never generated.
-        json retrieved = json::array();
-        bool med_material = false;
+        // Retrieved material that mentions a medicine (even an unknown name), in a piece or a remembered
+        // fact, is quoted word for word, never generated. Medicine pieces come first; at most 3.
+        json med_hits = json::array(), other = json::array(), med_facts = json::array();
         for (const auto &src : rel.sources) {
             json h = source_of(src);
             h["text"] = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
-            med_material = med_material || sve::mentions_medicine(jstr(h, "text"), names);
-            retrieved.push_back(h);
+            (sve::mentions_medicine(jstr(h, "text"), names) ? med_hits : other).push_back(h);
         }
-        if (med_material) {
+        size_t fh = rel.block.find("Remembered facts:\n");
+        if (fh != std::string::npos) {
+            std::string rest = rel.block.substr(fh), line;
+            for (size_t i = 0; i <= rest.size(); ++i) {
+                if (i < rest.size() && rest[i] != '\n') { line += rest[i]; continue; }
+                if (line.rfind("- ", 0) == 0 && sve::mentions_medicine(line.substr(2), names)) med_facts.push_back(line.substr(2));
+                line.clear();
+            }
+        }
+        if (!med_hits.empty() || !med_facts.empty()) {
             json hits = json::array();
-            add_hits(hits, retrieved, 3);
-            return dump(ask_result(sve::medicine_answer(json::array(), hits, lang), sources_of(hits), false, true));
+            add_hits(hits, med_hits, 3);
+            add_hits(hits, other, 3);
+            std::string answer = sve::medicine_answer(json::array(), hits, lang);
+            if (!med_facts.empty()) {
+                answer += std::string(answer.empty() ? "" : "\n\n") +
+                          (lang == "te" ? "Summaverick గుర్తుంచుకున్నవి:" : "Remembered facts:");
+                for (const auto &f : med_facts) answer += "\n\xE2\x80\x9C" + f.get<std::string>() + "\xE2\x80\x9D";
+            }
+            return dump(ask_result(answer, sources_of(hits), false, true));
         }
+        if (rel.sources.empty()) return dump(ask_result(sve::not_found_text(lang), json::array(), true, false));
         if (!ctx->llm) return nullptr;
 
         sve::Llm &llm = *ctx->llm;

@@ -60,7 +60,15 @@ bool dose_missing_unit(const std::string &dose);
 // Medicine reminders and profile medicines without a time from the routine get "times".
 std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id,
                                     const json &routine, const std::string &today_ymd = "",
-                                    const std::string &lang = "en");
+                                    const std::string &lang = "en",
+                                    const std::vector<std::string> &known_names = {},
+                                    const json &saved_medicines = json::array());
+
+// True when the quote says something a date can come from: a date, a weekday, today/tomorrow/tonight,
+// "<number> day(s)/week(s)/month(s)", or the Telugu equivalents (ఈరోజు, రేపు, రోజు, వారం, నెల, ...).
+bool quote_supports_date(const std::string &quote);
+// True when the quote contains the hour of "HH:MM" ("9 pm", "21:00", "9:30", "తొమ్మిది").
+bool quote_has_hour(const std::string &quote, const std::string &hhmm);
 
 // "Take Amlodipine 5 mg" / "Amlodipine 5 mg వేసుకోండి".
 std::string reminder_text(const std::string &name, const std::string &dose, const std::string &lang);

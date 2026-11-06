@@ -158,6 +158,43 @@ bool says_any(const std::string &quote, std::initializer_list<const char *> en, 
 
 }  // namespace
 
+bool quote_supports_date(const std::string &quote) {
+    static const std::set<std::string> kMonths = {"january", "february", "march", "april", "june", "july", "august",
+        "september", "october", "november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept",
+        "oct", "nov", "dec"};
+    static const std::set<std::string> kSpans = {"day", "days", "week", "weeks", "month", "months"};
+    static const std::set<std::string> kOrd = {"st", "nd", "rd", "th"};
+    std::vector<std::string> q = norm_tokens(quote);
+    auto num = [](const std::string &t) { return !t.empty() && t[0] >= '0' && t[0] <= '9'; };
+    for (size_t i = 0; i < q.size(); ++i) {
+        const std::string &t = q[i];
+        if (num(t) && (t.find('/') != std::string::npos || t.find('-') != std::string::npos)) return true;  // 20/11, 2026-11-20
+        if (kMonths.count(t) || t == "today" || t == "tomorrow" || t == "tonight") return true;
+        if (num(t) && i + 1 < q.size() && (kSpans.count(q[i + 1]) || kOrd.count(q[i + 1]))) return true;
+    }
+    if (!named_weekdays(quote).empty()) return true;
+    for (const char *w : {"ఈరోజు", "రేపు", "రోజు", "వారం", "వారాలు", "నెల"})
+        if (quote.find(w) != std::string::npos) return true;
+    return false;
+}
+
+bool quote_has_hour(const std::string &quote, const std::string &hhmm) {
+    if (!valid_hhmm(hhmm)) return false;
+    static const struct { const char *w; int v; } kTe[] = {
+        {"ఆరు", 6}, {"ఏడు", 7}, {"ఎనిమిది", 8}, {"తొమ్మిది", 9}, {"పది", 10}, {"పదకొండు", 11}, {"పన్నెండు", 12}};
+    int h = std::stoi(hhmm.substr(0, 2));
+    auto hour_ok = [&](int v) { return v == h || (v >= 1 && v <= 12 && v % 12 == h % 12); };
+    for (const auto &t : norm_tokens(quote)) {
+        if (!t.empty() && t[0] >= '0' && t[0] <= '9') {
+            size_t k = 0;
+            while (k < t.size() && t[k] >= '0' && t[k] <= '9' && k < 4) ++k;
+            if (hour_ok(std::stoi(t.substr(0, k)))) return true;
+        }
+        for (const auto &w : kTe) if (t == w.w && hour_ok(w.v)) return true;
+    }
+    return false;
+}
+
 std::string weekday_name(const std::string &ymd) {
     if (!valid_ymd(ymd)) return "";
     return kWeekdayNames[weekday_of(ymd_days(ymd))];
@@ -345,7 +382,7 @@ json date_field(const json &item, const char *key, std::vector<std::string> &fie
     std::string d = jstr(item, key);
     if (!valid_ymd(d)) return nullptr;
     std::string q = jstr(item, "quote");
-    bool ok = nearest ? date_plausible(d, q, today) : date_matches_weekday(d, q);
+    bool ok = quote_supports_date(q) && (nearest ? date_plausible(d, q, today) : date_matches_weekday(d, q));
     if (ok && strict && d != today) ok = named_weekdays(q).size() == 1;
     if (!ok) fields.push_back(key);
     return d;
@@ -365,7 +402,8 @@ json finish(Base &b, const json &payload) {
 }  // namespace
 
 std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id, const json &routine,
-                                    const std::string &today, const std::string &lang) {
+                                    const std::string &today, const std::string &lang,
+                                    const std::vector<std::string> &names, const json &saved) {
     std::vector<json> out;
     for (const auto &it : e.reminders) {
         Base b = base_for("reminder", it, pieces, note_id);
@@ -384,16 +422,20 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
             text = reminder_text(jstr(med, "name"), jstr(med, "dose"), lang);  // notification text from checked fields
         } else {
             text = trim(jstr(it, "text"));
-            if (mentions_medicine(text, {})) b.fields.push_back("text");
+            if (mentions_medicine(text, names)) b.fields.push_back("text");
         }
         if (text.empty()) continue;
+        if (has_med_name(med) && saved.is_array())  // a different dose than the saved medicine needs a look
+            for (const auto &m : saved)
+                if (normalize_for_match(jstr(m, "name")) == normalize_for_match(jstr(med, "name")) &&
+                    !jstr(m, "dose").empty() && !jstr(med, "dose").empty() &&
+                    normalize_for_match(jstr(m, "dose")) != normalize_for_match(jstr(med, "dose")))
+                    b.fields.push_back("dose");
         std::string rep = sanitize_repeat(jstr(it, "repeat"));
         if (med.is_null() && times.empty() && (rep.empty() || rep == "once")) {
             // A one-off with no time of day cannot be scheduled: it is a task due that day.
             json task = it;
-            std::string day = jstr(it, "start_date");
-            if (day.empty()) day = jstr(it, "until_date");
-            task["due_date"] = day;
+            task["due_date"] = jstr(it, "start_date");  // never until_date
             b.rec["kind"] = "task";
             json due = date_field(task, "due_date", b.fields, false, today, true);
             out.push_back(finish(b, {{"text", text}, {"who", nullptr}, {"due_date", due}}));
@@ -410,7 +452,7 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
         std::string text = trim(jstr(it, "text"));
         if (text.empty()) continue;
         Base b = base_for("task", it, pieces, note_id);
-        if (mentions_medicine(text, {})) b.fields.push_back("text");
+        if (mentions_medicine(text, names)) b.fields.push_back("text");
         json due = date_field(it, "due_date", b.fields, false, today, true);
         out.push_back(finish(b, {{"text", text}, {"who", str_or_null(trim(jstr(it, "who")))}, {"due_date", due}}));
     }
@@ -435,7 +477,9 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
             if (text.empty())
                 for (auto kv = r.begin(); kv != r.end(); ++kv)
                     text += (text.empty() ? "" : ", ") + kv.key() + " " + kv.value().get<std::string>();
-            if (mentions_medicine(text, {})) b.fields.push_back("text");
+            if (mentions_medicine(text, names)) b.fields.push_back("text");
+            for (auto kv = r.begin(); kv != r.end(); ++kv)  // each new time must be said in the quote
+                if (!quote_has_hour(jstr(it, "quote"), kv.value().get<std::string>())) b.fields.push_back("routine");
             out.push_back(finish(b, {{"change", change}, {"text", text}, {"detail", text}, {"routine", r},
                                      {"medicine", nullptr}}));
         }
@@ -444,7 +488,7 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
         std::string text = trim(jstr(it, "text"));
         if (text.empty()) continue;
         Base b = base_for("fact", it, pieces, note_id);
-        if (mentions_medicine(text, {})) b.fields.push_back("text");
+        if (mentions_medicine(text, names)) b.fields.push_back("text");
         out.push_back(finish(b, {{"memory_kind", "fact"}, {"text", text}}));
     }
     for (const auto &v : e.vocab) {

@@ -247,6 +247,8 @@ TEST(profile_medicine_is_checked) {
     CHECK_EQ(v[0]["payload"]["medicine"]["when_text"].get<std::string>(), std::string("after dinner"));
     CHECK_EQ(v[1]["payload"]["change"].get<std::string>(), std::string("routine"));
     CHECK_EQ(v[1]["payload"]["routine"], json::parse(R"({"dinner":"21:00"})"));
+    CHECK_EQ(v[1]["check_status"].get<std::string>(), std::string("check"));  // 21:00 is not in the quote
+    CHECK(has(v[1]["check_fields"], "routine"));
 }
 
 TEST(profile_medicine_without_time_is_check) {
@@ -377,7 +379,11 @@ TEST(medicine_dates_need_confirmation) {
     CHECK(has(v[0]["check_fields"], "start_date"));  // not said: "Please check"
     snprintf(buf, sizeof buf, src, "2026-11-06");
     v = build_suggestions(ex(buf), kPieces, 7, kRoutine, "2026-11-06");
-    CHECK_EQ(v[0]["check_status"].get<std::string>(), std::string("ok"));  // today is harmless
+    CHECK(has(v[0]["check_fields"], "start_date"));  // the quote says nothing about a day
+    const char *src2 = R"({"reminders":[{"text":"x","when_text":"after dinner","repeat":"daily","start_date":"2026-11-06",
+        "quote":"Take Amlodipine 5 mg once a day after dinner. Start from today.","start_sec":28,"medicine":{"name":"Amlodipine","dose":"5 mg"}}]})";
+    v = build_suggestions(ex(src2), kPieces, 7, kRoutine, "2026-11-06");
+    CHECK_EQ(v[0]["check_status"].get<std::string>(), std::string("ok"));  // "today" said
 }
 
 TEST(vocab_terms_are_short) {
@@ -497,4 +503,67 @@ TEST(untimed_one_off_reminder_becomes_task) {
     // a timed one-off stays a reminder
     Extracted t = ex(R"({"reminders":[{"text":"Call Ravi","times":["17:00"],"repeat":"once","quote":"Your BP is a little high","start_sec":0}]})");
     CHECK_EQ(build_suggestions(t, kPieces, 7, kRoutine, "2026-11-06")[0]["kind"].get<std::string>(), std::string("reminder"));
+}
+
+TEST(saved_medicine_name_in_text_is_check) {
+    Extracted e = ex(R"({"reminders":[{"text":"Take Amlodipine twice","times":["09:00"],"repeat":"daily","quote":"Take Amlodipine 5 mg once a day after dinner.","start_sec":28,"medicine":null}],
+        "tasks":[{"text":"Amlodipine 10 at night","quote":"Take Amlodipine 5 mg once a day after dinner.","start_sec":28}]})");
+    auto v = build_suggestions(e, kPieces, 7, kRoutine, "", "en", {"Amlodipine"});
+    CHECK_EQ(v.size(), (size_t)2);
+    for (const auto &s : v) {
+        CHECK_EQ(s["check_status"].get<std::string>(), std::string("check"));
+        CHECK(has(s["check_fields"], "text"));
+    }
+    auto w = build_suggestions(e, kPieces, 7, kRoutine);  // without the saved name "twice" passes the word check
+    CHECK(!has(w[0]["check_fields"], "text"));
+}
+
+TEST(routine_time_must_be_in_quote) {
+    auto one = [](const char *quote, const char *time) {
+        char buf[512];
+        snprintf(buf, sizeof buf, R"({"profile":[{"change":"routine","detail":"Dinner","quote":"%s","start_sec":0,"routine":{"dinner":"%s"}}]})", quote, time);
+        auto v = build_suggestions(ex(buf), kPieces, 7, kRoutine);
+        return v.empty() ? json() : v[0];
+    };
+    CHECK(!has(one("Have dinner at 9 pm", "21:00")["check_fields"], "routine"));
+    CHECK(!has(one("dinner at 21:00", "21:00")["check_fields"], "routine"));
+    CHECK(!has(one("dinner by 9:30", "21:30")["check_fields"], "routine"));
+    CHECK(!has(one("రాత్రి తొమ్మిది గంటలకు భోజనం", "21:00")["check_fields"], "routine"));
+    CHECK(has(one("Have dinner at 8 pm", "21:00")["check_fields"], "routine"));
+    CHECK(has(one("Have dinner later", "21:00")["check_fields"], "routine"));
+}
+
+TEST(converted_task_due_only_from_start_date) {
+    Extracted e = ex(R"({"reminders":[{"text":"Bring report","times":[],"repeat":"once","until_date":"2026-11-07",
+        "quote":"Bring your blood test report on Saturday","start_sec":56,"medicine":null}]})");
+    auto v = build_suggestions(e, kPieces, 7, kRoutine, "2026-11-06");
+    CHECK_EQ(v[0]["kind"].get<std::string>(), std::string("task"));
+    CHECK(v[0]["payload"]["due_date"].is_null());
+}
+
+TEST(dates_need_support_in_quote) {
+    Extracted t = ex(R"({"tasks":[{"text":"Less salt","due_date":"2026-11-20","quote":"less than one teaspoon of salt a day","start_sec":84}]})");
+    auto v = build_suggestions(t, kPieces, 7, kRoutine, "2026-11-06");
+    CHECK(has(v[0]["check_fields"], "due_date"));
+    Extracted r = ex(R"({"reminders":[{"text":"No pickles","times":["09:00"],"repeat":"daily","until_date":"2026-11-20",
+        "quote":"No pickles for two weeks","start_sec":84,"medicine":null}]})");
+    auto w = build_suggestions(r, kPieces, 7, kRoutine, "2026-11-06");
+    CHECK_EQ(w[0]["check_status"].get<std::string>(), std::string("ok"));
+    CHECK(quote_supports_date("come back tomorrow"));
+    CHECK(quote_supports_date("for 5 days"));
+    CHECK(quote_supports_date("on 20/11"));
+    CHECK(quote_supports_date("on the 15th of November"));
+    CHECK(quote_supports_date("రేపు రండి"));
+    CHECK(quote_supports_date("రెండు వారాలు"));
+    CHECK(!quote_supports_date("take it after dinner"));
+}
+
+TEST(dose_differing_from_saved_medicine_is_check) {
+    json saved = json::parse(R"([{"id":1,"name":"Amlodipine","dose":"2.5 mg"}])");
+    Extracted e = ex(R"({"reminders":[{"text":"","when_text":"after dinner","quote":"Take Amlodipine 5 mg once a day after dinner.",
+        "start_sec":28,"medicine":{"name":"Amlodipine","dose":"5 mg"}}]})");
+    auto v = build_suggestions(e, kPieces, 7, kRoutine, "", "en", {"Amlodipine"}, saved);
+    CHECK(has(v[0]["check_fields"], "dose"));
+    json same = json::parse(R"([{"id":1,"name":"amlodipine","dose":"5mg"}])");
+    CHECK_EQ(build_suggestions(e, kPieces, 7, kRoutine, "", "en", {"Amlodipine"}, same)[0]["check_status"].get<std::string>(), std::string("ok"));
 }
