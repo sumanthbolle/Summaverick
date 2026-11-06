@@ -601,6 +601,42 @@ char *sve_medicines_json(sve_ctx *ctx) {
     return guard<char *>("sve_medicines_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->medicines()) : nullptr; });
 }
 
+namespace {
+// The writes of one medicine save (see sve_medicine_save); -1 on failure, the caller rolls back.
+int64_t medicine_save_rows(sve::Store &st, const json &in, const json &m) {
+    int64_t id = jint(in, "id", 0);
+    if (id == 0) {
+        if (jstr(m, "name").empty()) return -1;
+        id = st.add_medicine(m);
+        if (id <= 0) return -1;
+        supersede_medicine_suggestions(st, id, jstr(m, "name"));  // e.g. a recording's card for it
+    } else if (m.contains("name") && jstr(m, "name").empty()) {
+        return -1;
+    } else {
+        json old = medicine_row(st, id);
+        if (!old.is_object() || (!m.empty() && !st.update_medicine(id, m))) return -1;
+        json now = medicine_row(st, id);
+        // A new dose, time, repeat or end date makes the old reminders wrong: turn them off now,
+        // before the new card, so nothing keeps ringing on the old schedule. null and "" are the same.
+        if (sve::normalize_for_match(jstr(old, "dose")) != sve::normalize_for_match(jstr(now, "dose")) ||
+            jarr(old, "times") != jarr(now, "times") || jstr(old, "repeat") != jstr(now, "repeat") ||
+            jstr(old, "until_date") != jstr(now, "until_date")) {
+            deactivate_medicine_reminders(st, id, jstr(old, "name"));
+            supersede_medicine_suggestions(st, id, jstr(old, "name"));
+        }
+    }
+    // Quote = what the person typed, so the card shows their own words.
+    std::string quote;
+    for (const auto &r : st.medicines())
+        if (jint(r, "id", 0) == id)
+            for (const char *k : {"name", "dose", "when_text"})
+                if (!jstr(r, k).empty()) quote += (quote.empty() ? "" : " ") + jstr(r, k);
+    if (quote.empty()) return -1;  // unknown id
+    propose_medicine_reminder(st, id, quote, nullptr, nullptr, true);
+    return id;
+}
+}  // namespace
+
 int64_t sve_medicine_save(sve_ctx *ctx, const char *js) {
     return guard<int64_t>("sve_medicine_save", -1, [&]() -> int64_t {
         json in = parse(js);
@@ -608,33 +644,16 @@ int64_t sve_medicine_save(sve_ctx *ctx, const char *js) {
         sve::Store &st = *ctx->store;
         json m;
         if (!medicine_fields(st, in, m)) return -1;
-        int64_t id = jint(in, "id", 0);
-        if (id == 0) {
-            if (jstr(m, "name").empty()) return -1;
-            id = st.add_medicine(m);
-            if (id <= 0) return -1;
-            supersede_medicine_suggestions(st, id, jstr(m, "name"));  // e.g. a recording's card for it
-        } else if (m.contains("name") && jstr(m, "name").empty()) {
-            return -1;
-        } else {
-            json old = medicine_row(st, id);
-            if (!old.is_object() || (!m.empty() && !st.update_medicine(id, m))) return -1;
-            json now = medicine_row(st, id);
-            // A new dose or time makes the old reminders wrong: turn them off now, before the new card.
-            if (sve::normalize_for_match(jstr(old, "dose")) != sve::normalize_for_match(jstr(now, "dose")) ||
-                jarr(old, "times") != jarr(now, "times")) {
-                deactivate_medicine_reminders(st, id, jstr(old, "name"));
-                supersede_medicine_suggestions(st, id, jstr(old, "name"));
-            }
+        // The row, the old reminders turned off and the new card are written together or not at all.
+        if (!st.begin()) return -1;
+        int64_t id = -1;
+        try {
+            id = medicine_save_rows(st, in, m);
+        } catch (...) {
+            st.rollback();
+            throw;
         }
-        // Quote = what the person typed, so the card shows their own words.
-        std::string quote;
-        for (const auto &r : st.medicines())
-            if (jint(r, "id", 0) == id)
-                for (const char *k : {"name", "dose", "when_text"})
-                    if (!jstr(r, k).empty()) quote += (quote.empty() ? "" : " ") + jstr(r, k);
-        if (quote.empty()) return -1;  // unknown id
-        propose_medicine_reminder(st, id, quote, nullptr, nullptr, true);
+        if (id <= 0 || !st.commit()) { st.rollback(); return -1; }
         return id;
     });
 }

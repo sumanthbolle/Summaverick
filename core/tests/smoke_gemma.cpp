@@ -574,6 +574,34 @@ static void run_api_final(sve_ctx *ctx) {
     int64_t t2 = sve_medicine_save(ctx, R"({"id":0,"name":"Telma","dose":"40 mg","times":["08:00","20:00"],"repeat":"twice_daily"})");
     expect(card(t2)["check_status"] == "ok", "twice_daily with two times: card ok");
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+
+    // I-3: a change to repeat or until_date alone turns the old reminder off and supersedes the old card.
+    auto active_for = [&](int64_t mid) {
+        json out = json::array();
+        for (const auto &r : take(sve_reminders_json(ctx, 1))) if (r["medicine_id"] == mid) out.push_back(r);
+        return out;
+    };
+    int64_t u = sve_medicine_save(ctx, R"({"id":0,"name":"Cefixime","dose":"200 mg","when":"after dinner","repeat":"daily","until_date":"2026-11-12"})");
+    int64_t r1 = sve_suggestion_accept(ctx, card(u)["id"], nullptr);
+    expect(r1 > 0 && active_for(u).size() == 1 && active_for(u)[0]["until_date"] == "2026-11-12", "until: reminder active before the edit");
+    sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"until_date":"2026-11-08"})").c_str());
+    json cu = card(u);
+    expect(active_for(u).empty() && cu["payload"]["until_date"] == "2026-11-08",
+           "until_date change: old reminder off, new card carries the new end date");
+    int64_t r2 = sve_suggestion_accept(ctx, cu["id"], nullptr);
+    expect(r2 > 0 && active_for(u).size() == 1, "until: new reminder after Yes");
+    sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"repeat":"weekly"})").c_str());
+    expect(active_for(u).empty() && card(u)["payload"]["repeat"] == "weekly", "repeat change: old reminder off, new card weekly");
+    json pend = take(sve_suggestions_json(ctx, "pending"));
+    int n = 0;
+    for (const auto &s : pend) if (s["medicine_id"] == u) ++n;
+    expect(n == 1, "repeat change: exactly one live card for the medicine");
+    sve_suggestion_accept(ctx, card(u)["id"], nullptr);
+    sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"until_date":""})").c_str());
+    expect(active_for(u).empty(), "clearing the end date also replaces the reminder");
+    int64_t same = sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"dose":"200 mg"})").c_str());
+    expect(same == u && card(u).is_object(), "unchanged save: still saved, card proposed");
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
 }
 
 static int run_api(sve_ctx *ctx) {
