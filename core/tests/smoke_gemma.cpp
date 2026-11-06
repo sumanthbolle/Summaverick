@@ -599,6 +599,21 @@ static void run_api_final(sve_ctx *ctx) {
     sve_suggestion_accept(ctx, card(u)["id"], nullptr);
     sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"until_date":""})").c_str());
     expect(active_for(u).empty(), "clearing the end date also replaces the reminder");
+    // I-4: a medicine named only on a card the person said No to (or that was superseded) stays known.
+    int64_t dolo = add_sugg(ctx, {{"kind", "reminder"}, {"note_id", nullptr}, {"start_sec", 0}, {"quote", "Dolo 650 when fever"},
+                                  {"check_status", "ok"}, {"check_fields", json::array()},
+                                  {"payload", {{"text", "Take Dolo 650"}, {"times", json::array({"21:00"})}, {"repeat", "daily"},
+                                               {"medicine", {{"name", "Dolo"}, {"dose", "650"}, {"when_text", "when fever"}}}}}});
+    int64_t zinc = add_sugg(ctx, {{"kind", "profile"}, {"note_id", nullptr}, {"start_sec", 0}, {"quote", "Zincovit daily"},
+                                  {"check_status", "ok"}, {"check_fields", json::array()},
+                                  {"payload", {{"change", "add_medicine"}, {"text", "Add medicine: Zincovit"},
+                                               {"medicine", {{"name", "Zincovit"}, {"dose", ""}, {"when_text", ""}}}}}});
+    sve_suggestion_reject(ctx, dolo);
+    ctx->store->set_suggestion_status(zinc, "superseded");
+    json qa = take(sve_assistant_ask(ctx, "When do I take Dolo?", nullptr, nullptr));
+    json qz = take(sve_assistant_ask(ctx, "Should I continue Zincovit?", nullptr, nullptr));
+    expect(qa.is_object() && qa["medicine"] == true && qz.is_object() && qz["medicine"] == true,
+           "names from rejected and superseded cards still route to the medicine answer");
     int64_t same = sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"dose":"200 mg"})").c_str());
     expect(same == u && card(u).is_object(), "unchanged save: still saved, card proposed");
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);

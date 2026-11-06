@@ -84,14 +84,16 @@ json int_or_null(const json &o, const char *k) {
     return v == INT64_MIN ? json(nullptr) : json(v);
 }
 
-// Medicine names the person has (profile) or the model proposed from recordings.
+// Medicine names the person has (profile) or the model proposed from recordings, whatever the
+// person answered on the card: a name stays a medicine after a No or a re-run, so the verbatim
+// and medicine filters keep catching it. Names only; nothing else of those cards is used.
 std::vector<std::string> known_med_names(sve::Store &st) {
     std::vector<std::string> names;
     auto add = [&](const std::string &n) {
         if (!n.empty() && std::find(names.begin(), names.end(), n) == names.end()) names.push_back(n);
     };
     for (const auto &m : st.medicines()) add(jstr(m, "name"));
-    for (const char *status : {"pending", "accepted"})
+    for (const char *status : {"pending", "accepted", "rejected", "superseded"})
         for (const auto &s : st.suggestions(status)) add(jstr(jobj(payload_of(s), "medicine"), "name"));
     return names;
 }
