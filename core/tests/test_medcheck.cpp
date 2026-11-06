@@ -130,3 +130,18 @@ TEST(normalize_basic) {
     CHECK_EQ(normalize_for_match("  Take,  TWO\ttablets. "), std::string("take 2 tablets"));
     CHECK_EQ(normalize_for_match(""), std::string(""));
 }
+
+TEST(spaced_fractions_and_ranges) {
+    dose_check("2 tablets", "take 1 / 2 tablets");
+    dose_check("10 mg", "5 - 10 mg");
+    MedFields f{"", "1 / 2 tablet", "", "", ""};
+    CHECK(!has(check_medicine(f, "give 1/2 tablet"), "dose"));
+}
+TEST(name_window_and_unsplit_tokens) {
+    name_check("Telma AM", "Telma H 40 at 8 am");
+    name_check("Vitamin D3", "vitamin d 1000 3 times");
+    MedFields f{"Vitamin D3", "", "", "", ""};
+    CHECK_EQ(check_medicine(f, "vitamin D3 1000 IU").status, std::string("ok"));
+    MedFields g{"Tab Amlodipine", "", "", "", ""};
+    CHECK_EQ(check_medicine(g, "Amlodipine 5 mg").status, std::string("ok"));
+}

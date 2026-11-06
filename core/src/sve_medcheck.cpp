@@ -1,5 +1,6 @@
 #include "sve_medcheck.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace sve {
@@ -44,7 +45,7 @@ const char *map_word(const std::string &t) {
     return nullptr;
 }
 
-std::vector<std::string> tokens(const std::string &raw) {
+std::vector<std::string> tokens(const std::string &raw, bool split = true) {
     std::string s = map_telugu_digits(raw);
     std::vector<std::string> out;
     std::string cur;
@@ -59,10 +60,23 @@ std::vector<std::string> tokens(const std::string &raw) {
         unsigned char c = (unsigned char)s[i];
         Cls k = classify(c);
         bool next_digit = i + 1 < s.size() && classify((unsigned char)s[i + 1]) == DIGIT;
-        if (k == SEP && next_digit && curc == DIGIT && !cur.empty() &&
-            (c == '.' || c == '/' || c == '-' || c == ',')) {
-            cur += (char)c;  // decimal, fraction, range, schedule: one number token
+        if (k == SEP && next_digit && curc == DIGIT && !cur.empty() && c == '.') {
+            cur += '.';  // decimal point
             continue;
+        }
+        if (k == SEP && curc == DIGIT && !cur.empty()) {
+            // fraction, range or schedule, with optional spaces: "1 / 2" -> "1/2"
+            size_t j = i;
+            while (j < s.size() && (s[j] == ' ' || s[j] == '\t' || s[j] == '\n' || s[j] == '\r')) ++j;
+            if (j < s.size() && (s[j] == '/' || s[j] == '-' || s[j] == ',')) {
+                size_t j2 = j + 1;
+                while (j2 < s.size() && (s[j2] == ' ' || s[j2] == '\t' || s[j2] == '\n' || s[j2] == '\r')) ++j2;
+                if (j2 < s.size() && classify((unsigned char)s[j2]) == DIGIT) {
+                    cur += s[j];
+                    i = j2 - 1;
+                    continue;
+                }
+            }
         }
         if (k == SEP && c == '.' && next_digit) {  // leading-dot decimal: ".5" -> "0.5"
             flush();
@@ -71,7 +85,7 @@ std::vector<std::string> tokens(const std::string &raw) {
             continue;
         }
         if (k == SEP) { flush(); curc = SEP; continue; }
-        if (k != curc) flush();
+        if (k != curc && split) flush();
         curc = k;
         if (c >= 'A' && c <= 'Z') c = (unsigned char)(c + 32);
         cur += (char)c;
@@ -103,19 +117,34 @@ bool blank(const std::string &v) {
     return true;
 }
 
-bool field_ok(const std::string &value, const std::vector<std::string> &q, bool is_name) {
+// Name fallback: all non-filler name tokens in order within a short window.
+bool name_window_match(const std::vector<std::string> &q, const std::vector<std::string> &nf) {
+    if (nf.empty()) return false;
+    size_t win = nf.size() + 2;
+    for (size_t i = 0; i < q.size(); ++i) {
+        if (q[i] != nf[0]) continue;
+        size_t k = 1, end = std::min(q.size(), i + win);
+        for (size_t j = i + 1; j < end && k < nf.size(); ++j)
+            if (q[j] == nf[k]) ++k;
+        if (k == nf.size()) return true;
+    }
+    return false;
+}
+
+bool name_ok(const std::string &value, const std::string &quote) {
+    std::vector<std::string> v = tokens(value, false), q = tokens(quote, false);
+    if (v.empty()) return false;
+    if (contains_run(q, v)) return true;
+    std::vector<std::string> nf;
+    for (auto &t : v) if (!is_filler(t)) nf.push_back(t);
+    return name_window_match(q, nf);
+}
+
+bool field_ok(const std::string &value, const std::vector<std::string> &q) {
     if (blank(value)) return true;
     std::vector<std::string> v = tokens(value);
     if (v.empty()) return false;  // non-empty but nothing verifiable
-    if (contains_run(q, v)) return true;
-    if (!is_name) return false;
-    bool any = false;
-    for (auto &t : v) {
-        if (is_filler(t)) continue;
-        any = true;
-        if (!contains_run(q, {t})) return false;
-    }
-    return any;
+    return contains_run(q, v);
 }
 
 }  // namespace
@@ -134,7 +163,8 @@ MedCheck check_medicine(const MedFields &f, const std::string &quote) {
         {"frequency", &f.frequency}, {"duration", &f.duration}};
     bool name_bad = false, dose_bad = false;
     for (auto &e : fs) {
-        if (field_ok(*e.v, q, std::strcmp(e.n, "name") == 0)) continue;
+        bool is_name = std::strcmp(e.n, "name") == 0;
+        if (is_name ? (blank(*e.v) || name_ok(*e.v, quote)) : field_ok(*e.v, q)) continue;
         r.fields.push_back(e.n);
         if (!std::strcmp(e.n, "name")) name_bad = true;
         if (!std::strcmp(e.n, "dose")) dose_bad = true;
