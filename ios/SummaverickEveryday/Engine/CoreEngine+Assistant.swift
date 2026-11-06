@@ -56,7 +56,11 @@ extension CoreEngine {
     }
 
     func accept(_ id: Int64, edited: SuggestionPayload? = nil) throws -> AcceptResult {
-        let json: String? = edited.flatMap { encodeJSON($0) }
+        var json: String?
+        if let edited {   // never fall back to "as proposed" when an edit can't be encoded
+            guard let j = encodeJSON(edited) else { throw AssistantError.badJSON }
+            json = j
+        }
         let r = sve_suggestion_accept(ctx, id, json)
         switch r {
         case 1...: return .created(r)
@@ -135,9 +139,10 @@ extension CoreEngine {
 
     // MARK: transcript pieces
 
-    func setPieces(_ noteID: Int64, _ pieces: [TranscriptPiece]) {
-        guard let json = encodeJSON(pieces) else { return }
-        _ = sve_note_set_pieces(ctx, noteID, json)
+    @discardableResult
+    func setPieces(_ noteID: Int64, _ pieces: [TranscriptPiece]) -> Bool {
+        guard let json = encodeJSON(pieces) else { return false }
+        return sve_note_set_pieces(ctx, noteID, json) == 0
     }
 
     func pieces(_ noteID: Int64) -> [TranscriptPiece] { list(TranscriptPiece.self, sve_note_pieces(ctx, noteID)) }
