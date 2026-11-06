@@ -1,0 +1,71 @@
+import SwiftUI
+
+@main
+struct SummaverickEverydayApp: App {
+    @State private var settings = AppSettings.shared
+    @State private var lock = AppLock.shared
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some Scene {
+        WindowGroup {
+            ZStack {
+                HomeView()
+                    .environment(settings)
+                if lock.isLocked {
+                    LockScreen()
+                        .transition(.opacity)
+                }
+            }
+            .task {
+                await Retention.applyPolicy(maxAgeDays: settings.retentionDays)
+            }
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .background: lock.lockIfNeeded()
+                case .active: lock.unlockIfNeeded()
+                default: break
+                }
+            }
+        }
+    }
+}
+
+/// User preferences. Small and boring on purpose.
+@MainActor
+@Observable
+final class AppSettings {
+    static let shared = AppSettings()
+    private let d = UserDefaults.standard
+
+    var languageID: String { didSet { d.set(languageID, forKey: "lang") } }
+    var retentionDays: Int { didSet { d.set(retentionDays, forKey: "retentionDays") } }
+    var requireUnlock: Bool { didSet { d.set(requireUnlock, forKey: "requireUnlock") } }
+    var consentAcknowledged: Bool { didSet { d.set(consentAcknowledged, forKey: "consentAck") } }
+
+    private init() {
+        languageID = d.string(forKey: "lang") ?? ""
+        retentionDays = d.object(forKey: "retentionDays") as? Int ?? 7
+        requireUnlock = d.bool(forKey: "requireUnlock")
+        consentAcknowledged = d.bool(forKey: "consentAck")
+    }
+
+    /// Resolves the chosen language against what this device can do on-device.
+    var language: SpeechLanguage {
+        let langs = SpeechTranscriber.onDeviceLanguages()
+        if let l = langs.first(where: { $0.id == languageID }) { return l }
+        if let l = langs.first { return l }
+        return SpeechLanguage(locale: Locale(identifier: "en-US"))
+    }
+}
+
+/// Deletes raw audio older than the retention window. Transcripts and notes stay.
+enum Retention {
+    static func applyPolicy(maxAgeDays: Int) async {
+        guard maxAgeDays > 0 else { return }
+        let engine = CoreEngine.shared
+        for row in await engine.audioOlderThan(days: Int32(maxAgeDays)) {
+            try? FileManager.default.removeItem(atPath: row.audio_path)
+            await engine.clearAudio(row.id)
+        }
+    }
+}
