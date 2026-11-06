@@ -265,6 +265,7 @@ std::vector<std::string> resolve_times(const std::string &when_text, const json 
         {"dinner", "dinner"}, {"supper", "dinner"}, {"night", "dinner"},
         {"\xE0\xB0\xB0\xE0\xB0\xBE\xE0\xB0\xA4\xE0\xB1\x8D\xE0\xB0\xB0\xE0\xB0\xBF", "dinner"},  // రాత్రి
         {"bedtime", "bed"}, {"before bed", "bed"}, {"before sleep", "bed"},
+        {"\xE0\xB0\xA8\xE0\xB0\xBF\xE0\xB0\xA6\xE0\xB1\x8D\xE0\xB0\xB0", "bed"},  // నిద్ర
     };
     std::vector<std::string> out;
     if (!routine.is_object() || when_text.empty()) return out;

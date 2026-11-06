@@ -62,6 +62,12 @@ TEST(resolve_times_from_routine) {
     CHECK(resolve_times("after dinner", json()).empty());
 }
 
+TEST(resolve_times_tiffin_and_sleep) {
+    json r = json::parse(R"({"breakfast":"08:00","dinner":"20:00","bed":"22:00"})");
+    CHECK_EQ(resolve_times("after tiffin", r), std::vector<std::string>({"08:00"}));
+    CHECK_EQ(resolve_times("నిద్ర ముందు", r), std::vector<std::string>({"22:00"}));
+}
+
 TEST(windows_respect_budget) {
     json p = json::array();
     for (int i = 0; i < 5; ++i) p.push_back({{"start_sec", i * 28}, {"text", "abcdefghij"}});

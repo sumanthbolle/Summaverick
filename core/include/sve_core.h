@@ -146,6 +146,7 @@ char *sve_suggestions_json(sve_ctx *ctx, const char *status);
  * no longer matches the saved medicine, when medicine.dose was not edited and the card has no "dose" flag:
  * nothing is applied, it stays pending with "dose" in check_fields). Accepting a medicine card with a new
  * dose supersedes the other pending cards for that medicine.
+ * A reminder whose final times are empty is refused (-1); times are never filled in on accept.
  * -1 on other errors (unknown id, not pending, bad JSON). */
 int64_t sve_suggestion_accept(sve_ctx *ctx, int64_t id, const char *edited_payload_json);
 int   sve_suggestion_reject(sve_ctx *ctx, int64_t id);
@@ -158,8 +159,13 @@ int   sve_profile_set(sve_ctx *ctx, const char *json);
 /* [{"id","name","dose","when_text","times":["20:00"],"repeat":"daily|twice_daily|weekly|once","until_date","created_at"}] */
 char *sve_medicines_json(sve_ctx *ctx);
 /* Saves a medicine the person typed ({"id":0 = new, "name", "dose", "when_text"|"when", "times", "repeat",
- * "until_date"}) and adds a pending reminder suggestion for it. Returns the medicine id, negative on error. */
+ * "until_date"}) and adds a pending reminder suggestion for it. Returns the medicine id, negative on error.
+ * "times" given (even []) is kept as given; only a missing "times" key is resolved from "when" against the
+ * routine (see sve_resolve_times). A card with no times is flagged "check" on "times". */
 int64_t sve_medicine_save(sve_ctx *ctx, const char *json);
+/* Routine times implied by the words of "when" (e.g. "after dinner" -> the profile's dinner time), as JSON
+ * ["HH:MM",…] sorted, [] if no keyword or no routine time. The one keyword table the apps use. NULL on error. */
+char *sve_resolve_times(sve_ctx *ctx, const char *when);
 /* Deletes a medicine and its reminders and suggestions. */
 int   sve_medicine_delete(sve_ctx *ctx, int64_t id);
 

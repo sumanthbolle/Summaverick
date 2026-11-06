@@ -512,6 +512,31 @@ static void run_api_direct(sve_ctx *ctx) {
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
 }
 
+// Times the person gave are kept as given; only a missing "times" key is resolved; Yes never fills them.
+static void run_api_times(sve_ctx *ctx) {
+    sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00","bed":"22:00"}})");
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+    auto med = [&](int64_t id) { for (const auto &m : take(sve_medicines_json(ctx))) if (m["id"] == id) return m; return json(); };
+    auto card = [&](int64_t id) { for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) if (s["medicine_id"] == id) return s; return json(); };
+    int64_t a = sve_medicine_save(ctx, R"({"id":0,"name":"Ecosprin","dose":"75 mg","when":"after dinner","times":[],"repeat":"daily"})");
+    json ca = card(a);
+    expect(a > 0 && med(a)["times"] == json::array() && ca["payload"]["times"] == json::array() &&
+           ca["check_status"] == "check" && contains(ca["check_fields"], "times"),
+           "times [] kept empty: medicine and card times empty, card flagged check on times");
+    expect(sve_suggestion_accept(ctx, ca["id"], nullptr) == -1 && card(a)["status"] == "pending",
+           "accept of a reminder with empty times -> -1, card stays pending");
+    expect(sve_suggestion_accept(ctx, ca["id"], R"({"times":["21:00"]})") > 0, "accept after adding a time works");
+    int64_t b = sve_medicine_save(ctx, R"({"id":0,"name":"Pantop","dose":"40 mg","when":"before breakfast","repeat":"daily"})");
+    expect(med(b)["times"] == json::array({"08:00"}) && card(b)["check_status"] == "ok", "no times key -> resolved from the routine");
+    int64_t b2 = sve_medicine_save(ctx, (R"({"id":)" + std::to_string(b) + R"(,"times":[]})").c_str());
+    expect(b2 == b && med(b)["times"] == json::array(), "edit with times [] removes the times");
+    expect(take(sve_resolve_times(ctx, "after tiffin")) == json::array({"08:00"}), "sve_resolve_times: after tiffin -> breakfast");
+    expect(take(sve_resolve_times(ctx, "నిద్ర ముందు")) == json::array({"22:00"}), "sve_resolve_times: నిద్ర -> bed");
+    expect(take(sve_resolve_times(ctx, "when needed")) == json::array() && sve_resolve_times(ctx, nullptr) == nullptr,
+           "sve_resolve_times: no keyword -> [], NULL -> NULL");
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+}
+
 // Delete all: everything the assistant stored goes, the notes stay for the host to delete.
 static void run_api_wipe(sve_ctx *ctx) {
     sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"te","routine":{"dinner":"20:00"}})");
@@ -597,6 +622,7 @@ static int run_api(sve_ctx *ctx) {
     expect(sve_topic_summary(ctx, 12345, "en", nullptr, nullptr) == nullptr, "unknown topic -> NULL");
     run_api_fixes(ctx);
     run_api_direct(ctx);
+    run_api_times(ctx);
     run_api_wipe(ctx);
     return 0;
 }

@@ -182,9 +182,13 @@ bool medicine_fields(sve::Store &st, const json &in, json &m) {
     if (in.contains("dose")) m["dose"] = jstr(in, "dose");
     std::string when = in.contains("when_text") ? jstr(in, "when_text") : jstr(in, "when");
     if (in.contains("when_text") || in.contains("when")) m["when_text"] = when;
-    std::vector<std::string> times = sve::valid_times(jarr(in, "times"));
-    if (times.empty()) times = sve::resolve_times(when, jobj(profile_of(st), "routine"));
-    if (!times.empty() || in.contains("times")) m["times"] = times;
+    // Times given (even []) are kept exactly: a time the person removed must not come back. Only when
+    // there is no "times" key are they resolved from "when" against the routine.
+    if (in.contains("times")) m["times"] = sve::valid_times(jarr(in, "times"));
+    else {
+        std::vector<std::string> times = sve::resolve_times(when, jobj(profile_of(st), "routine"));
+        if (!times.empty()) m["times"] = times;
+    }
     std::string rep = jstr(in, "repeat");
     if (!rep.empty()) {
         if (sve::sanitize_repeat(rep).empty()) return false;
@@ -264,8 +268,9 @@ int64_t accept_reminder(sve::Store &st, const json &s, const json &p, bool dose_
     }
     std::string text = name.empty() ? jstr(p, "text") : sve::reminder_text(shown, jstr(med, "dose"), lang_of(st));
     if (text.empty()) return -1;
+    // Never filled in on Yes: a reminder without a time is refused (the app opens Edit instead).
     std::vector<std::string> times = sve::valid_times(jarr(p, "times"));
-    if (times.empty()) times = sve::resolve_times(jstr(p, "when_text"), jobj(profile_of(st), "routine"));
+    if (times.empty()) return -1;
     std::string rep = sve::sanitize_repeat(jstr(p, "repeat"));
     if (rep.empty()) rep = !med_id.is_null() ? "daily" : "once";
     std::string start = jstr(p, "start_date"), until = jstr(p, "until_date");
@@ -562,6 +567,13 @@ int sve_suggestion_reject(sve_ctx *ctx, int64_t id) {
 }
 
 // ---------------------------------------------------------------- profile and medicines
+
+char *sve_resolve_times(sve_ctx *ctx, const char *when) {
+    return guard<char *>("sve_resolve_times", nullptr, [&]() -> char * {
+        if (!ctx || !when) return nullptr;
+        return dump(json(sve::resolve_times(when, jobj(profile_of(*ctx->store), "routine"))));
+    });
+}
 
 int sve_assistant_wipe(sve_ctx *ctx) {
     return guard("sve_assistant_wipe", -1, [&] { return ctx && ctx->store->wipe_assistant() ? 0 : -1; });
