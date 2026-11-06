@@ -46,7 +46,13 @@ extension CoreEngine {
         return id
     }
 
-    func deleteMedicine(_ id: Int64) { _ = sve_medicine_delete(ctx, id) }
+    @discardableResult func deleteMedicine(_ id: Int64) -> Bool { sve_medicine_delete(ctx, id) == 0 }
+
+    /// Deletes everything the assistant stored (profile, medicines, memory, reminders, tasks, topics,
+    /// suggestions, insights, transcript pieces). Notes are deleted separately; the caller resyncs reminders.
+    func wipeAssistant() throws {
+        guard sve_assistant_wipe(ctx) == 0 else { throw AssistantError.failed("delete the assistant data") }
+    }
 
     // MARK: suggestions
 
@@ -140,8 +146,8 @@ extension CoreEngine {
 
     /// kind: "fact", "preference", "vocab", or nil for all.
     func memory(kind: String? = nil) -> [MemoryItem] { list(MemoryItem.self, sve_memory_json(ctx, kind)) }
-    func updateMemory(_ id: Int64, _ text: String) { _ = sve_memory_update(ctx, id, text) }
-    func deleteMemory(_ id: Int64) { _ = sve_memory_delete(ctx, id) }
+    @discardableResult func updateMemory(_ id: Int64, _ text: String) -> Bool { sve_memory_update(ctx, id, text) == 0 }
+    @discardableResult func deleteMemory(_ id: Int64) -> Bool { sve_memory_delete(ctx, id) == 0 }
     @discardableResult func addVocab(_ term: String) -> Int64 { sve_vocab_add(ctx, term) }
 
     // MARK: ask

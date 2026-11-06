@@ -74,7 +74,10 @@ struct SettingsView: View {
             .task { languages = SpeechTranscriber.onDeviceLanguages() }
             .confirmationDialog("Delete everything on this phone?", isPresented: $confirmWipe, titleVisibility: .visible) {
                 Button("Delete all", role: .destructive) { wipe() }
+            } message: {
+                Text("All notes and recordings are deleted, and so are your profile, medicines, reminders and everything Summaverick has learned. This cannot be undone.")
             }
+            .onChange(of: confirmWipe) { _, open in PresentationGate.shared.set("settingsWipe", open) }
         }
     }
 
@@ -82,6 +85,8 @@ struct SettingsView: View {
         String(format: "%.0f", (Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824).rounded())
     }
 
+    /// Deletes the notes and their audio, then everything the assistant stored (profile, medicines,
+    /// memory, reminders, tasks, topics, insights), then removes every scheduled reminder.
     private func wipe() {
         Task {
             let engine = CoreEngine.shared
@@ -89,6 +94,9 @@ struct SettingsView: View {
                 if let full = await engine.note(n.id), let p = full.audio_path { try? FileManager.default.removeItem(atPath: p) }
                 await engine.deleteNote(n.id)
             }
+            do { try await engine.wipeAssistant() } catch { NSLog("Settings: assistant wipe failed: %@", "\(error)") }
+            await ReminderScheduler.shared.resync()   // no active reminders left: removes every scheduled one
+            NotificationCenter.default.post(name: .assistantChanged, object: nil)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
     }
