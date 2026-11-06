@@ -73,6 +73,10 @@
 			isa = PBXBuildFile;
 			fileRef = E82D33A65EFEE2CA535089B0;
 		};
+		DACFC767C169503E4AB3CA4F = {
+			isa = PBXBuildFile;
+			fileRef = 8EDD6E0FBF1E227C55F144C7;
+		};
 		DB8B42E9546B01810DFCAE5A = {
 			isa = PBXBuildFile;
 			fileRef = 8E2A14BEAEE07F5369F65BB8;
@@ -183,6 +187,13 @@
 			path = SummaverickEveryday/Security/AppLock.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		6013C41549784B5FC55E61C4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_medcheck.h;
+			path = ../core/src/sve_medcheck.h;
+			sourceTree = SOURCE_ROOT;
+		};
 		63A8A83C123E5491CBE9E84F = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -202,6 +213,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = App.swift;
 			path = SummaverickEveryday/App.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		8EDD6E0FBF1E227C55F144C7 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_medcheck.cpp;
+			path = ../core/src/sve_medcheck.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
 		931FE6600998F3EFAA62977F = {
@@ -399,6 +417,8 @@
 				CB86695FC323060A64BB0472,
 				1E7DCC7C328B39763C50AB6C,
 				EFA847D5450308230934F05A,
+				8EDD6E0FBF1E227C55F144C7,
+				6013C41549784B5FC55E61C4,
 				A2C4910B70238965992017BD,
 				171A4CC9E4CFD6CB1704585A,
 				D3DFAF817EC8F3EB79853B54,
@@ -492,6 +512,7 @@
 				8D4A6C6E4B479FCA91F91BA9,
 				66567DD2A6C40F6BC6CB1C24,
 				02B6E8042D07B8525DD08CA0,
+				DACFC767C169503E4AB3CA4F,
 				CE05B940BCBE599A11AE22E8,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

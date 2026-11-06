@@ -44,6 +44,7 @@ find_package(SQLite3 REQUIRED)
 add_library(svecore STATIC
   src/sve_core.cpp
   src/sve_llm.cpp
+  src/sve_medcheck.cpp
   src/sve_store.cpp
 )
 target_include_directories(svecore PUBLIC include PRIVATE src)
