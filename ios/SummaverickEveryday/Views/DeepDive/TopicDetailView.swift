@@ -17,6 +17,8 @@ struct TopicDetailView: View {
     @State private var summary: TopicSummary?
     @State private var loadingSummary = false
     @State private var summaryError: String?
+    @State private var summaryBusy = false
+    @State private var pipeline = ProcessingPipeline.shared
     @State private var revealed: Set<Int> = []
     @State private var request: TopicEditRequest?
 
@@ -53,13 +55,16 @@ struct TopicDetailView: View {
         .topicEditing(request: $request, gateKey: "deepdive.topic.\(route.id)") { removed in
             if removed?.id == route.id { dismiss() } else { Task { await reload() } }
         }
-        .task { await reload() }
+        .task {
+            await reload()
+            if summary == nil { await loadSummary() }   // first open only; later changes need a tap
+        }
         .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await reload() } }
         .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await reload() } }
         .onChange(of: scenePhase) { _, p in if p == .active { Task { await reload() } } }
     }
 
-    /// The topic as the list last saw it, or a stand-in built from the route.
+    /// The topic as the list last loaded it (nil until the first load).
     private var currentTopic: Topic? { topic }
 
     // MARK: sections
@@ -78,6 +83,21 @@ struct TopicDetailView: View {
                 .padding(.vertical, 4)
             } else if let s = summary {
                 VStack(alignment: .leading, spacing: 10) {
+                    if loadingSummary {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text("Reading your recordings…").foregroundStyle(.secondary)
+                        }
+                        .frame(minHeight: 44)
+                    } else if summaryBusy {
+                        busyView
+                    } else if topic?.summaryStale == 1 {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("New recordings were added.").font(.subheadline).foregroundStyle(.secondary)
+                            Button("Refresh summary") { Task { await loadSummary() } }
+                                .buttonStyle(.bordered).frame(minHeight: 44)
+                        }
+                    }
                     if s.summary.isEmpty {
                         Text("No summary yet.").foregroundStyle(.secondary)
                     } else {
@@ -101,15 +121,28 @@ struct TopicDetailView: View {
                         .buttonStyle(.borderedProminent).frame(minHeight: 44)
                 }
                 .padding(.vertical, 4)
-            } else {
+            } else if summaryBusy {
+                busyView
+            } else if loadingSummary {
                 HStack(spacing: 12) {
                     ProgressView()
                     Text("Reading your recordings…").foregroundStyle(.secondary)
                 }
                 .frame(minHeight: 44)
+            } else {
+                Button("Make the summary") { Task { await loadSummary() } }
+                    .buttonStyle(.borderedProminent).frame(minHeight: 44)
             }
         } header: {
             Text("Summary")
+        }
+    }
+
+    private var busyView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Busy with a recording — try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
+            Button("Try again") { Task { await loadSummary() } }
+                .buttonStyle(.bordered).frame(minHeight: 44)
         }
     }
 
@@ -205,13 +238,14 @@ struct TopicDetailView: View {
         notes = await e.topicNotes(route.id)
         let ids = Set(notes.map(\.id))
         tasks = await e.tasks(openOnly: true).filter { $0.noteID.map(ids.contains) ?? false }
-        await loadSummary()
     }
 
-    /// The core caches the summary, so this is quick unless a recording joined the topic since.
-    /// An old summary stays on screen while a new one is made.
+    /// Only called on first open and from the Refresh / Try again buttons: making a summary occupies the
+    /// core for a while, so background changes never trigger it. An old summary stays while a new one is made.
     private func loadSummary() async {
         guard canSummarise, !loadingSummary else { return }
+        summaryBusy = false
+        if pipeline.isBusy { summaryBusy = true; return }
         loadingSummary = true
         defer { loadingSummary = false }
         summaryError = nil

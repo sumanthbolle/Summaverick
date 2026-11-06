@@ -236,6 +236,16 @@
         }
       }
     },
+    "Busy with a recording — try again in a moment.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఒక రికార్డింగ్ మీద పని జరుగుతోంది — కొంత సేపటి తర్వాత మళ్లీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
     "Cancel": {
       "localizations": {
         "te": {
@@ -671,6 +681,16 @@
         }
       }
     },
+    "Make the summary": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశం తయారు చేయండి"
+          }
+        }
+      }
+    },
     "Mark as done: %@": {
       "localizations": {
         "te": {
@@ -780,6 +800,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gemma 4 కావాలి"
+          }
+        }
+      }
+    },
+    "New recordings were added.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొత్త రికార్డింగ్‌లు చేరాయి."
           }
         }
       }
@@ -1145,6 +1175,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "రికార్డింగ్‌లు"
+          }
+        }
+      }
+    },
+    "Refresh summary": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశాన్ని కొత్తది చేయండి"
           }
         }
       }

@@ -143,7 +143,7 @@ enum TopicEditRequest: Equatable {
 private struct TopicEditing: ViewModifier {
     @Binding var request: TopicEditRequest?
     let gateKey: String
-    /// Called after a rename or merge was applied. `removed` is the topic that no longer exists (merge).
+    /// Called after a rename or merge was applied (the list or detail then reloads). `removed` is the topic that no longer exists (merge).
     let onChanged: (Topic?) -> Void
 
     @State private var renaming: Topic?
@@ -175,11 +175,11 @@ private struct TopicEditing: ViewModifier {
                 TextField("Name", text: $newName)
                 Button("Save") { saveRename() }
                     .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) { renaming = nil }
             } message: {
                 Text("Type a new name.")
             }
-            .sheet(isPresented: $showMergeSheet) { mergeSheet }
+            .sheet(isPresented: $showMergeSheet, onDismiss: { merging = nil; choice = nil; candidates = [] }) { mergeSheet }
             .onChange(of: showRename || showMergeSheet) { _, open in PresentationGate.shared.set(gateKey, open) }
             .onDisappear { PresentationGate.shared.set(gateKey, false) }
     }
