@@ -123,6 +123,11 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
             let weekday = calendar.component(.weekday, from: start)
             let base = max(start, today)
             let bounded = start > today || untilEnd != nil
+            // A "once" reminder fires only on its own date: start_date, else the day it was created
+            // (created_at is epoch seconds), else today. Never max(start, today): the core does not
+            // deactivate fired once-reminders, so a past date must stay silent.
+            let onceDay: Date = r.startDate != nil ? start
+                : (r.createdAt.map { calendar.startOfDay(for: Date(timeIntervalSince1970: TimeInterval($0))) } ?? today)
 
             func make(_ id: String, _ c: DateComponents, _ repeats: Bool, _ fire: Date) -> PlannedRequest {
                 PlannedRequest(identifier: id, body: r.text, components: c, repeats: repeats, fireDate: fire,
@@ -179,7 +184,7 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
                         }
                     }
                 default: // "once" and anything unknown
-                    if let p = shot(base, h, m, hhmm), seen.insert(p.identifier).inserted { oneShots.append(p) }
+                    if let p = shot(onceDay, h, m, hhmm), seen.insert(p.identifier).inserted { oneShots.append(p) }
                 }
             }
         }
