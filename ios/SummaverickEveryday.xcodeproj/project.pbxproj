@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02B6E8042D07B8525DD08CA0 = {
+			isa = PBXBuildFile;
+			fileRef = 1E7DCC7C328B39763C50AB6C;
+		};
 		1970E5A56D56F7BC7ACE9401 = {
 			isa = PBXBuildFile;
 			fileRef = 40CF89C460C8558DF1531E3B;
@@ -107,6 +111,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = sve_store.cpp;
 			path = ../core/src/sve_store.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		1E7DCC7C328B39763C50AB6C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_llm.cpp;
+			path = ../core/src/sve_llm.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
 		2029A639DD8022543C17416B = {
@@ -221,6 +232,13 @@
 			path = Frameworks/llama.xcframework;
 			sourceTree = SOURCE_ROOT;
 		};
+		CB86695FC323060A64BB0472 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_internal.h;
+			path = ../core/src/sve_internal.h;
+			sourceTree = SOURCE_ROOT;
+		};
 		D3DFAF817EC8F3EB79853B54 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -247,6 +265,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = HomeView.swift;
 			path = SummaverickEveryday/Views/HomeView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		EFA847D5450308230934F05A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_llm.h;
+			path = ../core/src/sve_llm.h;
 			sourceTree = SOURCE_ROOT;
 		};
 		FC581254F5C135DB22FD9C42 = {
@@ -371,6 +396,9 @@
 			isa = PBXGroup;
 			children = (
 				3C94D64FE92A566816D76B43,
+				CB86695FC323060A64BB0472,
+				1E7DCC7C328B39763C50AB6C,
+				EFA847D5450308230934F05A,
 				A2C4910B70238965992017BD,
 				171A4CC9E4CFD6CB1704585A,
 				D3DFAF817EC8F3EB79853B54,
@@ -463,6 +491,7 @@
 				E374920B948422FA0FDEBA74,
 				8D4A6C6E4B479FCA91F91BA9,
 				66567DD2A6C40F6BC6CB1C24,
+				02B6E8042D07B8525DD08CA0,
 				CE05B940BCBE599A11AE22E8,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

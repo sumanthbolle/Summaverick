@@ -1,23 +1,8 @@
 // Summaverick Everyday — portable core implementation.
 // Hosts: iOS (today), Android (next), the Summaverick Everyday device (Linux/ARM).
 #include "sve_core.h"
-#include "sve_store.h"
+#include "sve_internal.h"
 #include "sve_prompts.h"
-
-// On iOS llama ships as llama.xcframework (framework-style include); elsewhere as a plain header.
-#if __has_include(<llama/llama.h>)
-#include <llama/llama.h>
-#else
-#include "llama.h"
-#endif
-
-// Audio-capable models (Gemma 4) go through llama.cpp's multimodal library. It ships inside
-// llama.xcframework on iOS; other hosts build without it unless they link mtmd.
-#if __has_include(<llama/mtmd.h>)
-#include <llama/mtmd.h>
-#include <llama/mtmd-helper.h>
-#define SVE_WITH_MTMD 1
-#endif
 
 #include <algorithm>
 #include <cstdarg>
@@ -29,15 +14,14 @@
 #include <thread>
 #include <vector>
 
-#ifdef SVE_WITH_WHISPER
-#include "whisper.h"
-#endif
+using sve::split_text;
+using sve::strip_thinking;
 
 // ---------------------------------------------------------------- logging
 static sve_log_cb g_log = nullptr;
 static void *g_log_user = nullptr;
 
-static void logf(int level, const char *fmt, ...) {
+void sve_logf(int level, const char *fmt, ...) {
     char buf[1024];
     va_list ap;
     va_start(ap, fmt);
@@ -66,204 +50,6 @@ static char *dup_str(const std::string &s) {
     return p;
 }
 
-// ---------------------------------------------------------------- LLM wrapper
-namespace {
-
-struct Llm {
-    llama_model *model = nullptr;
-    llama_context *ctx = nullptr;
-    const llama_vocab *vocab = nullptr;
-    int n_ctx = 4096;
-    int n_threads = 4;
-    std::string tmpl; // chat template (jinja source) from the GGUF, or empty
-
-    ~Llm() {
-        if (ctx) llama_free(ctx);
-        if (model) llama_model_free(model);
-    }
-
-    bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers) {
-        llama_model_params mp = llama_model_default_params();
-        mp.n_gpu_layers = n_gpu_layers; // default load mode is mmap, which is what we want on every host
-        model = llama_model_load_from_file(path, mp);
-        if (!model) { logf(2, "failed to load model %s", path); return false; }
-        vocab = llama_model_get_vocab(model);
-
-        n_ctx = n_ctx_req > 0 ? n_ctx_req : 4096;
-        int train = llama_model_n_ctx_train(model);
-        if (train > 0 && n_ctx > train) n_ctx = train;
-
-        unsigned hw = std::thread::hardware_concurrency();
-        n_threads = n_threads_req > 0 ? n_threads_req : (int)std::max(1u, std::min(hw, 4u));
-
-        llama_context_params cp = llama_context_default_params();
-        cp.n_ctx = n_ctx;
-        cp.n_batch = 512;
-        cp.n_ubatch = 512;
-        cp.n_threads = n_threads;
-        cp.n_threads_batch = n_threads;
-        cp.no_perf = true;
-        ctx = llama_init_from_model(model, cp);
-        if (!ctx) { logf(2, "failed to create context"); return false; }
-
-        const char *t = llama_model_chat_template(model, nullptr);
-        if (t) tmpl = t;
-        char desc[128];
-        llama_model_desc(model, desc, sizeof desc);
-        logf(0, "loaded %s (n_ctx=%d, threads=%d, gpu_layers=%d)", desc, n_ctx, n_threads, n_gpu_layers);
-        return true;
-    }
-
-    std::vector<llama_token> tokenize(const std::string &text, bool add_special, bool parse_special) const {
-        int n = -llama_tokenize(vocab, text.c_str(), (int)text.size(), nullptr, 0, add_special, parse_special);
-        std::vector<llama_token> out(std::max(n, 0));
-        if (n > 0) llama_tokenize(vocab, text.c_str(), (int)text.size(), out.data(), n, add_special, parse_special);
-        return out;
-    }
-
-    int count_tokens(const std::string &text) const {
-        return -llama_tokenize(vocab, text.c_str(), (int)text.size(), nullptr, 0, false, false);
-    }
-
-    // Wrap (system,user) in the model's chat template. Falls back to a ChatML‑style layout.
-    std::string apply_template(const std::string &system, const std::string &user) const {
-        // Gemma 4's template is not one llama_chat_apply_template knows; write it out directly.
-        // No <|think|> in the system turn, so the model answers without a thinking block.
-        if (tmpl.find("<|turn>") != std::string::npos) {
-            return "<|turn>system\n" + system + "<turn|>\n<|turn>user\n" + user + "<turn|>\n<|turn>model\n";
-        }
-        llama_chat_message msgs[2] = {{"system", system.c_str()}, {"user", user.c_str()}};
-        if (!tmpl.empty()) {
-            std::vector<char> buf((system.size() + user.size()) * 2 + 1024);
-            int n = llama_chat_apply_template(tmpl.c_str(), msgs, 2, true, buf.data(), (int)buf.size());
-            if (n > (int)buf.size()) {
-                buf.resize(n + 1);
-                n = llama_chat_apply_template(tmpl.c_str(), msgs, 2, true, buf.data(), (int)buf.size());
-            }
-            if (n > 0) return std::string(buf.data(), n);
-        }
-        return "<|im_start|>system\n" + system + "<|im_end|>\n<|im_start|>user\n" + user +
-               "<|im_end|>\n<|im_start|>assistant\n";
-    }
-
-    // Prompt → completion. Clears KV memory first, so every call is independent.
-    // Returns false on cancel or error.
-    bool complete(const std::string &prompt, int max_new_tokens, std::string &out,
-                  sve_progress_cb cb, void *user, const char *phase, int done, int total) {
-        out.clear();
-        llama_memory_clear(llama_get_memory(ctx), true);
-
-        std::vector<llama_token> toks = tokenize(prompt, true, true);
-        if ((int)toks.size() + 16 >= n_ctx) {
-            logf(2, "prompt too long (%zu tokens for n_ctx %d)", toks.size(), n_ctx);
-            return false;
-        }
-        int room = n_ctx - (int)toks.size() - 4;
-        if (max_new_tokens > room) max_new_tokens = room;
-
-        // prefill in n_batch‑sized pieces
-        const int nb = (int)llama_n_batch(ctx);
-        for (size_t i = 0; i < toks.size(); i += nb) {
-            int n = (int)std::min<size_t>(nb, toks.size() - i);
-            llama_batch batch = llama_batch_get_one(toks.data() + i, n);
-            if (llama_decode(ctx, batch) != 0) { logf(2, "decode failed during prefill"); return false; }
-            if (cb && cb(phase, done, total, user)) return false;
-        }
-        return generate(max_new_tokens, false, out, cb, user, phase, done, total);
-    }
-
-    // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
-    bool generate(int max_new_tokens, bool greedy, std::string &out,
-                  sve_progress_cb cb, void *user, const char *phase, int done, int total) {
-        llama_sampler_chain_params sp = llama_sampler_chain_default_params();
-        sp.no_perf = true;
-        llama_sampler *smpl = llama_sampler_chain_init(sp);
-        if (greedy) {
-            // light penalty only: real speech repeats words, but a stuck model repeats whole phrases
-            llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.05f, 0.0f, 0.0f));
-            llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
-        } else {
-            llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.15f, 0.0f, 0.0f));
-            llama_sampler_chain_add(smpl, llama_sampler_init_top_p(0.9f, 1));
-            llama_sampler_chain_add(smpl, llama_sampler_init_min_p(0.05f, 1));
-            llama_sampler_chain_add(smpl, llama_sampler_init_temp(0.3f));
-            llama_sampler_chain_add(smpl, llama_sampler_init_dist(42));
-        }
-
-        bool ok = true;
-        char piece[256];
-        for (int i = 0; i < max_new_tokens; ++i) {
-            llama_token id = llama_sampler_sample(smpl, ctx, -1);
-            if (llama_vocab_is_eog(vocab, id)) break;
-            llama_sampler_accept(smpl, id);
-            int n = llama_token_to_piece(vocab, id, piece, sizeof piece, 0, false);
-            if (n > 0) out.append(piece, n);
-            llama_batch batch = llama_batch_get_one(&id, 1);
-            if (llama_decode(ctx, batch) != 0) { logf(2, "decode failed"); ok = false; break; }
-            if ((i & 15) == 0 && cb && cb(phase, done, total, user)) { ok = false; break; }
-        }
-        llama_sampler_free(smpl);
-        return ok;
-    }
-};
-
-// Remove thinking blocks (Qwen3 "<think>…</think>", Gemma 4 "<|channel>…<channel|>") and surrounding whitespace.
-std::string strip_thinking(std::string s) {
-    for (auto tags : {std::make_pair(std::string("<think>"), std::string("</think>")),
-                      std::make_pair(std::string("<|channel>"), std::string("<channel|>"))}) {
-        for (;;) {
-            size_t a = s.find(tags.first);
-            if (a == std::string::npos) break;
-            size_t b = s.find(tags.second, a);
-            if (b == std::string::npos) { s.erase(a); break; }
-            s.erase(a, b + tags.second.size() - a);
-        }
-    }
-    size_t st = s.find_first_not_of(" \t\r\n");
-    if (st == std::string::npos) return "";
-    size_t en = s.find_last_not_of(" \t\r\n");
-    return s.substr(st, en - st + 1);
-}
-
-// Split text into pieces of ~target_chars, cutting at paragraph/sentence boundaries.
-std::vector<std::string> split_text(const std::string &text, size_t target_chars) {
-    std::vector<std::string> parts;
-    size_t pos = 0;
-    while (pos < text.size()) {
-        size_t end = std::min(text.size(), pos + target_chars);
-        if (end < text.size()) {
-            // search back for a good boundary, but not more than 40% of the chunk
-            size_t floor = pos + target_chars * 6 / 10;
-            size_t cut = std::string::npos;
-            for (const char *sep : {"\n\n", "\n", ". ", "। ", "? ", "! ", "; ", ", ", " "}) {
-                size_t c = text.rfind(sep, end);
-                if (c != std::string::npos && c > floor) { cut = c + strlen(sep); break; }
-            }
-            if (cut != std::string::npos) end = cut;
-        }
-        // never cut inside a UTF‑8 sequence
-        while (end < text.size() && (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) ++end;
-        parts.push_back(text.substr(pos, end - pos));
-        pos = end;
-    }
-    return parts;
-}
-
-} // namespace
-
-// ---------------------------------------------------------------- context
-struct sve_ctx {
-    std::unique_ptr<sve::Store> store;
-    std::unique_ptr<Llm> llm;
-#ifdef SVE_WITH_MTMD
-    mtmd_context *mtmd = nullptr; // audio projector; belongs to llm->model, freed before it
-#endif
-#ifdef SVE_WITH_WHISPER
-    whisper_context *whisper = nullptr;
-    int whisper_threads = 4;
-#endif
-};
-
 static bool g_backend_init = false;
 
 const char *sve_version(void) { return SVE_VERSION; }
@@ -277,7 +63,7 @@ sve_ctx *sve_init(const char *db_path) {
     auto *c = new sve_ctx();
     c->store = std::make_unique<sve::Store>(db_path ? db_path : ":memory:");
     if (!c->store->ok()) {
-        logf(2, "store open failed: %s", c->store->last_error().c_str());
+        sve_logf(2, "store open failed: %s", c->store->last_error().c_str());
         delete c;
         return nullptr;
     }
@@ -298,7 +84,7 @@ int sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, 
     if (!ctx || !gguf_path) return -1;
     sve_unload_audio(ctx);
     ctx->llm.reset();
-    auto l = std::make_unique<Llm>();
+    auto l = std::make_unique<sve::Llm>();
     if (!l->load(gguf_path, n_ctx, n_threads, n_gpu_layers)) return -2;
     ctx->llm = std::move(l);
     return 0;
@@ -312,7 +98,7 @@ namespace {
 // Reduce a long transcript to bullet points that fit the context budget (hierarchical).
 // Returns false on cancel/error. from_bullets is set when any reduction happened.
 // final_budget: max tokens of material the final prompt may contain.
-bool reduce_to_fit(Llm &llm, const std::string &lang, std::string material, int final_budget,
+bool reduce_to_fit(sve::Llm &llm, const std::string &lang, std::string material, int final_budget,
                    std::string &out, bool &from_bullets, sve_progress_cb cb, void *user) {
     from_bullets = false;
     const std::string sys = sve::system_prompt(lang);
@@ -351,7 +137,7 @@ bool reduce_to_fit(Llm &llm, const std::string &lang, std::string material, int 
 char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang_c,
                    sve_progress_cb cb, void *user) {
     if (!ctx || !ctx->llm || !transcript) return nullptr;
-    Llm &llm = *ctx->llm;
+    sve::Llm &llm = *ctx->llm;
     std::string lang = lang_c ? lang_c : "en";
     std::string text(transcript);
     if (strip_thinking(text).empty()) return dup_str("");
@@ -382,7 +168,7 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
 char *sve_ask(sve_ctx *ctx, const char *context_text, const char *question, const char *lang_c,
               sve_progress_cb cb, void *user) {
     if (!ctx || !ctx->llm || !context_text || !question) return nullptr;
-    Llm &llm = *ctx->llm;
+    sve::Llm &llm = *ctx->llm;
     std::string lang = lang_c ? lang_c : "en";
     const int max_out = std::max(96, std::min(300, llm.n_ctx / 6));
     std::string material;
@@ -432,7 +218,7 @@ bool read_wav16k(const std::string &path, std::vector<float> &pcm) {
             uint32_t r; memcpy(&r, data.data() + p + 12, 4); rate = r;
             uint16_t b; memcpy(&b, data.data() + p + 22, 2); bits = b;
         } else if (!memcmp(data.data() + p, "data", 4)) {
-            if (bits != 16 || rate != 16000) { logf(2, "wav must be 16 kHz 16‑bit (got %d Hz, %d bit)", rate, bits); return false; }
+            if (bits != 16 || rate != 16000) { sve_logf(2, "wav must be 16 kHz 16‑bit (got %d Hz, %d bit)", rate, bits); return false; }
             const int16_t *s = reinterpret_cast<const int16_t *>(data.data() + p + 8);
             size_t n = std::min<size_t>(sz, data.size() - p - 8) / 2;
             pcm.reserve(n / channels);
@@ -460,9 +246,9 @@ int sve_load_audio(sve_ctx *ctx, const char *mmproj_path) {
     mp.n_threads = ctx->llm->n_threads;
     mp.warmup = false;
     ctx->mtmd = mtmd_init_from_file(mmproj_path, ctx->llm->model, mp);
-    if (!ctx->mtmd) { logf(2, "failed to load audio projector %s", mmproj_path); return -2; }
+    if (!ctx->mtmd) { sve_logf(2, "failed to load audio projector %s", mmproj_path); return -2; }
     if (!mtmd_support_audio(ctx->mtmd)) {
-        logf(2, "projector %s has no audio encoder", mmproj_path);
+        sve_logf(2, "projector %s has no audio encoder", mmproj_path);
         sve_unload_audio(ctx);
         return -3;
     }
@@ -477,11 +263,11 @@ int sve_audio_loaded(const sve_ctx *ctx) { return ctx && ctx->mtmd ? 1 : 0; }
 
 char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user) {
     if (!ctx || !ctx->llm || !ctx->mtmd || !wav_path) return nullptr;
-    Llm &llm = *ctx->llm;
+    sve::Llm &llm = *ctx->llm;
     std::vector<float> pcm;
-    if (!read_wav16k(wav_path, pcm)) { logf(2, "could not read %s", wav_path); return nullptr; }
+    if (!read_wav16k(wav_path, pcm)) { sve_logf(2, "could not read %s", wav_path); return nullptr; }
     const int rate = mtmd_get_audio_sample_rate(ctx->mtmd);
-    if (rate > 0 && rate != 16000) { logf(2, "projector wants %d Hz audio", rate); return nullptr; }
+    if (rate > 0 && rate != 16000) { sve_logf(2, "projector wants %d Hz audio", rate); return nullptr; }
 
     // Gemma 4 takes at most ~30 s per clip. Cut at the quietest point near 28 s so words are not split.
     const size_t target = 28 * 16000, search = 3 * 16000, win = 1600;
@@ -533,7 +319,7 @@ char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb c
         if (rc == 0) rc = mtmd_helper_eval_chunks(ctx->mtmd, llm.ctx, chunks, 0, 0, (int32_t)llama_n_batch(llm.ctx), true, &n_past);
         mtmd_input_chunks_free(chunks);
         mtmd_bitmap_free(bmp);
-        if (rc != 0) { logf(2, "audio piece %d/%d failed to evaluate (%d)", i + 1, total, rc); return nullptr; }
+        if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", i + 1, total, rc); return nullptr; }
 
         std::string piece;
         int room = std::min(768, llm.n_ctx - (int)n_past - 4);
