@@ -19,10 +19,6 @@
 			isa = PBXBuildFile;
 			fileRef = 40CF89C460C8558DF1531E3B;
 		};
-		19EE52EB9A963AD707F9115D = {
-			isa = PBXBuildFile;
-			fileRef = 931FE6600998F3EFAA62977F;
-		};
 		1D9397B49E2B55EDE5DC3560 = {
 			isa = PBXBuildFile;
 			fileRef = 9E2ACA831A68C5FC7568EFA9;
@@ -77,6 +73,10 @@
 			isa = PBXBuildFile;
 			fileRef = 618A438B4C8E5391746526C9;
 		};
+		82BAF8328F881FAFD6AEC039 = {
+			isa = PBXBuildFile;
+			fileRef = 92C96DB63D6AC206F247279B;
+		};
 		8D4A6C6E4B479FCA91F91BA9 = {
 			isa = PBXBuildFile;
 			fileRef = DCE021A147EA4FBC88B74354;
@@ -92,6 +92,10 @@
 		9543CFE6FE3AF9374A448E0F = {
 			isa = PBXBuildFile;
 			fileRef = D58A3AD4F6AD27CF4A2AB3D8;
+		};
+		A062B0CDA53604F5D8A7D47D = {
+			isa = PBXBuildFile;
+			fileRef = C593582C209D99DB076F4AB2;
 		};
 		A14D701700FCEA89C5B0F439 = {
 			isa = PBXBuildFile;
@@ -407,11 +411,11 @@
 			path = SummaverickEveryday/Views/Profile/ProfileSetupView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
-		931FE6600998F3EFAA62977F = {
+		92C96DB63D6AC206F247279B = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			name = SpeechTranscriber.swift;
-			path = SummaverickEveryday/ASR/SpeechTranscriber.swift;
+			name = AIStatusViews.swift;
+			path = SummaverickEveryday/Views/Components/AIStatusViews.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		9E2ACA831A68C5FC7568EFA9 = {
@@ -461,6 +465,13 @@
 			lastKnownFileType = wrapper.xcframework;
 			name = llama.xcframework;
 			path = Frameworks/llama.xcframework;
+			sourceTree = SOURCE_ROOT;
+		};
+		C593582C209D99DB076F4AB2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ModelLogic.swift;
+			path = SummaverickEveryday/Engine/ModelLogic.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		CB86695FC323060A64BB0472 = {
@@ -582,18 +593,11 @@
 		3A82B61681BFF18BB638B388 = {
 			isa = PBXGroup;
 			children = (
+				92C96DB63D6AC206F247279B,
 				393C976A09F0C61C5B20B9DE,
 				D58A3AD4F6AD27CF4A2AB3D8,
 			);
 			name = Views/Components;
-			sourceTree = "<group>";
-		};
-		3FE2124A661217E4BCFDFACF = {
-			isa = PBXGroup;
-			children = (
-				931FE6600998F3EFAA62977F,
-			);
-			name = ASR;
 			sourceTree = "<group>";
 		};
 		518DA81DB9B99529C0C0AEBE = {
@@ -628,6 +632,7 @@
 				69DFE9A274CA05C81C452276,
 				618A438B4C8E5391746526C9,
 				3E8C99285C2BD28FE0ECE99B,
+				C593582C209D99DB076F4AB2,
 				B05E051B8E13E602C77A96F0,
 				2E361774B975154A11567968,
 				FC685B2FB5E51229E33B1F2C,
@@ -639,7 +644,6 @@
 			isa = PBXGroup;
 			children = (
 				8E2A14BEAEE07F5369F65BB8,
-				3FE2124A661217E4BCFDFACF,
 				D8254DAFFA2E6457E23C3B03,
 				68491ED0F099EABFEEBED4FC,
 				25B8EA0EC84CD169EC13005D,
@@ -803,17 +807,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				19EE52EB9A963AD707F9115D,
 				DB8B42E9546B01810DFCAE5A,
 				1970E5A56D56F7BC7ACE9401,
 				53208D279FD7D4526A01C523,
 				7DF93800DB3C9D1EB735C3CD,
 				B3682618E8A7DB35FCEEE996,
+				A062B0CDA53604F5D8A7D47D,
 				5997944FB95EF3E94D57974F,
 				5809D5B858D8CE07F8518B8C,
 				74F26ED096628426F957DD0E,
 				E38796377CD701DE27D4E42D,
 				ECB5419178B062460383B28A,
+				82BAF8328F881FAFD6AEC039,
 				8FB71A3DAC10CCF263B21175,
 				9543CFE6FE3AF9374A448E0F,
 				B65B60C3D1ED1A91BF301F39,

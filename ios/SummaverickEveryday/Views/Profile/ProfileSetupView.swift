@@ -188,6 +188,7 @@ struct ProfileSetupView: View {
                 }
                 .disabled(saving)
             }
+            AIStatusLine().padding(.top, 4)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

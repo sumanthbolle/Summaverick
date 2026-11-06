@@ -19,6 +19,7 @@ struct NoteDetailView: View {
     @State private var answer: String?
     @State private var asking = false
     @State private var pipeline = ProcessingPipeline.shared
+    @State private var models = ModelManager.shared
     @State private var player: AVAudioPlayer?
     @State private var playing = false
     /// startAt has not been applied to playback yet (it is, on the first play).
@@ -113,8 +114,13 @@ struct NoteDetailView: View {
 
                     if isThisNoteBusy {
                         StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else if waitingForAI {
+                        StatusBanner(stage: .paused(models.status == .unsupported ? AIStatus.unsupportedMessage
+                                                                                  : ProcessingPipeline.waitingMessage))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else if let failure = pipeline.lastFailure[noteID] {
-                        StatusBanner(stage: .failed(failure)).clipShape(RoundedRectangle(cornerRadius: 8))
+                        StatusBanner(stage: pipeline.interrupted.contains(noteID) ? .paused(failure) : .failed(failure))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
 
                     Picker("Section", selection: $tab) {
@@ -124,7 +130,7 @@ struct NoteDetailView: View {
 
                     content
 
-                    if needsGeneration && !isThisNoteBusy {
+                    if needsGeneration && !isThisNoteBusy && models.isReady {
                         Button {
                             Task { await pipeline.regenerate(noteID: noteID) }
                         } label: { Label("Generate notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
@@ -319,10 +325,13 @@ struct NoteDetailView: View {
     private var hasTranscript: Bool { !(note?.transcript ?? "").isEmpty }
     private var hasAudio: Bool { audioPath != nil }
 
-    /// Older recordings never went through extraction: offer it once, with an audio-capable model only.
+    /// Older recordings never went through extraction: offer it once, when the AI is ready.
     private var showFindReminders: Bool {
-        ModelManager.shared.selected.hearsAudio && !extracted && hasTranscript && !isThisNoteBusy
+        models.isReady && !extracted && hasTranscript && !isThisNoteBusy
     }
+
+    /// Recorded before the AI was ready: the audio is kept and processed once it has downloaded.
+    private var waitingForAI: Bool { !models.isReady && !hasTranscript && hasAudio }
 
     private var needsGeneration: Bool {
         guard let n = note else { return false }
@@ -400,10 +409,12 @@ struct NoteDetailView: View {
         answer = nil
         Task {
             defer { asking = false }
-            let mm = ModelManager.shared
-            guard mm.selectedInstalled else { answer = String(localized: "Download the AI model in Settings first."); return }
+            guard models.isReady else { answer = String(localized: "Summaverick is still getting ready"); return }
+            guard !Heat.isTooHot(ProcessInfo.processInfo.thermalState) else {
+                answer = String(localized: "The phone is too warm. Try again when it has cooled down."); return
+            }
             do {
-                try await CoreEngine.shared.loadModel(at: mm.fileURL(for: mm.selected).path)
+                try await models.loadIntoCore()
                 let context = [n.detailed_notes, t].compactMap { $0 }.joined(separator: "\n\n")
                 answer = try await CoreEngine.shared.ask(context: context, question: q, lang: n.lang)
             } catch {

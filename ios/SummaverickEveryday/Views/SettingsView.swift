@@ -5,8 +5,8 @@ struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var models = ModelManager.shared
-    @State private var languages: [SpeechLanguage] = []
     @State private var confirmWipe = false
+    @State private var confirmRemoveAI = false
     @State private var wipeFailed = false
     @State private var wipeBusy = false
     @State private var wiping = false
@@ -25,41 +25,16 @@ struct SettingsView: View {
                     }
                 }
 
-                if models.selected.hearsAudio {
-                    Section("Notes language") {
-                        Picker("Notes language", selection: $settings.notesLanguage) {
-                            Text("English").tag("en"); Text("Telugu").tag("te"); Text("Hindi").tag("hi")
-                            Text("Tamil").tag("ta"); Text("Kannada").tag("kn"); Text("Malayalam").tag("ml")
-                        }
-                        Text("\(models.selected.name) listens to the recording itself, so Telugu, Hindi and mixed speech work in any language. Summary, notes and questions are written in the language above.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                Section("Notes language") {
+                    Picker("Notes language", selection: $settings.notesLanguage) {
+                        Text("English").tag("en"); Text("Telugu").tag("te"); Text("Hindi").tag("hi")
+                        Text("Tamil").tag("ta"); Text("Kannada").tag("kn"); Text("Malayalam").tag("ml")
                     }
-                } else {
-                    Section("Language of recordings") {
-                        if languages.isEmpty {
-                            Text("No on-device speech languages found. Add a dictation language in Settings > General > Keyboard > Dictation.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        } else {
-                            Picker("Language", selection: $settings.languageID) {
-                                ForEach(languages) { Text($0.name).tag($0.id) }
-                            }
-                            Text("Only languages that work fully on this iPhone are listed. Audio is never sent to a server.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                Section("AI model (runs on this phone)") {
-                    ForEach(ModelCatalog.all) { spec in
-                        ModelRow(spec: spec, models: models, selected: models.selectedID == spec.id) {
-                            models.selectedID = spec.id
-                            Task { await CoreEngine.shared.unloadModel() }
-                        }
-                    }
-                    if let e = models.downloadError { Text(e).font(.footnote).foregroundStyle(.red) }
-                    Text("This phone has \(ramGB) GB of memory. Recommended: \(ModelCatalog.recommended.name).")
+                    Text("Summaverick listens to the recording itself, so Telugu, Hindi and mixed speech all work. Summary, notes and questions are written in the language above.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
+
+                aiSection
 
                 Section("Keep recordings for") {
                     Picker("Audio retention", selection: $settings.retentionDays) {
@@ -94,7 +69,6 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task { languages = SpeechTranscriber.onDeviceLanguages() }
             .confirmationDialog("Delete everything on this phone?", isPresented: $confirmWipe, titleVisibility: .visible) {
                 Button("Delete all", role: .destructive) { wipe() }
             } message: {
@@ -107,12 +81,40 @@ struct SettingsView: View {
             .alert("Summaverick is still working on a recording. Try again when it has finished.", isPresented: $wipeBusy) {
                 Button("OK", role: .cancel) {}
             }
-            .onChange(of: confirmWipe || wipeFailed || wipeBusy) { _, open in PresentationGate.shared.set("settingsWipe", open) }
+            .confirmationDialog("Remove Summaverick's AI?", isPresented: $confirmRemoveAI, titleVisibility: .visible) {
+                Button("Remove", role: .destructive) { Task { await models.remove() } }
+            } message: {
+                Text("Your notes stay. New recordings wait until it is downloaded again.")
+            }
+            .onChange(of: confirmWipe || wipeFailed || wipeBusy || confirmRemoveAI) { _, open in PresentationGate.shared.set("settingsWipe", open) }
         }
     }
 
-    private var ramGB: String {
-        String(format: "%.0f", (Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824).rounded())
+    /// Status, Download again, mobile data and Remove. The model itself is never named.
+    @ViewBuilder
+    private var aiSection: some View {
+        let status = models.status
+        Section("Summaverick's AI") {
+            if status == .unsupported {
+                Text(AIStatus.unsupportedMessage).font(.footnote).foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(status.settingsLine, systemImage: status.symbol).frame(minHeight: 44, alignment: .leading)
+                    if let p = status.progress { ProgressView(value: p) }
+                    if let d = status.detail { Text(d).font(.footnote).foregroundStyle(.secondary) }
+                }
+                if status.canRetry {
+                    Button("Download again") { models.startIfNeeded(userInitiated: true) }.frame(minHeight: 44)
+                }
+                AICellularToggle()
+                if status.isReady {
+                    Button("Remove to free space", role: .destructive) {
+                        if pipeline.isBusy { wipeBusy = true } else { confirmRemoveAI = true }
+                    }
+                    .frame(minHeight: 44)
+                }
+            }
+        }
     }
 
     /// Deletes the notes and their audio, then everything the assistant stored (profile, medicines,
@@ -141,39 +143,5 @@ struct SettingsView: View {
             wiping = false
             if !ok { wipeFailed = true }
         }
-    }
-}
-
-struct ModelRow: View {
-    let spec: ModelSpec
-    let models: ModelManager
-    let selected: Bool
-    let select: () -> Void
-
-    var body: some View {
-        let installed = models.isInstalled(spec)
-        let progress = models.downloadProgress[spec.id]
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Button(action: select) {
-                    HStack {
-                        Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? Color.accentColor : .secondary)
-                        Text(spec.name)
-                    }
-                }
-                .buttonStyle(.plain)
-                Spacer()
-                if progress != nil {
-                    Button("Cancel") { models.cancelDownload(spec) }.font(.footnote)
-                } else if installed {
-                    Button("Remove") { models.delete(spec) }.font(.footnote).foregroundStyle(.red)
-                } else {
-                    Button("Download \(spec.approxMB) MB") { models.download(spec) }.font(.footnote)
-                }
-            }
-            if let p = progress { ProgressView(value: p) }
-            Text(spec.notes).font(.footnote).foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 2)
     }
 }

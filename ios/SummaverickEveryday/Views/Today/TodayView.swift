@@ -66,28 +66,27 @@ struct TodayView: View {
     @State private var notificationsOff = false
     @State private var now = Date()
     @State private var showSetup = false
+    @AppStorage("ai.unsupportedShown") private var unsupportedShown = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     greeting
-                    if pipeline.isBusy || isFailed {
+                    if pipeline.isBusy || isFailed || isPaused {
                         StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 10))
                     }
-                    if !models.selectedInstalled && !pipeline.isBusy {
-                        ModelNudge { router.showSettings = true }.clipShape(RoundedRectangle(cornerRadius: 10))
+                    if models.status == .unsupported {
+                        if !unsupportedShown { AIUnsupportedCard { unsupportedShown = true } }
+                    } else if !models.isReady {
+                        AIDownloadCard()
                     }
                     if loaded && needsProfile { setupProfileCard }
-                    if models.selected.hearsAudio {
-                        waitingSection
-                        remindersSection
-                        tasksSection
-                        if let insight { insightCard(insight) }
-                        askBar
-                    } else {
-                        needsGemmaCard
-                    }
+                    waitingSection
+                    remindersSection
+                    tasksSection
+                    if let insight { insightCard(insight) }
+                    if models.isReady { askBar }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -126,6 +125,7 @@ struct TodayView: View {
     }
 
     private var isFailed: Bool { if case .failed = pipeline.stage { return true } else { return false } }
+    private var isPaused: Bool { if case .paused = pipeline.stage { return true } else { return false } }
     /// No profile saved yet (setup was closed with "Later", or never finished the routine step).
     private var needsProfile: Bool { profile == nil }
     private var errorShown: Binding<Bool> {
@@ -158,7 +158,6 @@ struct TodayView: View {
 
     private var subtitle: String {
         let weekday = now.formatted(.dateTime.weekday(.wide))
-        guard models.selected.hearsAudio else { return weekday }
         let n = needCount
         let need = n == 0 ? String(localized: "Nothing needs you today") : String(localized: "\(n) things need you today")
         return "\(weekday) · \(need)"
@@ -382,20 +381,6 @@ struct TodayView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private var needsGemmaCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Needs Gemma 4", systemImage: "waveform.badge.exclamationmark").font(.title3.bold())
-            Text("Reminders, to-dos and suggestions from your recordings need the Gemma 4 model. Your notes and recording still work.")
-                .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Button { router.showSettings = true } label: {
-                Text("Open Settings").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: data

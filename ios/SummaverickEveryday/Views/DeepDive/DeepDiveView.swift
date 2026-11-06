@@ -22,11 +22,12 @@ struct DeepDiveView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 BrandHeader()
-                if pipeline.isBusy || isFailed {
+                if pipeline.isBusy || isFailed || isPaused {
                     StatusBanner(stage: pipeline.stage)
                 }
-                if !models.selectedInstalled && !pipeline.isBusy {
-                    ModelNudge { router.showSettings = true }
+                if !models.isReady {
+                    AIStatusLine().padding(.horizontal).padding(.vertical, 8)
+                        .background(Color(.secondarySystemBackground))
                 }
                 Picker("Browse by", selection: $segment) {
                     Text("Topics").tag(Segment.topics)
@@ -50,6 +51,7 @@ struct DeepDiveView: View {
     }
 
     private var isFailed: Bool { if case .failed = pipeline.stage { return true } else { return false } }
+    private var isPaused: Bool { if case .paused = pipeline.stage { return true } else { return false } }
 }
 
 // MARK: - topic and person lists
@@ -70,8 +72,8 @@ struct TopicListView: View {
                     isPeople ? "No people yet" : "No topics yet",
                     systemImage: isPeople ? "person.2" : "tag",
                     description: Text(isPeople
-                        ? "People you talk about appear here after your recordings are processed with Gemma 4."
-                        : "Topics appear here after your recordings are processed with Gemma 4."))
+                        ? "People you talk about appear here after your recordings are processed."
+                        : "Topics appear here after your recordings are processed."))
                     .listRowSeparator(.hidden)
             }
             ForEach(topics) { t in

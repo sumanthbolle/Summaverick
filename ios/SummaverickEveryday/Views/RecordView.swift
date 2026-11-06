@@ -1,18 +1,15 @@
 import SwiftUI
 
 struct RecordView: View {
-    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var recorder = AudioRecorder()
     @State private var permissionDenied = false
-    @State private var language: SpeechLanguage?   // resolved once; the lookup is expensive
 
     var body: some View {
         VStack(spacing: 28) {
             HStack {
                 Button("Cancel", role: .cancel) { cancel() }
                 Spacer()
-                Text(language?.name ?? "").font(.footnote).foregroundStyle(.secondary)
             }
             .padding(.horizontal)
 
@@ -53,14 +50,11 @@ struct RecordView: View {
         .alert("Microphone access needed", isPresented: $permissionDenied) {
             Button("Open Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }; dismiss() }
             Button("Cancel", role: .cancel) { dismiss() }
-        } message: { Text("Allow microphone and speech recognition for Summaverick in Settings.") }
+        } message: { Text("Allow the microphone for Summaverick in Settings.") }
     }
 
     private func begin() async {
-        language = settings.language
-        let mic = await recorder.requestPermission()
-        let speech = await SpeechTranscriber.requestAuthorization()
-        guard mic && speech else { permissionDenied = true; return }
+        guard await recorder.requestPermission() else { permissionDenied = true; return }
         recorder.start()
     }
 
@@ -71,9 +65,8 @@ struct RecordView: View {
 
     private func stopAndProcess() {
         guard let (url, duration) = recorder.stop() else { return }
-        let lang = language ?? settings.language
         dismiss()
-        Task { await ProcessingPipeline.shared.process(audio: url, duration: duration, language: lang) }
+        Task { await ProcessingPipeline.shared.process(audio: url, duration: duration) }
     }
 
     private func timeString(_ t: TimeInterval) -> String {

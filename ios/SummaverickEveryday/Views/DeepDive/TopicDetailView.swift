@@ -27,7 +27,7 @@ struct TopicDetailView: View {
         _name = State(initialValue: route.name)
     }
 
-    private var canSummarise: Bool { models.selected.hearsAudio && models.selectedInstalled }
+    private var canSummarise: Bool { models.isReady }
 
     var body: some View {
         List {
@@ -73,14 +73,8 @@ struct TopicDetailView: View {
     private var summarySection: some View {
         Section {
             if !canSummarise {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("Needs Gemma 4", systemImage: "sparkles").font(.headline)
-                    Text("Summaries, key terms and quizzes need the Gemma 4 model. Your recordings below still work.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    Button("Open Settings") { router.showSettings = true }
-                        .buttonStyle(.bordered).frame(minHeight: 44)
-                }
-                .padding(.vertical, 4)
+                AIGettingReadyPanel()
+                    .listRowInsets(EdgeInsets())
             } else if let s = summary {
                 VStack(alignment: .leading, spacing: 10) {
                     if loadingSummary {

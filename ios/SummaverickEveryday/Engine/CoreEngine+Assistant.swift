@@ -199,10 +199,12 @@ extension CoreEngine {
     func pieces(_ noteID: Int64) -> [TranscriptPiece] { list(TranscriptPiece.self, sve_note_pieces(ctx, noteID)) }
 
     /// Same as transcribeAudio, but keeps the start second of each ~28 s piece.
-    func transcribeAudioPieces(path: String, onProgress: @escaping (Int, Int) -> Void = { _, _ in }) throws -> [TranscriptPiece] {
+    /// `shouldStop` is asked at every progress step; true cancels the run (it then throws).
+    func transcribeAudioPieces(path: String, shouldStop: @escaping () -> Bool = { false },
+                               onProgress: @escaping (Int, Int) -> Void = { _, _ in }) throws -> [TranscriptPiece] {
         guard let ctx else { throw CoreError.initFailed }
         guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
-        let box = progressBox { _, d, t in onProgress(d, t) }
+        let box = ProgressBox(onProgress: { _, d, t in onProgress(d, t) }, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let json = take(sve_transcribe_audio_pieces(ctx, path, CoreEngine.progressTrampoline, user)),
               let pieces = decode([TranscriptPiece].self, json) else {

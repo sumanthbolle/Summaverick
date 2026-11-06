@@ -59,7 +59,6 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         NSMicrophoneUsageDescription: "Summaverick records lectures, meetings and notes only when you press Record. Audio never leaves this device."
-        NSSpeechRecognitionUsageDescription: "Speech is converted to text on this device using Apple's on-device recogniser. Nothing is sent to a server."
         NSFaceIDUsageDescription: "Unlock your notes."
         UIBackgroundModes: [audio]
         ITSAppUsesNonExemptEncryption: false
@@ -68,7 +67,6 @@ targets:
       - framework: Frameworks/llama.xcframework
         embed: true
       - sdk: libsqlite3.tbd
-      - sdk: Speech.framework
       - sdk: AVFoundation.framework
       - sdk: LocalAuthentication.framework
       - sdk: Metal.framework

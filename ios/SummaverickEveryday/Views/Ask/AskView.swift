@@ -44,12 +44,13 @@ private struct AnswerFormRequest: Identifiable {
 
 /// A short message above the question box.
 private enum AskNotice: Equatable {
-    case busy, needsModel, micReady, holdLonger, notHeard, transcribeFailed, micFailed
+    case busy, needsModel, tooWarm, micReady, holdLonger, notHeard, transcribeFailed, micFailed
 
     var text: LocalizedStringKey {
         switch self {
         case .busy: return "Busy with a recording — try again in a moment."
-        case .needsModel: return "Download the AI model in Settings first."
+        case .needsModel: return "Summaverick is still getting ready"
+        case .tooWarm: return "The phone is too warm. Try again when it has cooled down."
         case .micReady: return "The microphone is ready. Hold the mic button and speak."
         case .holdLonger: return "Hold the mic button while you speak."
         case .notHeard: return "I couldn't hear a question. Please try again."
@@ -93,10 +94,10 @@ struct AskView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if models.selected.hearsAudio {
+                if models.isReady {
                     chat
                 } else {
-                    needsGemma
+                    ScrollView { AIGettingReadyPanel().padding(16) }
                 }
             }
             .navigationTitle("Ask Summaverick")
@@ -148,32 +149,10 @@ struct AskView: View {
         }
     }
 
-    // MARK: needs Gemma 4
-
-    private var needsGemma: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Needs Gemma 4", systemImage: "waveform.badge.exclamationmark").font(.title3.bold())
-                Text("Ask Summaverick needs the Gemma 4 model. Your notes and recording still work.")
-                    .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button { router.showSettings = true } label: {
-                    Text("Open Settings").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding(16)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-            .padding(16)
-        }
-    }
-
     // MARK: chat
 
     private var chat: some View {
         VStack(spacing: 0) {
-            if !models.selectedInstalled && !pipeline.isBusy {
-                ModelNudge { router.showSettings = true }
-            }
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -452,7 +431,8 @@ struct AskView: View {
         guard !q.isEmpty, !generating, !listening, !transcribing else { return }
         // A recording is being processed: the core is busy with it, so do not queue a question behind it.
         if pipeline.isBusy { notice = .busy; return }
-        guard models.selectedInstalled else { notice = .needsModel; return }
+        guard models.isReady else { notice = .needsModel; return }
+        if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
         notice = nil
         if fromField { text = "" }
         let turn = AskTurn(question: q, state: .waiting)
@@ -463,7 +443,8 @@ struct AskView: View {
     private func retry(_ turn: AskTurn) {
         guard !generating else { return }
         if pipeline.isBusy { notice = .busy; return }
-        guard models.selectedInstalled else { notice = .needsModel; return }
+        guard models.isReady else { notice = .needsModel; return }
+        if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
         notice = nil
         update(turn.id, .waiting)
         ask(turn.id, turn.question)
@@ -490,9 +471,7 @@ struct AskView: View {
     }
 
     private func loadSelectedModel() async throws {
-        let spec = models.selected
-        try await CoreEngine.shared.loadModel(at: models.fileURL(for: spec).path, contextTokens: spec.contextTokens,
-                                              mmprojPath: models.mmprojURL(for: spec)?.path)
+        try await models.loadIntoCore()
     }
 
     private func loadProfile() async {
@@ -504,7 +483,8 @@ struct AskView: View {
     private func beginVoice() {
         guard !listening, !transcribing, !generating else { return }
         if pipeline.isBusy { notice = .busy; return }
-        guard models.selectedInstalled else { notice = .needsModel; return }
+        guard models.isReady else { notice = .needsModel; return }
+        if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
         switch AVAudioApplication.shared.recordPermission {
         case .granted:
             recorder.start(in: AudioRecorder.askVoiceDirectory)

@@ -1,6 +1,8 @@
 // Recording → transcript → title → three outputs. Everything after recording is local.
-// If iOS suspends the app mid-way, the note keeps whatever was finished; the user can tap
-// "Generate notes" on the note to resume. Same stages the device firmware will run.
+// If iOS suspends the app mid-way, or the phone gets too hot, the note keeps whatever was finished and
+// is resumed automatically later; the user can also tap "Generate notes". Recordings made before the AI
+// has downloaded wait and are processed, one at a time, once it is ready. Same stages the device
+// firmware will run.
 import Foundation
 import Observation
 import UIKit
@@ -18,6 +20,8 @@ final class ProcessingPipeline {
         case generating(OutputKind, String, Int, Int)   // kind, phase, done, total
         case done
         case failed(String)
+        /// Stopped for now (the phone is too hot); resumes by itself.
+        case paused(String)
 
         var label: String {
             switch self {
@@ -29,11 +33,12 @@ final class ProcessingPipeline {
                 return phase == "chunk" && t > 1 ? String(localized: "Reading part \(d + 1) of \(t) for \(k.title.lowercased())…") : String(localized: "Writing \(k.title.lowercased())…")
             case .done: return String(localized: "Done")
             case .failed(let e): return String(localized: "Failed: \(e)")
+            case .paused(let m): return m
             }
         }
         /// True while the model is working (not idle, done or failed).
         var isWorking: Bool {
-            switch self { case .idle, .done, .failed: return false; default: return true }
+            switch self { case .idle, .done, .failed, .paused: return false; default: return true }
         }
     }
 
@@ -50,44 +55,84 @@ final class ProcessingPipeline {
             }
         }
     }
-    /// Notes whose processing was cut off by the app going to the background; resumed on return.
+    /// Notes whose processing was cut off (app in the background, phone too hot) or that waited for
+    /// the AI to download; resumed one at a time while the app is active.
     private(set) var interrupted: Set<Int64> = []
     private var wentToBackground = false
     @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
+    @ObservationIgnored private var thermalObserver: NSObjectProtocol?
+    @ObservationIgnored private var resuming = false
+    /// Set by the app from its scene phase: model work only starts while the app is in front.
+    @ObservationIgnored var appIsActive = false
+    /// Notes the "AI is ready" pass already ran once, so a silent recording is not re-run every launch.
+    @ObservationIgnored private var autoTried: Set<Int64> = Set((UserDefaults.standard.array(forKey: "pipeline.autoTried") as? [Int64]) ?? [])
     private(set) var activeNoteID: Int64?
     /// Last failure message per note, so the note screen can show why nothing was generated.
     private(set) var lastFailure: [Int64: String] = [:]
-    var isBusy: Bool {
-        switch stage { case .idle, .done, .failed: return false; default: return true }
+    var isBusy: Bool { stage.isWorking }
+
+    private var bgTask: UIBackgroundTaskIdentifier = .invalid
+
+    static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
+    static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
+    private static var tooHot: Bool { Heat.isTooHot(ProcessInfo.processInfo.thermalState) }
+
+    private init() {
+        // Cooled down: carry on with the notes that were paused for heat.
+        thermalObserver = NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !Self.tooHot, self.appIsActive else { return }
+                Task { await self.resumeInterrupted() }
+            }
+        }
     }
 
-    private let transcriber = SpeechTranscriber()
-    private var bgTask: UIBackgroundTaskIdentifier = .invalid
+    /// Stops before a model run when the phone is too hot; the note resumes when it has cooled down.
+    private func pausedForHeat(_ id: Int64) -> Bool {
+        guard Self.tooHot else { return false }
+        NSLog("[sve] pausing note %lld: thermal state %ld", id, ProcessInfo.processInfo.thermalState.rawValue)
+        interrupted.insert(id)
+        lastFailure[id] = Self.heatMessage
+        stage = .paused(Self.heatMessage)
+        return true
+    }
+
+    private func markAutoTried(_ id: Int64) {
+        guard autoTried.insert(id).inserted else { return }
+        UserDefaults.standard.set(autoTried.sorted(), forKey: "pipeline.autoTried")
+    }
 
     /// Full run for a fresh recording. Returns the note id as soon as it exists.
     @discardableResult
-    func process(audio: URL, duration: Int64, language: SpeechLanguage) async -> Int64? {
-        guard !isBusy else { return nil }
-        beginBackground()
-        defer { endBackground() }
-
+    func process(audio: URL, duration: Int64) async -> Int64? {
         let engine = CoreEngine.shared
         let title = "Recording " + Self.titleFormatter.string(from: Date())
-        let noteLang = notesLang(fallback: language.shortCode)
+        let noteLang = AppSettings.shared.notesLanguage
+        // The recording is always kept, even when the AI cannot run yet.
         let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
         guard id > 0 else { stage = .failed(String(localized: "Could not save the note.")); return nil }
-        activeNoteID = id
         NotificationCenter.default.post(name: .notesChanged, object: nil)
 
-        // 1. transcript
+        // Not downloaded yet: the note waits and is processed when the AI is ready (processWaitingNotes).
+        guard ModelManager.shared.isReady else { return id }
+        // Another note is being written: queue this one behind it.
+        guard !isBusy else { interrupted.insert(id); return id }
+        beginBackground()
+        defer { endBackground() }
+        activeNoteID = id
         lastFailure[id] = nil
+        defer { if !interrupted.contains(id) { markAutoTried(id) } }
+        if pausedForHeat(id) { return id }
+
+        // 1. transcript
         stage = .transcribing(0)
         let pieces: [TranscriptPiece]
         do {
-            pieces = try await transcribe(audio, language: language)
+            pieces = try await transcribe(audio, noteID: id)
         } catch {
             NSLog("[sve] transcription failed: %@", String(describing: error))
-            stage = .failed(error.localizedDescription)
+            if !pausedForHeat(id) { stage = .failed(error.localizedDescription) }
             return id
         }
         let transcript = Self.joined(pieces)
@@ -107,10 +152,12 @@ final class ProcessingPipeline {
     /// Re-runs the AI stage for an existing note (resume after interruption, or after a model change).
     func regenerate(noteID: Int64) async {
         guard !isBusy, let note = await CoreEngine.shared.note(noteID) else { return }
+        guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
         beginBackground()
         defer { endBackground() }
         activeNoteID = noteID
         lastFailure[noteID] = nil
+        if pausedForHeat(noteID) { return }
 
         // No transcript yet (earlier transcription failed): redo it from the audio if we still have it.
         var t = note.transcript ?? ""
@@ -118,15 +165,15 @@ final class ProcessingPipeline {
             guard let path = AudioRecorder.existingAudioPath(note.audio_path) else {
                 stage = .failed(String(localized: "No transcript and the audio is no longer available.")); return
             }
-            let lang = SpeechTranscriber.onDeviceLanguages().first { $0.shortCode == note.lang } ?? AppSettings.shared.language
             stage = .transcribing(0)
             var pieces: [TranscriptPiece] = []
             do {
-                pieces = try await transcribe(URL(fileURLWithPath: path), language: lang)
+                pieces = try await transcribe(URL(fileURLWithPath: path), noteID: noteID)
                 t = Self.joined(pieces)
             } catch {
                 NSLog("[sve] transcription failed: %@", String(describing: error))
-                stage = .failed(error.localizedDescription); return
+                if !pausedForHeat(noteID) { stage = .failed(error.localizedDescription) }
+                return
             }
             if t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 stage = .failed(String(localized: "No speech was detected in the recording.")); return
@@ -135,23 +182,16 @@ final class ProcessingPipeline {
             await CoreEngine.shared.setTranscript(noteID, t)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
-        await generateOutputs(noteID: noteID, transcript: t, lang: notesLang(fallback: note.lang), setTitle: note.title.hasPrefix("Recording "))
+        await generateOutputs(noteID: noteID, transcript: t, lang: AppSettings.shared.notesLanguage, setTitle: note.title.hasPrefix("Recording "))
     }
 
-    /// Audio → text. An audio-capable model (Gemma 4) hears the recording itself, so any language mix works;
-    /// otherwise Apple's on-device recogniser is used for the chosen language.
-    private func transcribe(_ audio: URL, language: SpeechLanguage) async throws -> [TranscriptPiece] {
-        let mm = ModelManager.shared
-        let spec = mm.selected
-        if spec.hearsAudio && mm.isInstalled(spec) {
-            try await loadSelectedModel()
-            stage = .transcribing(0)
-            return try await CoreEngine.shared.transcribeAudioPieces(path: audio.path) { done, total in
-                Task { @MainActor in self.stage = .transcribing(total > 0 ? Double(done) / Double(total) : 0) }
-            }
-        }
-        return try await transcriber.transcribe(fileURL: audio, locale: language.locale) { p in
-            Task { @MainActor in self.stage = .transcribing(p) }
+    /// Audio → text. The model hears the recording itself, so any language mix works. Stops (the
+    /// progress callback cancels) as soon as the phone gets too hot; the caller treats that as a pause.
+    private func transcribe(_ audio: URL, noteID: Int64) async throws -> [TranscriptPiece] {
+        try await loadSelectedModel()
+        stage = .transcribing(0)
+        return try await CoreEngine.shared.transcribeAudioPieces(path: audio.path, shouldStop: { Self.tooHot }) { done, total in
+            Task { @MainActor in self.stage = .transcribing(total > 0 ? Double(done) / Double(total) : 0) }
         }
     }
 
@@ -159,27 +199,19 @@ final class ProcessingPipeline {
         pieces.map(\.text).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Notes are written in the Notes language when the model hears audio; otherwise in the recording's language.
-    private func notesLang(fallback: String) -> String {
-        let mm = ModelManager.shared
-        return mm.selected.hearsAudio && mm.isInstalled(mm.selected) ? AppSettings.shared.notesLanguage : fallback
-    }
-
     private func loadSelectedModel() async throws {
-        let mm = ModelManager.shared
-        let spec = mm.selected
         stage = .loadingModel
-        try await CoreEngine.shared.loadModel(at: mm.fileURL(for: spec).path, contextTokens: spec.contextTokens,
-                                              mmprojPath: mm.mmprojURL(for: spec)?.path)
+        try await ModelManager.shared.loadIntoCore()
     }
 
     private func generateOutputs(noteID id: Int64, transcript: String, lang: String, setTitle: Bool) async {
         let engine = CoreEngine.shared
-        let mm = ModelManager.shared
-        guard mm.selectedInstalled else {
-            stage = .failed(String(localized: "Download the AI model in Settings, then tap Generate notes."))
+        guard ModelManager.shared.isReady else {
+            lastFailure[id] = Self.waitingMessage
+            stage = .idle
             return
         }
+        if pausedForHeat(id) { return }
         do {
             try await loadSelectedModel()
         } catch {
@@ -189,8 +221,7 @@ final class ProcessingPipeline {
 
         // Reminders, tasks and profile changes first, so they are ready even if note writing is interrupted.
         // A failure here never fails the notes.
-        let assistant = mm.selected.hearsAudio
-        if assistant {
+        do {
             if await engine.pieces(id).isEmpty {   // note from before pieces existed
                 let dur = await engine.note(id)?.duration_seconds ?? 0
                 await engine.setPieces(id, PiecesBackfill.pieces(transcript: transcript, durationSeconds: dur))
@@ -204,6 +235,7 @@ final class ProcessingPipeline {
             }
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
         }
+        if pausedForHeat(id) { return }
 
         if setTitle, let t = await engine.suggestTitle(transcript: transcript, lang: lang) {
             await engine.setTitle(id, t)
@@ -211,6 +243,7 @@ final class ProcessingPipeline {
         }
 
         for kind in OutputKind.allCases {
+            if pausedForHeat(id) { return }
             stage = .generating(kind, "final", 0, 1)
             do {
                 let text = try await engine.generate(transcript: transcript, kind: kind, lang: lang) { phase, done, total in
@@ -223,25 +256,22 @@ final class ProcessingPipeline {
                 return
             }
         }
-        if assistant {
-            _ = await engine.generateInsight(noteID: id)
-            NotificationCenter.default.post(name: .assistantChanged, object: nil)
-        }
+        _ = await engine.generateInsight(noteID: id)
+        NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
     }
 
     /// "Find reminders and tasks" on a note that was never extracted (an older recording): extraction
-    /// only, with the same busy guard as a recording. Needs an audio-capable model (Gemma 4).
+    /// only, with the same busy guard as a recording.
     func findReminders(noteID: Int64) async {
         guard !isBusy else { return }
-        let mm = ModelManager.shared
-        guard mm.selected.hearsAudio else { return }
+        guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
         beginBackground()
         defer { endBackground() }
         activeNoteID = noteID
         lastFailure[noteID] = nil
-        guard mm.selectedInstalled else {
-            stage = .failed(String(localized: "Download the AI model in Settings first.")); return
+        if Self.tooHot {
+            stage = .failed(String(localized: "The phone is too warm. Try again when it has cooled down.")); return
         }
         let engine = CoreEngine.shared
         guard let note = await engine.note(noteID), let t = note.transcript,
@@ -285,15 +315,43 @@ final class ProcessingPipeline {
     private func endBackground() {
         UIApplication.shared.isIdleTimerDisabled = false
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
+        // A recording queued behind this run (or a paused note) goes next.
+        if !interrupted.isEmpty && !resuming { Task { await self.resumeInterrupted() } }
     }
 
-    /// Re-runs notes that were cut off while the app was in the background, one at a time.
-    /// Called when the app becomes active again.
+    /// Re-runs cut-off and waiting notes, oldest first, one at a time, while the app is active, the
+    /// AI is ready and the phone is not too hot. Each note is tried once per pass, so a note that is
+    /// paused again (heat, background) waits for the next pass instead of looping.
     func resumeInterrupted() async {
-        while !isBusy, let id = interrupted.sorted().first {
+        guard !resuming else { return }
+        resuming = true
+        defer { resuming = false }
+        var tried: Set<Int64> = []
+        while !isBusy, appIsActive, ModelManager.shared.isReady, !Self.tooHot,
+              let id = interrupted.sorted().first(where: { !tried.contains($0) }) {
+            tried.insert(id)
             interrupted.remove(id)
             await regenerate(noteID: id)
+            if !interrupted.contains(id) { markAutoTried(id) }
         }
+    }
+
+    /// Once the AI is ready: every note with audio and no transcript (recorded while it downloaded)
+    /// is queued and processed one at a time.
+    func processWaitingNotes() async {
+        guard ModelManager.shared.isReady else { return }
+        let engine = CoreEngine.shared
+        var candidates: [WaitingNotes.Candidate] = []
+        for n in await engine.notes(limit: 10_000) where n.has_audio && !autoTried.contains(n.id) {
+            guard let note = await engine.note(n.id) else { continue }
+            candidates.append(.init(id: n.id,
+                                    hasAudio: AudioRecorder.existingAudioPath(note.audio_path) != nil,
+                                    hasTranscript: !(note.transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+        }
+        let ids = WaitingNotes.toProcess(candidates, alreadyTried: autoTried)
+        if !ids.isEmpty { NSLog("[sve] %ld notes waiting for the AI", ids.count) }
+        interrupted.formUnion(ids)
+        await resumeInterrupted()
     }
 
     private static let titleFormatter: DateFormatter = {

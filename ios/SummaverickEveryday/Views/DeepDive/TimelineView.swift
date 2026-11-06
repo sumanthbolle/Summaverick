@@ -77,8 +77,11 @@ struct StatusBanner: View {
     let stage: ProcessingPipeline.Stage
     var body: some View {
         HStack(spacing: 10) {
-            if case .failed = stage { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
-            else { ProgressView().controlSize(.small) }
+            switch stage {
+            case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            case .paused: Image(systemName: "thermometer.medium").foregroundStyle(.orange)
+            default: ProgressView().controlSize(.small)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(stage.label).font(.footnote).lineLimit(2)
                 if stage.isWorking {
@@ -90,22 +93,5 @@ struct StatusBanner: View {
         }
         .padding(.horizontal).padding(.vertical, 8)
         .background(Color(.secondarySystemBackground))
-    }
-}
-
-struct ModelNudge: View {
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: "arrow.down.circle.fill")
-                Text("Download the AI model once (about 640 MB) to get summaries and notes.").font(.footnote)
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption)
-            }
-            .padding(.horizontal).padding(.vertical, 8)
-            .background(Color.accentColor.opacity(0.12))
-        }
-        .buttonStyle(.plain)
     }
 }
