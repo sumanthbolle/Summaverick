@@ -37,6 +37,13 @@ for dirpath, _, files in os.walk(SWIFT_DIR):
             swift_files.append(os.path.join(dirpath, f).replace("\\", "/"))
 swift_files.sort()
 
+xcstrings_files = []
+for dirpath, _, files in os.walk(SWIFT_DIR):
+    for f in files:
+        if f.endswith(".xcstrings"):
+            xcstrings_files.append(os.path.join(dirpath, f).replace("\\", "/"))
+xcstrings_files.sort()
+
 core_files = sorted(
     os.path.join(CORE_SRC, f) for f in os.listdir(CORE_SRC) if f.endswith((".cpp", ".h"))
 )
@@ -85,6 +92,8 @@ bridging_ref = file_ref(bridging, "sourcecode.c.h", name="Bridging.h")
 plist_ref = file_ref(info_plist, "text.plist.xml", name="Info.plist")
 assets_ref = file_ref(assets, "folder.assetcatalog", name="Assets.xcassets")
 assets_build = build_file(assets_ref, "resources")
+xcstrings_refs = [file_ref(p, "text.json.xcstrings", name=os.path.basename(p)) for p in xcstrings_files]
+xcstrings_builds = [build_file(r, "resources") for r in xcstrings_refs]
 xcf_ref = file_ref(XCFRAMEWORK, "wrapper.xcframework", name="llama.xcframework")
 product_ref = uid("ref:product")
 objects[product_ref] = ("PBXFileReference", {
@@ -118,7 +127,7 @@ for d in sorted(by_dir):
         swift_children.extend(by_dir[d])
     else:
         swift_children.append(group("swift/" + d, d, by_dir[d]))
-swift_children += [bridging_ref, plist_ref, assets_ref]
+swift_children += [bridging_ref, plist_ref, assets_ref] + xcstrings_refs
 
 app_group = group("app", APP, swift_children)
 core_group = group("core", "Core", core_refs)
@@ -137,7 +146,7 @@ objects[frameworks_phase] = ("PBXFrameworksBuildPhase", {
     "runOnlyForDeploymentPostprocessing": "0"})
 resources_phase = uid("phase:resources")
 objects[resources_phase] = ("PBXResourcesBuildPhase", {
-    "isa": "PBXResourcesBuildPhase", "buildActionMask": "2147483647", "files": [assets_build],
+    "isa": "PBXResourcesBuildPhase", "buildActionMask": "2147483647", "files": [assets_build] + xcstrings_builds,
     "runOnlyForDeploymentPostprocessing": "0"})
 embed_phase = uid("phase:embed")
 objects[embed_phase] = ("PBXCopyFilesBuildPhase", {
@@ -182,7 +191,7 @@ target_settings = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
     "CODE_SIGN_STYLE": "Automatic",
-    "DEVELOPMENT_TEAM": "",
+    "DEVELOPMENT_TEAM": "3JVSNB8RYM",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": info_plist,
     "CODE_SIGN_ENTITLEMENTS": f"{SWIFT_DIR}/SummaverickEveryday.entitlements",
