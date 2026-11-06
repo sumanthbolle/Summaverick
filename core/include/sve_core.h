@@ -134,6 +134,10 @@ char *sve_note_pieces(sve_ctx *ctx, int64_t note_id);
  * topics and people directly. Returns the number of suggestions added (0 if the model output was unusable),
  * negative on error or cancel. Pending suggestions from an earlier run on the same note become "superseded". */
 int   sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user);
+/* 1 when extraction has run on the note (a run with usable output sets the settings key
+ * "extracted.<id>"; a note with suggestions or topic links from before that key also counts), 0 when
+ * never, -1 on error. The key goes with the note and with sve_assistant_wipe. */
+int   sve_note_extracted(sve_ctx *ctx, int64_t note_id);
 
 /* Suggestions with status ("pending", "accepted", "rejected"; NULL/"" = all):
  * [{"id","kind":"reminder|task|profile|vocab|fact","status","payload":{…},"quote","note_id","start_sec",
@@ -214,7 +218,7 @@ int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
 
 /* Deletes everything the assistant stored, in one transaction: the profile, medicines, memory (vocabulary,
  * preferences, facts), reminders, tasks, topics and their note links, suggestions, decisions, insights,
- * transcript pieces, and the settings keys the assistant created ("profile", "insight.last_date").
+ * transcript pieces, and the settings keys the assistant created ("profile", "insight.last_date", "extracted.<id>").
  * Notes and other settings are kept; the host deletes notes and cancels scheduled notifications.
  * Returns 0, or -1 on error (nothing deleted). */
 int   sve_assistant_wipe(sve_ctx *ctx);

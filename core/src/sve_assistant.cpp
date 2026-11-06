@@ -500,9 +500,14 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
                 if (tid > 0) st.link_topic(note_id, tid);
             }
         }
+        st.mark_extracted(note_id);  // the note's "Find reminders and tasks" button is no longer offered
         if (cb) cb("final", total, total, user);
         return added;
     });
+}
+
+int sve_note_extracted(sve_ctx *ctx, int64_t note_id) {
+    return guard("sve_note_extracted", -1, [&] { return ctx ? (ctx->store->was_extracted(note_id) ? 1 : 0) : -1; });
 }
 
 // ---------------------------------------------------------------- suggestions

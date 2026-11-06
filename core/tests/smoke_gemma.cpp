@@ -621,6 +621,16 @@ static void run_api_final(sve_ctx *ctx) {
                                              {"medicine", {{"name", "Shelcal"}, {"dose", "500 mg"}, {"when_text", "after lunch"}}}}}});
     expect(sve_suggestion_accept(ctx, nt, nullptr) == -1 && med_named(ctx, "Shelcal").is_null(),
            "empty-times Yes: -1 and no medicine created");
+    // I-6: per-note extracted flag.
+    int64_t old_note = make_note(ctx, json::parse(R"([{"start_sec":0,"text":"Call the bank on Monday."}])"), "Old note");
+    expect(sve_note_extracted(ctx, old_note) == 0 && sve_note_extracted(nullptr, old_note) == -1,
+           "sve_note_extracted: never extracted -> 0, NULL ctx -> -1");
+    ctx->store->mark_extracted(old_note);
+    expect(sve_note_extracted(ctx, old_note) == 1, "sve_note_extracted after a run -> 1");
+    sve_note_delete(ctx, old_note);
+    char *flag = sve_setting_get(ctx, ("extracted." + std::to_string(old_note)).c_str());
+    expect(flag == nullptr, "deleting the note deletes its extracted flag");
+    sve_free_string(flag);
     int64_t same = sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"dose":"200 mg"})").c_str());
     expect(same == u && card(u).is_object(), "unchanged save: still saved, card proposed");
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);

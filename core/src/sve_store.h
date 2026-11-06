@@ -95,6 +95,12 @@ public:
     json latest_insight();
     bool dismiss_insight(int64_t id);
 
+    // Per-note "extraction ran" flag: settings key "extracted.<id>", deleted with the note (trigger)
+    // and by wipe_assistant. was_extracted is also true for a note that already has suggestions or
+    // topic links (extracted before the flag existed).
+    bool mark_extracted(int64_t note_id);
+    bool was_extracted(int64_t note_id);
+
     // Deletes everything the assistant stored, in one transaction: profile and other assistant settings,
     // medicines, memory, reminders, tasks, topics and links, suggestions, decisions, insights, transcript
     // pieces. Notes and other settings are kept (the host deletes notes). Not nested in begin().

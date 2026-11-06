@@ -317,3 +317,28 @@ TEST(wipe_clears_everything) {
     CHECK(s.wipe_assistant());
     CHECK(s.medicines().empty());
 }
+
+TEST(extracted_flag_per_note) {
+    Store s(":memory:");
+    int64_t a = mk(s, "Old note"), b = mk(s, "Other"), c = mk(s, "With cards");
+    CHECK(!s.was_extracted(a) && !s.was_extracted(b));
+    CHECK(s.mark_extracted(a));
+    CHECK(s.was_extracted(a) && !s.was_extracted(b));
+    // A note extracted before the flag existed: its suggestions count.
+    s.add_suggestion(json::parse(R"({"kind":"task","payload":{"text":"Buy milk"},"note_id":)" + std::to_string(c) + "}"));
+    CHECK(s.was_extracted(c));
+}
+
+TEST(extracted_flag_goes_with_note_and_wipe) {
+    Store s(":memory:");
+    int64_t a = mk(s, "A"), b = mk(s, "B");
+    s.mark_extracted(a);
+    s.mark_extracted(b);
+    CHECK(s.remove(a));
+    CHECK(!s.setting_get("extracted." + std::to_string(a)).has_value());
+    CHECK(s.was_extracted(b));
+    s.setting_set("lang", "te");
+    CHECK(s.wipe_assistant());
+    CHECK(!s.was_extracted(b));
+    CHECK(s.setting_get("lang").has_value());  // host settings stay
+}

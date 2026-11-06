@@ -647,3 +647,25 @@ TEST(twice_daily_with_two_times_is_ok) {
     CHECK_EQ(v[0]["payload"]["times"], json::array({"08:00", "20:00"}));
     CHECK(!has(v[0]["check_fields"], "times"));
 }
+
+// Backfilled old notes: pieces of at most 1,500 characters (Unicode scalars, see the iOS backfill).
+// Even counted as one token per byte (3 per Telugu letter, far above Gemma's real rate) such a piece
+// is about the largest extraction window (4,500 tokens). sve_extract windows by whole pieces: each
+// lands whole in a window, none is cut, none is lost.
+TEST(backfill_pieces_fit_extraction_windows) {
+    json p = json::array();
+    std::string te;
+    for (int i = 0; i < 1490; ++i) te += "\xE0\xB0\x95";  // 1,490 Telugu letters
+    for (int i = 0; i < 6; ++i) p.push_back({{"start_sec", i * 60}, {"text", te}});
+    auto count = [](const std::string &s) { return (int)s.size(); };  // bytes >= tokens
+    auto w = group_windows(p, 4500, count);
+    CHECK_EQ(w.size(), (size_t)6);
+    size_t n = 0;
+    for (const auto &win : w) {
+        int used = 0;
+        for (const auto &x : win) used += count("[t=" + std::to_string(x["start_sec"].get<int>()) + "] " + x["text"].get<std::string>() + "\n");
+        CHECK(used <= 4500);
+        n += win.size();
+    }
+    CHECK_EQ(n, (size_t)6);
+}

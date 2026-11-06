@@ -84,6 +84,9 @@ CREATE TRIGGER IF NOT EXISTS notes_bd_assist BEFORE DELETE ON notes BEGIN
   UPDATE reminders SET from_deleted=1 WHERE note_id=old.id;
   UPDATE tasks SET from_deleted=1 WHERE note_id=old.id;
 END;
+CREATE TRIGGER IF NOT EXISTS notes_ad_extracted AFTER DELETE ON notes BEGIN
+  DELETE FROM settings WHERE key='extracted.' || old.id;
+END;
 CREATE TABLE IF NOT EXISTS topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('topic','person')),
     name TEXT NOT NULL, summary TEXT, summary_stale INTEGER NOT NULL DEFAULT 1, UNIQUE(kind, name)
@@ -625,6 +628,16 @@ bool Store::dismiss_insight(int64_t id) {
     return run("UPDATE insights SET dismissed=1 WHERE id=?", {id}) && sqlite3_changes(db_) > 0;
 }
 
+bool Store::mark_extracted(int64_t note_id) {
+    return setting_set("extracted." + std::to_string(note_id), "1");
+}
+
+bool Store::was_extracted(int64_t note_id) {
+    if (setting_get("extracted." + std::to_string(note_id))) return true;
+    return !query_rows("SELECT 1 FROM suggestions WHERE note_id=? UNION ALL SELECT 1 FROM note_topics WHERE note_id=? LIMIT 1",
+                       {note_id, note_id}).empty();
+}
+
 // Settings keys the assistant writes (sve_assistant.cpp). Other keys (host and device settings) stay.
 static const char *kAssistantSettings[] = {"profile", "insight.last_date"};
 
@@ -636,6 +649,7 @@ bool Store::wipe_assistant() {
     bool ok = true;
     for (const char *t : kTables) ok = ok && run((std::string("DELETE FROM ") + t).c_str(), {});
     for (const char *k : kAssistantSettings) ok = ok && run("DELETE FROM settings WHERE key=?", {k});
+    ok = ok && run("DELETE FROM settings WHERE key LIKE 'extracted.%'", {});
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
 }
