@@ -24,6 +24,20 @@ final class AudioRecorder {
         return dir
     }
 
+    /// Where a stored recording actually is now. Notes keep an absolute path, but iOS gives the app a
+    /// new container folder when it is reinstalled or updated, so an old path can point nowhere while
+    /// the file is still in our recordings folder. Returns nil only when the file is really gone.
+    nonisolated static func existingAudioPath(_ stored: String?) -> String? {
+        guard let stored, !stored.isEmpty else { return nil }
+        if FileManager.default.fileExists(atPath: stored) { return stored }
+        let name = (stored as NSString).lastPathComponent
+        guard !name.isEmpty else { return nil }
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Summaverick/recordings", isDirectory: true)
+        let here = dir.appendingPathComponent(name).path
+        return FileManager.default.fileExists(atPath: here) ? here : nil
+    }
+
     /// Ask's voice questions: short-lived WAVs, deleted after transcription and swept at launch.
     static var askVoiceDirectory: URL {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ask-voice", isDirectory: true)

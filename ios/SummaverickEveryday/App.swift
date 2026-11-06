@@ -82,7 +82,7 @@ enum Retention {
         guard maxAgeDays > 0 else { return }
         let engine = CoreEngine.shared
         for row in await engine.audioOlderThan(days: Int32(maxAgeDays)) {
-            try? FileManager.default.removeItem(atPath: row.audio_path)
+            if let p = AudioRecorder.existingAudioPath(row.audio_path) { try? FileManager.default.removeItem(atPath: p) }
             await engine.clearAudio(row.id)
         }
     }

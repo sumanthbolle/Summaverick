@@ -115,7 +115,7 @@ final class ProcessingPipeline {
         // No transcript yet (earlier transcription failed): redo it from the audio if we still have it.
         var t = note.transcript ?? ""
         if t.isEmpty {
-            guard let path = note.audio_path, FileManager.default.fileExists(atPath: path) else {
+            guard let path = AudioRecorder.existingAudioPath(note.audio_path) else {
                 stage = .failed(String(localized: "No transcript and the audio is no longer available.")); return
             }
             let lang = SpeechTranscriber.onDeviceLanguages().first { $0.shortCode == note.lang } ?? AppSettings.shared.language
