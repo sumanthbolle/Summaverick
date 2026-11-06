@@ -57,7 +57,8 @@ bool dose_missing_unit(const std::string &dose);
 // Reminder and profile-medicine text is built in code from the checked medicine fields (never the
 // model's words); other text that mentions a medicine gets "text" in check_fields. Dates naming a
 // weekday must be its nearest upcoming occurrence from today_ymd unless the quote says "next"/"వచ్చే".
-// Medicine reminders and profile medicines without a time from the routine get "times".
+// Medicine reminders and profile medicines without a time from the routine get "times"; those whose
+// dose differs from the saved medicine of that name (saved_medicines) get "dose".
 std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int64_t note_id,
                                     const json &routine, const std::string &today_ymd = "",
                                     const std::string &lang = "en",
@@ -67,7 +68,8 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
 // True when the quote says something a date can come from: a date, a weekday, today/tomorrow/tonight,
 // "<number> day(s)/week(s)/month(s)", or the Telugu equivalents (ఈరోజు, రేపు, రోజు, వారం, నెల, ...).
 bool quote_supports_date(const std::string &quote);
-// True when the quote contains the hour of "HH:MM" ("9 pm", "21:00", "9:30", "తొమ్మిది").
+// True when the quote contains the hour of "HH:MM" ("9 pm", "21:00", "9:30", "9:30 pm", "తొమ్మిది"); a
+// stated am/pm, also after the minutes, must match.
 bool quote_has_hour(const std::string &quote, const std::string &hhmm);
 
 // "Take Amlodipine 5 mg" / "Amlodipine 5 mg వేసుకోండి".

@@ -579,3 +579,37 @@ TEST(routine_hour_respects_am_pm) {
     CHECK(quote_has_hour("lunch at 12 pm", "12:00"));
     CHECK(quote_has_hour("dinner at 9", "21:00"));  // no am/pm: hour only
 }
+
+TEST(am_pm_after_minutes_is_read) {
+    CHECK(!quote_has_hour("dinner at 9:30 am", "21:30"));
+    CHECK(quote_has_hour("dinner at 9:30 pm", "21:30"));
+    CHECK(quote_has_hour("dinner at 21:30", "21:30"));
+    CHECK(quote_has_hour("dinner at 9:30", "21:30"));  // no am/pm: hour only
+    CHECK(quote_has_hour("walk at 9:30 am", "09:30"));
+    CHECK(!quote_has_hour("walk at 9:30 p.m.", "09:30"));
+    CHECK(!quote_has_hour("dinner at 9:05", "17:00"));  // the minutes are never read as an hour
+    // the routine check in build_suggestions sees the same thing
+    Extracted e = ex(R"({"profile":[{"change":"routine","detail":"Dinner","quote":"dinner at 9:30 am","start_sec":0,"routine":{"dinner":"21:30"}}]})");
+    CHECK(has(build_suggestions(e, kPieces, 7, kRoutine)[0]["check_fields"], "routine"));
+}
+
+TEST(profile_card_dose_differing_from_saved_is_check) {
+    json saved = json::parse(R"([{"id":1,"name":"Amlodipine","dose":"2.5 mg"}])");
+    Extracted e = ex(R"({"profile":[
+        {"change":"add_medicine","detail":"","quote":"Take Amlodipine 5 mg once a day after dinner.","start_sec":28,
+         "medicine":{"name":"Amlodipine","dose":"5 mg","when_text":"after dinner"}},
+        {"change":"update_medicine","detail":"","quote":"Take Amlodipine 5 mg once a day after dinner.","start_sec":28,
+         "medicine":{"name":"amlodipine","dose":"5 mg","when_text":"after dinner"}},
+        {"change":"stop_medicine","detail":"","quote":"Take Amlodipine 5 mg once a day after dinner.","start_sec":28,
+         "medicine":{"name":"Amlodipine","dose":"5 mg"}}]})");
+    auto v = build_suggestions(e, kPieces, 7, kRoutine, "", "en", {"Amlodipine"}, saved);
+    CHECK_EQ(v.size(), (size_t)3);
+    CHECK_EQ(v[0]["check_status"].get<std::string>(), std::string("check"));
+    CHECK(has(v[0]["check_fields"], "dose"));
+    CHECK(has(v[1]["check_fields"], "dose"));
+    CHECK(!has(v[2]["check_fields"], "dose"));  // stopping does not set a dose
+    json same = json::parse(R"([{"id":1,"name":"amlodipine","dose":"5mg"}])");
+    auto w = build_suggestions(e, kPieces, 7, kRoutine, "", "en", {"Amlodipine"}, same);
+    CHECK_EQ(w[0]["check_status"].get<std::string>(), std::string("ok"));
+    CHECK(!has(w[1]["check_fields"], "dose"));
+}

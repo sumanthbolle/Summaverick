@@ -114,12 +114,23 @@ json medicine_row(sve::Store &st, int64_t id) {
     return nullptr;
 }
 
-// Supersedes pending reminder suggestions for a medicine, matched by id or normalized name.
-void supersede_medicine_suggestions(sve::Store &st, int64_t med_id, const std::string &name) {
+// True for a pending card that would set a medicine's dose or times: a reminder, or a profile
+// add/update card.
+bool is_medicine_card(const json &s) {
+    std::string kind = jstr(s, "kind");
+    if (kind == "reminder") return true;
+    std::string change = jstr(payload_of(s), "change");
+    return kind == "profile" && (change == "add_medicine" || change == "update_medicine");
+}
+
+// Supersedes pending reminder and profile add/update cards for a medicine, matched by id or
+// normalized name. except_id: the card being accepted right now, which is left alone.
+void supersede_medicine_suggestions(sve::Store &st, int64_t med_id, const std::string &name, int64_t except_id = 0) {
     std::string n = sve::normalize_for_match(name);
     for (const auto &s : st.suggestions("pending"))
-        if (jstr(s, "kind") == "reminder" && ((med_id > 0 && jint(s, "medicine_id", -1) == med_id) ||
-            (!n.empty() && sve::normalize_for_match(jstr(jobj(payload_of(s), "medicine"), "name")) == n)))
+        if (jint(s, "id", 0) != except_id && is_medicine_card(s) &&
+            ((med_id > 0 && jint(s, "medicine_id", -1) == med_id) ||
+             (!n.empty() && sve::normalize_for_match(jstr(jobj(payload_of(s), "medicine"), "name")) == n)))
             st.set_suggestion_status(jint(s, "id", 0), "superseded");
 }
 
@@ -208,7 +219,17 @@ bool has_check_field(const json &s, const char *f) {
     return false;
 }
 
-int64_t accept_reminder(sve::Store &st, const json &s, const json &p, bool edited) {
+// Whether the card's dose, applied on Yes, would change the saved medicine's dose. A card whose dose
+// the person did not edit and that never warned about the dose is stale (the saved dose changed after
+// it was proposed): kStale, and nothing is applied. Otherwise the saved row takes the card's values.
+enum class DoseFit { same, stale, apply };
+DoseFit dose_fit(const json &s, const json &row, const std::string &dose, bool dose_edited) {
+    if (!row.is_object() || dose.empty() || sve::normalize_for_match(jstr(row, "dose")) == sve::normalize_for_match(dose))
+        return DoseFit::same;
+    return !dose_edited && !has_check_field(s, "dose") ? DoseFit::stale : DoseFit::apply;
+}
+
+int64_t accept_reminder(sve::Store &st, const json &s, const json &p, bool dose_edited) {
     json med = jobj(p, "medicine");
     const std::string name = jstr(med, "name");
     json med_id = int_or_null(s, "medicine_id");
@@ -225,22 +246,23 @@ int64_t accept_reminder(sve::Store &st, const json &s, const json &p, bool edite
         }
         med_id = id;
     }
-    if (!name.empty()) {
-        // The person confirmed this dose: a saved medicine with another dose takes the accepted values.
+    std::string shown = name;  // the saved medicine's spelling, once linked
+    if (!name.empty() && !created) {
         json row = medicine_row(st, med_id.get<int64_t>());
-        std::string dose = jstr(med, "dose");
-        if (!created && row.is_object() && !dose.empty() &&
-            sve::normalize_for_match(jstr(row, "dose")) != sve::normalize_for_match(dose)) {
-            // An unedited card that did not warn about the dose is stale (the saved dose changed after it was
-            // proposed): never let it overwrite the person's entry.
-            if (!edited && !has_check_field(s, "dose")) return kStale;
+        if (!jstr(row, "name").empty()) shown = jstr(row, "name");
+        // The person confirmed this dose: a saved medicine with another dose takes the accepted values.
+        DoseFit fit = dose_fit(s, row, jstr(med, "dose"), dose_edited);
+        if (fit == DoseFit::stale) return kStale;
+        if (fit == DoseFit::apply) {
             json m;
             if (!medicine_fields(st, medicine_input(p), m)) return -1;
             m.erase("name");  // keep the saved medicine's name
             if (!st.update_medicine(med_id.get<int64_t>(), m)) return -1;
+            // Sibling cards for this medicine now carry an older dose.
+            supersede_medicine_suggestions(st, med_id.get<int64_t>(), name, jint(s, "id", 0));
         }
     }
-    std::string text = name.empty() ? jstr(p, "text") : sve::reminder_text(name, jstr(med, "dose"), lang_of(st));
+    std::string text = name.empty() ? jstr(p, "text") : sve::reminder_text(shown, jstr(med, "dose"), lang_of(st));
     if (text.empty()) return -1;
     std::vector<std::string> times = sve::valid_times(jarr(p, "times"));
     if (times.empty()) times = sve::resolve_times(jstr(p, "when_text"), jobj(profile_of(st), "routine"));
@@ -255,7 +277,7 @@ int64_t accept_reminder(sve::Store &st, const json &s, const json &p, bool edite
                             {"medicine_id", med_id}});
 }
 
-int64_t accept_profile(sve::Store &st, const json &s, const json &p) {
+int64_t accept_profile(sve::Store &st, const json &s, const json &p, bool dose_edited) {
     std::string change = jstr(p, "change");
     json note = int_or_null(s, "note_id");
     if (change == "routine") {  // merged into profile.routine; returns 0 (no row)
@@ -279,12 +301,23 @@ int64_t accept_profile(sve::Store &st, const json &s, const json &p) {
     const bool update = change == "update_medicine";
     json m;
     if (!medicine_fields(st, medicine_input(p), m)) return -1;
-    if (update) deactivate_medicine_reminders(st, existing, name);
     int64_t id = existing;
-    if (existing) { if (!st.update_medicine(existing, m)) return -1; }
-    else id = st.add_medicine(m);
-    if (id > 0) supersede_medicine_suggestions(st, id, name);  // older cards for it are out of date
-    if (id > 0) propose_medicine_reminder(st, id, jstr(s, "quote"), note, int_or_null(s, "start_sec"), update);
+    bool dose_changed = false;
+    if (existing) {
+        // Same stale check as a reminder: a card the person did not edit, that never warned about the
+        // dose, must not overwrite a dose entered after it was proposed.
+        DoseFit fit = dose_fit(s, medicine_row(st, existing), jstr(jobj(p, "medicine"), "dose"), dose_edited);
+        if (fit == DoseFit::stale) return kStale;
+        dose_changed = fit == DoseFit::apply;
+        m.erase("name");  // keep the saved medicine's name
+        if (update || dose_changed) deactivate_medicine_reminders(st, existing, name);  // the old dose's reminders are wrong now
+        if (!st.update_medicine(existing, m)) return -1;
+    } else {
+        id = st.add_medicine(m);
+    }
+    if (id <= 0) return -1;
+    supersede_medicine_suggestions(st, id, name, jint(s, "id", 0));  // older cards for it are out of date
+    propose_medicine_reminder(st, id, jstr(s, "quote"), note, int_or_null(s, "start_sec"), update || dose_changed);
     return id;
 }
 
@@ -299,9 +332,10 @@ int64_t accept_memory(sve::Store &st, const json &s, const json &p, const std::s
 }
 
 // Creates the row for an accepted suggestion; see sve_suggestion_accept for the return values.
-int64_t accept_row(sve::Store &st, const json &s, const json &p, const std::string &kind, bool edited) {
-    if (kind == "reminder") return accept_reminder(st, s, p, edited);
-    if (kind == "profile") return accept_profile(st, s, p);
+// dose_edited: the person changed medicine.dose on the card (only that edit skips the stale check).
+int64_t accept_row(sve::Store &st, const json &s, const json &p, const std::string &kind, bool dose_edited) {
+    if (kind == "reminder") return accept_reminder(st, s, p, dose_edited);
+    if (kind == "profile") return accept_profile(st, s, p, dose_edited);
     if (kind == "vocab") return accept_memory(st, s, p, "vocab");
     if (kind == "fact") return accept_memory(st, s, p, jstr(p, "memory_kind") == "preference" ? "preference" : "fact");
     if (kind != "task") return -1;
@@ -484,13 +518,16 @@ int64_t sve_suggestion_accept(sve_ctx *ctx, int64_t id, const char *edited_paylo
             if (!e.is_object()) return -1;
             for (auto it = e.begin(); it != e.end(); ++it) p[it.key()] = it.value();
         }
+        const bool edited = p != before;
+        // Only a changed dose means the person looked at the dose; an edit to the time alone does not.
+        const bool dose_edited = sve::normalize_for_match(jstr(jobj(p, "medicine"), "dose")) !=
+                                 sve::normalize_for_match(jstr(jobj(before, "medicine"), "dose"));
         // All rows for one Yes are written together or not at all.
         if (!st.begin()) return -1;
         int64_t row = -1;
         try {
-            row = accept_row(st, s, p, kind, p != before);
+            row = accept_row(st, s, p, kind, dose_edited);
             if (row >= 0) {
-                bool edited = p != before;
                 if (edited) sve::record_edit(st, kind, before, p);
                 if (!st.set_suggestion_status(id, "accepted") || !st.log_decision(kind, "decision", "", edited ? "edit" : "yes"))
                     row = -1;

@@ -142,8 +142,10 @@ char *sve_suggestions_json(sve_ctx *ctx, const char *status);
 /* Accepts a pending suggestion. edited_payload_json (NULL = as proposed) overrides payload keys and is
  * recorded for learning. Creates the row: reminder -> reminder id, task -> task id, profile -> medicine id
  * (stop_medicine: the deleted medicine's id, 0 if none matched; routine: memory id), vocab/fact -> memory id.
- * -2: stale suggestion re-flagged; refresh and ask again (an unedited, unflagged card whose dose no longer
- * matches the saved medicine: nothing is applied, it stays pending with "dose" in check_fields).
+ * -2: stale suggestion re-flagged; refresh and ask again (a reminder or profile add/update card whose dose
+ * no longer matches the saved medicine, when medicine.dose was not edited and the card has no "dose" flag:
+ * nothing is applied, it stays pending with "dose" in check_fields). Accepting a medicine card with a new
+ * dose supersedes the other pending cards for that medicine.
  * -1 on other errors (unknown id, not pending, bad JSON). */
 int64_t sve_suggestion_accept(sve_ctx *ctx, int64_t id, const char *edited_payload_json);
 int   sve_suggestion_reject(sve_ctx *ctx, int64_t id);

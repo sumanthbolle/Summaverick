@@ -143,6 +143,95 @@ static json med_named(sve_ctx *ctx, const char *name) {
     return nullptr;
 }
 
+static bool has_field(const json &s, const char *f) {
+    for (const auto &x : s["check_fields"]) if (x == f) return true;
+    return false;
+}
+
+// Fix round 4: profile add/update cards go through the same stale guard as reminders; only a dose
+// edit skips it; accepting a new dose supersedes the sibling cards.
+static void run_api_fixes4(sve_ctx *ctx, int64_t note) {
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+    auto pcard = [&](const char *change, const char *name, const char *dose, const char *status, json fields) {
+        std::string nd = std::string(name) + " " + dose;
+        return json{{"kind", "profile"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Take " + nd + " after dinner"},
+                    {"check_status", status}, {"check_fields", fields},
+                    {"payload", {{"change", change}, {"text", "Add medicine: " + nd}, {"when_text", "after dinner"},
+                                 {"medicine", {{"name", name}, {"dose", dose}, {"when_text", "after dinner"}}}}}};
+    };
+    auto rcard = [&](const char *name, const char *dose, const char *status, json fields) {
+        std::string nd = std::string(name) + " " + dose;
+        return json{{"kind", "reminder"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Take " + nd + " after dinner"},
+                    {"check_status", status}, {"check_fields", fields},
+                    {"payload", {{"text", "Take " + nd}, {"when_text", "after dinner"}, {"times", {"21:30"}}, {"repeat", "daily"},
+                                 {"medicine", {{"name", name}, {"dose", dose}, {"when_text", "after dinner"}}}}}};
+    };
+
+    // 1 (add): recording card "add Telmikind 25 mg"; the person types 50 mg -> card superseded, 50 mg kept.
+    int64_t add_card = add_sugg(ctx, pcard("add_medicine", "Telmikind", "25 mg", "ok", json::array()));
+    int64_t tid = sve_medicine_save(ctx, R"({"name":"Telmikind","dose":"50 mg","when":"after dinner"})");
+    expect(tid > 0 && ctx->store->suggestion(add_card)["status"] == "superseded", "typing the medicine supersedes the profile add card");
+    expect(sve_suggestion_accept(ctx, add_card, nullptr) < 0, "superseded profile add card cannot be accepted");
+    json own = pending_kind(ctx, "reminder");
+    expect(own.size() == 1 && sve_suggestion_accept(ctx, own[0]["id"], nullptr) > 0, "person's own Telmikind card accepted");
+    expect(med_named(ctx, "Telmikind")["dose"] == "50 mg" && active_named(ctx, "Telmikind").size() == 1 &&
+           active_named(ctx, "Telmikind 50 mg").size() == 1, "add: 50 mg kept, exactly one active 50 mg reminder");
+
+    // 1 (update): saved Olmy 10 mg; recording card "update Olmy 25 mg"; the person edits to 50 mg.
+    int64_t oid = sve_medicine_save(ctx, R"({"name":"Olmy","dose":"10 mg","when":"after dinner"})");
+    for (const auto &s : pending_kind(ctx, "reminder")) sve_suggestion_reject(ctx, s["id"]);
+    int64_t upd_card = add_sugg(ctx, pcard("update_medicine", "Olmy", "25 mg", "ok", json::array()));
+    sve_medicine_save(ctx, (R"({"id":)" + std::to_string(oid) + R"(,"dose":"50 mg"})").c_str());
+    expect(ctx->store->suggestion(upd_card)["status"] == "superseded", "editing the dose supersedes the profile update card");
+    expect(sve_suggestion_accept(ctx, upd_card, nullptr) < 0, "superseded profile update card cannot be accepted");
+    own = pending_kind(ctx, "reminder");
+    expect(own.size() == 1 && sve_suggestion_accept(ctx, own[0]["id"], nullptr) > 0, "person's own Olmy card accepted");
+    expect(med_named(ctx, "Olmy")["dose"] == "50 mg" && active_named(ctx, "Olmy").size() == 1 &&
+           active_named(ctx, "Olmy 50 mg").size() == 1, "update: 50 mg kept, exactly one active 50 mg reminder");
+
+    // 1 (c): a crafted stale profile card accepted unedited -> -2, flagged, pending, nothing applied.
+    int64_t stale_p = add_sugg(ctx, pcard("add_medicine", "telmikind", "25 mg", "ok", json::array()));
+    expect(sve_suggestion_accept(ctx, stale_p, nullptr) == -2, "stale profile card returns -2");
+    json sp = ctx->store->suggestion(stale_p);
+    expect(sp["status"] == "pending" && sp["check_status"] == "check" && has_field(sp, "dose"), "stale profile card re-flagged on dose, still pending");
+    expect(med_named(ctx, "Telmikind")["dose"] == "50 mg" && active_named(ctx, "Telmikind 50 mg").size() == 1, "stale profile card applied nothing");
+    sve_suggestion_reject(ctx, stale_p);
+    // 2: an edit to the time alone does not count as looking at the dose.
+    int64_t stale_r = add_sugg(ctx, rcard("Telmikind", "25 mg", "ok", json::array()));
+    expect(sve_suggestion_accept(ctx, stale_r, R"({"times":["21:00"]})") == -2, "time-only edit on a stale reminder card returns -2");
+    int64_t stale_p2 = add_sugg(ctx, pcard("update_medicine", "Telmikind", "25 mg", "ok", json::array()));
+    expect(sve_suggestion_accept(ctx, stale_p2, R"({"when_text":"after lunch"})") == -2, "time-only edit on a stale profile card returns -2");
+    expect(med_named(ctx, "Telmikind")["dose"] == "50 mg", "time-only edits applied nothing");
+    // A dose edit does count: it applies the edited dose and keeps the saved name.
+    int64_t edit_r = add_sugg(ctx, rcard("telmikind", "25 mg", "ok", json::array()));
+    expect(sve_suggestion_accept(ctx, edit_r, R"({"medicine":{"name":"telmikind","dose":"40 mg","when_text":"after dinner"}})") > 0,
+           "dose edit on a stale card applies");
+    json tm = med_named(ctx, "Telmikind");
+    expect(tm.is_object() && tm["id"] == tid && tm["dose"] == "40 mg" && med_named(ctx, "telmikind").is_null(),
+           "edited dose applied, saved name kept");
+    expect(active_named(ctx, "Telmikind").size() == 1 && active_named(ctx, "Telmikind 40 mg").size() == 1, "one active reminder, 40 mg");
+
+    // 3: siblings. Two pending cards for one medicine; accepting one with a new dose supersedes the other.
+    for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
+    int64_t sib_r = add_sugg(ctx, rcard("Telmikind", "60 mg", "check", json::array({"dose"})));
+    int64_t sib_p = add_sugg(ctx, pcard("update_medicine", "Telmikind", "60 mg", "check", json::array({"dose"})));
+    expect(sve_suggestion_accept(ctx, sib_r, nullptr) > 0, "flagged reminder card with a new dose accepted");
+    expect(ctx->store->suggestion(sib_r)["status"] == "accepted" && ctx->store->suggestion(sib_p)["status"] == "superseded",
+           "accepting the new dose supersedes the sibling profile card");
+    expect(med_named(ctx, "Telmikind")["dose"] == "60 mg" && active_named(ctx, "Telmikind").size() == 1 &&
+           active_named(ctx, "Telmikind 60 mg").size() == 1, "60 mg saved, one active reminder");
+    // The flagged profile card, accepted, updates the dose, keeps the name, and supersedes a sibling reminder card.
+    int64_t sib_r2 = add_sugg(ctx, rcard("Telmikind", "80 mg", "check", json::array({"dose"})));
+    int64_t sib_p2 = add_sugg(ctx, pcard("update_medicine", "telmikind", "80 mg", "check", json::array({"dose"})));
+    expect(sve_suggestion_accept(ctx, sib_p2, nullptr) == tid, "flagged profile card with a new dose accepted");
+    expect(ctx->store->suggestion(sib_r2)["status"] == "superseded", "accepting the profile card supersedes the sibling reminder card");
+    tm = med_named(ctx, "Telmikind");
+    expect(tm.is_object() && tm["dose"] == "80 mg" && med_named(ctx, "telmikind").is_null(), "profile update keeps the saved name");
+    json pr = pending_kind(ctx, "reminder");
+    expect(active_named(ctx, "Telmikind").empty() && pr.size() == 1 && contains(pr[0]["payload"], "80 mg"),
+           "old reminder off, new 80 mg reminder proposed");
+}
+
 // Fix round 3: a stale "ok" card never overwrites a dose the person entered later.
 static void run_api_fixes3(sve_ctx *ctx, int64_t note) {
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
@@ -174,6 +263,7 @@ static void run_api_fixes3(sve_ctx *ctx, int64_t note) {
     json cm = med_named(ctx, "Cardace");
     expect(cm.is_object() && cm["id"] == cid && cm["dose"] == "25 mg", "accepted dose applied, saved name kept");
     expect(med_named(ctx, "cardace").is_null(), "no rename to the payload's spelling");
+    run_api_fixes4(ctx, note);
 }
 
 // Fix round 2: accepted dose updates the saved medicine; editing a dose turns old reminders off;
@@ -252,8 +342,10 @@ static void run_api_fixes(sve_ctx *ctx) {
     expect(rid > 0 && mid > 0 && act.size() == 1 && act[0]["medicine_id"] == mid && act[0]["text"] == "Take Ramipril 5 mg",
            "accepted recording reminder creates and links the medicine");
 
-    // Update -> old reminder off, new reminder proposed.
-    json upd = {{"kind", "profile"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Take Ramipril 10 mg"}, {"check_status", "ok"},
+    // Update -> old reminder off, new reminder proposed. (Round 4: extraction flags a card whose dose
+    // differs from the saved 5 mg with "dose"; an unflagged one would be stale and return -2.)
+    json upd = {{"kind", "profile"}, {"note_id", note}, {"start_sec", 0}, {"quote", "Take Ramipril 10 mg"}, {"check_status", "check"},
+                {"check_fields", {"dose"}},
                 {"payload", {{"change", "update_medicine"}, {"text", "Change medicine: Ramipril 10 mg"},
                              {"medicine", {{"name", "Ramipril"}, {"dose", "10 mg"}, {"when_text", "after dinner"}}}}}};
     expect(sve_suggestion_accept(ctx, add_sugg(ctx, upd), nullptr) == mid, "update_medicine accepted");

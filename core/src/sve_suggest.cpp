@@ -191,8 +191,16 @@ bool quote_has_hour(const std::string &quote, const std::string &hhmm) {
             size_t k = 0;
             while (k < t.size() && t[k] >= '0' && t[k] <= '9' && k < 4) ++k;
             int v = std::stoi(t.substr(0, k));
-            // "9 am" / "9 a.m." / "9pm": the stated half of the day must match
-            std::string next = i + 1 < q.size() ? q[i + 1] : "", after = i + 2 < q.size() ? q[i + 2] : "";
+            // "9:30" tokenizes as "9", "30": skip the minutes token, so it is never read as an hour and
+            // the am/pm after it still counts.
+            size_t j = i + 1;
+            if (k == t.size() && j < q.size() && q[j].size() <= 2 && digits(q[j], 0, q[j].size()) &&
+                std::stoi(q[j]) < 60) {
+                ++j;
+                i = j - 1;
+            }
+            // "9 am" / "9 a.m." / "9pm" / "9:30 am": the stated half of the day must match
+            std::string next = j < q.size() ? q[j] : "", after = j + 1 < q.size() ? q[j + 1] : "";
             bool am = next == "am" || (next == "a" && after == "m");
             bool pm = next == "pm" || (next == "p" && after == "m");
             if (v >= 1 && v <= 12 && (am || pm)) {
@@ -401,6 +409,16 @@ json date_field(const json &item, const char *key, std::vector<std::string> &fie
 
 bool has_med_name(const json &med) { return !med.is_null() && !jstr(med, "name").empty(); }
 
+// True when a saved medicine with this name has a (non-empty) dose that differs from the card's.
+bool dose_differs_from_saved(const json &saved, const json &med) {
+    if (!saved.is_array() || !has_med_name(med) || jstr(med, "dose").empty()) return false;
+    std::string n = normalize_for_match(jstr(med, "name")), d = normalize_for_match(jstr(med, "dose"));
+    for (const auto &m : saved)
+        if (normalize_for_match(jstr(m, "name")) == n && !jstr(m, "dose").empty() && normalize_for_match(jstr(m, "dose")) != d)
+            return true;
+    return false;
+}
+
 json finish(Base &b, const json &payload) {
     std::vector<std::string> u;
     for (auto &f : b.fields) if (std::find(u.begin(), u.end(), f) == u.end()) u.push_back(f);
@@ -436,12 +454,7 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
             if (mentions_medicine(text, names)) b.fields.push_back("text");
         }
         if (text.empty()) continue;
-        if (has_med_name(med) && saved.is_array())  // a different dose than the saved medicine needs a look
-            for (const auto &m : saved)
-                if (normalize_for_match(jstr(m, "name")) == normalize_for_match(jstr(med, "name")) &&
-                    !jstr(m, "dose").empty() && !jstr(med, "dose").empty() &&
-                    normalize_for_match(jstr(m, "dose")) != normalize_for_match(jstr(med, "dose")))
-                    b.fields.push_back("dose");
+        if (dose_differs_from_saved(saved, med)) b.fields.push_back("dose");  // differs from the saved medicine: needs a look
         std::string rep = sanitize_repeat(jstr(it, "repeat"));
         if (med.is_null() && times.empty() && (rep.empty() || rep == "once")) {
             // A one-off with no time of day cannot be scheduled: it is a task due that day.
@@ -478,7 +491,10 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
             if (when.empty()) when = trim(jstr(it, "when_text"));
             json med;
             if (!check_med(it, when, b.fields, med) || !has_med_name(med)) continue;
-            if (change != "stop_medicine" && resolve_times(when, routine).empty()) b.fields.push_back("times");
+            if (change != "stop_medicine") {
+                if (resolve_times(when, routine).empty()) b.fields.push_back("times");
+                if (dose_differs_from_saved(saved, med)) b.fields.push_back("dose");  // would change the saved dose
+            }
             std::string text = profile_text(change, jstr(med, "name"), jstr(med, "dose"), lang);
             out.push_back(finish(b, {{"change", change}, {"text", text}, {"when_text", when}, {"medicine", med}}));
         } else {
