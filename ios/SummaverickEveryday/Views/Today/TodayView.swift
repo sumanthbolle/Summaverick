@@ -109,6 +109,7 @@ struct TodayView: View {
             .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await reload() } }
             .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await reload() } }
             .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await reload() } } }
+            .onChange(of: notificationsOff || errorMessage != nil) { _, open in PresentationGate.shared.set("today", open) }
             .alert("Notifications are off", isPresented: $notificationsOff) {
                 Button("Open Settings") {
                     if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
@@ -204,8 +205,8 @@ struct TodayView: View {
                                noteTitle: s.noteID.flatMap { titles[$0] },
                                isStale: staleIDs.contains(s.id),
                                isBusy: busyIDs.contains(s.id),
-                               onAccept: { edited in Task { await accept(s, edited: edited) } },
-                               onReject: { Task { await reject(s) } })
+                               onAccept: { edited in beginAccept(s, edited: edited) },
+                               onReject: { beginReject(s) })
             }
         }
     }
@@ -419,8 +420,21 @@ struct TodayView: View {
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
     }
 
-    private func accept(_ s: Suggestion, edited: SuggestionPayload?) async {
+    /// Marks the card busy synchronously, so a second tap cannot queue a second accept.
+    private func beginAccept(_ s: Suggestion, edited: SuggestionPayload?) {
+        guard !busyIDs.contains(s.id) else { return }
         busyIDs.insert(s.id)
+        Task { await accept(s, edited: edited) }
+    }
+
+    private func beginReject(_ s: Suggestion) {
+        guard !busyIDs.contains(s.id) else { return }
+        busyIDs.insert(s.id)
+        Task { await reject(s) }
+    }
+
+    /// Only called through beginAccept, which has already marked the card busy.
+    private func accept(_ s: Suggestion, edited: SuggestionPayload?) async {
         defer { busyIDs.remove(s.id) }
         let makesReminder = s.kind == .reminder || (s.kind == .profile && s.payload.medicine != nil)
         do {
@@ -438,7 +452,6 @@ struct TodayView: View {
     }
 
     private func reject(_ s: Suggestion) async {
-        busyIDs.insert(s.id)
         defer { busyIDs.remove(s.id) }
         await CoreEngine.shared.reject(s.id)
         staleIDs.remove(s.id)

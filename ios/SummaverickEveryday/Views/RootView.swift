@@ -1,4 +1,5 @@
-// The app's root: three tabs (Today, Deep dive, Ask) and a red Record button in the tab bar.
+// The app's root: three tabs (Today, Deep dive, Ask) and a red Record button in the tab bar
+// (order: Today · Record · Deep dive · Ask).
 // RootView owns the UI every tab shares: the settings sheet, the recording consent alert, the recorder,
 // the note sheet opened from links and notifications, and the "deleted recording" alert.
 import SwiftUI
@@ -19,12 +20,23 @@ final class Router {
 
     func handle(_ route: ReminderRoute) {
         switch route {
-        case .note(let id, let startSec):
-            showSettings = false
-            openNote = (id, startSec)
+        case .note(let id, let startSec): openNote = (id, startSec)
         case .profile: showSettings = true
         case .deletedRecording: showDeletedRecording = true
         }
+    }
+}
+
+/// Screens with their own sheets or alerts report them here, so RootView never tries to present a
+/// note on top of them (SwiftUI drops a presentation while another is up). A notification route waits
+/// until this is empty.
+@MainActor
+@Observable
+final class PresentationGate {
+    static let shared = PresentationGate()
+    private(set) var open: Set<String> = []
+    func set(_ key: String, _ isOpen: Bool) {
+        if isOpen { open.insert(key) } else { open.remove(key) }
     }
 }
 
@@ -39,6 +51,7 @@ struct RootView: View {
     @State private var router = Router()
     @State private var scheduler = ReminderScheduler.shared
     @State private var lock = AppLock.shared
+    @State private var gate = PresentationGate.shared
     @State private var showRecorder = false
     @State private var showConsent = false
     /// The tab bar hides while a keyboard is up, so screens below it keep normal keyboard avoidance.
@@ -56,8 +69,8 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
         .environment(router)
-        .sheet(isPresented: $router.showSettings) { SettingsView().environment(settings) }
-        .sheet(item: noteLink) { link in
+        .sheet(isPresented: $router.showSettings, onDismiss: handlePendingRoute) { SettingsView().environment(settings) }
+        .sheet(item: noteLink, onDismiss: handlePendingRoute) { link in
             NavigationStack {
                 NoteDetailView(noteID: link.id)
                     .toolbar {
@@ -79,7 +92,11 @@ struct RootView: View {
         .onAppear { handlePendingRoute() }
         .onChange(of: scheduler.pendingRoute) { _, _ in handlePendingRoute() }
         .onChange(of: lock.isLocked) { _, _ in handlePendingRoute() }
-        .onChange(of: showRecorder) { _, _ in handlePendingRoute() }
+        // These flip when a presentation starts to close; wait for it to finish before presenting.
+        .onChange(of: showRecorder) { _, _ in handlePendingRouteSoon() }
+        .onChange(of: showConsent) { _, _ in handlePendingRouteSoon() }
+        .onChange(of: router.showDeletedRecording) { _, _ in handlePendingRouteSoon() }
+        .onChange(of: gate.open) { _, _ in handlePendingRouteSoon() }
     }
 
     /// Keeps every tab alive (so its navigation and scroll position survive a tab switch) and shows one.
@@ -102,17 +119,36 @@ struct RootView: View {
         if settings.consentAcknowledged { showRecorder = true } else { showConsent = true }
     }
 
+    /// Handles the route once a closing presentation has finished animating away.
+    private func handlePendingRouteSoon() {
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            handlePendingRoute()
+        }
+    }
+
     /// A tapped notification sets `pendingRoute`. Wait until the app is unlocked (so a sheet never opens
     /// on top of the lock screen) and the recorder is closed (so a recording is never interrupted),
     /// then route and clear it.
+    ///
+    /// Presentations are sequenced, never swapped in one update: if RootView's own sheet or alert is up,
+    /// it is closed first and the route is handled when it has gone (sheet onDismiss / onChange). While
+    /// a child screen's own sheet, alert or recorder is open (PresentationGate), the route is kept.
     private func handlePendingRoute() {
-        guard !lock.isLocked, !showRecorder, let route = scheduler.pendingRoute else { return }
+        guard !lock.isLocked, !showRecorder, !showConsent, gate.open.isEmpty,
+              let route = scheduler.pendingRoute else { return }
+        if router.showSettings || router.openNote != nil || router.showDeletedRecording {
+            router.showSettings = false
+            router.openNote = nil
+            router.showDeletedRecording = false
+            return
+        }
         scheduler.pendingRoute = nil
         router.handle(route)
     }
 }
 
-/// The bottom bar: Today, Deep dive, the red Record button, Ask.
+/// The bottom bar, in the owner-approved order: Today, the red Record button, Deep dive, Ask.
 private struct RootTabBar: View {
     @Binding var selection: Router.Tab
     let onRecord: () -> Void
@@ -120,8 +156,8 @@ private struct RootTabBar: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 0) {
             item(.today, "Today", "sun.max")
-            item(.deepDive, "Deep dive", "books.vertical")
             recordButton
+            item(.deepDive, "Deep dive", "books.vertical")
             item(.ask, "Ask", "bubble.left.and.bubble.right")
         }
         .padding(.top, 4)

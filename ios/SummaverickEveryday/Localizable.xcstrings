@@ -63,6 +63,16 @@
         }
       }
     },
+    "Add at least one time before saving.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సేవ్ చేసే ముందు కనీసం ఒక సమయం చేర్చండి."
+          }
+        }
+      }
+    },
     "Ask": {
       "localizations": {
         "te": {
@@ -631,6 +641,16 @@
         }
       }
     },
+    "Not set — please pick a time": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పెట్టలేదు — దయచేసి సమయం ఎంచుకోండి"
+          }
+        }
+      }
+    },
     "Nothing is waiting. New suggestions from your recordings appear here.": {
       "localizations": {
         "te": {
@@ -723,6 +743,26 @@
       },
       "comment": "%@ is the recording title"
     },
+    "Pick a time": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సమయం ఎంచుకోండి"
+          }
+        }
+      }
+    },
+    "Pick a time for each row, or remove it.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రతి వరుసకు ఒక సమయం ఎంచుకోండి, లేదా దాన్ని తీసివేయండి."
+          }
+        }
+      }
+    },
     "Please check": {
       "localizations": {
         "te": {
@@ -733,6 +773,17 @@
         }
       },
       "comment": "Yellow warning banner title on a suggestion"
+    },
+    "Please check this": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీన్ని సరిచూడండి"
+          }
+        }
+      },
+      "comment": "Accessibility label of a warning icon next to a flagged field"
     },
     "Record": {
       "localizations": {
@@ -833,6 +884,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "సేవ్ చేయండి"
+          }
+        }
+      }
+    },
+    "Set time": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ సమయం పెట్టండి"
           }
         }
       }

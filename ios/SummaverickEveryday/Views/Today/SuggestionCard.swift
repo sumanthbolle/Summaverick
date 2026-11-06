@@ -211,10 +211,10 @@ struct SuggestionCard: View {
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(s.isFlagged ? Color.orange : Color.clear, lineWidth: 2))
         .sheet(isPresented: $showEdit, onDismiss: runAfterEdit) {
-            SuggestionEditForm(suggestion: s, noteTitle: noteTitle, resume: resumeDraft) { payload, changed, draft in
+            SuggestionEditForm(suggestion: s, noteTitle: noteTitle, resume: resumeDraft) { payload, _, draft in
                 resumeDraft = draft
-                let fixedAFlag = !Set(s.checkFields).isDisjoint(with: changed)
-                afterEdit = (payload, s.isFlagged && !fixedAFlag)
+                // A flagged card always asks again, edited or not: the core does not enforce the flag.
+                afterEdit = (payload, s.isFlagged)
                 showEdit = false
             }
         }
@@ -222,6 +222,8 @@ struct SuggestionCard: View {
             Button("Save") { onAccept(pendingEdit) }
             Button("Edit") { showEdit = true }
         }
+        .onChange(of: showEdit || confirmFlagged) { _, open in PresentationGate.shared.set("card.\(s.id)", open) }
+        .onDisappear { PresentationGate.shared.set("card.\(s.id)", false) }
     }
 
     private var header: some View {
@@ -397,19 +399,21 @@ struct SuggestionDraft: Equatable {
     }
 
     /// The core's field names that differ between `self` and `before`.
+    /// Text is compared trimmed, so a stray space is not an edit.
     func changedKeys(from before: SuggestionDraft) -> Set<String> {
+        func t(_ s: String) -> String { s.trimmingCharacters(in: .whitespacesAndNewlines) }
         var k = Set<String>()
-        if text != before.text { k.insert("text") }
+        if t(text) != t(before.text) { k.insert("text") }
         if times != before.times { k.insert("times") }
         if repeatRule != before.repeatRule { k.insert("repeat") }
         if untilDate != before.untilDate { k.insert("until_date") }
         if dueDate != before.dueDate { k.insert("due_date") }
-        if who != before.who { k.insert("who") }
-        if medName != before.medName { k.insert("name") }
-        if medDose != before.medDose { k.insert("dose") }
-        if medWhen != before.medWhen { k.insert("when_text") }
-        if medFrequency != before.medFrequency { k.insert("frequency") }
-        if medDuration != before.medDuration { k.insert("duration") }
+        if t(who) != t(before.who) { k.insert("who") }
+        if t(medName) != t(before.medName) { k.insert("name") }
+        if t(medDose) != t(before.medDose) { k.insert("dose") }
+        if t(medWhen) != t(before.medWhen) { k.insert("when_text") }
+        if t(medFrequency) != t(before.medFrequency) { k.insert("frequency") }
+        if t(medDuration) != t(before.medDuration) { k.insert("duration") }
         return k
     }
 
@@ -445,27 +449,32 @@ struct SuggestionDraft: Equatable {
 }
 
 struct SuggestionEditForm: View {
-    let suggestion: Suggestion
     let noteTitle: String?
     /// The edited payload (nil when nothing changed), the changed field names and the form's values.
     let onSave: (SuggestionPayload?, Set<String>, SuggestionDraft) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: SuggestionDraft
-    private let before: SuggestionDraft
+    /// Frozen when the form opens, so a reload behind the sheet never changes what "unchanged" means.
+    @State private var original: Suggestion
+    @State private var before: SuggestionDraft
+    /// Index of the time being picked in the picker sheet; == times.count means a new time.
+    @State private var pickingIndex: Int?
+    @State private var pickedTime = Date()
+    @State private var openNoteID: Int64?
 
     /// resume: earlier unsaved values to start from. Changes are always measured against the suggestion itself.
     init(suggestion: Suggestion, noteTitle: String?, resume: SuggestionDraft? = nil,
          onSave: @escaping (SuggestionPayload?, Set<String>, SuggestionDraft) -> Void) {
-        self.suggestion = suggestion
         self.noteTitle = noteTitle
         self.onSave = onSave
         let d = SuggestionDraft(suggestion.payload)
-        before = d
+        _original = State(initialValue: suggestion)
+        _before = State(initialValue: d)
         _draft = State(initialValue: resume ?? d)
     }
 
-    private var s: Suggestion { suggestion }
+    private var s: Suggestion { original }
     private var hasMedicine: Bool { s.payload.medicine != nil }
     private var hasSchedule: Bool { s.kind == .reminder || (s.kind == .profile && hasMedicine) }
     private func flagged(_ key: String) -> Bool { s.checkFields.contains(key) }
@@ -477,7 +486,7 @@ struct SuggestionEditForm: View {
                     Section { PleaseCheckBanner(fields: s.checkFields) }
                         .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                 }
-                Section { QuoteBlock(suggestion: s, noteTitle: noteTitle) }
+                Section { QuoteBlock(suggestion: s, noteTitle: noteTitle) { id, _ in openNoteID = id } }
 
                 Section {
                     TextField("Wording", text: $draft.text, axis: .vertical)
@@ -515,16 +524,86 @@ struct SuggestionEditForm: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.font(.headline) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }.font(.headline).disabled(timesProblem != nil)
+                }
             }
+            // The ▶ link opens the recording inside this sheet, so the edits are kept.
+            .navigationDestination(item: $openNoteID) { NoteDetailView(noteID: $0) }
+            .sheet(isPresented: pickerShown) { timePickerSheet }
         }
+    }
+
+    private var pickerShown: Binding<Bool> {
+        Binding(get: { pickingIndex != nil }, set: { if !$0 { pickingIndex = nil } })
+    }
+
+    /// The person chooses a time here and confirms it; nothing is written until "Set time".
+    private var timePickerSheet: some View {
+        NavigationStack {
+            DatePicker("Time", selection: $pickedTime, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+                .padding()
+                .navigationTitle("Pick a time")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { pickingIndex = nil } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Set time") {
+                            if let i = pickingIndex {
+                                let c = Calendar.current.dateComponents([.hour, .minute], from: pickedTime)
+                                let v = String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+                                if i < draft.times.count { draft.times[i] = v } else { draft.times.append(v) }
+                            }
+                            pickingIndex = nil
+                        }
+                        .font(.headline)
+                    }
+                }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func pickTime(at i: Int) {
+        // The wheel starts at the current time; it is only a starting position, never saved unless confirmed.
+        pickedTime = Date()
+        pickingIndex = i
+    }
+
+    /// Why Save is blocked for a reminder's times, or nil.
+    private var timesProblem: LocalizedStringKey? {
+        guard hasSchedule else { return nil }
+        if draft.times.isEmpty { return "Add at least one time before saving." }
+        if draft.times != before.times && draft.times.contains(where: { ReminderScheduler.clock($0) == nil }) {
+            return "Pick a time for each row, or remove it."
+        }
+        return nil
     }
 
     private var scheduleSection: some View {
         Section {
             ForEach(draft.times.indices, id: \.self) { i in
                 HStack {
-                    DatePicker("Time", selection: timeValue(i), displayedComponents: .hourAndMinute)
+                    if ReminderScheduler.clock(draft.times[i]) != nil {
+                        DatePicker("Time", selection: timeValue(i), displayedComponents: .hourAndMinute)
+                    } else {
+                        // Unreadable value: show it as it is and ask for a real time. Never invent one.
+                        Button { pickTime(at: i) } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label("Not set — please pick a time", systemImage: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.primary)
+                                if !draft.times[i].isEmpty {
+                                    Text(verbatim: "“\(draft.times[i])”").font(.footnote).foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityHint(Text("Pick a time"))
+                    }
                     Button(role: .destructive) { draft.times.remove(at: i) } label: {
                         Image(systemName: "minus.circle.fill").font(.title3)
                             .frame(minWidth: 44, minHeight: 44)
@@ -534,10 +613,14 @@ struct SuggestionEditForm: View {
                 }
                 .highlightedRow(flagged("times"))
             }
-            Button { draft.times.append(draft.times.last ?? "08:00") } label: {
+            Button { pickTime(at: draft.times.count) } label: {
                 Label("Add a time", systemImage: "plus.circle").frame(minHeight: 44)
             }
             .highlightedRow(flagged("times") && draft.times.isEmpty)
+            if let problem = timesProblem {
+                Label(problem, systemImage: "exclamationmark.circle.fill")
+                    .font(.callout.weight(.medium)).foregroundStyle(.red)
+            }
             Picker("Repeats", selection: $draft.repeatRule) {
                 ForEach(repeatOptions, id: \.self) { r in
                     Text(AssistantFormat.repeatLabel(r) ?? String(localized: "Not set")).tag(r)
@@ -564,7 +647,10 @@ struct SuggestionEditForm: View {
     private func labeled(_ title: LocalizedStringKey, _ value: Binding<String>, _ key: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                if flagged(key) { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
+                if flagged(key) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        .accessibilityLabel(Text("Please check this"))
+                }
                 Text(title).font(.footnote).foregroundStyle(flagged(key) ? Color.primary : Color.secondary)
             }
             TextField(title, text: value, axis: .vertical).font(.body.weight(flagged(key) ? .semibold : .regular))
@@ -576,7 +662,10 @@ struct SuggestionEditForm: View {
     private func fieldHeader(_ title: LocalizedStringKey, _ on: Bool) -> some View {
         HStack(spacing: 6) {
             Text(title)
-            if on { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
+            if on {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    .accessibilityLabel(Text("Please check this"))
+            }
         }
     }
 
@@ -592,8 +681,10 @@ struct SuggestionEditForm: View {
 
     private func timeValue(_ i: Int) -> Binding<Date> {
         Binding(get: {
-            guard i < draft.times.count, let (h, m) = ReminderScheduler.clock(draft.times[i]) else { return defaultTime }
-            return Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) ?? defaultTime
+            // Only used for rows whose value parses; unreadable rows use the picker sheet instead.
+            guard i < draft.times.count, let (h, m) = ReminderScheduler.clock(draft.times[i]),
+                  let d = Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) else { return Date() }
+            return d
         }, set: { d in
             guard i < draft.times.count else { return }
             let c = Calendar.current.dateComponents([.hour, .minute], from: d)
@@ -601,9 +692,8 @@ struct SuggestionEditForm: View {
         })
     }
 
-    private var defaultTime: Date { Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date() }
-
     private func save() {
+        guard timesProblem == nil else { return }
         let changed = draft.changedKeys(from: before)
         onSave(changed.isEmpty ? nil : draft.apply(to: s.payload, changed: changed), changed, draft)
     }

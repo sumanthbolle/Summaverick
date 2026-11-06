@@ -58,6 +58,8 @@ struct HomeView: View {
             }
             .task { await reload() }
             .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await reload() } }
+            // Lets RootView hold a notification route until these close (Task 11 removes them).
+            .onChange(of: showRecorder || showSettings || showConsent) { _, open in PresentationGate.shared.set("home", open) }
         }
     }
 
