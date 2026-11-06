@@ -12,10 +12,16 @@ std::string truncate_utf8(const std::string &s, size_t max_bytes);
 // preferences, when over budget; truncate_utf8 as the last resort. Empty if nothing known.
 std::string always_block(Store &store, size_t max_bytes = 2000);
 
-// Memory facts and transcript pieces matching `query`; pieces are labelled [S<n>].
-std::string relevant_block(Store &store, const std::string &query, size_t max_bytes);
+struct Relevant {
+    std::string block;
+    json sources;  // [{"label":"S1","note_id":..,"start_sec":..,"title":..}], exactly the labels in block
+};
 
-// [{"label":"S1","note_id":..,"start_sec":..,"title":..}] in the same order as relevant_block.
-json relevant_sources(Store &store, const std::string &query);
+// Memory facts and transcript pieces matching `query`, within max_bytes. Whole items only
+// (pieces first, then facts); an oversized first piece is included truncated.
+Relevant relevant(Store &store, const std::string &query, size_t max_bytes);
+
+std::string relevant_block(Store &store, const std::string &query, size_t max_bytes);
+json relevant_sources(Store &store, const std::string &query, size_t max_bytes);
 
 } // namespace sve

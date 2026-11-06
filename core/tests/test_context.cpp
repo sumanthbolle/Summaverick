@@ -74,7 +74,7 @@ TEST(relevant_block_labels_sources) {
     CHECK(b.find("avoids salt") != std::string::npos);
     CHECK(b.find("@4:12") != std::string::npos);
     CHECK(b.find("@1:05") != std::string::npos);
-    json src = sve::relevant_sources(s, "salt");
+    json src = sve::relevant_sources(s, "salt", 2000);
     CHECK_EQ(src.size(), (size_t)2);
     CHECK_EQ(src[0]["label"].get<std::string>(), std::string("S1"));
     CHECK_EQ(src[0]["note_id"].get<int64_t>(), id);
@@ -83,4 +83,61 @@ TEST(relevant_block_labels_sources) {
     CHECK(first == 252 || first == 65);
     std::string tag = first == 252 ? "@4:12" : "@1:05";
     CHECK(b.find("[S1] Doctor visit " + tag) != std::string::npos);
+}
+
+TEST(relevant_budget_keeps_labels_and_sources_in_sync) {
+    Store s(":memory:");
+    int64_t id = s.create("Talk", "en", "a.m4a", "tx", 300);
+    json ps = json::array();
+    for (int i = 0; i < 6; i++) ps.push_back({{"start_sec", i * 10}, {"text", "salt note number " + std::to_string(i) + " with some padding words"}});
+    s.set_pieces(id, ps);
+    s.add_memory("fact", "avoids salt", std::nullopt);
+    for (size_t budget : {60u, 120u, 200u, 400u, 2000u}) {
+        sve::Relevant r = sve::relevant(s, "salt", budget);
+        CHECK(r.block.size() <= budget);
+        for (int k = 1; k <= 6; k++) {
+            bool in_block = r.block.find("[S" + std::to_string(k) + "]") != std::string::npos;
+            bool in_src = false;
+            for (auto &x : r.sources) if (x["label"].get<std::string>() == "S" + std::to_string(k)) in_src = true;
+            CHECK_EQ(in_block, in_src);
+        }
+        CHECK(sve::relevant_block(s, "salt", budget) == r.block);
+        CHECK(sve::relevant_sources(s, "salt", budget) == r.sources);
+    }
+    CHECK_EQ(sve::relevant(s, "salt", 2000).sources.size(), (size_t)6);
+    CHECK(sve::relevant(s, "salt", 200).sources.size() < 6);
+}
+
+TEST(relevant_oversized_first_piece_truncated_but_kept) {
+    Store s(":memory:");
+    int64_t id = s.create("Talk", "en", "a.m4a", "tx", 300);
+    s.set_pieces(id, json::parse(R"([{"start_sec":7,"text":"salt salt salt salt salt salt salt salt salt salt salt salt"}])"));
+    sve::Relevant r = sve::relevant(s, "salt", 50);
+    CHECK(r.block.size() <= 50);
+    CHECK(r.block.find("[S1]") != std::string::npos);
+    CHECK_EQ(r.sources.size(), (size_t)1);
+}
+
+TEST(always_block_drops_preferences_after_vocab) {
+    Store s(":memory:");
+    s.setting_set("profile", R"({"name":"Ravi"})");
+    for (int i = 0; i < 30; i++) s.add_memory("preference", "pref" + std::to_string(i) + " xxxxxxxxxx", std::nullopt);
+    s.add_memory("vocab", "zzvocab", std::nullopt);
+    std::string b = sve::always_block(s, 200);
+    CHECK(b.size() <= 200);
+    CHECK(b.find("zzvocab") == std::string::npos);
+    CHECK(b.find("pref29") != std::string::npos);
+    CHECK(b.find("pref0 ") == std::string::npos);
+    CHECK(b.find("Ravi") != std::string::npos);
+}
+
+TEST(always_block_malformed_profile_and_sparse_medicine) {
+    Store s(":memory:");
+    s.setting_set("profile", "{not json");
+    s.add_medicine(json::parse(R"({"name":"Metformin"})"));
+    s.add_medicine(json::parse(R"({"name":"","dose":"1 mg"})"));
+    std::string b = sve::always_block(s);
+    CHECK(b.find("About the person") == std::string::npos);
+    CHECK(b.find("- Metformin daily\n") != std::string::npos);
+    CHECK(b.find("1 mg") == std::string::npos);
 }

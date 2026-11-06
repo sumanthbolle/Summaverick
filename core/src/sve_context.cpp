@@ -52,9 +52,11 @@ std::string build_always(const json &profile, const json &meds, const std::vecto
         if (!r.empty()) about += "Routine: " + r + "\n";
     }
     if (!about.empty()) out += "About the person:\n" + about;
-    if (meds.is_array() && !meds.empty()) {
+    bool any_med = false;
+    if (meds.is_array()) for (const auto &m : meds) if (!str_of(m, "name").empty()) any_med = true;
+    if (any_med) {
         out += std::string(out.empty() ? "" : "\n") + "Medicines:\n";
-        for (const auto &m : meds) out += medicine_line(m) + "\n";
+        for (const auto &m : meds) if (!str_of(m, "name").empty()) out += medicine_line(m) + "\n";
     }
     if (pref_from < prefs.size()) {
         out += std::string(out.empty() ? "" : "\n") + "Preferences:\n";
@@ -122,35 +124,54 @@ std::string always_block(Store &store, size_t max_bytes) {
     return truncate_utf8(out, max_bytes);
 }
 
-std::string relevant_block(Store &store, const std::string &query, size_t max_bytes) {
+Relevant relevant(Store &store, const std::string &query, size_t max_bytes) {
     Selection sel = select_relevant(store, query);
-    std::string out;
-    if (!sel.facts.empty()) {
-        out += "Remembered facts:\n";
-        for (const auto &f : sel.facts) out += "- " + f + "\n";
-    }
-    if (!sel.pieces.empty()) {
-        out += std::string(out.empty() ? "" : "\n") + "From recordings:\n";
-        int n = 0;
-        for (const auto &p : sel.pieces) {
-            long long sec = p.contains("start_sec") && p["start_sec"].is_number() ? p["start_sec"].get<long long>() : 0;
-            out += "[S" + std::to_string(++n) + "] " + str_of(p, "title") + " " + timestamp(sec) + ": " +
-                   str_of(p, "text") + "\n";
+    Relevant r;
+    r.sources = json::array();
+    std::string pieces, facts;
+    const std::string phead = "From recordings:\n", fhead = "Remembered facts:\n";
+    size_t used = 0;
+    int n = 0;
+    for (const auto &p : sel.pieces) {
+        long long sec = p.contains("start_sec") && p["start_sec"].is_number() ? p["start_sec"].get<long long>() : 0;
+        std::string label = "S" + std::to_string(n + 1);
+        std::string line = "[" + label + "] " + str_of(p, "title") + " " + timestamp(sec) + ": " + str_of(p, "text") + "\n";
+        std::string add = (n == 0 ? phead : std::string()) + line;
+        if (used + add.size() > max_bytes) {
+            if (n == 0) {
+                pieces = truncate_utf8(add, max_bytes);
+                used = pieces.size();
+                if (pieces.find("[" + label + "]") == std::string::npos) break;
+                n = 1;
+                r.sources.push_back({{"label", label}, {"note_id", p.value("note_id", (int64_t)0)},
+                                     {"start_sec", p.value("start_sec", (int64_t)0)}, {"title", str_of(p, "title")}});
+            }
+            break;
         }
+        pieces += add;
+        used += add.size();
+        n++;
+        r.sources.push_back({{"label", label}, {"note_id", p.value("note_id", (int64_t)0)},
+                             {"start_sec", p.value("start_sec", (int64_t)0)}, {"title", str_of(p, "title")}});
     }
-    return truncate_utf8(out, max_bytes);
+    bool first = true;
+    for (const auto &f : sel.facts) {
+        std::string add = (first ? std::string(used ? "\n" : "") + fhead : std::string()) + "- " + f + "\n";
+        if (used + add.size() > max_bytes) break;
+        facts += add;
+        used += add.size();
+        first = false;
+    }
+    r.block = pieces + facts;
+    return r;
 }
 
-json relevant_sources(Store &store, const std::string &query) {
-    Selection sel = select_relevant(store, query);
-    json out = json::array();
-    int n = 0;
-    for (const auto &p : sel.pieces)
-        out.push_back({{"label", "S" + std::to_string(++n)},
-                       {"note_id", p.value("note_id", (int64_t)0)},
-                       {"start_sec", p.value("start_sec", (int64_t)0)},
-                       {"title", str_of(p, "title")}});
-    return out;
+std::string relevant_block(Store &store, const std::string &query, size_t max_bytes) {
+    return relevant(store, query, max_bytes).block;
+}
+
+json relevant_sources(Store &store, const std::string &query, size_t max_bytes) {
+    return relevant(store, query, max_bytes).sources;
 }
 
 } // namespace sve
