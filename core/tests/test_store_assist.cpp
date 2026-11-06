@@ -151,3 +151,17 @@ TEST(medicine_reminder_cascade_and_misc) {
     CHECK(s.dismiss_insight(i));
     CHECK(s.latest_insight().is_null());
 }
+
+TEST(search_pieces_matches_any_word_ranked) {
+    Store s(":memory:");
+    int64_t id = mk(s, "Doctor visit");
+    s.set_pieces(id, json::parse(R"([{"start_sec":0,"text":"the doctor checked BP"},{"start_sec":28,"text":"salt less than one teaspoon"},{"start_sec":56,"text":"doctor said salt is bad"}])"));
+    json r = s.search_pieces("doctor salt", 10);
+    CHECK_EQ(r.size(), (size_t)3);
+    CHECK_EQ(r[0]["start_sec"].get<int>(), 56);  // matches both words
+    CHECK_EQ(s.search_pieces("pickles", 10).size(), (size_t)0);
+    s.add_memory("fact", "no pickles", std::nullopt);
+    CHECK_EQ(s.search_memory("pickles sugar", 5).size(), (size_t)1);
+    // note search keeps AND semantics
+    CHECK_EQ(s.list("doctor zebra", 10).size(), (size_t)0);
+}

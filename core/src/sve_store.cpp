@@ -214,12 +214,13 @@ std::optional<NoteRow> Store::get(int64_t id) {
     return out;
 }
 
-// Turn free text into a tolerant FTS5 query: each word becomes a prefix term, ANDed.
-static std::string fts_query(const std::string &q) {
+// Turn free text into a tolerant FTS5 query: each word becomes a prefix term, ANDed
+// (or ORed when any_word, ranked by bm25 so pieces matching more words come first).
+static std::string fts_query(const std::string &q, bool any_word = false) {
     std::string out, word;
     auto flush = [&]() {
         if (word.empty()) return;
-        if (!out.empty()) out += " ";
+        if (!out.empty()) out += any_word ? " OR " : " ";
         out += "\"" + word + "\"*";
         word.clear();
     };
@@ -371,7 +372,8 @@ static json jtext(const json &v, bool null_ok = true) {
 }
 static json now_j() { return (int64_t)time(nullptr); }
 
-static std::string to_fts(const std::string &q) { return fts_query(q); }
+// Assistant searches match any word: questions carry words the piece never says.
+static std::string to_fts(const std::string &q) { return fts_query(q, true); }
 
 // pieces ---------------------------------------------------------------------
 
