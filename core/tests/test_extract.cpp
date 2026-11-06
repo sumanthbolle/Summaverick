@@ -62,3 +62,33 @@ TEST(prompt_contains_schema_and_today) {
     CHECK(p.find("CTX-BLOCK") != std::string::npos);
     CHECK(p.find("[t=0] hi") != std::string::npos);
 }
+
+TEST(leading_prose_with_braces) {
+    auto a = parse_extraction("Use {x}: {\"reminders\":[{\"text\":\"r\"}]}");
+    CHECK(a.ok);
+    CHECK_EQ(a.reminders.size(), (size_t)1);
+    auto b = parse_extraction("stray { brace then {\"topics\":[\"t\"]}");
+    CHECK(b.ok);
+    CHECK_EQ(b.topics.size(), (size_t)1);
+}
+
+TEST(wrong_typed_elements_dropped) {
+    auto e = parse_extraction(R"({"reminders":["take pill", null, {"text":"x"}],"vocab":[1,"BP"],"people":[null,"Ravi",{"a":1}]})");
+    CHECK(e.ok);
+    CHECK_EQ(e.reminders.size(), (size_t)1);
+    CHECK_EQ(e.vocab.size(), (size_t)1);
+    CHECK_EQ(e.vocab[0].get<std::string>(), std::string("BP"));
+    CHECK_EQ(e.people.size(), (size_t)1);
+}
+
+TEST(markers_tolerate_bad_pieces) {
+    json p = json::array({{{"text", "a"}}, {{"start_sec", "x"}, {"text", "b"}}, {{"start_sec", 5}, {"text", 7}}, "str", {{"start_sec", 9}, {"text", "c"}}});
+    CHECK_EQ(pieces_with_markers(p), std::string("[t=0] a\n[t=0] b\n[t=9] c\n"));
+}
+
+TEST(telugu_roundtrip) {
+    auto e = parse_extraction("```json\n{\"facts\":[{\"text\":\"మీరు రోజూ మాత్ర వేసుకోండి\",\"quote\":\"మాత్ర\"}],\"topics\":[\"ఆరోగ్యం\"]}\n```");
+    CHECK(e.ok);
+    CHECK_EQ(e.facts[0]["text"].get<std::string>(), std::string("మీరు రోజూ మాత్ర వేసుకోండి"));
+    CHECK_EQ(e.topics[0].get<std::string>(), std::string("ఆరోగ్యం"));
+}

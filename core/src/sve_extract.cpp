@@ -31,7 +31,8 @@ std::string extraction_prompt(const std::string &context_block,
          "- Write every \"text\" and \"detail\" field in the person's preferred language from the context above. "
          "Keys and the fixed values (repeat, change) stay in English.\n"
          "- Only statements clearly about the listener (\"you\", \"your\") go into \"profile\". "
-         "General talk about medicines never goes into \"profile\".\n"
+         "General talk about medicines never goes into \"profile\". "
+         "Other people's medicines and tasks never go into \"profile\": only the listener's own.\n"
          "- \"quote\" must be copied word-for-word from the transcript.\n"
          "- Each \"quote\" covers exactly one medicine: the shortest sentence that states it.\n"
          "- \"start_sec\" is the number in the [t=SEC] marker of the transcript line the quote is in.\n"
@@ -45,51 +46,61 @@ std::string extraction_prompt(const std::string &context_block,
     return p;
 }
 
-// Returns the first balanced {...} (respecting strings and escapes), or "".
-static std::string first_object(const std::string &s) {
-    size_t start = s.find('{');
-    while (start != std::string::npos) {
-        int depth = 0;
-        bool in_str = false, esc = false;
-        for (size_t i = start; i < s.size(); ++i) {
-            char c = s[i];
-            if (in_str) {
-                if (esc) esc = false;
-                else if (c == '\\') esc = true;
-                else if (c == '"') in_str = false;
-                continue;
-            }
-            if (c == '"') in_str = true;
-            else if (c == '{') ++depth;
-            else if (c == '}' && --depth == 0) return s.substr(start, i - start + 1);
+// End index (inclusive) of the balanced {...} starting at start, or npos.
+static size_t balanced_end(const std::string &s, size_t start) {
+    int depth = 0;
+    bool in_str = false, esc = false;
+    for (size_t i = start; i < s.size(); ++i) {
+        char c = s[i];
+        if (in_str) {
+            if (esc) esc = false;
+            else if (c == '\\') esc = true;
+            else if (c == '"') in_str = false;
+            continue;
         }
-        return "";  // unbalanced (truncated)
+        if (c == '"') in_str = true;
+        else if (c == '{') ++depth;
+        else if (c == '}' && --depth == 0) return i;
     }
-    return "";
+    return std::string::npos;
 }
 
-static json arr_or_empty(const json &o, const char *key) {
+// First balanced {...} that parses as a JSON object; skips stray braces in prose.
+static bool first_object(const std::string &s, json &out) {
+    for (size_t start = s.find('{'); start != std::string::npos; start = s.find('{', start + 1)) {
+        size_t end = balanced_end(s, start);
+        if (end == std::string::npos) continue;
+        try {
+            json j = json::parse(s.substr(start, end - start + 1));
+            if (j.is_object()) { out = std::move(j); return true; }
+        } catch (...) {}
+    }
+    return false;
+}
+
+// Array under key, keeping only objects (want_obj) or only strings.
+static json arr_of(const json &o, const char *key, bool want_obj) {
+    json out = json::array();
     auto it = o.find(key);
-    if (it != o.end() && it->is_array()) return *it;
-    return json::array();
+    if (it == o.end() || !it->is_array()) return out;
+    for (const auto &el : *it)
+        if (want_obj ? el.is_object() : el.is_string()) out.push_back(el);
+    return out;
 }
 
 Extracted parse_extraction(const std::string &model_output) {
     Extracted e;
     try {
-        // Fences need no special handling: leading prose and fence lines sit
-        // outside the first balanced object.
-        std::string obj = first_object(model_output);
-        if (obj.empty()) return e;
-        json j = json::parse(obj);
-        if (!j.is_object()) return e;
-        e.reminders = arr_or_empty(j, "reminders");
-        e.tasks = arr_or_empty(j, "tasks");
-        e.profile = arr_or_empty(j, "profile");
-        e.vocab = arr_or_empty(j, "vocab");
-        e.facts = arr_or_empty(j, "facts");
-        e.topics = arr_or_empty(j, "topics");
-        e.people = arr_or_empty(j, "people");
+        // Fences and leading prose sit outside the chosen object.
+        json j;
+        if (!first_object(model_output, j)) return e;
+        e.reminders = arr_of(j, "reminders", true);
+        e.tasks = arr_of(j, "tasks", true);
+        e.profile = arr_of(j, "profile", true);
+        e.vocab = arr_of(j, "vocab", false);
+        e.facts = arr_of(j, "facts", true);
+        e.topics = arr_of(j, "topics", false);
+        e.people = arr_of(j, "people", false);
         e.ok = true;
     } catch (...) {
         return Extracted();
@@ -103,9 +114,12 @@ std::string pieces_with_markers(const json &pieces) {
         if (!pieces.is_array()) return out;
         for (const auto &p : pieces) {
             if (!p.is_object()) continue;
-            long long sec = p.value("start_sec", 0LL);
-            std::string text = p.contains("text") && p["text"].is_string() ? p["text"].get<std::string>() : "";
-            out += "[t=" + std::to_string(sec) + "] " + text + "\n";
+            auto t = p.find("text");
+            if (t == p.end() || !t->is_string()) continue;
+            long long sec = 0;
+            auto st = p.find("start_sec");
+            if (st != p.end() && st->is_number_integer()) sec = st->get<long long>();
+            out += "[t=" + std::to_string(sec) + "] " + t->get<std::string>() + "\n";
         }
     } catch (...) {}
     return out;
