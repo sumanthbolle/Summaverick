@@ -11,7 +11,7 @@ final class Router {
     enum Tab: Hashable { case today, deepDive, ask }
 
     var tab: Tab = .today
-    /// Set to open a recording. startSec is kept for later; NoteDetailView does not seek yet.
+    /// Set to open a recording as RootView's sheet, from any tab; NoteDetailView starts at startSec.
     var openNote: (id: Int64, startSec: Int?)?
     /// Text to put into the Ask box when the Ask tab opens.
     var askDraft: String?
@@ -40,10 +40,12 @@ final class PresentationGate {
     }
 }
 
-/// Identifiable wrapper so the note sheet can use `sheet(item:)`.
-private struct NoteLink: Identifiable {
-    let id: Int64
+/// A moment in a recording: what a source link opens. Used by the note sheet (`sheet(item:)`) and as a
+/// navigation value inside a tab (Deep dive, the Edit form).
+struct NoteMoment: Identifiable, Hashable {
+    let noteID: Int64
     let startSec: Int?
+    var id: String { "\(noteID)@\(startSec.map(String.init) ?? "-")" }
 }
 
 struct RootView: View {
@@ -61,7 +63,7 @@ struct RootView: View {
         ZStack {
             tabContent(.today) { TodayView() }
             tabContent(.deepDive) { DeepDiveView() }
-            tabContent(.ask) { AskPlaceholderView() }
+            tabContent(.ask) { AskView() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !keyboardUp { RootTabBar(selection: $router.tab) { startRecordingFlow() } }
@@ -72,7 +74,7 @@ struct RootView: View {
         .sheet(isPresented: $router.showSettings, onDismiss: handlePendingRoute) { SettingsView().environment(settings) }
         .sheet(item: noteLink, onDismiss: handlePendingRoute) { link in
             NavigationStack {
-                NoteDetailView(noteID: link.id)
+                NoteDetailView(noteID: link.noteID, startAt: link.startSec)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) { Button("Done") { router.openNote = nil } }
                     }
@@ -109,10 +111,10 @@ struct RootView: View {
             .accessibilityHidden(!visible)
     }
 
-    private var noteLink: Binding<NoteLink?> {
+    private var noteLink: Binding<NoteMoment?> {
         Binding(
-            get: { router.openNote.map { NoteLink(id: $0.id, startSec: $0.startSec) } },
-            set: { router.openNote = $0.map { ($0.id, $0.startSec) } })
+            get: { router.openNote.map { NoteMoment(noteID: $0.id, startSec: $0.startSec) } },
+            set: { router.openNote = $0.map { ($0.noteID, $0.startSec) } })
     }
 
     private func startRecordingFlow() {
@@ -209,18 +211,5 @@ private struct RootTabBar: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Record"))
             }
-    }
-}
-
-/// Task 12 replaces this with the Ask screen.
-struct AskPlaceholderView: View {
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView("Ask Summaverick — coming soon",
-                                   systemImage: "bubble.left.and.bubble.right",
-                                   description: Text("Soon you can ask about anything you recorded."))
-                .navigationTitle("Ask")
-                .navigationBarTitleDisplayMode(.inline)
-        }
     }
 }

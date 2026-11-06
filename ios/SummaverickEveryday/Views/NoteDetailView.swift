@@ -1,17 +1,38 @@
+// One recording: title, summary / notes / questions / transcript, playback, and a question box.
+// Opened from source links at a moment (startAt): playback starts there and the transcript scrolls to
+// that piece. The transcript is shown in pieces with m:ss stamps; long-press a piece to fix a word.
 import AVFoundation
 import SwiftUI
+import UIKit
 
 struct NoteDetailView: View {
     let noteID: Int64
+    /// The second to open at (a source link, a reminder). nil = the start.
+    let startAt: Int?
+
     @State private var note: Note?
-    @State private var tab: Tab = .summary
+    @State private var loaded = false
+    @State private var pieces: [TranscriptPiece] = []
+    @State private var tab: Tab
     @State private var title = ""
     @State private var question = ""
     @State private var answer: String?
     @State private var asking = false
     @State private var pipeline = ProcessingPipeline.shared
     @State private var player: AVAudioPlayer?
+    @State private var playing = false
+    /// startAt has not been applied to playback yet (it is, on the first play).
+    @State private var seekPending: Bool
+    /// Index of the highlighted transcript piece (the source moment, or the last stamp tapped).
+    @State private var highlighted: Int?
+    @State private var scrollRequest: Int?
+    @State private var didScrollToStart = false
     @State private var confirmDelete = false
+    @State private var fixing: FixTarget?
+    @State private var shareItem: ShareItem?
+    @State private var errorMessage: String?
+    @State private var toast: String?
+    @State private var gateKey = "note.\(UUID().uuidString)"
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -19,91 +40,226 @@ struct NoteDetailView: View {
         var id: String { rawValue }
     }
 
+    init(noteID: Int64, startAt: Int? = nil) {
+        self.noteID = noteID
+        self.startAt = startAt
+        _tab = State(initialValue: startAt == nil ? .summary : .transcript)
+        _seekPending = State(initialValue: startAt != nil)
+    }
+
     private var isThisNoteBusy: Bool { pipeline.isBusy && pipeline.activeNoteID == noteID }
+    private var presenting: Bool { confirmDelete || fixing != nil || shareItem != nil || errorMessage != nil }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                TextField("Title", text: $title, axis: .vertical)
-                    .font(.title2.weight(.semibold))
-                    .onSubmit { saveTitle() }
-
-                if let n = note {
-                    HStack(spacing: 8) {
-                        Text(n.createdAt, format: .dateTime.day().month().year().hour().minute())
-                        if n.duration_seconds > 0 { Text("· \(Duration.seconds(n.duration_seconds).formatted(.time(pattern: .minuteSecond)))") }
-                        Text("· \(n.lang.uppercased())")
-                        if let p = n.audio_path, FileManager.default.fileExists(atPath: p) {
-                            Button { togglePlay(p) } label: { Image(systemName: player?.isPlaying == true ? "stop.circle" : "play.circle") }
-                        }
-                    }
-                    .font(.caption).foregroundStyle(.secondary)
-                }
-
-                if isThisNoteBusy {
-                    StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
-                } else if let failure = pipeline.lastFailure[noteID] {
-                    StatusBanner(stage: .failed(failure)).clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                Picker("Section", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-
-                content
-
-                if needsGeneration && !isThisNoteBusy {
-                    Button {
-                        Task { await pipeline.regenerate(noteID: noteID) }
-                    } label: { Label("Generate notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(pipeline.isBusy || !(hasTranscript || hasAudio))
-                }
-
-                askSection
+        Group {
+            if loaded && note == nil {
+                ContentUnavailableView("This came from a deleted recording.", systemImage: "trash.slash")
+            } else {
+                detail
             }
-            .padding()
         }
         .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await load() } }
+        .onChange(of: presenting) { _, open in PresentationGate.shared.set(gateKey, open) }
+        .onDisappear {
+            saveTitle()
+            stopPlayback()
+            PresentationGate.shared.set(gateKey, false)
+        }
+    }
+
+    private var detail: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    TextField("Title", text: $title, axis: .vertical)
+                        .font(.title2.weight(.semibold))
+                        .onSubmit { saveTitle() }
+
+                    if let n = note {
+                        HStack(spacing: 8) {
+                            Text(n.createdAt, format: .dateTime.day().month().year().hour().minute())
+                            if n.duration_seconds > 0 { Text("· \(Duration.seconds(n.duration_seconds).formatted(.time(pattern: .minuteSecond)))") }
+                            Text("· \(n.lang.uppercased())")
+                            if let p = audioPath {
+                                Button { togglePlay(p) } label: {
+                                    Image(systemName: playing ? "stop.circle" : "play.circle").font(.title2)
+                                        .frame(minWidth: 44, minHeight: 44)
+                                }
+                                .accessibilityLabel(playing ? Text("Stop") : Text("Play the recording"))
+                            }
+                        }
+                        .font(.caption).foregroundStyle(.secondary)
+                    }
+
+                    if isThisNoteBusy {
+                        StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else if let failure = pipeline.lastFailure[noteID] {
+                        StatusBanner(stage: .failed(failure)).clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+
+                    Picker("Section", selection: $tab) {
+                        ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+
+                    content
+
+                    if needsGeneration && !isThisNoteBusy {
+                        Button {
+                            Task { await pipeline.regenerate(noteID: noteID) }
+                        } label: { Label("Generate notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(pipeline.isBusy || !(hasTranscript || hasAudio))
+                    }
+
+                    askSection
+                }
+                .padding()
+            }
+            .onChange(of: scrollRequest) { _, i in
+                guard let i else { return }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(300))   // let the transcript lay out first
+                    withAnimation { proxy.scrollTo(pieceID(i), anchor: .center) }
+                    scrollRequest = nil
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let toast {
+                Text(verbatim: toast)
+                    .font(.callout.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.bottom, 24).padding(.horizontal)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if let text = shareText { ShareLink(item: text, subject: Text(title)) }
+                if let text = shareText {
+                    Button { shareItem = ShareItem(items: [text]) } label: { Image(systemName: "square.and.arrow.up") }
+                        .accessibilityLabel(Text("Share"))
+                }
                 Menu {
-                    if let url = exportFileURL() { ShareLink("Export as Markdown file", item: url) }
+                    if shareText != nil {
+                        Button {
+                            if let url = exportFileURL() { shareItem = ShareItem(items: [url]) }
+                        } label: { Label("Export as Markdown file", systemImage: "doc") }
+                    }
                     Button(role: .destructive) { confirmDelete = true } label: { Label("Delete note", systemImage: "trash") }
                 } label: { Image(systemName: "ellipsis.circle") }
+                .accessibilityLabel(Text("More options"))
             }
         }
         .confirmationDialog("Delete this note and its recording?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { deleteNote() }
         }
-        .task { await load() }
-        .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await load() } }
-        .onDisappear { saveTitle(); player?.stop() }
+        .sheet(item: $shareItem) { ActivityView(items: $0.items) }
+        .sheet(item: $fixing) { target in
+            FixWordSheet(pieceText: target.text) { word in Task { await saveWord(word) } }
+        }
+        .alert("Could not save this. Please try again.", isPresented: errorShown) {
+            Button("OK", role: .cancel) {}
+        }
     }
 
     @ViewBuilder private var content: some View {
-        let text: String? = {
-            guard let n = note else { return nil }
-            switch tab {
-            case .summary: return n.short_summary
-            case .notes: return n.detailed_notes
-            case .questions: return n.revision_questions
-            case .transcript: return n.transcript
-            }
-        }()
-        if let text, !text.isEmpty {
-            Text(markdown(text))
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        if tab == .transcript && !pieces.isEmpty {
+            piecesList
         } else {
-            Text(isThisNoteBusy ? "Being written…" : (tab == .transcript ? "No transcript." : "Not generated yet."))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 24)
+            let text: String? = {
+                guard let n = note else { return nil }
+                switch tab {
+                case .summary: return n.short_summary
+                case .notes: return n.detailed_notes
+                case .questions: return n.revision_questions
+                case .transcript: return n.transcript
+                }
+            }()
+            if let text, !text.isEmpty {
+                Text(markdown(text))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(isThisNoteBusy ? "Being written…" : (tab == .transcript ? "No transcript." : "Not generated yet."))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 24)
+            }
         }
     }
+
+    // MARK: transcript pieces
+
+    private func pieceID(_ i: Int) -> String { "piece-\(i)" }
+
+    private var piecesList: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(pieces.enumerated()), id: \.offset) { i, p in
+                pieceRow(i, p).id(pieceID(i))
+            }
+            Text("Touch and hold a part to fix a word.")
+                .font(.footnote).foregroundStyle(.secondary).padding(.top, 8)
+        }
+    }
+
+    private func pieceRow(_ i: Int, _ p: TranscriptPiece) -> some View {
+        let stamp = AssistantFormat.mmss(p.startSec)
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            if let path = audioPath {
+                Button { playFrom(path, p.startSec, piece: i) } label: {
+                    Text(verbatim: stamp).font(.callout.monospacedDigit().weight(.semibold))
+                        .frame(minWidth: 52, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .accessibilityLabel(Text("Play from \(stamp)"))
+            } else {
+                Text(verbatim: stamp).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                    .frame(minWidth: 52, alignment: .leading)
+            }
+            Text(verbatim: p.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 2)
+        .background(highlighted == i ? Color.yellow.opacity(0.28) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .contextMenu {
+            Button { fixing = FixTarget(text: p.text) } label: { Label("Fix a word", systemImage: "character.cursor.ibeam") }
+        }
+        .accessibilityAction(named: Text("Fix a word")) { fixing = FixTarget(text: p.text) }
+    }
+
+    private func saveWord(_ word: String) async {
+        let w = word.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !w.isEmpty else { return }
+        fixing = nil
+        let id = await CoreEngine.shared.addVocab(w)
+        guard id > 0 else { errorMessage = String(localized: "Could not save this. Please try again."); return }
+        NotificationCenter.default.post(name: .assistantChanged, object: nil)
+        showToast(String(localized: "Saved “\(w)”. Summaverick will remember this word."))
+    }
+
+    private func showToast(_ message: String) {
+        withAnimation { toast = message }
+        UIAccessibility.post(notification: .announcement, argument: message)
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            if toast == message { withAnimation { toast = nil } }
+        }
+    }
+
+    private var errorShown: Binding<Bool> {
+        Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
+    }
+
+    // MARK: ask about this recording
 
     private var askSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -113,19 +269,21 @@ struct NoteDetailView: View {
                 TextField("e.g. What was the homework?", text: $question)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { ask() }
-                Button { ask() } label: { Image(systemName: "paperplane.fill") }
+                Button { ask() } label: { Image(systemName: "paperplane.fill").frame(minWidth: 44, minHeight: 44) }
                     .disabled(question.isEmpty || asking || pipeline.isBusy)
+                    .accessibilityLabel(Text("Send"))
             }
             if asking { ProgressView().controlSize(.small) }
-            if let a = answer { Text(a).textSelection(.enabled).padding(.top, 4) }
+            if let a = answer { Text(verbatim: a).textSelection(.enabled).padding(.top, 4) }
         }
     }
 
-    private var hasTranscript: Bool { !(note?.transcript ?? "").isEmpty }
-    private var hasAudio: Bool {
-        guard let p = note?.audio_path else { return false }
-        return FileManager.default.fileExists(atPath: p)
+    private var audioPath: String? {
+        guard let p = note?.audio_path, FileManager.default.fileExists(atPath: p) else { return nil }
+        return p
     }
+    private var hasTranscript: Bool { !(note?.transcript ?? "").isEmpty }
+    private var hasAudio: Bool { audioPath != nil }
 
     private var needsGeneration: Bool {
         guard let n = note else { return false }
@@ -146,7 +304,7 @@ struct NoteDetailView: View {
         guard let text = shareText else { return nil }
         let safe = title.replacingOccurrences(of: "/", with: "-").prefix(60)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(safe).md")
-        try? text.write(to: url, atomically: true, encoding: .utf8)
+        do { try text.write(to: url, atomically: true, encoding: .utf8) } catch { return nil }
         return url
     }
 
@@ -166,13 +324,26 @@ struct NoteDetailView: View {
         return (try? AttributedString(markdown: cleaned, options: opts)) ?? AttributedString(s)
     }
 
+    // MARK: data
+
     private func load() async {
         let previous = note
-        note = await CoreEngine.shared.note(noteID)
-        guard let n = note else { return }
+        let n = await CoreEngine.shared.note(noteID)
+        let ps = await CoreEngine.shared.pieces(noteID)
+        note = n
+        pieces = ps
+        loaded = true
+        guard let n else { return }
         // Adopt the stored title unless the user has typed their own.
         let userEdited = previous != nil && title != previous!.title
         if !userEdited { title = n.title }
+        // Opened at a moment: show and highlight the piece it falls in (once).
+        if let startAt, !didScrollToStart, !ps.isEmpty {
+            didScrollToStart = true
+            let i = ps.lastIndex(where: { $0.startSec <= startAt }) ?? 0
+            highlighted = i
+            scrollRequest = i
+        }
     }
 
     private func saveTitle() {
@@ -190,7 +361,7 @@ struct NoteDetailView: View {
         Task {
             defer { asking = false }
             let mm = ModelManager.shared
-            guard mm.selectedInstalled else { answer = "Download the AI model in Settings first."; return }
+            guard mm.selectedInstalled else { answer = String(localized: "Download the AI model in Settings first."); return }
             do {
                 try await CoreEngine.shared.loadModel(at: mm.fileURL(for: mm.selected).path)
                 let context = [n.detailed_notes, t].compactMap { $0 }.joined(separator: "\n\n")
@@ -201,19 +372,125 @@ struct NoteDetailView: View {
         }
     }
 
+    // MARK: playback
+
     private func togglePlay(_ path: String) {
-        if let p = player, p.isPlaying { p.stop(); player = nil; return }
+        if let p = player, p.isPlaying { stopPlayback(); return }
+        let from = seekPending ? startAt : nil
+        seekPending = false
+        play(path, from: from)
+    }
+
+    /// A tapped m:ss stamp: play from there and highlight that piece.
+    private func playFrom(_ path: String, _ sec: Int, piece: Int) {
+        seekPending = false
+        highlighted = piece
+        play(path, from: sec)
+    }
+
+    private func play(_ path: String, from sec: Int?) {
         try? AVAudioSession.sharedInstance().setCategory(.playback)
-        player = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: path))
-        player?.play()
+        if player == nil { player = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: path)) }
+        guard let p = player else { return }
+        if let sec { p.currentTime = min(TimeInterval(max(0, sec)), max(0, p.duration - 0.5)) }
+        playing = p.play()
+    }
+
+    private func stopPlayback() {
+        player?.stop()
+        player = nil
+        playing = false
     }
 
     private func deleteNote() {
         Task {
+            stopPlayback()
             if let p = note?.audio_path { try? FileManager.default.removeItem(atPath: p) }
             await CoreEngine.shared.deleteNote(noteID)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
             dismiss()
+        }
+    }
+}
+
+/// The piece whose word is being fixed.
+private struct FixTarget: Identifiable {
+    let id = UUID()
+    let text: String
+}
+
+/// What the share sheet shares.
+private struct ShareItem: Identifiable {
+    let id = UUID()
+    let items: [Any]
+}
+
+/// The system share sheet, presented by this screen (so it can be registered with PresentationGate).
+private struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
+}
+
+/// "Fix a word": pick the word that was heard wrong (or type it), write it correctly, save.
+/// The word is the person's own edit, so it is added to Summaverick's vocabulary directly.
+private struct FixWordSheet: View {
+    let pieceText: String
+    let onSave: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var word = ""
+
+    private var words: [String] {
+        var seen = Set<String>()
+        return pieceText.split(whereSeparator: { $0.isWhitespace })
+            .map { $0.trimmingCharacters(in: .punctuationCharacters.union(.symbols)) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(verbatim: pieceText).font(.body)
+                } header: { Text("What was written") }
+
+                if !words.isEmpty {
+                    Section {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], alignment: .leading, spacing: 8) {
+                            ForEach(words, id: \.self) { w in
+                                Button { word = w } label: {
+                                    Text(verbatim: w).font(.body).lineLimit(1).minimumScaleFactor(0.7)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } header: { Text("Tap the word that is wrong") }
+                }
+
+                Section {
+                    TextField("Correct word", text: $word)
+                        .font(.title3)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .frame(minHeight: 44)
+                } header: { Text("Write it correctly") } footer: {
+                    Text("Summaverick will remember this word for your next recordings.")
+                }
+            }
+            .navigationTitle("Fix a word")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(word) }
+                        .font(.headline)
+                        .disabled(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
         }
     }
 }

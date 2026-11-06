@@ -165,6 +165,22 @@
         }
       }
     },
+    "Answers come only from your recordings, with a link to the moment they came from.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answers come only from your recordings, with a link to the moment they came from."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "జవాబులు మీ రికార్డింగ్‌ల నుంచే వస్తాయి. అవి ఎక్కడ విన్నాయో ఆ క్షణానికి లింక్ కూడా ఉంటుంది."
+          }
+        }
+      }
+    },
     "Ask": {
       "localizations": {
         "te": {
@@ -176,12 +192,98 @@
       },
       "comment": "Tab name"
     },
-    "Ask Summaverick — coming soon": {
+    "Ask about anything you recorded.": {
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask about anything you recorded."
+          }
+        },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverickని అడగండి — త్వరలో వస్తుంది"
+            "value": "మీరు రికార్డ్ చేసిన దేని గురించైనా అడగండి."
+          }
+        }
+      }
+    },
+    "Ask about this recording": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask about this recording"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ రికార్డింగ్ గురించి అడగండి"
+          }
+        }
+      }
+    },
+    "Ask about your recordings…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask about your recordings…"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌ల గురించి అడగండి…"
+          }
+        }
+      }
+    },
+    "Ask by voice": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask by voice"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మాట్లాడి అడగండి"
+          }
+        }
+      }
+    },
+    "Ask Summaverick": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask Summaverick"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverickని అడగండి"
+          }
+        }
+      }
+    },
+    "Ask Summaverick needs the Gemma 4 model. Your notes and recording still work.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask Summaverick needs the Gemma 4 model. Your notes and recording still work."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask Summaverickకి Gemma 4 మోడల్ కావాలి. మీ నోట్స్, రికార్డింగ్ ఎప్పటిలాగే పనిచేస్తాయి."
           }
         }
       }
@@ -212,6 +314,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "రికార్డ్ చేసే ముందు"
+          }
+        }
+      }
+    },
+    "Being written…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Being written…"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాస్తున్నాను…"
           }
         }
       }
@@ -299,6 +417,54 @@
       },
       "comment": "Kind of profile change"
     },
+    "Copied from your recordings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied from your recordings"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌ల నుంచి ఉన్నది ఉన్నట్టుగా"
+          }
+        }
+      }
+    },
+    "Correct word": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correct word"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సరైన పదం"
+          }
+        }
+      }
+    },
+    "Could not answer this. Please try again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not answer this. Please try again."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీనికి జవాబు ఇవ్వలేకపోయాను. మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
     "Could not make the summary.": {
       "localizations": {
         "te": {
@@ -325,6 +491,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "దీన్ని సేవ్ చేయలేకపోయాం. దయచేసి మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Could not start the microphone.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not start the microphone."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మైక్రోఫోన్ మొదలవ్వలేదు."
+          }
+        }
+      }
+    },
+    "Could not write down your question. Please try again, or type it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not write down your question. Please try again, or type it."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ ప్రశ్నను రాయలేకపోయాను. మళ్ళీ ప్రయత్నించండి, లేదా టైప్ చేయండి."
           }
         }
       }
@@ -360,6 +558,54 @@
         }
       },
       "comment": "Tab name: topics, people and the list of recordings"
+    },
+    "Delete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తొలగించు"
+          }
+        }
+      }
+    },
+    "Delete note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete note"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్ తొలగించు"
+          }
+        }
+      }
+    },
+    "Delete this note and its recording?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this note and its recording?"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ నోట్‌ను, దాని రికార్డింగ్‌ను తొలగించాలా?"
+          }
+        }
+      }
     },
     "Dinner": {
       "localizations": {
@@ -412,6 +658,22 @@
       },
       "comment": "Field name inside 'Look again at: …'"
     },
+    "Download the AI model in Settings first.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download the AI model in Settings first."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముందు సెట్టింగ్స్‌లో AI మోడల్‌ను డౌన్‌లోడ్ చేయండి."
+          }
+        }
+      }
+    },
     "Due": {
       "localizations": {
         "te": {
@@ -439,6 +701,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "గడువు: %@"
+          }
+        }
+      }
+    },
+    "e.g. What was the homework?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. What was the homework?"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఉదా: హోంవర్క్ ఏమిటి?"
           }
         }
       }
@@ -475,6 +753,38 @@
       },
       "comment": "How often a reminder repeats"
     },
+    "Export as Markdown file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export as Markdown file"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markdown ఫైల్‌గా పంపు"
+          }
+        }
+      }
+    },
+    "Fix a word": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fix a word"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పదం సరిచేయి"
+          }
+        }
+      }
+    },
     "From a deleted recording": {
       "localizations": {
         "te": {
@@ -491,6 +801,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "మీ ప్రొఫైల్ నుండి."
+          }
+        }
+      }
+    },
+    "Generate notes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate notes"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ తయారు చేయి"
           }
         }
       }
@@ -588,6 +914,38 @@
         }
       }
     },
+    "Hold the mic button while you speak.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold the mic button while you speak."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మాట్లాడేటప్పుడు మైక్ బటన్‌ను నొక్కి పట్టుకోండి."
+          }
+        }
+      }
+    },
+    "Hold to speak, then let go.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold to speak, then let go."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నొక్కి పట్టుకుని మాట్లాడండి, తర్వాత వదలండి."
+          }
+        }
+      }
+    },
     "How long": {
       "localizations": {
         "te": {
@@ -630,6 +988,22 @@
       },
       "comment": "Field name inside 'Look again at: …'"
     },
+    "I couldn't hear a question. Please try again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I couldn't hear a question. Please try again."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రశ్న వినపడలేదు. మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
     "I understand": {
       "localizations": {
         "te": {
@@ -670,6 +1044,22 @@
         }
       }
     },
+    "Listening… %lld s of 30. Let go to stop.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening… %lld s of 30. Let go to stop."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వింటున్నాను… 30లో %lld సెకన్లు. ఆపడానికి వదలండి."
+          }
+        }
+      }
+    },
     "Look again at: %@": {
       "localizations": {
         "te": {
@@ -691,12 +1081,44 @@
         }
       }
     },
+    "Make reminder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make reminder"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్ పెట్టు"
+          }
+        }
+      }
+    },
     "Make the summary": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "సారాంశం తయారు చేయండి"
+          }
+        }
+      }
+    },
+    "Make to-do": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make to-do"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చేయాల్సిన పనిగా పెట్టు"
           }
         }
       }
@@ -914,6 +1336,38 @@
         }
       }
     },
+    "No transcript.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No transcript."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాత ప్రతి లేదు."
+          }
+        }
+      }
+    },
+    "Not generated yet.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not generated yet."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా తయారు కాలేదు."
+          }
+        }
+      }
+    },
     "Not now": {
       "localizations": {
         "te": {
@@ -1116,6 +1570,38 @@
         }
       }
     },
+    "Play from %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play from %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ నుంచి వినిపించు"
+          }
+        }
+      }
+    },
+    "Play the recording": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play the recording"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ వినిపించు"
+          }
+        }
+      }
+    },
     "Please check": {
       "localizations": {
         "te": {
@@ -1126,6 +1612,22 @@
         }
       },
       "comment": "Yellow warning banner title on a suggestion"
+    },
+    "Please check the dose and time against your doctor's words above.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please check the dose and time against your doctor's words above."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పైన ఉన్న డాక్టర్ మాటలతో మోతాదు, సమయం సరిగ్గా ఉన్నాయో చూసుకోండి."
+          }
+        }
+      }
     },
     "Please check this": {
       "localizations": {
@@ -1144,6 +1646,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "క్విజ్"
+          }
+        }
+      }
+    },
+    "Quiz me": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quiz me"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నాకు క్విజ్ పెట్టు"
           }
         }
       }
@@ -1215,6 +1733,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "రిమైండర్"
+          }
+        }
+      }
+    },
+    "Reminder saved.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder saved."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్ సేవ్ అయింది."
           }
         }
       }
@@ -1291,12 +1825,60 @@
         }
       }
     },
+    "Saved “%@”. Summaverick will remember this word.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved “%@”. Summaverick will remember this word."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” సేవ్ అయింది. Summaverick ఈ పదాన్ని గుర్తుంచుకుంటుంది."
+          }
+        }
+      }
+    },
     "Search your notes": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "మీ నోట్స్‌లో వెతకండి"
+          }
+        }
+      }
+    },
+    "Section": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Section"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "విభాగం"
+          }
+        }
+      }
+    },
+    "Send": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పంపు"
           }
         }
       }
@@ -1341,6 +1923,22 @@
         }
       }
     },
+    "Share": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పంచుకో"
+          }
+        }
+      }
+    },
     "Shows the answer": {
       "localizations": {
         "te": {
@@ -1371,16 +1969,6 @@
         }
       }
     },
-    "Soon you can ask about anything you recorded.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "మీరు రికార్డ్ చేసిన ఏ విషయం గురించైనా త్వరలో అడగవచ్చు."
-          }
-        }
-      }
-    },
     "Starts": {
       "localizations": {
         "te": {
@@ -1392,6 +1980,22 @@
       },
       "comment": "Label before a start date"
     },
+    "Stop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆపు"
+          }
+        }
+      }
+    },
     "Stop a medicine": {
       "localizations": {
         "te": {
@@ -1402,6 +2006,22 @@
         }
       },
       "comment": "Kind of profile change"
+    },
+    "Stop and write down my question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop and write down my question"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆపి, నా ప్రశ్నను రాయి"
+          }
+        }
+      }
     },
     "Suggestion": {
       "localizations": {
@@ -1423,12 +2043,76 @@
         }
       }
     },
+    "Summarise this week": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summarise this week"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ వారం సారాంశం"
+          }
+        }
+      }
+    },
     "Summary": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "సారాంశం"
+          }
+        }
+      }
+    },
+    "Summaverick is writing an answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick is writing an answer"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick జవాబు రాస్తోంది"
+          }
+        }
+      }
+    },
+    "Summaverick will remember this word for your next recordings.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick will remember this word for your next recordings."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ తర్వాతి రికార్డింగ్‌ల కోసం Summaverick ఈ పదాన్ని గుర్తుంచుకుంటుంది."
+          }
+        }
+      }
+    },
+    "Summaverick's answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick's answer"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick జవాబు"
           }
         }
       }
@@ -1449,6 +2133,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "పాఠం, సమావేశం లేదా మీ ఆలోచనను రికార్డ్ చేయడానికి రికార్డ్ నొక్కండి. నోట్స్ ఈ ఫోన్‌లోనే తయారవుతాయి, బయటకు వెళ్లవు."
+          }
+        }
+      }
+    },
+    "Tap the word that is wrong": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the word that is wrong"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తప్పుగా ఉన్న పదాన్ని తాకండి"
+          }
+        }
+      }
+    },
+    "That time has passed today. Pick a later time, or choose how often it repeats.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That time has passed today. Pick a later time, or choose how often it repeats."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ రోజు ఆ సమయం దాటిపోయింది. తర్వాతి సమయం ఎంచుకోండి, లేదా ఎంత తరచుగా రావాలో ఎంచుకోండి."
+          }
+        }
+      }
+    },
+    "The microphone is off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The microphone is off"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మైక్రోఫోన్ ఆఫ్‌లో ఉంది"
+          }
+        }
+      }
+    },
+    "The microphone is ready. Hold the mic button and speak.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The microphone is ready. Hold the mic button and speak."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మైక్రోఫోన్ సిద్ధంగా ఉంది. మైక్ బటన్‌ను నొక్కి పట్టుకుని మాట్లాడండి."
           }
         }
       }
@@ -1546,12 +2294,60 @@
         }
       }
     },
+    "Title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "శీర్షిక"
+          }
+        }
+      }
+    },
+    "To ask by voice, allow the microphone for Summaverick in Settings. You can still type your question.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To ask by voice, allow the microphone for Summaverick in Settings. You can still type your question."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మాట్లాడి అడగాలంటే, సెట్టింగ్స్‌లో Summaverickకి మైక్రోఫోన్ అనుమతి ఇవ్వండి. అప్పటివరకు మీ ప్రశ్నను టైప్ చేయవచ్చు."
+          }
+        }
+      }
+    },
     "To do": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "చేయాల్సినవి"
+          }
+        }
+      }
+    },
+    "To-do saved.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-do saved."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పని సేవ్ అయింది."
           }
         }
       }
@@ -1593,6 +2389,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "మీ రికార్డింగ్‌లను Gemma 4 ప్రాసెస్ చేసిన తర్వాత అంశాలు ఇక్కడ కనిపిస్తాయి."
+          }
+        }
+      }
+    },
+    "Touch and hold a part to fix a word.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touch and hold a part to fix a word."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఏదైనా పదం సరిచేయడానికి ఆ భాగాన్ని నొక్కి పట్టుకోండి."
           }
         }
       }
@@ -1680,6 +2492,38 @@
       },
       "comment": "Heading above the exact quoted words from the recording"
     },
+    "What was written": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What was written"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాసింది ఇది"
+          }
+        }
+      }
+    },
+    "What's due?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's due?"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఏమి చేయాలి?"
+          }
+        }
+      }
+    },
     "When": {
       "localizations": {
         "te": {
@@ -1732,6 +2576,54 @@
       },
       "comment": "Edit form: the reminder or to-do text"
     },
+    "Write it correctly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write it correctly"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సరిగ్గా రాయండి"
+          }
+        }
+      }
+    },
+    "Write what this is about before saving.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write what this is about before saving."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సేవ్ చేసే ముందు ఇది దేని గురించో రాయండి."
+          }
+        }
+      }
+    },
+    "Writing down your question…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writing down your question…"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ ప్రశ్నను రాస్తున్నాను…"
+          }
+        }
+      }
+    },
     "Yes": {
       "localizations": {
         "te": {
@@ -1742,12 +2634,44 @@
         }
       }
     },
+    "You asked: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You asked: %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు అడిగింది: %@"
+          }
+        }
+      }
+    },
     "Your name, your day and your medicines help Summaverick time reminders for you.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "మీ పేరు, మీ దినచర్య, మీ మందులు తెలిస్తే Summaverick సరైన సమయానికి రిమైండర్లు పెడుతుంది."
+          }
+        }
+      }
+    },
+    "· %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· %@"
           }
         }
       }

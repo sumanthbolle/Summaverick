@@ -145,6 +145,10 @@
 			isa = PBXBuildFile;
 			fileRef = 0A726C07BA65E563FB374790;
 		};
+		ECB5419178B062460383B28A = {
+			isa = PBXBuildFile;
+			fileRef = EAF88B4A3FB9A8689FADBD2C;
+		};
 		F5DF4BFB0174304CA2197095 = {
 			isa = PBXBuildFile;
 			fileRef = 4E9F0134C12B9B82D2B2A856;
@@ -446,6 +450,13 @@
 			path = ../core/src/sve_context.h;
 			sourceTree = SOURCE_ROOT;
 		};
+		EAF88B4A3FB9A8689FADBD2C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AskView.swift;
+			path = SummaverickEveryday/Views/Ask/AskView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		EE7D0A38215CFAEEF0A0E2BE = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -578,6 +589,7 @@
 				68491ED0F099EABFEEBED4FC,
 				25B8EA0EC84CD169EC13005D,
 				9808AA3855D4662F673FBFD8,
+				BECA9321D0D66DAD007659AB,
 				3A82B61681BFF18BB638B388,
 				14170FB9E149C3DD932A78DD,
 				F86C9C201E773F26CECBA845,
@@ -598,6 +610,14 @@
 				DCE021A147EA4FBC88B74354,
 			);
 			name = Views;
+			sourceTree = "<group>";
+		};
+		BECA9321D0D66DAD007659AB = {
+			isa = PBXGroup;
+			children = (
+				EAF88B4A3FB9A8689FADBD2C,
+			);
+			name = Views/Ask;
 			sourceTree = "<group>";
 		};
 		D8254DAFFA2E6457E23C3B03 = {
@@ -724,6 +744,7 @@
 				5809D5B858D8CE07F8518B8C,
 				74F26ED096628426F957DD0E,
 				E38796377CD701DE27D4E42D,
+				ECB5419178B062460383B28A,
 				8FB71A3DAC10CCF263B21175,
 				9543CFE6FE3AF9374A448E0F,
 				B65B60C3D1ED1A91BF301F39,

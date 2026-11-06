@@ -111,7 +111,7 @@ struct TopicDetailView: View {
                         Text(verbatim: s.summary).font(.body)
                     }
                     ForEach(s.sources) { src in
-                        NavigationLink(value: src.noteID) {
+                        NavigationLink(value: NoteMoment(noteID: src.noteID, startSec: src.startSec)) {
                             Text(verbatim: "▶ \(src.title.isEmpty ? String(localized: "Recording") : src.title) @\(AssistantFormat.mmss(src.startSec))")
                                 .font(.subheadline).foregroundStyle(Color.accentColor)
                                 .frame(minHeight: 44, alignment: .leading)
@@ -206,7 +206,7 @@ struct TopicDetailView: View {
                 }
                 .frame(minHeight: 44, alignment: .leading)
                 if let id = t.noteID, !t.fromDeleted {
-                    NavigationLink(value: id) { row }
+                    NavigationLink(value: NoteMoment(noteID: id, startSec: t.startSec)) { row }
                 } else {
                     row
                 }

@@ -448,8 +448,18 @@ struct SuggestionDraft: Equatable {
     }
 }
 
+/// What an Edit form opened from an Ask answer ("Make reminder" / "Make to-do") shows in place of the
+/// recorded quote: the answer exactly as it was given.
+struct AnswerContext: Equatable {
+    let text: String
+    /// A medicine answer: built in the core from saved facts and recorded words; shown quoted, never changed.
+    let medicine: Bool
+}
+
 struct SuggestionEditForm: View {
     let noteTitle: String?
+    /// Set when the form was opened from an Ask answer.
+    let answer: AnswerContext?
     /// The edited payload (nil when nothing changed), the changed field names and the form's values.
     let onSave: (SuggestionPayload?, Set<String>, SuggestionDraft) -> Void
 
@@ -468,12 +478,13 @@ struct SuggestionEditForm: View {
     @State private var picking: Picking?
     /// The wheel's starting position only; nothing is written until the person confirms.
     @State private var pickedDate = Date()
-    @State private var openNoteID: Int64?
+    @State private var openMoment: NoteMoment?
 
     /// resume: earlier unsaved values to start from. Changes are always measured against the suggestion itself.
-    init(suggestion: Suggestion, noteTitle: String?, resume: SuggestionDraft? = nil,
+    init(suggestion: Suggestion, noteTitle: String?, resume: SuggestionDraft? = nil, answer: AnswerContext? = nil,
          onSave: @escaping (SuggestionPayload?, Set<String>, SuggestionDraft) -> Void) {
         self.noteTitle = noteTitle
+        self.answer = answer
         self.onSave = onSave
         let d = SuggestionDraft(suggestion.payload)
         _original = State(initialValue: suggestion)
@@ -493,12 +504,20 @@ struct SuggestionEditForm: View {
                     Section { PleaseCheckBanner(fields: s.checkFields) }
                         .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                 }
-                Section { QuoteBlock(suggestion: s, noteTitle: noteTitle) { id, _ in openNoteID = id } }
+                if let answer {
+                    answerSection(answer)
+                } else {
+                    Section { QuoteBlock(suggestion: s, noteTitle: noteTitle) { id, sec in openMoment = NoteMoment(noteID: id, startSec: sec) } }
+                }
 
                 Section {
                     TextField("Wording", text: $draft.text, axis: .vertical)
                         .lineLimit(2...6)
                         .highlightedRow(flagged("text"))
+                    if textMissing {
+                        Label("Write what this is about before saving.", systemImage: "exclamationmark.circle.fill")
+                            .font(.callout.weight(.medium)).foregroundStyle(.red)
+                    }
                 } header: { fieldHeader("Wording", flagged("text")) }
 
                 if hasMedicine {
@@ -531,12 +550,12 @@ struct SuggestionEditForm: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.font(.headline).disabled(timesProblem != nil)
+                    Button("Save") { save() }.font(.headline).disabled(timesProblem != nil || textMissing)
                 }
             }
             // The ▶ link opens the recording inside this sheet, so the edits are kept.
-            .navigationDestination(item: $openNoteID) { id in
-                NoteDetailView(noteID: id).environment(settings).environment(router)
+            .navigationDestination(item: $openMoment) { m in
+                NoteDetailView(noteID: m.noteID, startAt: m.startSec).environment(settings).environment(router)
             }
             .sheet(item: $picking) { pickerSheet($0) }
         }
@@ -618,7 +637,58 @@ struct SuggestionEditForm: View {
         if draft.times != before.times && draft.times.contains(where: { ReminderScheduler.clock($0) == nil }) {
             return "Pick a time for each row, or remove it."
         }
+        // A new one-time reminder starts today; if every time has passed it would never ring.
+        if answer != nil, s.kind == .reminder, draft.repeatRule.isEmpty || draft.repeatRule == "once",
+           draft.times.allSatisfy(Self.hasPassedToday) {
+            return "That time has passed today. Pick a later time, or choose how often it repeats."
+        }
         return nil
+    }
+
+    private static func hasPassedToday(_ hhmm: String) -> Bool {
+        guard let (h, m) = ReminderScheduler.clock(hhmm),
+              let d = Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) else { return false }
+        return d <= Date()
+    }
+
+    /// A reminder or to-do the person makes from an answer needs words (the core refuses empty text).
+    private var textMissing: Bool {
+        answer != nil && draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The answer exactly as given, its source link, and for medicine a reminder to check against the doctor's words.
+    private func answerSection(_ a: AnswerContext) -> some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(a.medicine ? "Copied from your recordings" : "Summaverick's answer")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 10) {
+                    RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)
+                        .accessibilityHidden(true)
+                    Text(verbatim: a.text).font(a.medicine ? .body.italic() : .body).textSelection(.enabled)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                if let id = s.noteID {
+                    let title = noteTitle.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Recording")
+                    Button { openMoment = NoteMoment(noteID: id, startSec: s.startSec) } label: {
+                        Text(verbatim: "▶ \(title) @\(AssistantFormat.mmss(s.startSec ?? 0))")
+                            .font(.subheadline.weight(.medium))
+                            .multilineTextAlignment(.leading)
+                            .frame(minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityLabel(Text("Open the recording: \(title)"))
+                }
+            }
+            if a.medicine {
+                Label("Please check the dose and time against your doctor's words above.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .listRowBackground(Color.yellow.opacity(0.3))
+            }
+        }
     }
 
     private var scheduleSection: some View {

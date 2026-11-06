@@ -44,6 +44,7 @@ struct DeepDiveView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Int64.self) { NoteDetailView(noteID: $0) }
+            .navigationDestination(for: NoteMoment.self) { NoteDetailView(noteID: $0.noteID, startAt: $0.startSec) }
             .navigationDestination(for: TopicRoute.self) { TopicDetailView(route: $0) }
         }
     }
