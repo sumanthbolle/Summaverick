@@ -237,6 +237,10 @@ DoseFit dose_fit(const json &s, const json &row, const std::string &dose, bool d
 }
 
 int64_t accept_reminder(sve::Store &st, const json &s, const json &p, bool dose_edited) {
+    // Never filled in on Yes: a reminder without a time is refused (the app opens Edit instead).
+    // Checked before any medicine is created, updated or superseded.
+    std::vector<std::string> times = sve::valid_times(jarr(p, "times"));
+    if (times.empty()) return -1;
     json med = jobj(p, "medicine");
     const std::string name = jstr(med, "name");
     json med_id = int_or_null(s, "medicine_id");
@@ -271,9 +275,6 @@ int64_t accept_reminder(sve::Store &st, const json &s, const json &p, bool dose_
     }
     std::string text = name.empty() ? jstr(p, "text") : sve::reminder_text(shown, jstr(med, "dose"), lang_of(st));
     if (text.empty()) return -1;
-    // Never filled in on Yes: a reminder without a time is refused (the app opens Edit instead).
-    std::vector<std::string> times = sve::valid_times(jarr(p, "times"));
-    if (times.empty()) return -1;
     std::string rep = sve::sanitize_repeat(jstr(p, "repeat"));
     if (rep.empty()) rep = !med_id.is_null() ? "daily" : "once";
     std::string start = jstr(p, "start_date"), until = jstr(p, "until_date");

@@ -614,6 +614,13 @@ static void run_api_final(sve_ctx *ctx) {
     json qz = take(sve_assistant_ask(ctx, "Should I continue Zincovit?", nullptr, nullptr));
     expect(qa.is_object() && qa["medicine"] == true && qz.is_object() && qz["medicine"] == true,
            "names from rejected and superseded cards still route to the medicine answer");
+    // Minor (c): a Yes on a reminder card with no times writes nothing, not even the medicine.
+    int64_t nt = add_sugg(ctx, {{"kind", "reminder"}, {"note_id", nullptr}, {"start_sec", 0}, {"quote", "Shelcal 500 mg after lunch"},
+                                {"check_status", "check"}, {"check_fields", json::array({"times"})},
+                                {"payload", {{"text", "Take Shelcal 500 mg"}, {"times", json::array()}, {"repeat", "daily"},
+                                             {"medicine", {{"name", "Shelcal"}, {"dose", "500 mg"}, {"when_text", "after lunch"}}}}}});
+    expect(sve_suggestion_accept(ctx, nt, nullptr) == -1 && med_named(ctx, "Shelcal").is_null(),
+           "empty-times Yes: -1 and no medicine created");
     int64_t same = sve_medicine_save(ctx, (R"({"id":)" + std::to_string(u) + R"(,"dose":"200 mg"})").c_str());
     expect(same == u && card(u).is_object(), "unchanged save: still saved, card proposed");
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
