@@ -97,6 +97,10 @@
 			isa = PBXBuildFile;
 			fileRef = 3E8C99285C2BD28FE0ECE99B;
 		};
+		B939673027A07B580BF6B7A1 = {
+			isa = PBXBuildFile;
+			fileRef = 892E4DF51BC5A1D8EB706A7A;
+		};
 		CE05B940BCBE599A11AE22E8 = {
 			isa = PBXBuildFile;
 			fileRef = 171A4CC9E4CFD6CB1704585A;
@@ -285,6 +289,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = SuggestionCard.swift;
 			path = SummaverickEveryday/Views/Today/SuggestionCard.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		892E4DF51BC5A1D8EB706A7A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			name = Localizable.xcstrings;
+			path = SummaverickEveryday/Localizable.xcstrings;
 			sourceTree = SOURCE_ROOT;
 		};
 		8B7A0A18322F15224FEF40CC = {
@@ -540,6 +551,7 @@
 				29A1CD6197C4EBF318C20726,
 				8C247BC7003BBE5F71E1479C,
 				FC581254F5C135DB22FD9C42,
+				892E4DF51BC5A1D8EB706A7A,
 			);
 			name = SummaverickEveryday;
 			sourceTree = "<group>";
@@ -659,6 +671,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				334316FE5AD49DBFE79A28C1,
+				B939673027A07B580BF6B7A1,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
