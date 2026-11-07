@@ -146,3 +146,11 @@ TEST(section_prompt_mentions_language_and_starts) {
     CHECK(en.find("English") != std::string::npos);
     CHECK(en.find("Telugu") == std::string::npos);
 }
+
+TEST(parse_section_summary_survives_huge_start_sec) {
+    json s;
+    CHECK(parse_section_summary("{\"title\":\"T\",\"points\":[{\"text\":\"a\",\"start_sec\":1e300},"
+                                "{\"text\":\"b\",\"start_sec\":-1e300}]}", kStarts, s));
+    CHECK_EQ(s["points"][0]["start_sec"].get<int64_t>(), (int64_t)0);
+    CHECK_EQ(s["points"][1]["start_sec"].get<int64_t>(), (int64_t)0);
+}

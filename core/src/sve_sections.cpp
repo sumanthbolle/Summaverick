@@ -1,6 +1,8 @@
 #include "sve_sections.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cmath>
 #include <cstdlib>
 
 using nlohmann::json;
@@ -87,7 +89,10 @@ bool parse_section_summary(const std::string &model_out, const std::vector<int64
             if (points.size() >= 6) break;
             if (!e.is_object() || !e.contains("text") || !e["text"].is_string() || e["text"].get<std::string>().empty()) continue;
             int64_t s = 0;
-            if (e.contains("start_sec") && e["start_sec"].is_number()) s = e["start_sec"].get<int64_t>();
+            if (e.contains("start_sec") && e["start_sec"].is_number()) {
+                double d = e["start_sec"].get<double>();  // non-finite or absurd values count as 0, then clamp to a piece
+                if (std::isfinite(d) && std::fabs(d) < 1e12) s = (int64_t)d;
+            }
             if (!piece_starts.empty()) {
                 int64_t best = piece_starts[0];
                 for (int64_t c : piece_starts) if (std::llabs(c - s) < std::llabs(best - s)) best = c;

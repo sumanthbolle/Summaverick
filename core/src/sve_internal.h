@@ -21,6 +21,9 @@
 // Logging: routes to the host callback (sve_set_log) or stderr.
 void sve_logf(int level, const char *fmt, ...);
 
+// Test hook: output token cap of sve_section_summarize (smoke sets a tiny value to force the fallback).
+extern int g_sve_section_max_out;
+
 struct sve_ctx {
     std::unique_ptr<sve::Store> store;
     std::unique_ptr<sve::Llm> llm;

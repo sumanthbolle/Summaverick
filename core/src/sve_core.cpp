@@ -268,6 +268,8 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
     return true;
 }
 
+int g_sve_section_max_out = 512;
+
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang_c, sve_progress_cb cb, void *user) {
     try {
         if (!ctx || !ctx->llm || !pieces_json) return nullptr;
@@ -277,14 +279,15 @@ char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *l
         if (!arr.is_array()) return nullptr;
         for (const auto &e : arr) {
             if (!e.is_object() || !e.contains("text") || !e["text"].is_string()) continue;
+            if (e["text"].get<std::string>().find_first_not_of(" \t\r\n") == std::string::npos) continue;  // blank piece
             int64_t s = e.contains("start_sec") && e["start_sec"].is_number() ? e["start_sec"].get<int64_t>() : 0;
             pieces.push_back({s, e["text"].get<std::string>()});
             starts.push_back(s);
         }
-        if (pieces.empty()) return nullptr;
+        if (pieces.empty()) return nullptr;  // no piece has text: nothing to summarise
         sve::Llm &llm = *ctx->llm;
         const std::string lang = lang_c ? lang_c : "en";
-        const int kMaxOut = 512;
+        const int kMaxOut = g_sve_section_max_out;
         const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
         const std::string prompt = llm.apply_template(
             sys, sve::section_prompt(pieces, lang, sve::transcription_vocab_line(*ctx->store, 400)));
@@ -293,7 +296,18 @@ char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *l
         if (llm.count_tokens(prompt) + kMaxOut + 16 > llm.n_ctx) return dump(sve::fallback_section_summary(pieces));
         for (int attempt = 0; attempt < 2; ++attempt) {  // sampled, then greedy
             std::string out;
-            if (!llm.complete(prompt, kMaxOut, out, cb, user, "section", attempt, 2, attempt == 1)) return nullptr;
+            // Only a cancel from the host ends the call; any other failure goes on to the retry, then the fallback.
+            struct Watch { sve_progress_cb cb; void *user; bool cancelled; } w{cb, user, false};
+            auto watch = [](const char *ph, int d, int t, void *u) -> int {
+                Watch *x = static_cast<Watch *>(u);
+                if (x->cb && x->cb(ph, d, t, x->user)) x->cancelled = true;
+                return x->cancelled ? 1 : 0;
+            };
+            if (!llm.complete(prompt, kMaxOut, out, watch, &w, "section", attempt, 2, attempt == 1)) {
+                if (w.cancelled) return nullptr;
+                sve_logf(1, "section summary attempt %d failed", attempt + 1);
+                continue;
+            }
             sve::json j;
             if (sve::parse_section_summary(strip_thinking(out), starts, j)) return dump(j);
             sve_logf(1, "section summary attempt %d did not parse", attempt + 1);

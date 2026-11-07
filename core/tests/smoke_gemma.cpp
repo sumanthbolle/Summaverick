@@ -761,7 +761,10 @@ done:
 
 // Transcribes the WAV piece by piece (as live does), plans ~5 minute sections, summarises each and prints
 // the JSON with the seconds it took. Expects a title and 1..6 points per section; "fallback" is reported.
+// SVE_SECTION_MAX_OUT=8 truncates every answer, so the retry and the fallback path run and must still return a summary.
 static int run_sections(sve_ctx *ctx, const char *wav, const char *lang) {
+    if (const char *m = getenv("SVE_SECTION_MAX_OUT")) g_sve_section_max_out = atoi(m);
+    const bool force_fb = getenv("SVE_SECTION_MAX_OUT") != nullptr;
     std::vector<std::pair<int64_t, std::string>> pieces;
     int64_t cursor = 0;
     double dur = 0;
@@ -792,6 +795,7 @@ static int run_sections(sve_ctx *ctx, const char *wav, const char *lang) {
         expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 6,
                "section summary has a title and 1..6 points");
         if (s.value("fallback", false)) printf("(fallback used)\n");
+        if (force_fb) expect(s.value("fallback", false), "forced truncation returns the fallback summary");
     }
     return 0;
 }
@@ -809,7 +813,7 @@ int main(int argc, char **argv) {
     }
     if (!gguf) { fprintf(stderr, "set SVE_GEMMA\n"); return 2; }
     const bool live = !strcmp(mode, "live") || !strcmp(mode, "sections");
-    // live runs as on the phone: CPU only (the projector follows), 4 threads.
+    // live and sections run as on the phone: CPU only (the projector follows), 4 threads.
     if (sve_load_llm(ctx, gguf, 8192, live ? 4 : 0, live ? 0 : 99) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
     if (live) {
         const bool sections = !strcmp(mode, "sections");
