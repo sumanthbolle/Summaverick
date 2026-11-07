@@ -762,7 +762,7 @@ done:
 // Transcribes the WAV piece by piece (as live does), plans ~5 minute sections, summarises each and prints
 // the JSON with the seconds it took. Expects a title and 1..6 points per section; "fallback" is reported.
 // SVE_SECTION_MAX_OUT=8 truncates every answer, so the retry and the fallback path run and must still return a summary.
-static int run_sections(sve_ctx *ctx, const char *wav, const char *lang) {
+static int run_sections(sve_ctx *ctx, const char *wav, const char *lang, json *stored = nullptr, double *dur_out = nullptr) {
     if (const char *m = getenv("SVE_SECTION_MAX_OUT")) g_sve_section_max_out = atoi(m);
     const bool force_fb = getenv("SVE_SECTION_MAX_OUT") != nullptr;
     std::vector<std::pair<int64_t, std::string>> pieces;
@@ -780,6 +780,7 @@ static int run_sections(sve_ctx *ctx, const char *wav, const char *lang) {
         std::string t = r.value("text", "");
         if (!t.empty()) { pieces.push_back({r.value("start_sec", (int64_t)0), t}); prev = t; }
     }
+    if (dur_out) *dur_out = dur;
     printf("transcribed %zu pieces, %.1f s audio\n", pieces.size(), dur);
     std::vector<sve::PieceRef> refs;
     for (size_t i = 0; i < pieces.size(); ++i)
@@ -794,9 +795,52 @@ static int run_sections(sve_ctx *ctx, const char *wav, const char *lang) {
         printf("--- section %zu (pieces %zu..%zu, %.1f s)\n%s\n", k, secs[k].first, secs[k].second, sec, s.dump(2).c_str());
         expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 6,
                "section summary has a title and 1..6 points");
+        if (stored) stored->push_back({{"idx", (int)k}, {"first_piece", (int)secs[k].first}, {"last_piece", (int)secs[k].second},
+                                       {"start_sec", refs[secs[k].first].start_sec}, {"end_sec", refs[secs[k].second - 1].end_sec}, {"summary", s}});
         if (s.value("fallback", false)) printf("(fallback used)\n");
         if (force_fb) expect(s.value("fallback", false), "forced truncation returns the fallback summary");
     }
+    return 0;
+}
+
+// Synthetic ~2 hour input: the fixture's section summaries repeated with shifted starts (no new model work per
+// repeat). Times notes for all three kinds and the title, and prints chapters. Output is labelled synthetic.
+static int run_longnotes(sve_ctx *ctx, const char *wav, const char *lang) {
+    json base = json::array();
+    double dur = 0;
+    if (run_sections(ctx, wav, lang, &base, &dur) != 0 || base.empty()) return 1;
+    const int64_t span = std::max<int64_t>(1, (int64_t)dur + 1);
+    const int repeats = (int)std::max<int64_t>(1, (7200 + span - 1) / span);
+    json all = json::array();
+    for (int r = 0; r < repeats; ++r)
+        for (auto sec : base) {
+            int64_t off = (int64_t)r * span;
+            sec["idx"] = (int)all.size();
+            sec["start_sec"] = sec["start_sec"].get<int64_t>() + off;
+            sec["end_sec"] = sec["end_sec"].get<int64_t>() + off;
+            for (auto &p : sec["summary"]["points"]) p["start_sec"] = p["start_sec"].get<int64_t>() + off;
+            all.push_back(sec);
+        }
+    int64_t id = sve_note_create(ctx, "synthetic long note", lang, nullptr, "x", (int64_t)repeats * span);
+    expect(id > 0, "note created");
+    expect(sve_note_set_sections(ctx, id, all.dump().c_str()) == 0, "sections stored");
+    printf("SYNTHETIC ~%.1f h input: %zu sections (fixture's %zu repeated %d times)\n", repeats * span / 3600.0, all.size(), base.size(), repeats);
+    json ch = take(sve_chapters_json(ctx, id));
+    printf("chapters: %zu\n", ch.size());
+    const char *names[] = {"short summary", "detailed notes", "revision questions"};
+    for (int k = 0; k < 3; ++k) {
+        auto t0 = std::chrono::steady_clock::now();
+        char *o = sve_generate_from_sections(ctx, id, (sve_output_kind)k, lang, nullptr, nullptr);
+        double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        printf("--- SYNTHETIC %s: %.1f s\n%s\n", names[k], sec, o ? o : "(NULL)");
+        expect(o && *o, "notes generated from sections");
+        sve_free_string(o);
+    }
+    auto t0 = std::chrono::steady_clock::now();
+    char *t = sve_title_from_sections(ctx, id, lang);
+    printf("--- SYNTHETIC title: %.1f s\n%s\n", std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), t ? t : "(NULL)");
+    expect(t && *t, "title from sections");
+    sve_free_string(t);
     return 0;
 }
 
@@ -812,7 +856,7 @@ int main(int argc, char **argv) {
         return fails ? 1 : 0;
     }
     if (!gguf) { fprintf(stderr, "set SVE_GEMMA\n"); return 2; }
-    const bool live = !strcmp(mode, "live") || !strcmp(mode, "sections");
+    const bool live = !strcmp(mode, "live") || !strcmp(mode, "sections") || !strcmp(mode, "longnotes");
     // live and sections run as on the phone: CPU only (the projector follows), 4 threads.
     if (sve_load_llm(ctx, gguf, 8192, live ? 4 : 0, live ? 0 : 99) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
     if (live) {
@@ -820,7 +864,9 @@ int main(int argc, char **argv) {
         if (!mmproj || !wav) { fprintf(stderr, "set SVE_MMPROJ and SVE_TEST_WAV\n"); return 2; }
         if (sve_load_audio(ctx, mmproj) != 0) { fprintf(stderr, "sve_load_audio failed\n"); return 1; }
         const char *lang = getenv("SVE_LANG");
-        int rc = sections ? run_sections(ctx, wav, lang ? lang : "te") : run_live(ctx, wav);
+        const bool longnotes = !strcmp(mode, "longnotes");
+        int rc = longnotes ? run_longnotes(ctx, wav, lang ? lang : "te") : sections ? run_sections(ctx, wav, lang ? lang : "te") : run_live(ctx, wav);
+        if (longnotes) { printf("%s (%d missed)\n", fails ? "LONGNOTES FAIL" : "LONGNOTES OK", fails); if (fails) rc = 1; }
         if (sections) { printf("%s (%d missed)\n", fails ? "SECTIONS FAIL" : "SECTIONS OK", fails); if (fails) rc = 1; }
         sve_free(ctx);
         return rc;

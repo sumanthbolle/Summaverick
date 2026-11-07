@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 
 using nlohmann::json;
@@ -140,6 +141,124 @@ json fallback_section_summary(const SectionPieces &pieces) {
     }
     return {{"title", title}, {"topic", ""}, {"points", points}, {"terms", json::array()}, {"hints", json::array()},
             {"fallback", true}};
+}
+
+namespace {
+
+// Decodes UTF-8 into code points; bad bytes become U+FFFD.
+std::u32string decode_utf8(const std::string &s) {
+    std::u32string o;
+    for (size_t i = 0; i < s.size();) {
+        unsigned char c = (unsigned char)s[i];
+        int n = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 0;
+        if (n == 0 || i + n > s.size()) { o.push_back(0xFFFD); ++i; continue; }
+        char32_t cp = n == 1 ? c : c & (0xFF >> (n + 1));
+        bool ok = true;
+        for (int k = 1; k < n; ++k) {
+            unsigned char d = (unsigned char)s[i + k];
+            if ((d & 0xC0) != 0x80) { ok = false; break; }
+            cp = (cp << 6) | (d & 0x3F);
+        }
+        if (!ok) { o.push_back(0xFFFD); ++i; continue; }
+        o.push_back(cp);
+        i += n;
+    }
+    return o;
+}
+
+char32_t lower_cp(char32_t c) {
+    if (c < 0x80) return (c >= 'A' && c <= 'Z') ? c + 32 : c;
+    if ((c >= 0xC0 && c <= 0xDE && c != 0xD7) || (c >= 0x391 && c <= 0x3A9) || (c >= 0x410 && c <= 0x42F)) return c + 32;
+    if (c >= 0x400 && c <= 0x40F) return c + 80;
+    if ((c >= 0x100 && c <= 0x137) || (c >= 0x14A && c <= 0x177)) return (c & 1) ? c : c + 1;  // Latin Extended-A pairs
+    if ((c >= 0x139 && c <= 0x148) || (c >= 0x179 && c <= 0x17E)) return (c & 1) ? c + 1 : c;
+    return c;
+}
+
+bool space_cp(char32_t c) { return c == ' ' || (c >= 9 && c <= 13) || c == 0xA0 || c == 0x2003 || c == 0x2009 || c == 0x3000 || c == 0x200B; }
+
+std::string normalise_topic(const std::string &s) {
+    std::u32string cps = decode_utf8(s), out;
+    bool gap = false;
+    for (char32_t c : cps) {
+        if (space_cp(c)) { gap = !out.empty(); continue; }
+        if (gap) { out.push_back(' '); gap = false; }
+        out.push_back(lower_cp(c));
+    }
+    std::string r;
+    for (char32_t c : out) {
+        if (c < 0x80) r += (char)c;
+        else if (c < 0x800) { r += (char)(0xC0 | (c >> 6)); r += (char)(0x80 | (c & 0x3F)); }
+        else if (c < 0x10000) { r += (char)(0xE0 | (c >> 12)); r += (char)(0x80 | ((c >> 6) & 0x3F)); r += (char)(0x80 | (c & 0x3F)); }
+        else { r += (char)(0xF0 | (c >> 18)); r += (char)(0x80 | ((c >> 12) & 0x3F)); r += (char)(0x80 | ((c >> 6) & 0x3F)); r += (char)(0x80 | (c & 0x3F)); }
+    }
+    return r;
+}
+
+std::string str_of(const json &j, const char *k) { return j.is_object() && j.contains(k) && j[k].is_string() ? j[k].get<std::string>() : ""; }
+int64_t start_of(const json &sec) { return sec.is_object() && sec.contains("start_sec") && sec["start_sec"].is_number() ? sec["start_sec"].get<int64_t>() : 0; }
+const json &summary_of(const json &sec) { static const json none = json::object(); return sec.is_object() && sec.contains("summary") && sec["summary"].is_object() ? sec["summary"] : none; }
+
+std::string clock_label(int64_t s) {
+    if (s < 0) s = 0;
+    char b[24];
+    if (s >= 3600) snprintf(b, sizeof b, "%lld:%02lld:%02lld", (long long)(s / 3600), (long long)(s / 60 % 60), (long long)(s % 60));
+    else snprintf(b, sizeof b, "%lld:%02lld", (long long)(s / 60), (long long)(s % 60));
+    return b;
+}
+
+std::string render_section(const json &sec) {
+    const json &sm = summary_of(sec);
+    std::string o = "[" + clock_label(start_of(sec)) + "] " + str_of(sm, "title") + "\n";
+    if (sm.contains("points") && sm["points"].is_array())
+        for (const auto &p : sm["points"]) { std::string t = str_of(p, "text"); if (!t.empty()) o += "- " + t + "\n"; }
+    return o;
+}
+
+std::string cut_to_fit(std::string s, int budget, const std::function<int(const std::string &)> &count) {
+    while (!s.empty() && count(s) > budget) {
+        size_t n = s.size() * 9 / 10;
+        if (n >= s.size()) n = s.size() - 1;
+        while (n > 0 && ((unsigned char)s[n] & 0xC0) == 0x80) --n;
+        s.resize(n);
+    }
+    return s;
+}
+
+}  // namespace
+
+json merge_chapters(const json &sections) {
+    json out = json::array();
+    if (!sections.is_array()) return out;
+    std::string last;
+    bool have = false;
+    for (const auto &sec : sections) {
+        const json &sm = summary_of(sec);
+        std::string title = str_of(sm, "title");
+        std::string key = normalise_topic(str_of(sm, "topic").empty() ? title : str_of(sm, "topic"));
+        if (have && key == last) continue;
+        out.push_back({{"title", title}, {"start_sec", start_of(sec)}});
+        last = key;
+        have = true;
+    }
+    return out;
+}
+
+std::vector<std::string> section_groups(const json &sections, int budget_tokens,
+                                        const std::function<int(const std::string &)> &count_tokens) {
+    std::vector<std::string> groups;
+    if (!sections.is_array()) return groups;
+    std::string cur;
+    for (const auto &sec : sections) {
+        std::string b = render_section(sec);
+        if (b.empty()) continue;
+        if (count_tokens(b) > budget_tokens) b = cut_to_fit(b, budget_tokens, count_tokens);
+        // Counting the joined text keeps the guarantee for tokenisers that do not add up per block.
+        if (!cur.empty() && count_tokens(cur + b) > budget_tokens) { groups.push_back(cur); cur.clear(); }
+        cur += b;
+    }
+    if (!cur.empty()) groups.push_back(cur);
+    return groups;
 }
 
 }  // namespace sve

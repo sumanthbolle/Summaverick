@@ -134,6 +134,89 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
     return dup_str(out);
 }
 
+char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c,
+                                 sve_progress_cb cb, void *user) {
+    try {
+        if (!ctx || !ctx->llm) return nullptr;
+        sve::json secs = ctx->store->sections(note_id);
+        if (!secs.is_array() || secs.empty()) return nullptr;
+        sve::Llm &llm = *ctx->llm;
+        const std::string lang = lang_c ? lang_c : "en";
+        // Same budget as sve_generate.
+        const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
+        const int max_out = std::max(160, std::min(700, llm.n_ctx / 4));
+        const int budget = llm.n_ctx - max_out - 250 - llm.count_tokens(sys);
+        auto count = [&llm](const std::string &t) { return llm.count_tokens(t); };
+
+        std::vector<std::string> groups = sve::section_groups(secs, budget, count);
+        if (groups.empty()) return nullptr;
+        std::string material = groups[0];
+        bool from_bullets = false;
+        if (groups.size() > 1) {
+            // Hierarchical: summarise each group (room as in reduce_to_fit's chunk step), then write from those.
+            const int chunk_out = std::max(120, std::min(400, llm.n_ctx / 5));
+            const int chunk_budget = std::max(128, llm.n_ctx - chunk_out - llm.count_tokens(sys) - 80 - 32);
+            groups = sve::section_groups(secs, std::max(budget, chunk_budget), count);
+            std::string bullets;
+            const int total = (int)groups.size();
+            for (int i = 0; i < total; ++i) {
+                std::string piece;
+                if (!llm.complete(llm.apply_template(sys, sve::chunk_prompt(groups[i], i, total)), chunk_out, piece, cb, user, "chunk", i, total))
+                    return nullptr;
+                bullets += strip_thinking(piece) + "\n";
+            }
+            from_bullets = true;
+            material.clear();
+            bool more = false;
+            if (!reduce_to_fit(llm, sys, bullets, budget, material, more, cb, user)) return nullptr;
+        }
+
+        std::string userp, prefix;
+        switch (kind) {
+            case SVE_OUT_SHORT_SUMMARY: userp = sve::short_summary_prompt(material, from_bullets); break;
+            case SVE_OUT_DETAILED_NOTES: userp = sve::detailed_notes_prompt(material, from_bullets); prefix = "## Topic"; break;
+            case SVE_OUT_REVISION_QUESTIONS: userp = sve::revision_questions_prompt(material, from_bullets); break;
+            default: return nullptr;
+        }
+        std::string out;
+        if (!llm.complete(llm.apply_template(sys, userp), max_out, out, cb, user, "final", 0, 1)) return nullptr;
+        out = strip_thinking(out);
+        if (!prefix.empty() && out.rfind(prefix, 0) != 0) out = prefix + " " + out;
+        return dup_str(out);
+    } catch (const std::exception &e) {
+        sve_logf(2, "generate from sections failed: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang_c) {
+    try {
+        if (!ctx || !ctx->llm) return nullptr;
+        sve::json ch = sve::merge_chapters(ctx->store->sections(note_id));
+        if (!ch.is_array() || ch.empty()) return nullptr;
+        std::string excerpt;
+        for (const auto &c : ch) {
+            if (!c.contains("title") || !c["title"].is_string()) continue;
+            excerpt += c["title"].get<std::string>() + ".\n";
+            if (excerpt.size() > 1200) break;
+        }
+        return sve_suggest_title(ctx, excerpt.c_str(), lang_c);  // trims to 1200 bytes at a character boundary
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char *sve_chapters_json(sve_ctx *ctx, int64_t note_id) {
+    try {
+        if (!ctx) return nullptr;
+        return dup_str(sve::merge_chapters(ctx->store->sections(note_id)).dump(-1, ' ', false, sve::json::error_handler_t::replace));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 char *sve_ask(sve_ctx *ctx, const char *context_text, const char *question, const char *lang_c,
               sve_progress_cb cb, void *user) {
     if (!ctx || !ctx->llm || !context_text || !question) return nullptr;

@@ -157,6 +157,17 @@ char *sve_note_sections(sve_ctx *ctx, int64_t note_id);
  * gives NULL. NULL on cancel, no model or bad input. Output capped at 512 tokens. */
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang, sve_progress_cb cb, void *user);
 
+/* Notes built from a note's stored section summaries instead of the raw transcript. One group of summaries that
+ * fits: one model call (same prompts and budget as sve_generate). Several: each group is summarised first, then the
+ * combined result is written. NULL when the note has no sections (callers then use sve_generate), no model, or on
+ * cancel/failure (callers check their own cancel flag first). */
+char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang,
+                                 sve_progress_cb cb, void *user);
+/* Title from the section titles (same cleanup as sve_suggest_title). NULL when no sections or no model. */
+char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang);
+/* Chapters [{"title","start_sec"}]: consecutive sections on the same topic merged. Pure, no model; "[]" when none. */
+char *sve_chapters_json(sve_ctx *ctx, int64_t note_id);
+
 /* Runs extraction on a note's pieces (greedy, windowed for long recordings). Adds pending suggestions
  * (reminders, tasks, profile changes, vocabulary, facts), each quote and medicine checked in code; links
  * topics and people directly. Returns the number of suggestions added (0 if the model output was unusable),

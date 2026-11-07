@@ -154,3 +154,45 @@ TEST(parse_section_summary_survives_huge_start_sec) {
     CHECK_EQ(s["points"][0]["start_sec"].get<int64_t>(), (int64_t)0);
     CHECK_EQ(s["points"][1]["start_sec"].get<int64_t>(), (int64_t)0);
 }
+
+static json sec(int64_t start, const std::string &title, const std::string &topic) {
+    return {{"start_sec", start}, {"summary", {{"title", title}, {"topic", topic}, {"points", json::array({{{"text", title + " point"}, {"start_sec", start}}})}}}};
+}
+
+TEST(merge_chapters_joins_same_topic) {
+    json s = json::array({sec(0, "First A", "A"), sec(300, "Second", "a "), sec(600, "B1", "B"), sec(900, "B2", "B"), sec(1200, "Back", "A")});
+    json c = merge_chapters(s);
+    CHECK_EQ(c.size(), (size_t)3);
+    CHECK_EQ(c[0]["title"].get<std::string>(), std::string("First A"));
+    CHECK_EQ(c[0]["start_sec"].get<int64_t>(), (int64_t)0);
+    CHECK_EQ(c[1]["title"].get<std::string>(), std::string("B1"));
+    CHECK_EQ(c[1]["start_sec"].get<int64_t>(), (int64_t)600);
+    CHECK_EQ(c[2]["start_sec"].get<int64_t>(), (int64_t)1200);
+}
+
+TEST(merge_chapters_telugu_topics) {
+    json s = json::array({sec(0, "ఆరోగ్యం 1", "ఆరోగ్య సలహా"), sec(300, "ఆరోగ్యం 2", "  ఆరోగ్య సలహా\n"), sec(600, "ఆహారం", "ఆహారం")});
+    json c = merge_chapters(s);
+    CHECK_EQ(c.size(), (size_t)2);
+    CHECK_EQ(c[0]["title"].get<std::string>(), std::string("ఆరోగ్యం 1"));
+    CHECK_EQ(c[1]["start_sec"].get<int64_t>(), (int64_t)300 * 2);
+    CHECK_EQ(merge_chapters(json::array()).size(), (size_t)0);
+}
+
+TEST(section_groups_respects_budget) {
+    json s = json::array();
+    for (int i = 0; i < 36; ++i) s.push_back(sec(i * 300, "Section number " + std::to_string(i), "t" + std::to_string(i)));
+    auto count = [](const std::string &t) { return (int)(t.size() / 4); };
+    const int budget = 120;
+    auto g = section_groups(s, budget, count);
+    CHECK(g.size() > 1);
+    std::string all;
+    for (const auto &x : g) { CHECK(count(x) <= budget); all += x; }
+    size_t last = 0;
+    for (int i = 0; i < 36; ++i) {
+        size_t p = all.find("Section number " + std::to_string(i) + " ", last);
+        CHECK(p != std::string::npos);
+        if (p != std::string::npos) last = p;
+    }
+    CHECK_EQ(section_groups(json::array(), budget, count).size(), (size_t)0);
+}

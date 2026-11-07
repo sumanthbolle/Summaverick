@@ -3,6 +3,7 @@
 // Pure: no llama, no SQLite. Tested in core/tests/test_sections.cpp.
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -32,5 +33,15 @@ std::string section_prompt(const SectionPieces &pieces, const std::string &lang,
 bool parse_section_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, nlohmann::json &out);
 // No-model summary: title = first 8 words, points = first sentence of up to 3 pieces, "fallback":true.
 nlohmann::json fallback_section_summary(const SectionPieces &pieces);
+
+// Stored sections ([{"start_sec","summary":{...}}], as sve_note_sections returns) to chapters
+// [{"title","start_sec"}]: consecutive sections with the same normalised topic (trimmed, whitespace collapsed,
+// lower-cased for Latin/Greek/Cyrillic; Telugu has no case) merge, the title comes from the run's first section.
+nlohmann::json merge_chapters(const nlohmann::json &sections);
+
+// Section summaries rendered as text blocks ("[m:ss] title" and "- point" lines), consecutive blocks joined into
+// groups of at most budget_tokens by count_tokens. A single block over the budget is cut to fit.
+std::vector<std::string> section_groups(const nlohmann::json &sections, int budget_tokens,
+                                        const std::function<int(const std::string &)> &count_tokens);
 
 }  // namespace sve
