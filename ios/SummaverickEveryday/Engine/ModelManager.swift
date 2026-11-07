@@ -26,8 +26,8 @@ struct ModelSpec: Hashable {
 }
 
 /// Where the audio projector is downloaded from. Today: the full ggml-org file (has an unused image
-/// encoder). After the slim file (tools/model/strip_vision.py) is uploaded, change these two and the
-/// file name below; see tools/model/README.md.
+/// encoder). After the slim file (tools/model/strip_vision.py) is uploaded, change these two and keep the
+/// file name below, so phones that already have the full file keep working; see tools/model/README.md.
 enum ModelHost {
     static let projectorURL = URL(string: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf")!
     static let projectorBytes: Int64 = 559_874_816

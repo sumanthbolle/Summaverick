@@ -32,8 +32,9 @@ should be ignored when comparing.
     huggingface-cli repo create <name> --type model
     huggingface-cli upload <user>/<name> mmproj-gemma-4-E4B-it-audio-Q8_0.gguf mmproj-gemma-4-E4B-it-audio-Q8_0.gguf
 
-Add a short model card: derived from Gemma 4 E4B (Apache 2.0 per the original file's metadata), image
-encoder removed.
+Add a short model card: derived from Gemma 4 E4B, image encoder removed. The source file's metadata
+has `general.license = apache-2.0` (link: https://ai.google.dev/gemma/docs/gemma_4_license); check the
+licence terms yourself before publishing.
 
 ## Switch the app
 
@@ -43,5 +44,6 @@ In `ios/SummaverickEveryday/Engine/ModelManager.swift`, change `ModelHost`:
 - `projectorBytes` to the slim file's size in bytes (`stat -f %z <file>`; the build here is 331821760)
 
 Leave `fileName` (`mmproj-gemma-4-E4B-it-Q8_0.gguf`) as it is: phones that already have the full file keep
-working and new installs save the slim one under the same name. Until you change `ModelHost`, the app keeps
+working and new installs save the slim one under the same name. The switch is one-way for the app: phones that already have the full file keep it and do not re-download.
+Until you change `ModelHost`, the app keeps
 downloading the full file.
