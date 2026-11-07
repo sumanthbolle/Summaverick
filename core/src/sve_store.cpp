@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS transcript_pieces (
     idx INTEGER NOT NULL, start_sec INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL,
     PRIMARY KEY(note_id, idx)
 );
+CREATE TABLE IF NOT EXISTS sections (
+    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    idx INTEGER NOT NULL, first_piece INTEGER NOT NULL, last_piece INTEGER NOT NULL,
+    start_sec INTEGER NOT NULL, end_sec INTEGER NOT NULL, summary_json TEXT,
+    PRIMARY KEY(note_id, idx)
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS pieces_fts USING fts5(
     text, content='transcript_pieces', content_rowid='rowid', tokenize='unicode61 remove_diacritics 0'
 );
@@ -627,6 +633,47 @@ json Store::latest_insight() {
 bool Store::dismiss_insight(int64_t id) {
     return run("UPDATE insights SET dismissed=1 WHERE id=?", {id}) && sqlite3_changes(db_) > 0;
 }
+// sections -------------------------------------------------------------------
+
+bool Store::set_sections(int64_t note_id, const json &sections) {
+    if (!sections.is_array()) { err_ = "sections must be an array"; return false; }
+    if (!exec("BEGIN")) return false;
+    bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id});
+    for (const auto &s : sections) {
+        if (!ok) break;
+        ok = run("INSERT INTO sections(note_id,idx,first_piece,last_piece,start_sec,end_sec,summary_json) VALUES(?,?,?,?,?,?,?)",
+                 {note_id, jget(s, "idx", 0), jget(s, "first_piece", 0), jget(s, "last_piece", 0),
+                  jget(s, "start_sec", 0), jget(s, "end_sec", 0),
+                  s.contains("summary") ? json(s["summary"].dump()) : json(nullptr)});
+    }
+    if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
+    return exec("COMMIT");
+}
+
+json Store::sections(int64_t note_id) {
+    json rows = query_rows("SELECT idx,first_piece,last_piece,start_sec,end_sec,summary_json FROM sections WHERE note_id=? ORDER BY idx",
+                           {note_id});
+    json out = json::array();
+    for (auto &r : rows) {
+        json summary = json::object();
+        if (r["summary_json"].is_string()) {
+            json parsed = json::parse(r["summary_json"].get<std::string>(), nullptr, false);
+            if (!parsed.is_discarded()) summary = parsed;
+        }
+        r.erase("summary_json");
+        r["summary"] = summary;
+        out.push_back(r);
+    }
+    return out;
+}
+
+bool Store::clear_transcript(int64_t note_id) {
+    if (!exec("BEGIN")) return false;
+    bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id});
+    ok = ok && set_text_column(note_id, "transcript", nullptr);
+    if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
+    return exec("COMMIT");
+}
 
 bool Store::mark_extracted(int64_t note_id) {
     return setting_set("extracted." + std::to_string(note_id), "1");
@@ -644,7 +691,7 @@ static const char *kAssistantSettings[] = {"profile", "insight.last_date"};
 bool Store::wipe_assistant() {
     // Children before parents, so no foreign key blocks a delete; the FTS triggers clean the indexes.
     static const char *kTables[] = {"suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
-                                    "medicines", "decisions", "insights", "transcript_pieces"};
+                                    "medicines", "decisions", "insights", "sections", "transcript_pieces"};
     if (!exec("BEGIN")) return false;
     bool ok = true;
     for (const char *t : kTables) ok = ok && run((std::string("DELETE FROM ") + t).c_str(), {});

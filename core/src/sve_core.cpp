@@ -380,7 +380,7 @@ int sve_note_set_title(sve_ctx *ctx, int64_t id, const char *title) {
 }
 int sve_note_delete(sve_ctx *ctx, int64_t id) { return ctx && ctx->store->remove(id) ? 0 : -1; }
 int sve_note_clear_audio(sve_ctx *ctx, int64_t id) { return ctx && ctx->store->set_text_column(id, "audio_path", nullptr) ? 0 : -1; }
-int sve_note_clear_transcript(sve_ctx *ctx, int64_t id) { return ctx && ctx->store->set_text_column(id, "transcript", nullptr) ? 0 : -1; }
+int sve_note_clear_transcript(sve_ctx *ctx, int64_t id) { return ctx && ctx->store->clear_transcript(id) ? 0 : -1; }
 
 static void json_opt(std::string &o, const char *key, const std::optional<std::string> &v) {
     o += "\"";

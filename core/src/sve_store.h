@@ -55,6 +55,12 @@ public:
     json pieces(int64_t note_id);
     json search_pieces(const std::string &q, int limit);
 
+    // Section summaries: [{idx,first_piece,last_piece,start_sec,end_sec,summary:{...}}]. set replaces all
+    // (fails for a missing note, so a deleted note is never resurrected). clear_transcript also drops sections.
+    bool set_sections(int64_t note_id, const json &sections);
+    json sections(int64_t note_id);
+    bool clear_transcript(int64_t note_id);
+
     int64_t add_suggestion(const json &s);
     json suggestions(const std::string &status);
     bool set_suggestion_status(int64_t id, const std::string &status);

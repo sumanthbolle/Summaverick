@@ -143,6 +143,14 @@ int   sve_note_set_pieces(sve_ctx *ctx, int64_t note_id, const char *pieces_json
 /* [{"idx":0,"start_sec":0,"text":"…"}] */
 char *sve_note_pieces(sve_ctx *ctx, int64_t note_id);
 
+/* Section summaries of a note (~5 minute parts of a long recording). sections_json:
+ * [{"idx":0,"first_piece":0,"last_piece":10,"start_sec":0,"end_sec":308,
+ *   "summary":{"title","topic","points":[{"text","start_sec"}],"terms":[],"hints":[]}}]. Replaces all.
+ * Removed with the note and by sve_note_clear_transcript. Fails for a note that does not exist. */
+int   sve_note_set_sections(sve_ctx *ctx, int64_t note_id, const char *sections_json);
+/* Same array; "[]" when none. */
+char *sve_note_sections(sve_ctx *ctx, int64_t note_id);
+
 /* Runs extraction on a note's pieces (greedy, windowed for long recordings). Adds pending suggestions
  * (reminders, tasks, profile changes, vocabulary, facts), each quote and medicine checked in code; links
  * topics and people directly. Returns the number of suggestions added (0 if the model output was unusable),

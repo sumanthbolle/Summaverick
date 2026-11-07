@@ -433,6 +433,27 @@ char *sve_note_pieces(sve_ctx *ctx, int64_t note_id) {
     });
 }
 
+int sve_note_set_sections(sve_ctx *ctx, int64_t note_id, const char *sections_json) {
+    return guard("sve_note_set_sections", -1, [&] {
+        if (!ctx) return -1;
+        json in = parse(sections_json);
+        if (!in.is_array()) return -1;
+        json clean = json::array();
+        for (const auto &s : in)
+            if (s.is_object())
+                clean.push_back({{"idx", jint(s, "idx", 0)}, {"first_piece", jint(s, "first_piece", 0)},
+                                 {"last_piece", jint(s, "last_piece", 0)}, {"start_sec", jint(s, "start_sec", 0)},
+                                 {"end_sec", jint(s, "end_sec", 0)}, {"summary", jobj(s, "summary")}});
+        return ctx->store->set_sections(note_id, clean) ? 0 : -1;
+    });
+}
+
+char *sve_note_sections(sve_ctx *ctx, int64_t note_id) {
+    return guard<char *>("sve_note_sections", nullptr, [&]() -> char * {
+        return ctx ? dump(ctx->store->sections(note_id)) : nullptr;
+    });
+}
+
 // ---------------------------------------------------------------- extraction
 
 int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
