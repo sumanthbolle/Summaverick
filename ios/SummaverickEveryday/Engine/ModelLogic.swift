@@ -65,10 +65,38 @@ enum DeviceGate {
 }
 
 enum Heat {
-    /// Serious or critical: stop model work and let the phone cool down.
+    /// Serious or critical: too warm to start a one-off model run the person asked for (Ask, topic summary).
     static func isTooHot(_ state: ProcessInfo.ThermalState) -> Bool {
         state == .serious || state == .critical
     }
+
+    /// What long work (transcription pieces, note stages) does before each piece or stage.
+    enum Step: Equatable {
+        /// Start now.
+        case go
+        /// Serious: rest `restSeconds`, then start anyway, so progress is always made, just slower.
+        case rest
+        /// Critical: stop; carry on once the phone is back to nominal or fair.
+        case pause
+    }
+
+    /// Rest before a piece or stage while the phone is at serious.
+    static let restSeconds: Double = 30
+
+    static func beforeRun(_ state: ProcessInfo.ThermalState) -> Step {
+        switch state {
+        case .critical: return .pause
+        case .serious: return .rest
+        default: return .go
+        }
+    }
+
+    /// Only critical cancels a piece or stage in the middle; serious lets it finish (cancelling at serious
+    /// threw away the same piece again and again and made no progress).
+    static func cancelsRun(_ state: ProcessInfo.ThermalState) -> Bool { state == .critical }
+
+    /// A note paused at critical carries on only once the phone is back to nominal or fair.
+    static func canResume(_ state: ProcessInfo.ThermalState) -> Bool { state == .nominal || state == .fair }
 }
 
 enum SizeCheck {
@@ -154,10 +182,13 @@ enum LivePause: Equatable {
     /// Below this battery level (and not charging) live transcription waits; the recording continues.
     static let lowBattery: Float = 0.20
 
-    /// Why live transcription should wait now, nil to go on. Heat comes first. batteryLevel is 0…1,
-    /// or negative when unknown (simulator, monitoring off), which never pauses.
-    static func reason(thermal: ProcessInfo.ThermalState, batteryLevel: Float, charging: Bool) -> LivePause? {
-        if Heat.isTooHot(thermal) { return .heat }
+    /// Why live transcription should wait now, nil to go on. Heat (critical only; serious rests between
+    /// pieces instead, see Heat.beforeRun) comes first. batteryLevel is 0…1, or negative when unknown
+    /// (simulator, monitoring off), which never pauses.
+    /// heatPaused: already paused for heat, which lasts until nominal or fair (not just below critical).
+    static func reason(thermal: ProcessInfo.ThermalState, batteryLevel: Float, charging: Bool,
+                       heatPaused: Bool = false) -> LivePause? {
+        if Heat.beforeRun(thermal) == .pause || (heatPaused && !Heat.canResume(thermal)) { return .heat }
         if batteryLevel >= 0, batteryLevel < lowBattery, !charging { return .battery }
         return nil
     }

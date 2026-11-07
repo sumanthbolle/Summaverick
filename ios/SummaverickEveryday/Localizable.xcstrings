@@ -4583,6 +4583,22 @@
           }
         }
       }
+    },
+    "Going slower to keep the phone cool": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Going slower to keep the phone cool"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ చల్లగా ఉండేందుకు నెమ్మదిగా రాస్తోంది"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

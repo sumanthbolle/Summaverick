@@ -35,11 +35,14 @@ enum TranscriptRun {
                     shouldStop: @escaping () -> Bool,
                     shouldContinue: () -> Bool = { true },
                     shouldStart: @escaping () -> Bool = { true },
+                    beforePiece: () async -> Bool = { true },
                     onPiece: (TranscriptSidecar) -> Void = { _ in }) async throws -> (TranscriptSidecar, Stop) {
         var progress = TranscriptSidecar.load(audioPath: audioPath)
         while true {
             if shouldStop() || Task.isCancelled { throw CancellationError() }
             if !shouldContinue() || !shouldStart() { return (progress, .yielded) }
+            // The heat gate (rest at serious, stop at critical); false yields.
+            if !(await beforePiece()) || !shouldContinue() || !shouldStart() { return (progress, .yielded) }
             // Loads the files if needed; the CPU itself is ensured inside the run (same actor turn).
             try await ModelManager.shared.loadIntoCore(for: .transcription)
             let next = try await CoreEngine.shared.transcribeNextPiece(path: audioPath, startSample: progress.cursor_sample,
@@ -90,6 +93,8 @@ final class LiveTranscriber {
         case behind(minutes: Int)
         case pausedHeat
         case pausedBattery
+        /// Serious: resting between pieces.
+        case cooling
     }
 
     /// A recording for notes is going (not an Ask voice question). Model runs use the CPU meanwhile.
@@ -117,6 +122,7 @@ final class LiveTranscriber {
         case .pausedHeat: return String(localized: "Paused while the phone cools down")
         case .pausedBattery: return String(localized: "Paused: battery low — notes will be written later")
         case .later: return String(localized: "Notes will be written after you stop")
+        case .cooling: return String(localized: "Going slower to keep the phone cool")
         }
     }
 
@@ -131,6 +137,7 @@ final class LiveTranscriber {
         lines = []
         transcribedSeconds = 0
         self.elapsed = elapsed
+        heatPaused = false
         TranscriptSidecar.remove(audioPath: audio.path)   // a new recording always starts at 0
         // isReady also means the phone is supported.
         guard ModelManager.shared.isReady else { status = .later; return }
@@ -171,10 +178,29 @@ final class LiveTranscriber {
         if running.isEmpty && current == nil { UIDevice.current.isBatteryMonitoringEnabled = false }
     }
 
+    /// Paused at critical: stays paused until nominal or fair.
+    @ObservationIgnored private var heatPaused = false
+
     private func pauseReason() -> LivePause? {
         let d = UIDevice.current
-        return LivePause.reason(thermal: ProcessInfo.processInfo.thermalState, batteryLevel: d.batteryLevel,
-                                charging: d.batteryState == .charging || d.batteryState == .full)
+        let r = LivePause.reason(thermal: ProcessInfo.processInfo.thermalState, batteryLevel: d.batteryLevel,
+                                 charging: d.batteryState == .charging || d.batteryState == .full, heatPaused: heatPaused)
+        heatPaused = r == .heat
+        return r
+    }
+
+    /// Before each piece: at serious rest 30 s (Stop/Cancel cut it short), then go on; false at critical.
+    private func heatGate(_ s: LiveSession) async -> Bool {
+        switch Heat.beforeRun(ProcessInfo.processInfo.thermalState) {
+        case .go: return true
+        case .pause: return false
+        case .rest:
+            show(s, .cooling)
+            await nap(Heat.restSeconds, s)
+            if Heat.beforeRun(ProcessInfo.processInfo.thermalState) == .pause { return false }
+            refresh(s)
+            return true
+        }
     }
 
     /// Only the current recording drives the screen.
@@ -201,9 +227,10 @@ final class LiveTranscriber {
             do {
                 let (_, stop) = try await TranscriptRun.run(
                     audioPath: s.audioPath, isFinal: false,
-                    shouldStop: { abort.isSet || Heat.isTooHot(ProcessInfo.processInfo.thermalState) },
+                    shouldStop: { abort.isSet || Heat.cancelsRun(ProcessInfo.processInfo.thermalState) },
                     shouldContinue: { !finishing.isSet && self.pauseReason() == nil },
                     shouldStart: { !finishing.isSet },
+                    beforePiece: { await self.heatGate(s) },
                     onPiece: { p in
                         guard self.current === s else { return }
                         self.lines = p.pieces.map(\.text)
@@ -215,7 +242,7 @@ final class LiveTranscriber {
                 else if stop == .yielded, pauseReason() != nil { continue }
             } catch {
                 if abort.isSet || finishing.isSet || Task.isCancelled { break }
-                if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { continue }   // paused at the top
+                if Heat.cancelsRun(ProcessInfo.processInfo.thermalState) { continue }   // paused at the top
                 failures += 1
                 NSLog("[sve] live transcription failed (%ld): %@", failures, String(describing: error))
                 if failures >= 3 {

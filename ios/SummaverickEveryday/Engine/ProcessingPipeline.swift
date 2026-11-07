@@ -24,6 +24,8 @@ final class ProcessingPipeline {
         case failed(String)
         /// Stopped for now (the phone is too hot); resumes by itself.
         case paused(String)
+        /// The phone is warm (serious): resting before the next piece or stage, then going on.
+        case cooling
 
         var label: String {
             switch self {
@@ -36,6 +38,7 @@ final class ProcessingPipeline {
             case .done: return String(localized: "Done")
             case .failed(let e): return String(localized: "Failed: \(e)")
             case .paused(let m): return m
+            case .cooling: return String(localized: "Going slower to keep the phone cool")
             }
         }
         /// True while the model is working (not idle, done or failed).
@@ -84,7 +87,11 @@ final class ProcessingPipeline {
 
     static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
-    nonisolated private static var tooHot: Bool { Heat.isTooHot(ProcessInfo.processInfo.thermalState) }
+    nonisolated private static var thermal: ProcessInfo.ThermalState { ProcessInfo.processInfo.thermalState }
+    /// Critical: the only heat that cancels a model run in the middle.
+    nonisolated private static var critical: Bool { Heat.cancelsRun(thermal) }
+    /// Notes paused at critical; they carry on only at nominal or fair (others may start at serious).
+    @ObservationIgnored private var heatPaused: Set<Int64> = []
 
     private init() {
         ContinuedWork.shared.onExpire = { [weak self] in self?.continuedWorkExpired() }
@@ -92,20 +99,41 @@ final class ProcessingPipeline {
         thermalObserver = NotificationCenter.default.addObserver(
             forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, !Self.tooHot, self.appIsActive else { return }
+                guard let self, Heat.canResume(Self.thermal), self.appIsActive else { return }
                 Task { await self.resumeInterrupted() }
             }
         }
     }
 
-    /// Stops before a model run when the phone is too hot; the note resumes when it has cooled down.
+    /// Critical: the note is paused and resumes once the phone is back to nominal or fair.
     private func pausedForHeat(_ id: Int64) -> Bool {
-        guard Self.tooHot else { return false }
+        guard Heat.beforeRun(Self.thermal) == .pause else { return false }
         NSLog("[sve] pausing note %lld: thermal state %ld", id, ProcessInfo.processInfo.thermalState.rawValue)
         interrupted.insert(id)
+        heatPaused.insert(id)
         lastFailure[id] = Self.heatMessage
         stage = .paused(Self.heatMessage)
         return true
+    }
+
+    /// Before each piece or stage. Serious: rest 30 s (cut short by an abort or a cooler phone), then go on,
+    /// so progress is always made, at a lower duty cycle. Critical: pause the note (false).
+    private func heatGate(_ id: Int64) async -> Bool {
+        switch Heat.beforeRun(Self.thermal) {
+        case .go: return true
+        case .pause: return !pausedForHeat(id)
+        case .rest:
+            let before = stage
+            stage = .cooling
+            NSLog("[sve] note %lld: phone is warm, resting %.0f s", id, Heat.restSeconds)
+            let end = Date().addingTimeInterval(Heat.restSeconds)
+            while Date() < end, !abort.isSet, Heat.beforeRun(Self.thermal) == .rest {
+                do { try await Task.sleep(nanoseconds: 500_000_000) } catch { break }
+            }
+            if pausedForHeat(id) { return false }
+            stage = before
+            return true
+        }
     }
 
     private func markAutoTried(_ id: Int64) {
@@ -171,7 +199,7 @@ final class ProcessingPipeline {
             activeNoteID = id
         }
         defer { if !interrupted.contains(id) { markAutoTried(id) } }
-        if pausedForHeat(id) { return id }
+        if !(await heatGate(id)) { return id }
 
         // 1. transcript
         stage = .transcribing(0)
@@ -212,7 +240,7 @@ final class ProcessingPipeline {
         defer { endBackground() }
         activeNoteID = noteID
         lastFailure[noteID] = nil
-        if pausedForHeat(noteID) { return }
+        if !(await heatGate(noteID)) { return }
 
         // No transcript yet (earlier transcription failed): redo it from the audio if we still have it.
         var t = note.transcript ?? ""
@@ -255,9 +283,11 @@ final class ProcessingPipeline {
         }
         report(TranscriptSidecar.load(audioPath: audio.path))   // from where live transcription got to
         let abort = self.abort
-        let (done, _) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true,
-                                                    shouldStop: { Self.tooHot || abort.isSet },
-                                                    onPiece: { report($0) })
+        let (done, stop) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true,
+                                                       shouldStop: { Self.critical || abort.isSet },
+                                                       beforePiece: { await self.heatGate(noteID) },
+                                                       onPiece: { report($0) })
+        if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
         return TranscriptRun.pieces(done)
     }
 
@@ -302,7 +332,7 @@ final class ProcessingPipeline {
             stage = .idle
             return
         }
-        if pausedForHeat(id) { return }
+        if !(await heatGate(id)) { return }
         do {
             try await loadSelectedModel()
         } catch {
@@ -330,8 +360,8 @@ final class ProcessingPipeline {
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
         }
         if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
-        if pausedForHeat(id) { return }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
+        if setTitle, !(await heatGate(id)) { return }
 
         if setTitle, let t = try? await onBackend({ () async throws -> String in
             guard let t = await engine.suggestTitle(transcript: transcript, lang: lang) else { throw CoreError.generationFailed }
@@ -344,7 +374,7 @@ final class ProcessingPipeline {
 
         for (i, kind) in OutputKind.allCases.enumerated() {
             if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
-            if pausedForHeat(id) { return }
+            if !(await heatGate(id)) { return }
             stage = .generating(kind, "final", 0, 1)
             do {
                 let text = try await onBackend {
@@ -378,7 +408,7 @@ final class ProcessingPipeline {
         defer { endBackground() }
         activeNoteID = noteID
         lastFailure[noteID] = nil
-        if Self.tooHot {
+        if Heat.isTooHot(Self.thermal) {
             stage = .failed(String(localized: "The phone is too warm. Try again when it has cooled down.")); return
         }
         let engine = CoreEngine.shared
@@ -447,10 +477,13 @@ final class ProcessingPipeline {
         defer { resuming = false; finishContinuedWork() }
         var tried: Set<Int64> = []
         while !isBusy, appIsActive || ContinuedWork.shared.isHeld, !LiveTranscriber.shared.isRecording,
-              ModelManager.shared.isReady, !Self.tooHot,
-              let id = interrupted.sorted().first(where: { !tried.contains($0) }) {
+              ModelManager.shared.isReady, Heat.beforeRun(Self.thermal) != .pause,
+              let id = interrupted.sorted().first(where: {
+                  !tried.contains($0) && (!heatPaused.contains($0) || Heat.canResume(Self.thermal))
+              }) {
             tried.insert(id)
             interrupted.remove(id)
+            heatPaused.remove(id)
             await regenerate(noteID: id)
             if !interrupted.contains(id) { markAutoTried(id) }
         }
