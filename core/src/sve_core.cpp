@@ -275,12 +275,16 @@ char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t star
         switch (sve::wav_probe(wav_path, info)) {
             case sve::WavProbe::ok: break;
             case sve::WavProbe::incomplete:
-                if (!is_final) return dup_str("{\"status\":\"wait\"}");   // header not written yet
-                sve_logf(2, "could not read %s", wav_path);
+            case sve::WavProbe::bad:
+                // While recording, a header not (fully) written yet, or still zeroed, is not an error.
+                if (!is_final) return dup_str("{\"status\":\"wait\"}");
+                sve_logf(2, "%s is not a readable 16 kHz 16-bit WAV", wav_path);
                 return nullptr;
-            case sve::WavProbe::bad: sve_logf(2, "%s is not a 16 kHz 16-bit WAV", wav_path); return nullptr;
         }
         const size_t start = (size_t)start_sample, total = (size_t)info.frames;
+        // Nothing to read until 28 s + 3 s are there (the planner's rule; checked first to skip the read).
+        if (!is_final && (total <= start || total - start < sve::kPieceTarget + sve::kPieceSearch))
+            return dup_str("{\"status\":\"wait\"}");
         std::vector<float> pcm;
         if (start < total && !sve::wav_read(wav_path, info, start, sve::kPieceTarget, pcm)) {
             sve_logf(2, "could not read %s", wav_path);

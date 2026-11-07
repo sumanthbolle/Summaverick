@@ -102,7 +102,8 @@ char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progre
  *   {"status":"piece","start_sec":N,"end_sample":N,"text":"…"}  continue from end_sample (text may be "")
  *   {"status":"wait"}  not final and under 28 s + 3 s recorded after start_sample: call again later
  *   {"status":"end"}   nothing left (final: under 0.5 s left)
- * is_final: the recording has stopped; the last piece takes what is left. NULL on failure or cancel. */
+ * is_final: the recording has stopped; the last piece takes what is left. While not final, a file whose
+ * header is missing, incomplete or not yet valid is a "wait". NULL on failure or cancel. */
 char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,
                                 const char *prev_text, sve_progress_cb cb, void *user);
 
