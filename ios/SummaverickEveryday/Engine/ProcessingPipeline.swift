@@ -113,29 +113,63 @@ final class ProcessingPipeline {
         UserDefaults.standard.set(autoTried.sorted(), forKey: "pipeline.autoTried")
     }
 
-    /// Full run for a fresh recording. Returns the note id as soon as it exists.
+    /// Recordings stopped whose run has not finished setting up (their note may not exist yet): the
+    /// waiting-notes pass and the sidecar sweep leave them alone.
+    @ObservationIgnored private var handingOver: Set<String> = []
+
+    /// Stop and make notes. Runs synchronously in the tap, before any await: stops live transcription
+    /// starting new pieces, claims the pipeline (busy) and the background time, and asks for the
+    /// continued-processing task while the app is still in front. The live piece in flight can hold the
+    /// engine for up to ~30 s; nothing else can start on this recording meanwhile.
+    func recordingStopped(audio: URL, duration: Int64) {
+        LiveTranscriber.shared.stop(audioPath: audio.path)
+        handingOver.insert(audio.path)
+        var claimed = false
+        if ModelManager.shared.isReady {
+            // Keyed on the file name: the note id is not known until the engine is free.
+            ContinuedWork.shared.begin(key: audio.deletingPathExtension().lastPathComponent, subtitle: Stage.transcribing(0).label)
+            if !isBusy {
+                starting = true
+                claimed = true
+                activeNoteID = nil   // the note is about to exist; no other note shows as busy
+                beginBackground()
+                stage = .transcribing(0)
+            }
+        }
+        Task { await self.process(audio: audio, duration: duration, claimed: claimed) }
+    }
+
+    /// Full run for a fresh recording. Returns the note id as soon as it exists. claimed: recordingStopped
+    /// already holds the busy claim and the background time for this run.
     @discardableResult
-    func process(audio: URL, duration: Int64) async -> Int64? {
+    func process(audio: URL, duration: Int64, claimed: Bool = false) async -> Int64? {
+        var ownsBackground = claimed
+        defer {
+            handingOver.remove(audio.path)
+            if claimed { starting = false }
+            if ownsBackground { endBackground() }
+        }
         let engine = CoreEngine.shared
         let title = "Recording " + Self.titleFormatter.string(from: Date())
         let noteLang = AppSettings.shared.notesLanguage
         // The recording is always kept, even when the AI cannot run yet.
         let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
         guard id > 0 else { stage = .failed(String(localized: "Could not save the note.")); return nil }
+        if claimed { activeNoteID = id }
+        lastFailure[id] = nil
         NotificationCenter.default.post(name: .notesChanged, object: nil)
 
         // Live transcription finishes the piece in flight and hands over; this run continues from its cursor.
-        await LiveTranscriber.shared.finish()
+        await LiveTranscriber.shared.finish(audioPath: audio.path)
         // Not downloaded yet: the note waits and is processed when the AI is ready (processWaitingNotes).
         guard ModelManager.shared.isReady else { return id }
-        // Keep working with the phone locked (iOS 26+), also for a note queued behind another one.
-        ContinuedWork.shared.begin(noteID: id, subtitle: Stage.transcribing(0).label)
-        // Another note is being written: queue this one behind it.
-        guard !isBusy else { interrupted.insert(id); return id }
-        beginBackground()
-        defer { endBackground() }
-        activeNoteID = id
-        lastFailure[id] = nil
+        if !claimed {
+            // Another note is being written: queue this one behind it.
+            guard !isBusy else { interrupted.insert(id); return id }
+            beginBackground()
+            ownsBackground = true
+            activeNoteID = id
+        }
         defer { if !interrupted.contains(id) { markAutoTried(id) } }
         if pausedForHeat(id) { return id }
 
@@ -375,6 +409,7 @@ final class ProcessingPipeline {
     private func beginBackground() {
         wentToBackground = false
         abort.set(false)
+        ContinuedWork.shared.startNote()   // lock-screen progress starts again for this note
         // Keep the screen on while the model works: a locked phone stops GPU work and the run fails.
         UIApplication.shared.isIdleTimerDisabled = true
         if backgroundObserver == nil {
@@ -429,14 +464,42 @@ final class ProcessingPipeline {
         var candidates: [WaitingNotes.Candidate] = []
         for n in await engine.notes(limit: 10_000) where n.has_audio && !autoTried.contains(n.id) {
             guard let note = await engine.note(n.id) else { continue }
+            let path = AudioRecorder.existingAudioPath(note.audio_path)
+            // A recording just stopped is already being handed over to its own run.
+            if let path, isHandingOver(path) || isHandingOver(note.audio_path ?? "") { continue }
             candidates.append(.init(id: n.id,
-                                    hasAudio: AudioRecorder.existingAudioPath(note.audio_path) != nil,
+                                    hasAudio: path != nil,
                                     hasTranscript: !(note.transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
         }
         let ids = WaitingNotes.toProcess(candidates, alreadyTried: autoTried, running: isBusy ? activeNoteID : nil)
         if !ids.isEmpty { NSLog("[sve] %ld notes waiting for the AI", ids.count) }
         interrupted.formUnion(ids)
         await resumeInterrupted()
+    }
+
+    private func isHandingOver(_ path: String) -> Bool {
+        handingOver.contains(path) || LiveTranscriber.shared.isTranscribing(audioPath: path)
+    }
+
+    /// At launch: removes transcription progress files whose recording is gone or belongs to no note
+    /// (for example the app was closed during a recording). The recordings themselves are left alone.
+    func sweepOrphanSidecars() async {
+        let dir = AudioRecorder.recordingsDirectory
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        let sidecars = files.filter { $0.hasSuffix(".live.json") }
+        guard !sidecars.isEmpty else { return }
+        let engine = CoreEngine.shared
+        var known: Set<String> = []
+        for n in await engine.notes(limit: 10_000) where n.has_audio {
+            if let p = await engine.note(n.id)?.audio_path { known.insert((p as NSString).lastPathComponent) }
+        }
+        for f in sidecars {
+            let audioName = String(f.dropLast(".live.json".count))
+            let audioPath = dir.appendingPathComponent(audioName).path
+            if known.contains(audioName) || isHandingOver(audioPath) { continue }
+            NSLog("[sve] removing orphan transcription progress %@", f)
+            TranscriptSidecar.remove(audioPath: audioPath)
+        }
     }
 
     private static let titleFormatter: DateFormatter = {

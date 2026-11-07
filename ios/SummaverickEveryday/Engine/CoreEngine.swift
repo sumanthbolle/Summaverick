@@ -106,11 +106,14 @@ actor CoreEngine {
 
     /// Where the loaded model runs; the audio projector follows it.
     private(set) var loadedBackend: ModelBackend?
+    /// What the last loadModel asked for, so a run can switch backend itself (ensureBackend).
+    private var lastLoad: (path: String, contextTokens: Int32, mmprojPath: String?)?
 
     /// Loads the model (and projector) on `backend`. A no-op when that is what is loaded; reloads
     /// (about 5 s) when the backend differs. Call between model runs, never during one.
     func loadModel(at path: String, contextTokens: Int32 = 4096, mmprojPath: String? = nil, backend: ModelBackend = .gpu) throws {
         guard let ctx else { throw CoreError.initFailed }
+        lastLoad = (path, contextTokens, mmprojPath)
         if loadedModelPath == path, loadedBackend == backend, sve_llm_loaded(ctx) != 0,
            mmprojPath == nil || sve_audio_loaded(ctx) != 0 { return }
         if sve_load_llm(ctx, path, contextTokens, backend.threads, backend.gpuLayers) != 0 {
@@ -127,6 +130,13 @@ actor CoreEngine {
     }
 
     var isAudioLoaded: Bool { sve_audio_loaded(ctx) != 0 }
+
+    /// Inside a run: makes sure the model is on `backend` (same files as the last load), so the choice and
+    /// the run cannot be split by another caller reloading in between.
+    func ensureBackend(_ backend: ModelBackend) throws {
+        guard let l = lastLoad else { throw CoreError.audioModelNotLoaded }
+        try loadModel(at: l.path, contextTokens: l.contextTokens, mmprojPath: l.mmprojPath, backend: backend)
+    }
 
     /// Transcribes a 16 kHz WAV with the loaded audio-capable model. progress: (done pieces, total pieces).
     func transcribeAudio(path: String, onProgress: @escaping (Int, Int) -> Void = { _, _ in }) throws -> String {

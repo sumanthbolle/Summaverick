@@ -34,6 +34,7 @@ struct SummaverickEverydayApp: App {
             .task { await ReminderScheduler.shared.resync() }
             .task { await PiecesBackfill.runOnce() }   // older notes become searchable by Ask (one time)
             .task { await ProcessingPipeline.shared.processWaitingNotes() }
+            .task { await ProcessingPipeline.shared.sweepOrphanSidecars() }
             // The AI finished downloading: write the notes for recordings made while it downloaded.
             .onReceive(NotificationCenter.default.publisher(for: .aiReady)) { _ in
                 Task { await ProcessingPipeline.shared.processWaitingNotes() }

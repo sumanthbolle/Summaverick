@@ -12,6 +12,8 @@ final class AtomicFlag: @unchecked Sendable {
     private var value = false
     var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
     func set(_ v: Bool) { lock.lock(); value = v; lock.unlock() }
+    /// Sets the flag; true only for the caller that set it first.
+    func setOnce() -> Bool { lock.lock(); defer { lock.unlock() }; if value { return false }; value = true; return true }
 }
 
 /// The one transcription loop: from the sidecar's cursor, piece by piece, saving after every piece.
@@ -22,31 +24,36 @@ enum TranscriptRun {
         case end
         /// Still recording and not enough new audio yet.
         case wait
-        /// `shouldContinue` said no between two pieces.
+        /// `shouldContinue` said no before a piece.
         case yielded
     }
 
     /// shouldStop is asked during a model run (any thread) and cancels it: the run throws and the piece is
-    /// lost, the cursor stays. shouldContinue is asked between pieces. onPiece gets the progress after each piece.
+    /// lost, the cursor stays. shouldContinue is asked before every piece (main actor); shouldStart once
+    /// the engine is free, right before the run (any thread). onPiece gets the progress after each piece.
     static func run(audioPath: String, isFinal: Bool,
                     shouldStop: @escaping () -> Bool,
                     shouldContinue: () -> Bool = { true },
+                    shouldStart: @escaping () -> Bool = { true },
                     onPiece: (TranscriptSidecar) -> Void = { _ in }) async throws -> (TranscriptSidecar, Stop) {
         var progress = TranscriptSidecar.load(audioPath: audioPath)
         while true {
-            if shouldStop() { throw CancellationError() }
+            if shouldStop() || Task.isCancelled { throw CancellationError() }
+            if !shouldContinue() || !shouldStart() { return (progress, .yielded) }
+            // Loads the files if needed; the CPU itself is ensured inside the run (same actor turn).
             try await ModelManager.shared.loadIntoCore(for: .transcription)
             let next = try await CoreEngine.shared.transcribeNextPiece(path: audioPath, startSample: progress.cursor_sample,
                                                                        isFinal: isFinal, previousText: progress.previousText,
+                                                                       backend: .cpu, shouldStart: shouldStart,
                                                                        shouldStop: shouldStop)
             switch next {
             case .end: return (progress, .end)
             case .wait: return (progress, .wait)
+            case .skipped: return (progress, .yielded)
             case .piece(let startSec, let endSample, let text):
                 progress.append(startSec: startSec, endSample: endSample, text: text)
                 progress.save(audioPath: audioPath)   // skipped when the audio was deleted meanwhile
                 onPiece(progress)
-                if !shouldContinue() { return (progress, .yielded) }
             }
         }
     }
@@ -57,6 +64,19 @@ enum TranscriptRun {
     }
 }
 
+/// One recording's live transcription. Its flags are its own, so a Stop or Cancel of one recording never
+/// touches the next one.
+@MainActor
+final class LiveSession {
+    let audioPath: String
+    /// Stop or Cancel: no new piece starts (read on any thread).
+    let finishing = AtomicFlag()
+    /// Cancel: the piece in flight is dropped too.
+    let abort = AtomicFlag()
+    var task: Task<Void, Never>?
+    init(audioPath: String) { self.audioPath = audioPath }
+}
+
 @MainActor
 @Observable
 final class LiveTranscriber {
@@ -64,7 +84,7 @@ final class LiveTranscriber {
 
     enum Status: Equatable {
         case idle
-        /// The AI is not ready (or gave up): notes are written after Stop.
+        /// The AI is not ready (or keeps failing for now): notes are written after Stop.
         case later
         case writing
         case behind(minutes: Int)
@@ -73,16 +93,20 @@ final class LiveTranscriber {
     }
 
     /// A recording for notes is going (not an Ask voice question). Model runs use the CPU meanwhile.
-    private(set) var isRecording = false
+    var isRecording: Bool { current != nil }
     private(set) var status: Status = .idle
-    /// Transcript so far, one entry per piece, oldest first.
+    /// Transcript so far of the current recording, one entry per piece, oldest first.
     private(set) var lines: [String] = []
 
-    @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var finishing = false
-    @ObservationIgnored private let abort = AtomicFlag()
+    /// The recording going now; Stop or Cancel clears it at once.
+    private var current: LiveSession?
+    /// Sessions whose loop has not ended yet (the current one, and stopped ones finishing their piece).
+    @ObservationIgnored private var running: [String: LiveSession] = [:]
     @ObservationIgnored private var elapsed: () -> TimeInterval = { 0 }
     @ObservationIgnored private var transcribedSeconds: Double = 0
+
+    /// Wait after this many failures in a row before trying again (the recording goes on meanwhile).
+    static let failureBackoff: Double = 60
 
     private init() {}
 
@@ -96,38 +120,55 @@ final class LiveTranscriber {
         }
     }
 
+    /// True while a session of this recording still has a loop (Stop waits for it in finish).
+    func isTranscribing(audioPath: String) -> Bool { running[audioPath] != nil }
+
     /// A recording started (its WAV is being written at `audio`). Transcribes along if the AI is ready.
     func recordingStarted(audio: URL, elapsed: @escaping () -> TimeInterval) {
-        task?.cancel()
-        isRecording = true
-        finishing = false
-        abort.set(false)
+        if let old = current { stop(audioPath: old.audioPath) }   // never two current recordings
+        let session = LiveSession(audioPath: audio.path)
+        current = session
         lines = []
         transcribedSeconds = 0
         self.elapsed = elapsed
+        TranscriptSidecar.remove(audioPath: audio.path)   // a new recording always starts at 0
         // isReady also means the phone is supported.
         guard ModelManager.shared.isReady else { status = .later; return }
         status = .writing
         UIDevice.current.isBatteryMonitoringEnabled = true
-        let path = audio.path
-        task = Task { await self.loop(path) }
+        running[audio.path] = session
+        // Earlier sessions still finishing their piece go first: one model run at a time.
+        let earlier = running.values.filter { $0 !== session }.compactMap(\.task)
+        session.task = Task {
+            for t in earlier { await t.value }
+            await self.loop(session)
+            self.ended(session)
+        }
     }
 
-    /// Stop: the piece in flight is finished and saved; returns once the loop has ended, so the pipeline
-    /// can take over from the cursor.
-    func finish() async {
-        isRecording = false
-        finishing = true
-        await task?.value
-        task = nil
+    /// Stop, synchronously: no new piece starts; the piece in flight is finished and saved.
+    func stop(audioPath: String) {
+        guard let s = current, s.audioPath == audioPath else { running[audioPath]?.finishing.set(true); return }
+        s.finishing.set(true)
+        current = nil
         status = .idle
-        UIDevice.current.isBatteryMonitoringEnabled = false
     }
 
-    /// Cancel: the piece in flight is dropped so deleting the recording is not delayed.
-    func cancel() async {
-        abort.set(true)
-        await finish()
+    /// Stop, then wait until that recording's loop has ended, so the pipeline can take over from the cursor.
+    func finish(audioPath: String) async {
+        stop(audioPath: audioPath)
+        await running[audioPath]?.task?.value
+    }
+
+    /// Cancel: the piece in flight is dropped as well, so deleting the recording is not held up.
+    func cancel(audioPath: String) async {
+        running[audioPath]?.abort.set(true)
+        await finish(audioPath: audioPath)
+    }
+
+    private func ended(_ s: LiveSession) {
+        if running[s.audioPath] === s { running[s.audioPath] = nil }
+        if running.isEmpty && current == nil { UIDevice.current.isBatteryMonitoringEnabled = false }
     }
 
     private func pauseReason() -> LivePause? {
@@ -136,52 +177,64 @@ final class LiveTranscriber {
                                 charging: d.batteryState == .charging || d.batteryState == .full)
     }
 
-    private func refresh() {
+    /// Only the current recording drives the screen.
+    private func show(_ s: LiveSession, _ st: Status) { if current === s { status = st } }
+
+    private func refresh(_ s: LiveSession) {
         if let m = LiveLag.minutesBehind(recordedSeconds: elapsed(), transcribedSeconds: transcribedSeconds) {
-            status = .behind(minutes: m)
+            show(s, .behind(minutes: m))
         } else {
-            status = .writing
+            show(s, .writing)
         }
     }
 
-    private func loop(_ path: String) async {
+    private func loop(_ s: LiveSession) async {
         var failures = 0
-        let abort = self.abort
-        while !finishing {
+        let finishing = s.finishing, abort = s.abort
+        while !finishing.isSet, !Task.isCancelled {
             if let p = pauseReason() {
-                status = p == .heat ? .pausedHeat : .pausedBattery
-                await nap(3)
+                show(s, p == .heat ? .pausedHeat : .pausedBattery)
+                await nap(3, s)
                 continue
             }
-            refresh()
+            refresh(s)
             do {
                 let (_, stop) = try await TranscriptRun.run(
-                    audioPath: path, isFinal: false,
+                    audioPath: s.audioPath, isFinal: false,
                     shouldStop: { abort.isSet || Heat.isTooHot(ProcessInfo.processInfo.thermalState) },
-                    shouldContinue: { !self.finishing && self.pauseReason() == nil },
-                    onPiece: { s in
-                        self.lines = s.pieces.map(\.text)
-                        self.transcribedSeconds = s.transcribedSeconds
-                        self.refresh()
+                    shouldContinue: { !finishing.isSet && self.pauseReason() == nil },
+                    shouldStart: { !finishing.isSet },
+                    onPiece: { p in
+                        guard self.current === s else { return }
+                        self.lines = p.pieces.map(\.text)
+                        self.transcribedSeconds = p.transcribedSeconds
+                        self.refresh(s)
                     })
                 failures = 0
-                if stop == .wait { await nap(3) }
+                if stop == .wait { await nap(3, s) }
+                else if stop == .yielded, pauseReason() != nil { continue }
             } catch {
-                if abort.isSet || finishing { break }
+                if abort.isSet || finishing.isSet || Task.isCancelled { break }
                 if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { continue }   // paused at the top
                 failures += 1
                 NSLog("[sve] live transcription failed (%ld): %@", failures, String(describing: error))
-                if failures >= 3 { status = .later; return }   // the pipeline does it after Stop
-                await nap(3)
+                if failures >= 3 {
+                    // Back off instead of giving up for the whole recording; after Stop the pipeline does the rest.
+                    show(s, .later)
+                    await nap(Self.failureBackoff, s)
+                    failures = 0
+                } else {
+                    await nap(3, s)
+                }
             }
         }
     }
 
-    /// Sleeps up to `seconds`, waking early on Stop or Cancel.
-    private func nap(_ seconds: Double) async {
+    /// Sleeps up to `seconds`, waking early on Stop, Cancel or task cancellation.
+    private func nap(_ seconds: Double, _ s: LiveSession) async {
         let end = Date().addingTimeInterval(seconds)
-        while !finishing, Date() < end {
-            try? await Task.sleep(nanoseconds: 250_000_000)
+        while !s.finishing.isSet, Date() < end {
+            do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
         }
     }
 }

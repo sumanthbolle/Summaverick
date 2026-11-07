@@ -222,6 +222,8 @@ extension CoreEngine {
         case wait
         /// Nothing left to transcribe (final only).
         case end
+        /// `shouldStart` said no once the engine was free: nothing was run.
+        case skipped
     }
 
     private struct NextPieceJSON: Decodable {
@@ -232,11 +234,16 @@ extension CoreEngine {
     }
 
     /// Plans and transcribes the next ~28 s piece of a WAV that may still be being recorded, from
-    /// `startSample`. isFinal: the recording has stopped. Throws on failure; cancels (throws) when
-    /// `shouldStop` turns true during the run.
+    /// `startSample`, on `backend` (switched here, in the same actor turn as the run). isFinal: the
+    /// recording has stopped. shouldStart is asked once the engine is free (a Stop while this call waited
+    /// skips it). Throws on failure; cancels (throws) when `shouldStop` turns true during the run.
     func transcribeNextPiece(path: String, startSample: Int64, isFinal: Bool, previousText: String?,
+                             backend: ModelBackend = .cpu,
+                             shouldStart: () -> Bool = { true },
                              shouldStop: @escaping () -> Bool = { false }) throws -> NextPiece {
         guard let ctx else { throw CoreError.initFailed }
+        guard shouldStart() else { return .skipped }
+        try ensureBackend(backend)
         guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
         let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()

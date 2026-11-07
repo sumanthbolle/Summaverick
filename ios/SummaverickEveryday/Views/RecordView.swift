@@ -96,15 +96,17 @@ struct RecordView: View {
         dismiss()
         // Drop the piece in flight first, so nothing is written next to the deleted recording.
         Task {
-            await live.cancel()
-            if let (url, _) = stopped { AudioRecorder.removeAudio(atPath: url.path) }
+            guard let (url, _) = stopped else { return }
+            await live.cancel(audioPath: url.path)
+            AudioRecorder.removeAudio(atPath: url.path)
         }
     }
 
     private func stopAndProcess() {
         guard let (url, duration) = recorder.stop() else { return }
+        // Synchronous, before anything awaits: claims the work and the background time right in the tap.
+        ProcessingPipeline.shared.recordingStopped(audio: url, duration: duration)
         dismiss()
-        Task { await ProcessingPipeline.shared.process(audio: url, duration: duration) }
     }
 
     private func timeString(_ t: TimeInterval) -> String {

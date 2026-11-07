@@ -162,7 +162,9 @@ final class ModelManager: NSObject {
     /// not recording (BackendChoice). Returns the backend used.
     @discardableResult
     func loadIntoCore(for purpose: ModelPurpose = .generation) async throws -> ModelBackend {
-        let backend = BackendChoice.backend(for: purpose, appActive: UIApplication.shared.applicationState == .active,
+        // .inactive (Control Center, a banner, the app switcher) still counts as in front: switching would
+        // cost two ~5 s reloads; GPU work is only refused once the app is in the background.
+        let backend = BackendChoice.backend(for: purpose, appActive: UIApplication.shared.applicationState != .background,
                                             recording: LiveTranscriber.shared.isRecording)
         try await loadIntoCore(backend: backend)
         return backend

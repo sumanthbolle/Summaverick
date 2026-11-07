@@ -77,7 +77,7 @@ final class AudioRecorder {
             try session.setActive(true)
 
             let url = (directory ?? AudioRecorder.recordingsDirectory)
-                .appendingPathComponent("rec-\(Int(Date().timeIntervalSince1970)).wav")
+                .appendingPathComponent("rec-\(Int64(Date().timeIntervalSince1970 * 1000)).wav")   // ms: never the same name twice
             let settings: [String: Any] = [
                 AVFormatIDKey: Int(kAudioFormatLinearPCM),
                 AVSampleRateKey: 16_000.0,
