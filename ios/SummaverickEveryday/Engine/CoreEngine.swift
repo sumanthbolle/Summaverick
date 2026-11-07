@@ -212,6 +212,7 @@ actor CoreEngine {
     func setTitle(_ id: Int64, _ title: String) { _ = sve_note_set_title(ctx, id, title) }
     func deleteNote(_ id: Int64) { _ = sve_note_delete(ctx, id) }
     func clearAudio(_ id: Int64) { _ = sve_note_clear_audio(ctx, id) }
+    func setAudioPath(_ id: Int64, _ path: String) -> Bool { sve_note_set_audio_path(ctx, id, path) == 0 }
     func clearTranscript(_ id: Int64) { _ = sve_note_clear_transcript(ctx, id) }
 
     func note(_ id: Int64) -> Note? { decode(Note.self, take(sve_note_get_json(ctx, id))) }

@@ -6,6 +6,7 @@
 // automatically later; the user can also tap "Generate notes". Recordings made before the AI has
 // downloaded wait and are processed, one at a time, once it is ready. A long recording can instead be
 // finished overnight while the phone charges (OvernightWork). Same stages the device firmware will run.
+import AVFoundation
 import Foundation
 import Observation
 import UIKit
@@ -460,6 +461,7 @@ final class ProcessingPipeline {
         }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
+        Task { await self.compressAudio(noteID: id) }   // the notes are done; the WAV can shrink
     }
 
     /// Writes the note's missing section summaries from its stored pieces, one at a time, each stored before the
@@ -746,6 +748,77 @@ final class ProcessingPipeline {
             if known.contains(audioName) || isHandingOver(audioPath) { continue }
             NSLog("[sve] removing orphan transcription progress %@", f)
             TranscriptSidecar.remove(audioPath: audioPath)
+        }
+    }
+
+    // MARK: compress audio
+
+    @ObservationIgnored private var compressing: Set<Int64> = []
+
+    /// Nothing is converted during a recording, while this note is being written, or while its WAV is
+    /// still being handed from live transcription to the pipeline.
+    private func mayCompress(_ id: Int64, path: String? = nil) -> Bool {
+        if LiveTranscriber.shared.isRecording { return false }
+        if isBusy && activeNoteID == id { return false }
+        if starting && activeNoteID == id { return false }
+        if let path, isHandingOver(path) { return false }
+        return true
+    }
+
+    /// Once a note has its transcript and all three outputs, its WAV becomes an AAC file. Order: convert,
+    /// check the .m4a, point the note at it, only then delete the WAV (and its progress file). Any failure
+    /// removes the .m4a and keeps the WAV; the next launch tries again, so a kill at any point leaves a
+    /// recording that plays.
+    func compressAudio(noteID id: Int64) async {
+        guard !compressing.contains(id), mayCompress(id) else { return }
+        let engine = CoreEngine.shared
+        guard let note = await engine.note(id), let stored = note.audio_path,
+              (stored as NSString).pathExtension.lowercased() == "wav",
+              !WaitingNotes.needsWork(hasTranscript: !(note.transcript ?? "").isEmpty,
+                                      outputs: OutputKind.allCases.map { note.output($0) != nil }),
+              let path = AudioRecorder.existingAudioPath(stored),
+              (path as NSString).pathExtension.lowercased() == "wav",
+              mayCompress(id, path: path) else { return }
+        compressing.insert(id)
+        defer { compressing.remove(id) }
+        let wav = URL(fileURLWithPath: path)
+        let m4a: URL
+        do { m4a = try await AudioCompressor.compress(wav: wav) } catch {
+            NSLog("[sve] audio compression failed: %@", String(describing: error))
+            return
+        }
+        func discard() { try? FileManager.default.removeItem(at: m4a) }
+        // The length to expect is the WAV's own; the note's stored seconds are only a rounded timer.
+        guard let source = try? AVAudioFile(forReading: wav), source.processingFormat.sampleRate > 0,
+              AudioCompressor.verify(m4a: m4a, expectedSeconds: Double(source.length) / source.processingFormat.sampleRate) else {
+            NSLog("[sve] compressed audio did not check out; keeping the WAV")
+            discard(); return
+        }
+        // Things may have changed while converting: a recording started, the note was deleted or redone.
+        guard mayCompress(id, path: path), let now = await engine.note(id), now.audio_path == stored,
+              !WaitingNotes.needsWork(hasTranscript: !(now.transcript ?? "").isEmpty,
+                                      outputs: OutputKind.allCases.map { now.output($0) != nil }),
+              await engine.setAudioPath(id, m4a.path) else { discard(); return }
+        AudioRecorder.removeAudio(atPath: path)
+        NotificationCenter.default.post(name: .notesChanged, object: nil)
+    }
+
+    /// At launch: removes half-written .m4a.part files, finishes a swap an app kill cut short (note already
+    /// on the .m4a, WAV still there), and compresses the finished notes that still have a WAV.
+    func sweepCompression() async {
+        if compressing.isEmpty { AudioCompressor.sweepParts(in: AudioRecorder.recordingsDirectory) }
+        let engine = CoreEngine.shared
+        for n in await engine.notes(limit: 10_000) where n.has_audio {
+            guard !LiveTranscriber.shared.isRecording, let note = await engine.note(n.id),
+                  let stored = note.audio_path else { continue }
+            if (stored as NSString).pathExtension.lowercased() == "m4a" {
+                let wav = AudioCompressor.wavSibling(ofM4A: AudioRecorder.existingAudioPath(stored) ?? stored)
+                if FileManager.default.fileExists(atPath: wav), !isHandingOver(wav), AudioRecorder.existingAudioPath(stored) != nil {
+                    AudioRecorder.removeAudio(atPath: wav)
+                }
+            } else {
+                await compressAudio(noteID: n.id)
+            }
         }
     }
 

@@ -342,3 +342,11 @@ TEST(extracted_flag_goes_with_note_and_wipe) {
     CHECK(!s.was_extracted(b));
     CHECK(s.setting_get("lang").has_value());  // host settings stay
 }
+
+TEST(audio_path_can_be_replaced) {
+    Store s(":memory:");
+    int64_t id = s.create("n", "en", "/r/a.wav", "tx", 10);
+    CHECK(s.set_text_column(id, "audio_path", "/r/a.m4a"));
+    CHECK_EQ(*s.get(id)->audio_path, std::string("/r/a.m4a"));
+    CHECK(!s.set_text_column(id + 99, "audio_path", "/r/b.m4a"));  // no such note
+}

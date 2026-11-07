@@ -35,7 +35,14 @@ final class AudioRecorder {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Summaverick/recordings", isDirectory: true)
         let here = dir.appendingPathComponent(name).path
-        return FileManager.default.fileExists(atPath: here) ? here : nil
+        if FileManager.default.fileExists(atPath: here) { return here }
+        // A compressed recording: the note may still name the WAV that was swapped for its .m4a.
+        let stem = (name as NSString).deletingPathExtension
+        if (name as NSString).pathExtension.lowercased() == "wav" {
+            let packed = dir.appendingPathComponent(stem + ".m4a").path
+            if FileManager.default.fileExists(atPath: packed) { return packed }
+        }
+        return nil
     }
 
     /// Deletes a recording and the transcription progress saved next to it (TranscriptSidecar).

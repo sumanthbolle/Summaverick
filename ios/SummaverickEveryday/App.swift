@@ -37,6 +37,7 @@ struct SummaverickEverydayApp: App {
             .task { await PiecesBackfill.runOnce() }   // older notes become searchable by Ask (one time)
             .task { await ProcessingPipeline.shared.processWaitingNotes() }
             .task { await ProcessingPipeline.shared.sweepOrphanSidecars() }
+            .task { await ProcessingPipeline.shared.sweepCompression() }   // finished notes: WAV → AAC; stray .part files go
             // The AI finished downloading: write the notes for recordings made while it downloaded.
             .onReceive(NotificationCenter.default.publisher(for: .aiReady)) { _ in
                 Task { await ProcessingPipeline.shared.processWaitingNotes() }
