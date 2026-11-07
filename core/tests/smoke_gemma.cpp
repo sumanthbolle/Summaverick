@@ -6,7 +6,8 @@
 //   extract     doctor-visit fixture: extract, list pending suggestions, two Ask questions
 //   api         assistant C API without a model (accept/reject, medicines, medicine Ask route)
 #include "sve_core.h"
-#include "sve_internal.h"  // api mode adds model-like suggestions straight to the store
+#include "sve_internal.h"
+#include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
 #include "third_party/nlohmann/json.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -758,6 +759,43 @@ done:
     return 0;
 }
 
+// Transcribes the WAV piece by piece (as live does), plans ~5 minute sections, summarises each and prints
+// the JSON with the seconds it took. Expects a title and 1..6 points per section; "fallback" is reported.
+static int run_sections(sve_ctx *ctx, const char *wav, const char *lang) {
+    std::vector<std::pair<int64_t, std::string>> pieces;
+    int64_t cursor = 0;
+    double dur = 0;
+    { std::ifstream f(wav, std::ios::binary | std::ios::ate); dur = f.tellg() > 44 ? (double)(f.tellg() - (std::streamoff)44) / 32000.0 : 0; }
+    std::string prev;
+    for (;;) {
+        json r = take(sve_transcribe_next_piece(ctx, wav, cursor, 1, prev.empty() ? nullptr : prev.c_str(), nullptr, nullptr));
+        if (r.is_null()) { fprintf(stderr, "next_piece failed\n"); return 1; }
+        if (r.value("status", "") != "piece") break;
+        int64_t end = r.value("end_sample", (int64_t)0);
+        if (end <= cursor) return 1;
+        cursor = end;
+        std::string t = r.value("text", "");
+        if (!t.empty()) { pieces.push_back({r.value("start_sec", (int64_t)0), t}); prev = t; }
+    }
+    printf("transcribed %zu pieces, %.1f s audio\n", pieces.size(), dur);
+    std::vector<sve::PieceRef> refs;
+    for (size_t i = 0; i < pieces.size(); ++i)
+        refs.push_back({pieces[i].first, i + 1 < pieces.size() ? pieces[i + 1].first : (int64_t)dur});
+    auto secs = sve::plan_sections(refs, true);
+    for (size_t k = 0; k < secs.size(); ++k) {
+        json arr = json::array();
+        for (size_t i = secs[k].first; i < secs[k].second; ++i) arr.push_back({{"start_sec", pieces[i].first}, {"text", pieces[i].second}});
+        auto t0 = std::chrono::steady_clock::now();
+        json s = take(sve_section_summarize(ctx, arr.dump().c_str(), lang, nullptr, nullptr));
+        double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        printf("--- section %zu (pieces %zu..%zu, %.1f s)\n%s\n", k, secs[k].first, secs[k].second, sec, s.dump(2).c_str());
+        expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 6,
+               "section summary has a title and 1..6 points");
+        if (s.value("fallback", false)) printf("(fallback used)\n");
+    }
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "transcribe";
     const char *gguf = getenv("SVE_GEMMA"), *mmproj = getenv("SVE_MMPROJ"), *wav = getenv("SVE_TEST_WAV");
@@ -770,13 +808,16 @@ int main(int argc, char **argv) {
         return fails ? 1 : 0;
     }
     if (!gguf) { fprintf(stderr, "set SVE_GEMMA\n"); return 2; }
-    const bool live = !strcmp(mode, "live");
+    const bool live = !strcmp(mode, "live") || !strcmp(mode, "sections");
     // live runs as on the phone: CPU only (the projector follows), 4 threads.
     if (sve_load_llm(ctx, gguf, 8192, live ? 4 : 0, live ? 0 : 99) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
     if (live) {
+        const bool sections = !strcmp(mode, "sections");
         if (!mmproj || !wav) { fprintf(stderr, "set SVE_MMPROJ and SVE_TEST_WAV\n"); return 2; }
         if (sve_load_audio(ctx, mmproj) != 0) { fprintf(stderr, "sve_load_audio failed\n"); return 1; }
-        int rc = run_live(ctx, wav);
+        const char *lang = getenv("SVE_LANG");
+        int rc = sections ? run_sections(ctx, wav, lang ? lang : "te") : run_live(ctx, wav);
+        if (sections) { printf("%s (%d missed)\n", fails ? "SECTIONS FAIL" : "SECTIONS OK", fails); if (fails) rc = 1; }
         sve_free(ctx);
         return rc;
     }

@@ -81,3 +81,68 @@ TEST(sections_roundtrip_and_cascade) {
     CHECK(!st.set_sections(id, in));
     CHECK(st.sections(id).empty());
 }
+
+using Pieces = std::vector<std::pair<int64_t, std::string>>;
+static const std::vector<int64_t> kStarts = {0, 28, 56, 84, 112};
+
+TEST(parse_section_summary_accepts_fenced_json) {
+    std::string out = "<think>hmm</think>Here:\n```json\n{\"title\":\"Budget\",\"topic\":\"money\",\"points\":"
+                      "[{\"text\":\"Spend less\",\"start_sec\":28},{\"text\":\"Save\",\"start_sec\":56}],"
+                      "\"terms\":[\"GST\"],\"hints\":[\"x\"]}\n```";
+    json s;
+    CHECK(parse_section_summary(out, kStarts, s));
+    CHECK_EQ(s["title"].get<std::string>(), std::string("Budget"));
+    CHECK_EQ(s["points"].size(), (size_t)2);
+    CHECK_EQ(s["points"][1]["start_sec"].get<int64_t>(), (int64_t)56);
+    CHECK_EQ(s["terms"][0].get<std::string>(), std::string("GST"));
+}
+
+TEST(parse_section_summary_clamps_start_secs) {
+    json s;
+    CHECK(parse_section_summary("{\"title\":\"T\",\"points\":[{\"text\":\"a\",\"start_sec\":95},"
+                                "{\"text\":\"b\",\"start_sec\":9999},{\"text\":\"c\"}]}", kStarts, s));
+    CHECK_EQ(s["points"][0]["start_sec"].get<int64_t>(), (int64_t)84);
+    CHECK_EQ(s["points"][1]["start_sec"].get<int64_t>(), (int64_t)112);
+    CHECK_EQ(s["points"][2]["start_sec"].get<int64_t>(), (int64_t)0);
+    CHECK(s["terms"].is_array() && s["hints"].is_array());
+}
+
+TEST(parse_section_summary_rejects_truncated) {
+    json s;
+    CHECK(!parse_section_summary("{\"title\":\"T\",\"points\":[{\"text\":\"abc", kStarts, s));
+    CHECK(!parse_section_summary("{\"title\":\"\",\"points\":[{\"text\":\"a\",\"start_sec\":0}]}", kStarts, s));
+    CHECK(!parse_section_summary("{\"title\":\"T\",\"points\":[]}", kStarts, s));
+    CHECK(!parse_section_summary("", kStarts, s));
+}
+
+TEST(parse_section_summary_caps_points_at_6) {
+    std::string o = "{\"title\":\"T\",\"points\":[";
+    for (int i = 0; i < 9; ++i) o += std::string(i ? "," : "") + "{\"text\":\"p" + std::to_string(i) + "\",\"start_sec\":0}";
+    o += "]}";
+    json s;
+    CHECK(parse_section_summary(o, kStarts, s));
+    CHECK_EQ(s["points"].size(), (size_t)6);
+}
+
+TEST(fallback_summary_shape) {
+    Pieces p = {{0, "One two three four five six seven eight nine ten. Second sentence."}, {28, "Alpha beta. More."},
+                {56, "Gamma."}, {84, "Delta."}};
+    json s = fallback_section_summary(p);
+    CHECK_EQ(s["title"].get<std::string>(), std::string("One two three four five six seven eight"));
+    CHECK_EQ(s["points"].size(), (size_t)3);
+    CHECK_EQ(s["points"][0]["text"].get<std::string>(), std::string("One two three four five six seven eight nine ten."));
+    CHECK_EQ(s["points"][1]["start_sec"].get<int64_t>(), (int64_t)28);
+    CHECK(s["fallback"].get<bool>());
+    CHECK(s["terms"].is_array() && s["hints"].is_array());
+}
+
+TEST(section_prompt_mentions_language_and_starts) {
+    Pieces p = {{0, "hello"}, {28, "world"}, {56, "x"}};
+    std::string te = section_prompt(p, "te", "Words: Metformin");
+    CHECK(te.find("Telugu") != std::string::npos);
+    CHECK(te.find("[t=0]") != std::string::npos && te.find("[t=28]") != std::string::npos && te.find("[t=56]") != std::string::npos);
+    CHECK(te.find("Metformin") != std::string::npos);
+    std::string en = section_prompt(p, "en", "");
+    CHECK(en.find("English") != std::string::npos);
+    CHECK(en.find("Telugu") == std::string::npos);
+}

@@ -5,6 +5,7 @@
 #include "sve_prompts.h"
 #include "sve_context.h"
 #include "sve_audio.h"
+#include "sve_sections.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -265,6 +266,45 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
     }
     if (cb) cb("final", total, total, user);
     return true;
+}
+
+char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang_c, sve_progress_cb cb, void *user) {
+    try {
+        if (!ctx || !ctx->llm || !pieces_json) return nullptr;
+        sve::SectionPieces pieces;
+        std::vector<int64_t> starts;
+        sve::json arr = sve::json::parse(pieces_json, nullptr, false);
+        if (!arr.is_array()) return nullptr;
+        for (const auto &e : arr) {
+            if (!e.is_object() || !e.contains("text") || !e["text"].is_string()) continue;
+            int64_t s = e.contains("start_sec") && e["start_sec"].is_number() ? e["start_sec"].get<int64_t>() : 0;
+            pieces.push_back({s, e["text"].get<std::string>()});
+            starts.push_back(s);
+        }
+        if (pieces.empty()) return nullptr;
+        sve::Llm &llm = *ctx->llm;
+        const std::string lang = lang_c ? lang_c : "en";
+        const int kMaxOut = 512;
+        const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
+        const std::string prompt = llm.apply_template(
+            sys, sve::section_prompt(pieces, lang, sve::transcription_vocab_line(*ctx->store, 400)));
+        auto dump = [](const sve::json &j) { return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace)); };
+        // A section that cannot fit the context with room to answer goes straight to the fallback.
+        if (llm.count_tokens(prompt) + kMaxOut + 16 > llm.n_ctx) return dump(sve::fallback_section_summary(pieces));
+        for (int attempt = 0; attempt < 2; ++attempt) {  // sampled, then greedy
+            std::string out;
+            if (!llm.complete(prompt, kMaxOut, out, cb, user, "section", attempt, 2, attempt == 1)) return nullptr;
+            sve::json j;
+            if (sve::parse_section_summary(strip_thinking(out), starts, j)) return dump(j);
+            sve_logf(1, "section summary attempt %d did not parse", attempt + 1);
+        }
+        return dump(sve::fallback_section_summary(pieces));
+    } catch (const std::exception &e) {
+        sve_logf(2, "section summary failed: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,

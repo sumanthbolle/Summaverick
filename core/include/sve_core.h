@@ -151,6 +151,12 @@ int   sve_note_set_sections(sve_ctx *ctx, int64_t note_id, const char *sections_
 /* Same array; "[]" when none. */
 char *sve_note_sections(sve_ctx *ctx, int64_t note_id);
 
+/* Summary of one section. pieces_json: [{"start_sec":0,"text":"…"}]; lang "en"/"te". Returns the summary JSON
+ * ({"title","topic","points":[{"text","start_sec"}],"terms","hints"}). Sampled first try, one greedy retry,
+ * then a plain-text fallback ("fallback":true) built from the first sentences, so a model that ran never
+ * gives NULL. NULL on cancel, no model or bad input. Output capped at 512 tokens. */
+char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang, sve_progress_cb cb, void *user);
+
 /* Runs extraction on a note's pieces (greedy, windowed for long recordings). Adds pending suggestions
  * (reminders, tasks, profile changes, vocabulary, facts), each quote and medicine checked in code; links
  * topics and people directly. Returns the number of suggestions added (0 if the model output was unusable),
