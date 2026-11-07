@@ -4487,6 +4487,102 @@
           }
         }
       }
+    },
+    "About %lld min behind": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About %lld min behind"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సుమారు %lld నిమిషాలు వెనుక ఉంది"
+          }
+        }
+      }
+    },
+    "Notes will be written after you stop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes will be written after you stop"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు ఆపిన తర్వాత నోట్స్ రాయబడతాయి"
+          }
+        }
+      }
+    },
+    "Paused while the phone cools down": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused while the phone cools down"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ చల్లబడే వరకు ఆగింది"
+          }
+        }
+      }
+    },
+    "Paused: battery low — notes will be written later": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused: battery low — notes will be written later"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆగింది: బ్యాటరీ తక్కువగా ఉంది — నోట్స్ తర్వాత రాయబడతాయి"
+          }
+        }
+      }
+    },
+    "Writing as you talk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writing as you talk"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు మాట్లాడుతుండగానే రాస్తోంది"
+          }
+        }
+      }
+    },
+    "Writing your notes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writing your notes"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నోట్స్ రాస్తోంది"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

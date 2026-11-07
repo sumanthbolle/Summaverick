@@ -104,15 +104,23 @@ actor CoreEngine {
 
     var isModelLoaded: Bool { sve_llm_loaded(ctx) != 0 }
 
-    func loadModel(at path: String, contextTokens: Int32 = 4096, mmprojPath: String? = nil) throws {
+    /// Where the loaded model runs; the audio projector follows it.
+    private(set) var loadedBackend: ModelBackend?
+
+    /// Loads the model (and projector) on `backend`. A no-op when that is what is loaded; reloads
+    /// (about 5 s) when the backend differs. Call between model runs, never during one.
+    func loadModel(at path: String, contextTokens: Int32 = 4096, mmprojPath: String? = nil, backend: ModelBackend = .gpu) throws {
         guard let ctx else { throw CoreError.initFailed }
-        if loadedModelPath == path, sve_llm_loaded(ctx) != 0, mmprojPath == nil || sve_audio_loaded(ctx) != 0 { return }
-        // 99 = all layers on the GPU (Metal). Threads 0 = auto.
-        if sve_load_llm(ctx, path, contextTokens, 0, 99) != 0 {
+        if loadedModelPath == path, loadedBackend == backend, sve_llm_loaded(ctx) != 0,
+           mmprojPath == nil || sve_audio_loaded(ctx) != 0 { return }
+        if sve_load_llm(ctx, path, contextTokens, backend.threads, backend.gpuLayers) != 0 {
             loadedModelPath = nil
+            loadedBackend = nil
             throw CoreError.modelLoadFailed(path)
         }
         loadedModelPath = path
+        loadedBackend = backend
+        NSLog("[sve] model loaded on the %@", backend == .gpu ? "GPU" : "CPU")
         if let mmprojPath, sve_load_audio(ctx, mmprojPath) != 0 {
             throw CoreError.modelLoadFailed(mmprojPath)
         }
@@ -135,6 +143,7 @@ actor CoreEngine {
     func unloadModel() {
         sve_unload_llm(ctx)
         loadedModelPath = nil
+        loadedBackend = nil
     }
 
     // MARK: generation
@@ -155,10 +164,10 @@ actor CoreEngine {
         return box.isCancelled() ? 1 : 0
     }
 
-    func generate(transcript: String, kind: OutputKind, lang: String,
+    func generate(transcript: String, kind: OutputKind, lang: String, shouldStop: @escaping () -> Bool = { false },
                   onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> String {
         guard let ctx else { throw CoreError.initFailed }
-        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled })
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let out = take(sve_generate(ctx, transcript, kind.cKind, lang, CoreEngine.progressTrampoline, user)) else {
             throw CoreError.generationFailed

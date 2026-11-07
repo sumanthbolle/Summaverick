@@ -456,7 +456,7 @@ struct NoteDetailView: View {
     private func deleteNote() {
         Task {
             stopPlayback()
-            if let p = AudioRecorder.existingAudioPath(note?.audio_path) { try? FileManager.default.removeItem(atPath: p) }
+            if let p = AudioRecorder.existingAudioPath(note?.audio_path) { AudioRecorder.removeAudio(atPath: p) }
             await CoreEngine.shared.deleteNote(noteID)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
             NotificationCenter.default.post(name: .assistantChanged, object: nil)   // resync notifications now

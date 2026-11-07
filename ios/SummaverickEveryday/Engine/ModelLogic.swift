@@ -112,3 +112,83 @@ enum WaitingNotes {
         !(hasTranscript && outputs.count == 3 && outputs.allSatisfy { $0 })
     }
 }
+
+/// Where a model run goes. iOS refuses GPU work from the background (even while recording), so
+/// transcription always runs on the CPU, and everything else only uses the GPU while the app is in front.
+enum ModelBackend: Equatable {
+    case gpu, cpu
+
+    /// Layers given to the GPU: all of them (Metal), or none.
+    var gpuLayers: Int32 { self == .gpu ? 99 : 0 }
+    /// 4 threads on the CPU (measured: 6 is slower on the phone); 0 = the core's own choice for the GPU.
+    var threads: Int32 { self == .cpu ? 4 : 0 }
+}
+
+enum ModelPurpose: Equatable {
+    /// Recording -> text (live and after Stop).
+    case transcription
+    /// Notes, titles, extraction, Ask.
+    case generation
+}
+
+enum BackendChoice {
+    /// Picked right before each model run, never during one.
+    static func backend(for purpose: ModelPurpose, appActive: Bool, recording: Bool) -> ModelBackend {
+        switch purpose {
+        case .transcription: return .cpu
+        case .generation: return appActive && !recording ? .gpu : .cpu
+        }
+    }
+
+    /// A GPU run that failed because the app went to the background is retried once on the CPU, but
+    /// only while a continued-processing task keeps the app running; otherwise the note is interrupted.
+    static func retryOnCPU(failedOn backend: ModelBackend, wentToBackground: Bool, continuedTaskHeld: Bool,
+                           cancelled: Bool, alreadyRetried: Bool) -> Bool {
+        backend == .gpu && wentToBackground && continuedTaskHeld && !cancelled && !alreadyRetried
+    }
+}
+
+enum LivePause: Equatable {
+    case heat, battery
+
+    /// Below this battery level (and not charging) live transcription waits; the recording continues.
+    static let lowBattery: Float = 0.20
+
+    /// Why live transcription should wait now, nil to go on. Heat comes first. batteryLevel is 0…1,
+    /// or negative when unknown (simulator, monitoring off), which never pauses.
+    static func reason(thermal: ProcessInfo.ThermalState, batteryLevel: Float, charging: Bool) -> LivePause? {
+        if Heat.isTooHot(thermal) { return .heat }
+        if batteryLevel >= 0, batteryLevel < lowBattery, !charging { return .battery }
+        return nil
+    }
+}
+
+enum LiveLag {
+    /// One piece is always in the making (28 s + 3 s wait, then about as long again to write it), so
+    /// up to this much lag still counts as "writing as you talk".
+    static let keepingUpSeconds: Double = 90
+
+    /// Whole minutes behind ("About N min behind"), nil while keeping up.
+    static func minutesBehind(recordedSeconds: Double, transcribedSeconds: Double) -> Int? {
+        let behind = recordedSeconds - transcribedSeconds
+        guard behind > keepingUpSeconds else { return nil }
+        return max(1, Int((behind / 60).rounded()))
+    }
+}
+
+enum NotesProgress {
+    /// Share of the work after Stop that is transcription; the rest is reminders, title and the three outputs.
+    static let transcriptionShare = 0.7
+
+    /// 0…1 for the lock-screen progress. transcribed / duration in seconds during transcription;
+    /// afterwards `outputsDone` of `outputsTotal` steps (extraction, then each output).
+    static func fraction(transcribedSeconds: Double, durationSeconds: Double) -> Double {
+        guard durationSeconds > 0 else { return 0 }
+        return transcriptionShare * min(1, max(0, transcribedSeconds / durationSeconds))
+    }
+
+    static func fraction(outputsDone: Int, outputsTotal: Int) -> Double {
+        guard outputsTotal > 0 else { return 1 }
+        return transcriptionShare + (1 - transcriptionShare) * min(1, max(0, Double(outputsDone) / Double(outputsTotal)))
+    }
+}

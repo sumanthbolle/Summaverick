@@ -39,7 +39,7 @@ struct TimelineView: View {
         let ids = offsets.map { notes[$0].id }
         Task {
             for id in ids {
-                if let n = await CoreEngine.shared.note(id), let p = AudioRecorder.existingAudioPath(n.audio_path) { try? FileManager.default.removeItem(atPath: p) }
+                if let n = await CoreEngine.shared.note(id), let p = AudioRecorder.existingAudioPath(n.audio_path) { AudioRecorder.removeAudio(atPath: p) }
                 await CoreEngine.shared.deleteNote(id)
             }
             await reload()

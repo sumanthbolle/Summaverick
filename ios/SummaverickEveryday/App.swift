@@ -12,6 +12,8 @@ struct SummaverickEverydayApp: App {
         // Must be set before launch finishes so a tap that cold-starts the app is delivered.
         UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
         AudioRecorder.sweepAskVoice()
+        // Lets notes keep being written with the phone locked after Stop (iOS 26+).
+        ContinuedWork.register()
         // Reconnect to (or start) the AI download as early as possible.
         ModelManager.shared.activate()
     }
@@ -81,7 +83,7 @@ enum Retention {
         guard maxAgeDays > 0 else { return }
         let engine = CoreEngine.shared
         for row in await engine.audioOlderThan(days: Int32(maxAgeDays)) {
-            if let p = AudioRecorder.existingAudioPath(row.audio_path) { try? FileManager.default.removeItem(atPath: p) }
+            if let p = AudioRecorder.existingAudioPath(row.audio_path) { AudioRecorder.removeAudio(atPath: p) }
             await engine.clearAudio(row.id)
         }
     }

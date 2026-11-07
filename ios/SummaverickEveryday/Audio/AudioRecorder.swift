@@ -38,6 +38,12 @@ final class AudioRecorder {
         return FileManager.default.fileExists(atPath: here) ? here : nil
     }
 
+    /// Deletes a recording and the transcription progress saved next to it (TranscriptSidecar).
+    nonisolated static func removeAudio(atPath path: String) {
+        try? FileManager.default.removeItem(atPath: path)
+        TranscriptSidecar.remove(audioPath: path)
+    }
+
     /// Ask's voice questions: short-lived WAVs, deleted after transcription and swept at launch.
     static var askVoiceDirectory: URL {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ask-voice", isDirectory: true)

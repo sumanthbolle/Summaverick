@@ -157,10 +157,20 @@ final class ModelManager: NSObject {
     /// "Remove to free space" has something to remove.
     var hasFiles: Bool { spec.parts.contains { present($0) } }
 
-    /// Loads the model into the core (no-op when it is already loaded).
-    func loadIntoCore() async throws {
+    /// Loads the model into the core for the next run (no-op when it is already loaded on the right
+    /// backend). Transcription runs on the CPU; the rest on the GPU only while the app is in front and
+    /// not recording (BackendChoice). Returns the backend used.
+    @discardableResult
+    func loadIntoCore(for purpose: ModelPurpose = .generation) async throws -> ModelBackend {
+        let backend = BackendChoice.backend(for: purpose, appActive: UIApplication.shared.applicationState == .active,
+                                            recording: LiveTranscriber.shared.isRecording)
+        try await loadIntoCore(backend: backend)
+        return backend
+    }
+
+    func loadIntoCore(backend: ModelBackend) async throws {
         try await CoreEngine.shared.loadModel(at: Self.fileURL(spec.weights).path, contextTokens: spec.contextTokens,
-                                              mmprojPath: Self.fileURL(spec.projector).path)
+                                              mmprojPath: Self.fileURL(spec.projector).path, backend: backend)
     }
 
     // MARK: status

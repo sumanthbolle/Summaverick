@@ -170,9 +170,10 @@ extension CoreEngine {
     // MARK: extraction and insight
 
     /// Runs extraction on a note's pieces. Returns the number of pending suggestions added.
-    func extract(noteID: Int64, onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> Int {
+    func extract(noteID: Int64, shouldStop: @escaping () -> Bool = { false },
+                 onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> Int {
         guard let ctx else { throw CoreError.initFailed }
-        let box = progressBox(onProgress)
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         let n = sve_extract(ctx, noteID, CoreEngine.progressTrampoline, user)
         guard n >= 0 else { throw AssistantError.failed(String(localized: "find reminders and tasks")) }
@@ -211,5 +212,46 @@ extension CoreEngine {
             throw CoreError.transcriptionFailed
         }
         return pieces
+    }
+
+    /// Result of one step of incremental transcription (sve_transcribe_next_piece).
+    enum NextPiece: Equatable {
+        /// Transcribed [start, endSample); text may be empty (silence).
+        case piece(startSec: Int, endSample: Int64, text: String)
+        /// Still recording and under 31 s after the cursor: ask again later.
+        case wait
+        /// Nothing left to transcribe (final only).
+        case end
+    }
+
+    private struct NextPieceJSON: Decodable {
+        let status: String
+        let start_sec: Int?
+        let end_sample: Int64?
+        let text: String?
+    }
+
+    /// Plans and transcribes the next ~28 s piece of a WAV that may still be being recorded, from
+    /// `startSample`. isFinal: the recording has stopped. Throws on failure; cancels (throws) when
+    /// `shouldStop` turns true during the run.
+    func transcribeNextPiece(path: String, startSample: Int64, isFinal: Bool, previousText: String?,
+                             shouldStop: @escaping () -> Bool = { false }) throws -> NextPiece {
+        guard let ctx else { throw CoreError.initFailed }
+        guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_transcribe_next_piece(ctx, path, startSample, isFinal ? 1 : 0, previousText,
+                                                        CoreEngine.progressTrampoline, user)),
+              let r = decode(NextPieceJSON.self, json) else {
+            throw CoreError.transcriptionFailed
+        }
+        switch r.status {
+        case "wait": return .wait
+        case "end": return .end
+        case "piece":
+            guard let end = r.end_sample, end > startSample else { throw CoreError.transcriptionFailed }
+            return .piece(startSec: r.start_sec ?? Int(startSample / 16_000), endSample: end, text: r.text ?? "")
+        default: throw CoreError.transcriptionFailed
+        }
     }
 }

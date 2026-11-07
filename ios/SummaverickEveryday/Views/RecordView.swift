@@ -3,6 +3,7 @@ import SwiftUI
 struct RecordView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var recorder = AudioRecorder()
+    @State private var live = LiveTranscriber.shared
     @State private var permissionDenied = false
 
     var body: some View {
@@ -16,7 +17,8 @@ struct RecordView: View {
             Spacer()
 
             RecordingPulseView(level: recorder.level, active: recorder.isRecording)
-                .frame(width: 320, height: 320)
+                .frame(width: live.lines.isEmpty ? 320 : 220, height: live.lines.isEmpty ? 320 : 220)
+                .animation(.easeInOut, value: live.lines.isEmpty)
 
             Text(timeString(recorder.elapsed))
                 .font(.system(size: 48, weight: .thin, design: .rounded).monospacedDigit())
@@ -27,6 +29,8 @@ struct RecordView: View {
                 .multilineTextAlignment(.center).padding(.horizontal, 32)
 
             if let e = recorder.lastError { Text(e).font(.footnote).foregroundStyle(.red) }
+
+            if recorder.isRecording { liveTranscript }
 
             Spacer()
 
@@ -53,14 +57,48 @@ struct RecordView: View {
         } message: { Text("Allow the microphone for Summaverick in Settings.") }
     }
 
+    /// The transcript so far (last lines, newest at the bottom) and one status line.
+    private var liveTranscript: some View {
+        VStack(spacing: 8) {
+            if !live.lines.isEmpty {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(live.lines.suffix(6).enumerated()), id: \.offset) { i, line in
+                                Text(line).font(.callout).frame(maxWidth: .infinity, alignment: .leading).id(i)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                    }
+                    .frame(maxHeight: 150)
+                    .onAppear { proxy.scrollTo(min(5, live.lines.count - 1), anchor: .bottom) }
+                    .onChange(of: live.lines.count) { _, n in
+                        withAnimation { proxy.scrollTo(min(5, n - 1), anchor: .bottom) }
+                    }
+                }
+            }
+            Text(live.statusLine)
+                .font(.footnote.weight(.medium)).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).padding(.horizontal, 32)
+        }
+    }
+
     private func begin() async {
         guard await recorder.requestPermission() else { permissionDenied = true; return }
         recorder.start()
+        if recorder.isRecording, let url = recorder.currentURL {
+            live.recordingStarted(audio: url) { [recorder] in recorder.elapsed }
+        }
     }
 
     private func cancel() {
-        if let (url, _) = recorder.stop() { try? FileManager.default.removeItem(at: url) }
+        let stopped = recorder.stop()
         dismiss()
+        // Drop the piece in flight first, so nothing is written next to the deleted recording.
+        Task {
+            await live.cancel()
+            if let (url, _) = stopped { AudioRecorder.removeAudio(atPath: url.path) }
+        }
     }
 
     private func stopAndProcess() {

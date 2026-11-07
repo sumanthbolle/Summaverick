@@ -1,8 +1,10 @@
 // Recording → transcript → title → three outputs. Everything after recording is local.
-// If iOS suspends the app mid-way, or the phone gets too hot, the note keeps whatever was finished and
-// is resumed automatically later; the user can also tap "Generate notes". Recordings made before the AI
-// has downloaded wait and are processed, one at a time, once it is ready. Same stages the device
-// firmware will run.
+// Transcription runs on the CPU, mostly while recording (LiveTranscriber); after Stop it continues from
+// the saved cursor (TranscriptSidecar). Notes use the GPU while the app is in front, else the CPU.
+// On iOS 26+ a continued-processing task keeps the work going with the phone locked. If iOS suspends the
+// app mid-way, or the phone gets too hot, the note keeps whatever was finished and is resumed
+// automatically later; the user can also tap "Generate notes". Recordings made before the AI has
+// downloaded wait and are processed, one at a time, once it is ready. Same stages the device firmware will run.
 import Foundation
 import Observation
 import UIKit
@@ -44,8 +46,9 @@ final class ProcessingPipeline {
 
     private(set) var stage: Stage = .idle {
         didSet {
+            if stage.isWorking { ContinuedWork.shared.update(subtitle: stage.label) }
             guard case .failed(let msg) = stage, let id = activeNoteID else { return }
-            if wentToBackground {
+            if wentToBackground || abort.isSet {
                 // iOS stops the AI model (it runs on the GPU) once the app is in the background, so a
                 // failure after the phone locked is an interruption, not a real error. Resume it later.
                 interrupted.insert(id)
@@ -76,12 +79,15 @@ final class ProcessingPipeline {
     var isBusy: Bool { starting || stage.isWorking }
 
     private var bgTask: UIBackgroundTaskIdentifier = .invalid
+    /// Set when the continued-processing task expires: cancels the model run in flight.
+    @ObservationIgnored private let abort = AtomicFlag()
 
     static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
     nonisolated private static var tooHot: Bool { Heat.isTooHot(ProcessInfo.processInfo.thermalState) }
 
     private init() {
+        ContinuedWork.shared.onExpire = { [weak self] in self?.continuedWorkExpired() }
         // Cooled down: carry on with the notes that were paused for heat.
         thermalObserver = NotificationCenter.default.addObserver(
             forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
@@ -118,8 +124,12 @@ final class ProcessingPipeline {
         guard id > 0 else { stage = .failed(String(localized: "Could not save the note.")); return nil }
         NotificationCenter.default.post(name: .notesChanged, object: nil)
 
+        // Live transcription finishes the piece in flight and hands over; this run continues from its cursor.
+        await LiveTranscriber.shared.finish()
         // Not downloaded yet: the note waits and is processed when the AI is ready (processWaitingNotes).
         guard ModelManager.shared.isReady else { return id }
+        // Keep working with the phone locked (iOS 26+), also for a note queued behind another one.
+        ContinuedWork.shared.begin(noteID: id, subtitle: Stage.transcribing(0).label)
         // Another note is being written: queue this one behind it.
         guard !isBusy else { interrupted.insert(id); return id }
         beginBackground()
@@ -133,7 +143,7 @@ final class ProcessingPipeline {
         stage = .transcribing(0)
         let pieces: [TranscriptPiece]
         do {
-            pieces = try await transcribe(audio, noteID: id)
+            pieces = try await transcribe(audio, noteID: id, durationSeconds: duration)
         } catch {
             NSLog("[sve] transcription failed: %@", String(describing: error))
             if !pausedForHeat(id) { stage = .failed(error.localizedDescription) }
@@ -142,6 +152,7 @@ final class ProcessingPipeline {
         let transcript = Self.joined(pieces)
         await engine.setPieces(id, pieces)
         await engine.setTranscript(id, transcript)
+        TranscriptSidecar.remove(audioPath: audio.path)   // complete and saved to the note
         NotificationCenter.default.post(name: .notesChanged, object: nil)
         if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             stage = .failed(String(localized: "No speech was detected in the recording."))
@@ -178,7 +189,7 @@ final class ProcessingPipeline {
             stage = .transcribing(0)
             var pieces: [TranscriptPiece] = []
             do {
-                pieces = try await transcribe(URL(fileURLWithPath: path), noteID: noteID)
+                pieces = try await transcribe(URL(fileURLWithPath: path), noteID: noteID, durationSeconds: note.duration_seconds)
                 t = Self.joined(pieces)
             } catch {
                 NSLog("[sve] transcription failed: %@", String(describing: error))
@@ -190,19 +201,30 @@ final class ProcessingPipeline {
             }
             await CoreEngine.shared.setPieces(noteID, pieces)
             await CoreEngine.shared.setTranscript(noteID, t)
+            TranscriptSidecar.remove(audioPath: path)   // complete and saved to the note
             NotificationCenter.default.post(name: .notesChanged, object: nil)
+        } else if let path = AudioRecorder.existingAudioPath(note.audio_path) {
+            TranscriptSidecar.remove(audioPath: path)   // left over from before the transcript was saved
         }
         await generateOutputs(noteID: noteID, transcript: t, lang: AppSettings.shared.notesLanguage, setTitle: note.title.hasPrefix("Recording "))
     }
 
-    /// Audio → text. The model hears the recording itself, so any language mix works. Stops (the
-    /// progress callback cancels) as soon as the phone gets too hot; the caller treats that as a pause.
-    private func transcribe(_ audio: URL, noteID: Int64) async throws -> [TranscriptPiece] {
-        try await loadSelectedModel()
-        stage = .transcribing(0)
-        return try await CoreEngine.shared.transcribeAudioPieces(path: audio.path, shouldStop: { Self.tooHot }) { done, total in
-            Task { @MainActor in self.stage = .transcribing(total > 0 ? Double(done) / Double(total) : 0) }
+    /// Audio → text, on the CPU, from where live transcription (or an interrupted run) stopped. The model
+    /// hears the recording itself, so any language mix works. Stops (the progress callback cancels) as
+    /// soon as the phone gets too hot or the background time runs out; the caller treats that as a pause,
+    /// and the next run continues from the saved cursor.
+    private func transcribe(_ audio: URL, noteID: Int64, durationSeconds: Int64) async throws -> [TranscriptPiece] {
+        let duration = Double(max(1, durationSeconds))
+        func report(_ s: TranscriptSidecar) {
+            stage = .transcribing(min(1, s.transcribedSeconds / duration))
+            ContinuedWork.shared.update(fraction: NotesProgress.fraction(transcribedSeconds: s.transcribedSeconds, durationSeconds: duration))
         }
+        report(TranscriptSidecar.load(audioPath: audio.path))   // from where live transcription got to
+        let abort = self.abort
+        let (done, _) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true,
+                                                    shouldStop: { Self.tooHot || abort.isSet },
+                                                    onPiece: { report($0) })
+        return TranscriptRun.pieces(done)
     }
 
     private static func joined(_ pieces: [TranscriptPiece]) -> String {
@@ -211,7 +233,32 @@ final class ProcessingPipeline {
 
     private func loadSelectedModel() async throws {
         stage = .loadingModel
-        try await ModelManager.shared.loadIntoCore()
+        try await ModelManager.shared.loadIntoCore(for: .generation)
+    }
+
+    /// One model step on the backend for right now (GPU in front, else CPU). A GPU run cut off by the app
+    /// going to the background is retried once on the CPU while a continued-processing task is held.
+    private func onBackend<T>(_ body: () async throws -> T) async throws -> T {
+        let backend = try await ModelManager.shared.loadIntoCore(for: .generation)
+        do {
+            return try await body()
+        } catch {
+            guard BackendChoice.retryOnCPU(failedOn: backend, wentToBackground: wentToBackground || !appIsActive,
+                                           continuedTaskHeld: ContinuedWork.shared.isHeld, cancelled: abort.isSet,
+                                           alreadyRetried: false) else { throw error }
+            NSLog("[sve] GPU run stopped in the background; retrying on the CPU")
+            try await ModelManager.shared.loadIntoCore(backend: .cpu)
+            return try await body()
+        }
+    }
+
+    /// The system ended the continued-processing task: stop the run; the note resumes from where it was.
+    private func continuedWorkExpired() {
+        abort.set(true)
+        if isBusy, let id = activeNoteID {
+            interrupted.insert(id)
+            lastFailure[id] = String(localized: "Paused when the phone locked. It will continue when you open Summaverick.")
+        }
     }
 
     private func generateOutputs(noteID id: Int64, transcript: String, lang: String, setTitle: Bool) async {
@@ -231,6 +278,9 @@ final class ProcessingPipeline {
 
         // Reminders, tasks and profile changes first, so they are ready even if note writing is interrupted.
         // A failure here never fails the notes.
+        let abort = self.abort
+        let steps = 2 + OutputKind.allCases.count   // reminders, title, three outputs
+        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 0, outputsTotal: steps))
         do {
             if await engine.pieces(id).isEmpty {   // note from before pieces existed
                 let dur = await engine.note(id)?.duration_seconds ?? 0
@@ -238,35 +288,47 @@ final class ProcessingPipeline {
             }
             stage = .extracting
             do {
-                let n = try await engine.extract(noteID: id)
+                let n = try await onBackend { try await engine.extract(noteID: id, shouldStop: { abort.isSet }) }
                 NSLog("[sve] extract added %d suggestions", n)
             } catch {
                 NSLog("[sve] extract failed: %@", String(describing: error))
             }
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
         }
+        if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
         if pausedForHeat(id) { return }
+        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
 
-        if setTitle, let t = await engine.suggestTitle(transcript: transcript, lang: lang) {
+        if setTitle, let t = try? await onBackend({ () async throws -> String in
+            guard let t = await engine.suggestTitle(transcript: transcript, lang: lang) else { throw CoreError.generationFailed }
+            return t
+        }) {
             await engine.setTitle(id, t)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
+        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
 
-        for kind in OutputKind.allCases {
+        for (i, kind) in OutputKind.allCases.enumerated() {
+            if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
             if pausedForHeat(id) { return }
             stage = .generating(kind, "final", 0, 1)
             do {
-                let text = try await engine.generate(transcript: transcript, kind: kind, lang: lang) { phase, done, total in
-                    Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
+                let text = try await onBackend {
+                    try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }) { phase, done, total in
+                        Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
+                    }
                 }
                 await engine.setOutput(id, kind, text)
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
+                ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3 + i, outputsTotal: steps))
             } catch {
                 stage = .failed(error.localizedDescription)
                 return
             }
         }
-        _ = await engine.generateInsight(noteID: id)
+        if (try? await ModelManager.shared.loadIntoCore(for: .generation)) != nil {
+            _ = await engine.generateInsight(noteID: id)
+        }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
     }
@@ -312,6 +374,7 @@ final class ProcessingPipeline {
 
     private func beginBackground() {
         wentToBackground = false
+        abort.set(false)
         // Keep the screen on while the model works: a locked phone stops GPU work and the run fails.
         UIApplication.shared.isIdleTimerDisabled = true
         if backgroundObserver == nil {
@@ -329,17 +392,27 @@ final class ProcessingPipeline {
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
         // A recording queued behind this run (or a paused note) goes next.
         if !interrupted.isEmpty && !resuming { Task { await self.resumeInterrupted() } }
+        // After the caller's other defers (its busy claim) have run.
+        else if !resuming { Task { self.finishContinuedWork() } }
     }
 
-    /// Re-runs cut-off and waiting notes, oldest first, one at a time, while the app is active, the
-    /// AI is ready and the phone is not too hot. Each note is tried once per pass, so a note that is
-    /// paused again (heat, background) waits for the next pass instead of looping.
+    /// Nothing is running and nothing more can run now: release the continued-processing task.
+    private func finishContinuedWork() {
+        guard !isBusy else { return }
+        ContinuedWork.shared.finish(success: interrupted.isEmpty)
+    }
+
+    /// Re-runs cut-off and waiting notes, oldest first, one at a time, while the app is active (or a
+    /// continued-processing task keeps it running), not recording, the AI is ready and the phone is not
+    /// too hot. Each note is tried once per pass, so a note that is paused again (heat, background) waits
+    /// for the next pass instead of looping.
     func resumeInterrupted() async {
         guard !resuming else { return }
         resuming = true
-        defer { resuming = false }
+        defer { resuming = false; finishContinuedWork() }
         var tried: Set<Int64> = []
-        while !isBusy, appIsActive, ModelManager.shared.isReady, !Self.tooHot,
+        while !isBusy, appIsActive || ContinuedWork.shared.isHeld, !LiveTranscriber.shared.isRecording,
+              ModelManager.shared.isReady, !Self.tooHot,
               let id = interrupted.sorted().first(where: { !tried.contains($0) }) {
             tried.insert(id)
             interrupted.remove(id)

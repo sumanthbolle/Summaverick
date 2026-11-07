@@ -133,7 +133,7 @@ struct SettingsView: View {
         Task {
             let engine = CoreEngine.shared
             for n in await engine.notes(limit: 10_000) {
-                if let full = await engine.note(n.id), let p = AudioRecorder.existingAudioPath(full.audio_path) { try? FileManager.default.removeItem(atPath: p) }
+                if let full = await engine.note(n.id), let p = AudioRecorder.existingAudioPath(full.audio_path) { AudioRecorder.removeAudio(atPath: p) }
                 await engine.deleteNote(n.id)
             }
             var ok = await engine.notes(limit: 1).isEmpty
