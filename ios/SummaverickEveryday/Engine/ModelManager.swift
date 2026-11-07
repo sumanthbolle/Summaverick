@@ -25,6 +25,14 @@ struct ModelSpec: Hashable {
     var parts: [ModelPart] { [weights, projector] }
 }
 
+/// Where the audio projector is downloaded from. Today: the full ggml-org file (has an unused image
+/// encoder). After the slim file (tools/model/strip_vision.py) is uploaded, change these two and the
+/// file name below; see tools/model/README.md.
+enum ModelHost {
+    static let projectorURL = URL(string: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf")!
+    static let projectorBytes: Int64 = 559_874_816
+}
+
 enum ModelCatalog {
     // Google Gemma 4 E4B (Apache 2.0). Hears the audio itself, so it understands Telugu, Hindi and mixed
     // speech. Weights: unsloth Q4_K_M; audio projector: ggml-org Q8_0. Sizes as served on 2026-11-07.
@@ -34,8 +42,8 @@ enum ModelCatalog {
                            url: URL(string: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf")!,
                            approxBytes: 4_977_171_584),
         projector: ModelPart(key: "projector", fileName: "mmproj-gemma-4-E4B-it-Q8_0.gguf",
-                             url: URL(string: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf")!,
-                             approxBytes: 559_874_816))
+                             url: ModelHost.projectorURL,
+                             approxBytes: ModelHost.projectorBytes))
 
     /// Models earlier versions could download; deleted at launch to free the space.
     static let retiredFilePrefixes = ["Qwen3-", "qwen3-"]
