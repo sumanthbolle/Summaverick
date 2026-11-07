@@ -117,12 +117,18 @@ final class ProcessingPipeline {
     @ObservationIgnored private var parked: Set<Int64> = []
     /// The overnight task's expired flag while it runs. Set: no new run starts, and the abort stays set.
     @ObservationIgnored private var overnightRun: AtomicFlag?
+    /// Set while the run in flight was started by the overnight task (read on any thread): only that run is
+    /// cancelled when the task expires; a run in front or kept by a continued-processing task is not.
+    @ObservationIgnored private let overnightOwnsRun = AtomicFlag()
     /// Plugged in (charging or full). Battery monitoring is switched on as needed (live transcription
     /// switches it off when a recording ends).
     static var pluggedIn: Bool {
         let d = UIDevice.current
-        if !d.isBatteryMonitoringEnabled { d.isBatteryMonitoringEnabled = true }
-        return d.batteryState == .charging || d.batteryState == .full
+        let was = d.isBatteryMonitoringEnabled
+        if !was { d.isBatteryMonitoringEnabled = true }
+        let state = d.batteryState
+        if !was { d.isBatteryMonitoringEnabled = false }   // as it was (live transcription manages its own)
+        return state == .charging || state == .full
     }
 
     private init() {
@@ -622,7 +628,8 @@ final class ProcessingPipeline {
 
     private func beginBackground() {
         wentToBackground = false
-        abort.set(overnightRun?.isSet ?? false)   // the overnight task expired: nothing more runs in it
+        // A run of the overnight task that starts after it expired is cancelled at once; any other run starts clean.
+        abort.set(overnightOwnsRun.isSet && (overnightRun?.isSet ?? false))
         ContinuedWork.shared.startNote()   // lock-screen progress starts again for this note
         // Keep the screen on while the model works: a locked phone stops GPU work and the run fails.
         UIApplication.shared.isIdleTimerDisabled = true
@@ -668,7 +675,11 @@ final class ProcessingPipeline {
             tried.insert(id)
             interrupted.remove(id)
             heatPaused.remove(id)
+            let owned = OvernightList.ownsRun(inOvernightTask: overnightRun != nil, appActive: appIsActive,
+                                              continuedTaskHeld: ContinuedWork.shared.isHeld)
+            overnightOwnsRun.set(owned)
             await regenerate(noteID: id)
+            overnightOwnsRun.set(false)
             if !interrupted.contains(id) { markAutoTried(id) }
         }
     }
@@ -819,7 +830,9 @@ final class ProcessingPipeline {
         parkRequested.remove(id)
         let stoppedForNight = parked.remove(id) != nil
         if overnightOffer == id { overnightOffer = nil }
-        guard overnight.contains(id), !stoppedForNight, !interrupted.contains(id) else { return }
+        if stoppedForNight, case .overnight = stage { stage = .idle }   // the note's own banner shows the wait
+        guard overnight.contains(id),
+              !OvernightList.keepsMark(marked: true, parked: stoppedForNight, queued: interrupted.contains(id)) else { return }
         unmarkOvernight(id)
     }
 
@@ -839,16 +852,16 @@ final class ProcessingPipeline {
     private func pruneOvernight() async {
         let snapshot = overnight
         guard !snapshot.isEmpty else { return }
-        var drop: Set<Int64> = []
+        var keep: Set<Int64> = []   // still there, with work left
         for id in snapshot {
-            guard let n = await CoreEngine.shared.note(id) else { drop.insert(id); continue }
+            guard let n = await CoreEngine.shared.note(id) else { continue }   // deleted
             let hasTranscript = !(n.transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            if !WaitingNotes.needsWork(hasTranscript: hasTranscript, outputs: OutputKind.allCases.map { n.output($0) != nil }) {
-                drop.insert(id)
+            if WaitingNotes.needsWork(hasTranscript: hasTranscript, outputs: OutputKind.allCases.map { n.output($0) != nil }) {
+                keep.insert(id)
             }
         }
-        // Against the list as it is now: a note marked meanwhile is kept.
-        let pruned = OvernightList.pruned(overnight, existing: Set(overnight).subtracting(drop))
+        // Against the list as it is now: a note marked meanwhile is kept, one forgotten meanwhile stays gone.
+        let pruned = OvernightList.pruned(overnight, checked: Set(snapshot), keep: keep)
         if pruned != overnight {
             overnight = pruned
             UserDefaults.standard.set(overnight, forKey: Self.overnightKey)
@@ -875,9 +888,10 @@ final class ProcessingPipeline {
         return !overnight.isEmpty || !interrupted.isEmpty
     }
 
-    /// The overnight task expired (any thread): cancel the model run in flight. The note keeps every piece,
-    /// section and output already finished and is queued again (the stage's failure handler, abort set).
-    nonisolated func cancelForExpiry() { abort.set(true) }
+    /// The overnight task expired (any thread): cancel the model run in flight if the task started it. The
+    /// note keeps every piece, section and output already finished and is queued again (the stage's failure
+    /// handler, abort set). A run in front, or one a continued-processing task keeps going, is left alone.
+    nonisolated func cancelForExpiry() { if overnightOwnsRun.isSet { abort.set(true) } }
 
     private static let titleFormatter: DateFormatter = {
         let f = DateFormatter()

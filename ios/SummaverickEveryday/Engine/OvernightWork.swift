@@ -61,8 +61,11 @@ final class OvernightWork {
     }
 
     private func started(_ task: BGTask) {
-        guard task is BGProcessingTask, run == nil else {
-            task.setTaskCompleted(success: true)   // not ours to run, or one is already running
+        guard task is BGProcessingTask else { task.setTaskCompleted(success: false); return }
+        guard run == nil else {
+            // One is already running: this launch ends, and the next is asked for so none is lost.
+            Self.submit()
+            task.setTaskCompleted(success: true)
             return
         }
         NSLog("[sve] overnight task started")

@@ -256,10 +256,22 @@ enum WorkEstimate {
 
 /// Notes the person chose to finish overnight, while the phone charges (UserDefaults "pipeline.overnight").
 enum OvernightList {
-    /// The list without notes that no longer exist (deleted) and without repeats; order kept.
-    static func pruned(_ ids: [Int64], existing: Set<Int64>) -> [Int64] {
+    /// The list after a check of the notes in `checked`: those not in `keep` (deleted, or nothing left to do)
+    /// are dropped; ids marked after the check started (not in `checked`) are kept; repeats are dropped; order kept.
+    static func pruned(_ ids: [Int64], checked: Set<Int64>, keep: Set<Int64>) -> [Int64] {
         var seen = Set<Int64>()
-        return ids.filter { existing.contains($0) && seen.insert($0).inserted }
+        return ids.filter { (!checked.contains($0) || keep.contains($0)) && seen.insert($0).inserted }
+    }
+
+    /// After a run of a note: its mark stays only while it is still marked (not forgotten, not "Do it now")
+    /// and work is left — stopped for the night, or cut off / too hot and queued again.
+    static func keepsMark(marked: Bool, parked: Bool, queued: Bool) -> Bool { marked && (parked || queued) }
+
+    /// A run belongs to the overnight task (and its expiry may cancel it) only when that task started it with
+    /// the app in the background and no continued-processing task holding it; never a run in front or one the
+    /// continued-processing task keeps going.
+    static func ownsRun(inOvernightTask: Bool, appActive: Bool, continuedTaskHeld: Bool) -> Bool {
+        inOvernightTask && !appActive && !continuedTaskHeld
     }
 
     /// A note marked overnight is only started while plugged in or inside the overnight task; "Do it now"
