@@ -121,6 +121,12 @@ struct NoteDetailView: View {
 
                     if isThisNoteBusy {
                         StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
+                        if pipeline.overnightOffer == noteID { overnightOffer }
+                    } else if pipeline.isOvernight(noteID) {
+                        StatusBanner(stage: .overnight, onDoItNow: models.isReady ? {
+                            Task { await pipeline.doItNow(noteID: noteID) }
+                        } : nil)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else if waitingForAI {
                         StatusBanner(stage: .paused(models.status == .unsupported ? AIStatus.unsupportedMessage
                                                                                   : ProcessingPipeline.waitingMessage))
@@ -137,7 +143,7 @@ struct NoteDetailView: View {
 
                     content
 
-                    if needsGeneration && !isThisNoteBusy && models.isReady {
+                    if needsGeneration && !isThisNoteBusy && models.isReady && !pipeline.isOvernight(noteID) {
                         Button {
                             Task { await pipeline.regenerate(noteID: noteID) }
                         } label: { Label("Generate notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
@@ -239,6 +245,27 @@ struct NoteDetailView: View {
                     .padding(.vertical, 24)
             }
         }
+    }
+
+    /// After Stop, when the work left is long: finish overnight while charging, or keep going now.
+    private var overnightOffer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("This will take a while. Finish overnight while charging?", systemImage: "moon.zzz")
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Button { pipeline.finishOvernight(noteID: noteID) } label: {
+                    Text("Yes").frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                Button { pipeline.keepGoing(noteID: noteID) } label: {
+                    Text("Keep going").frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: transcript pieces
@@ -471,6 +498,7 @@ struct NoteDetailView: View {
     private func deleteNote() {
         Task {
             stopPlayback()
+            pipeline.forget(noteID: noteID)
             if let p = AudioRecorder.existingAudioPath(note?.audio_path) { AudioRecorder.removeAudio(atPath: p) }
             await CoreEngine.shared.deleteNote(noteID)
             NotificationCenter.default.post(name: .notesChanged, object: nil)

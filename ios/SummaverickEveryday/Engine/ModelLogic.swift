@@ -223,3 +223,48 @@ enum NotesProgress {
         return transcriptionShare + (1 - transcriptionShare) * min(1, max(0, Double(outputsDone) / Double(outputsTotal)))
     }
 }
+
+/// How long the work left on a note will take on the phone's CPU (measured on the device), to decide whether
+/// to offer finishing it overnight. All the constants are here.
+enum WorkEstimate {
+    /// Transcription: seconds of work per second of audio still to transcribe.
+    static let secondsPerAudioSecond = 1.2
+    /// One section summary (~5 minutes of audio).
+    static let secondsPerSection = 60
+    /// One of the three outputs (summary, notes, questions).
+    static let secondsPerOutput = 90
+    /// Audio per section, for sections not planned yet (the planner's target length).
+    static let sectionSeconds = 300
+    /// More work than this (minutes) and the note offers to finish overnight.
+    static let offerAboveMinutes = 20
+
+    /// Whole minutes of work left, rounded up. Negative inputs count as none.
+    static func minutesLeft(audioSecondsLeft: Int, sectionsLeft: Int, outputsLeft: Int) -> Int {
+        let seconds = Double(max(0, audioSecondsLeft)) * secondsPerAudioSecond
+            + Double(max(0, sectionsLeft) * secondsPerSection + max(0, outputsLeft) * secondsPerOutput)
+        return Int((seconds / 60).rounded(.up))
+    }
+
+    /// Sections still to write: the audio after the last section written, in sections of `sectionSeconds`.
+    static func sectionsLeft(durationSeconds: Int, coveredSeconds: Int) -> Int {
+        let left = max(0, durationSeconds - max(0, coveredSeconds))
+        return (left + sectionSeconds - 1) / sectionSeconds
+    }
+
+    static func offersOvernight(minutesLeft: Int) -> Bool { minutesLeft > offerAboveMinutes }
+}
+
+/// Notes the person chose to finish overnight, while the phone charges (UserDefaults "pipeline.overnight").
+enum OvernightList {
+    /// The list without notes that no longer exist (deleted) and without repeats; order kept.
+    static func pruned(_ ids: [Int64], existing: Set<Int64>) -> [Int64] {
+        var seen = Set<Int64>()
+        return ids.filter { existing.contains($0) && seen.insert($0).inserted }
+    }
+
+    /// A note marked overnight is only started while plugged in or inside the overnight task; "Do it now"
+    /// clears the mark. Unmarked notes always may run.
+    static func mayStart(marked: Bool, pluggedIn: Bool, inOvernightTask: Bool) -> Bool {
+        !marked || pluggedIn || inOvernightTask
+    }
+}

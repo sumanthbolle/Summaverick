@@ -14,6 +14,8 @@ struct SummaverickEverydayApp: App {
         AudioRecorder.sweepAskVoice()
         // Lets notes keep being written with the phone locked after Stop (iOS 26+).
         ContinuedWork.register()
+        // Finishes long recordings overnight while charging: a fixed identifier, registered before launch ends.
+        OvernightWork.register()
         // Reconnect to (or start) the AI download as early as possible.
         ModelManager.shared.activate()
     }
@@ -44,7 +46,9 @@ struct SummaverickEverydayApp: App {
             }
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
-                case .background: lock.lockIfNeeded()
+                case .background:
+                    lock.lockIfNeeded()
+                    ProcessingPipeline.shared.appWentToBackground()   // unfinished notes can finish while charging
                 case .active:
                     lock.unlockIfNeeded()
                     Task { await ReminderScheduler.shared.resync() }

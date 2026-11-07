@@ -4626,6 +4626,70 @@
           }
         }
       }
+    },
+    "This will take a while. Finish overnight while charging?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will take a while. Finish overnight while charging?"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీనికి చాలా సమయం పడుతుంది. ఛార్జింగ్‌లో ఉన్నప్పుడు రాత్రిపూట పూర్తి చేయాలా?"
+          }
+        }
+      }
+    },
+    "Keep going": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep going"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొనసాగించు"
+          }
+        }
+      }
+    },
+    "Waiting for the charger — finishes overnight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for the charger — finishes overnight"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఛార్జర్ కోసం వేచి ఉంది — రాత్రిపూట పూర్తవుతుంది"
+          }
+        }
+      }
+    },
+    "Do it now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Do it now"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడే చేయి"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

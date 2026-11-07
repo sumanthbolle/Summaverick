@@ -39,6 +39,7 @@ struct TimelineView: View {
         let ids = offsets.map { notes[$0].id }
         Task {
             for id in ids {
+                ProcessingPipeline.shared.forget(noteID: id)
                 if let n = await CoreEngine.shared.note(id), let p = AudioRecorder.existingAudioPath(n.audio_path) { AudioRecorder.removeAudio(atPath: p) }
                 await CoreEngine.shared.deleteNote(id)
             }
@@ -75,11 +76,14 @@ struct NoteRow: View {
 
 struct StatusBanner: View {
     let stage: ProcessingPipeline.Stage
+    /// Waiting for the charger: "Do it now" runs the note at once.
+    var onDoItNow: (() -> Void)? = nil
     var body: some View {
         HStack(spacing: 10) {
             switch stage {
             case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             case .paused: Image(systemName: "thermometer.medium").foregroundStyle(.orange)
+            case .overnight: Image(systemName: "moon.zzz.fill").foregroundStyle(.indigo)
             default: ProgressView().controlSize(.small)
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -90,6 +94,12 @@ struct StatusBanner: View {
                 }
             }
             Spacer()
+            if let onDoItNow {
+                Button("Do it now", action: onDoItNow)
+                    .buttonStyle(.bordered)
+                    .font(.footnote.weight(.semibold))
+                    .frame(minHeight: 44)
+            }
         }
         .padding(.horizontal).padding(.vertical, 8)
         .background(Color(.secondarySystemBackground))
