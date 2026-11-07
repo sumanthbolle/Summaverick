@@ -7,7 +7,7 @@ import Foundation
 @MainActor
 final class ContinuedWork {
     static let shared = ContinuedWork()
-    /// Registered once at launch; matches Info.plist BGTaskSchedulerPermittedIdentifiers.
+    /// Matches Info.plist BGTaskSchedulerPermittedIdentifiers.
     static let wildcard = "com.summaverick.everyday.notes.*"
     /// key: known at Stop before anything else runs (the recording's file name), not the note id.
     static func identifier(key: String) -> String {
@@ -41,13 +41,23 @@ final class ContinuedWork {
 
     static var title: String { String(localized: "Writing your notes") }
 
-    /// At launch, before the first submit. Registering twice would end the app, so only here.
-    static func register() {
-        guard #available(iOS 26, *) else { return }
-        let ok = BGTaskScheduler.shared.register(forTaskWithIdentifier: wildcard, using: .main) { task in
+    /// Identifiers already given a handler. Registering the same one twice ends the app.
+    private var registered: Set<String> = []
+
+    /// Kept for the launch call site. On iOS 26/27 the system does not route a concrete identifier to
+    /// a wildcard handler (Apple forums 799126; seen on the owner's iPhone: register returned false), so
+    /// each request's own identifier is registered right before it is submitted (allowed for
+    /// continued-processing tasks).
+    static func register() {}
+
+    @available(iOS 26, *)
+    private func registerHandler(_ id: String) {
+        guard !registered.contains(id) else { return }
+        let ok = BGTaskScheduler.shared.register(forTaskWithIdentifier: id, using: .main) { task in
             MainActor.assumeIsolated { ContinuedWork.shared.started(task) }
         }
-        if !ok { NSLog("[sve] continued processing not registered (Info.plist identifiers?)") }
+        registered.insert(id)
+        if !ok { NSLog("[sve] continued processing handler not registered for %@", id) }
     }
 
     /// Processing starts after Stop: call synchronously in the tap, while the app is in front. Submits
@@ -57,7 +67,9 @@ final class ContinuedWork {
         self.subtitle = subtitle
         guard !wanted else { apply(); return }
         fraction = 0
-        let request = BGContinuedProcessingTaskRequest(identifier: Self.identifier(key: key), title: Self.title, subtitle: subtitle)
+        let id = Self.identifier(key: key)
+        registerHandler(id)
+        let request = BGContinuedProcessingTaskRequest(identifier: id, title: Self.title, subtitle: subtitle)
         request.strategy = .fail   // now or not at all: the work is already running
         do {
             try BGTaskScheduler.shared.submit(request)
