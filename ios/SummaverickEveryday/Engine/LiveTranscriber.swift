@@ -31,12 +31,15 @@ enum TranscriptRun {
     /// shouldStop is asked during a model run (any thread) and cancels it: the run throws and the piece is
     /// lost, the cursor stays. shouldContinue is asked before every piece (main actor); shouldStart once
     /// the engine is free, right before the run (any thread). onPiece gets the progress after each piece.
+    /// afterPiece then may write section summaries: the sections it returns are saved with the progress
+    /// (nil: nothing new).
     static func run(audioPath: String, isFinal: Bool,
                     shouldStop: @escaping () -> Bool,
                     shouldContinue: () -> Bool = { true },
                     shouldStart: @escaping () -> Bool = { true },
                     beforePiece: () async -> Bool = { true },
-                    onPiece: (TranscriptSidecar) -> Void = { _ in }) async throws -> (TranscriptSidecar, Stop) {
+                    onPiece: (TranscriptSidecar) -> Void = { _ in },
+                    afterPiece: (TranscriptSidecar) async throws -> [NoteSection]? = { _ in nil }) async throws -> (TranscriptSidecar, Stop) {
         var progress = TranscriptSidecar.load(audioPath: audioPath)
         while true {
             if shouldStop() || Task.isCancelled { throw CancellationError() }
@@ -57,6 +60,10 @@ enum TranscriptRun {
                 progress.append(startSec: startSec, endSample: endSample, text: text)
                 progress.save(audioPath: audioPath)   // skipped when the audio was deleted meanwhile
                 onPiece(progress)
+                if let sections = try await afterPiece(progress) {
+                    progress.sections = sections
+                    progress.save(audioPath: audioPath)
+                }
             }
         }
     }
@@ -99,6 +106,8 @@ final class LiveTranscriber {
 
     /// A recording for notes is going (not an Ask voice question). Model runs use the CPU meanwhile.
     var isRecording: Bool { current != nil }
+    /// Same as isRecording, readable on any thread (a model run's cancel check).
+    nonisolated let recordingNow = AtomicFlag()
     private(set) var status: Status = .idle
     /// Transcript so far of the current recording, one entry per piece, oldest first.
     private(set) var lines: [String] = []
@@ -134,6 +143,7 @@ final class LiveTranscriber {
         if let old = current { stop(audioPath: old.audioPath) }   // never two current recordings
         let session = LiveSession(audioPath: audio.path)
         current = session
+        recordingNow.set(true)
         lines = []
         transcribedSeconds = 0
         self.elapsed = elapsed
@@ -158,6 +168,7 @@ final class LiveTranscriber {
         guard let s = current, s.audioPath == audioPath else { running[audioPath]?.finishing.set(true); return }
         s.finishing.set(true)
         current = nil
+        recordingNow.set(false)
         status = .idle
     }
 
@@ -236,7 +247,8 @@ final class LiveTranscriber {
                         self.lines = p.pieces.map(\.text)
                         self.transcribedSeconds = p.transcribedSeconds
                         self.refresh(s)
-                    })
+                    },
+                    afterPiece: { p in try await self.writeSections(s, p) })
                 failures = 0
                 if stop == .wait { await nap(3, s) }
                 else if stop == .yielded, pauseReason() != nil { continue }
@@ -254,6 +266,38 @@ final class LiveTranscriber {
                     await nap(3, s)
                 }
             }
+        }
+    }
+
+    /// After a piece: the sections that are due (at most one per piece, so transcription keeps the lead), only
+    /// while this is the current recording and fewer than a section's worth of pieces waits to be transcribed.
+    /// On the CPU, after the heat gate. Stop, Cancel or critical heat cancel the section in flight: a section on
+    /// the CPU can take a couple of minutes, too long to hold up Stop, and the pipeline writes whatever is
+    /// missing after Stop (on the GPU when the app is in front). Other failures skip sections for this piece.
+    /// nil: nothing new.
+    private func writeSections(_ s: LiveSession, _ p: TranscriptSidecar) async throws -> [NoteSection]? {
+        let finishing = s.finishing, abort = s.abort
+        guard current === s, !finishing.isSet,
+              LiveSections.shouldWrite(recordedSeconds: elapsed(), transcribedSeconds: p.transcribedSeconds) else { return nil }
+        do {
+            let done = try await SectionWriter.writeDue(
+                pieces: TranscriptRun.pieces(p), existing: p.sections, isFinal: false,
+                lang: AppSettings.shared.notesLanguage, endSec: p.cursor_sample / Int64(TranscriptSidecar.sampleRate), limit: 1,
+                beforeEach: {
+                    guard !finishing.isSet, self.pauseReason() == nil, await self.heatGate(s) else { return false }
+                    return !finishing.isSet
+                },
+                summarize: { pieces, lang in
+                    try await ModelManager.shared.loadIntoCore(for: .transcription)   // the CPU, as transcription
+                    return try await CoreEngine.shared.sectionSummarize(
+                        pieces: pieces, lang: lang, backend: .cpu, shouldStart: { !finishing.isSet },
+                        shouldStop: { finishing.isSet || abort.isSet || Heat.cancelsRun(ProcessInfo.processInfo.thermalState) })
+                })
+            return done == p.sections ? nil : done
+        } catch {
+            if abort.isSet || Task.isCancelled || Heat.cancelsRun(ProcessInfo.processInfo.thermalState) { throw error }
+            if !finishing.isSet { NSLog("[sve] live section summary failed: %@", String(describing: error)) }
+            return nil   // Stop: the loop ends at the next check; the pipeline takes over
         }
     }
 

@@ -23,6 +23,12 @@ struct PieceRef {
 std::vector<std::pair<size_t, size_t>> plan_sections(const std::vector<PieceRef> &pieces, bool is_final,
                                                      int target = 300, int min_len = 240, int max_len = 360);
 
+// plan_sections over pieces JSON ([{"start_sec":0,"text":"…"}], in transcript order), as the host has them.
+// Made sane first: start_sec is a number >= 0 and never below the previous piece's; a piece ends where the next
+// starts, the last at end_sec_of_last (never before its own start). Returns "[[first,last),…]" as JSON text,
+// e.g. "[[0,11],[11,22]]"; "[]" for no pieces or input that is not an array.
+std::string plan_sections_json(const std::string &pieces_json, int64_t end_sec_of_last, bool is_final);
+
 // Section summary JSON: {"title","topic","points":[{"text","start_sec"}],"terms":[],"hints":[]}.
 using SectionPieces = std::vector<std::pair<int64_t, std::string>>;  // (start_sec, text)
 

@@ -34,6 +34,36 @@ std::vector<std::pair<size_t, size_t>> plan_sections(const std::vector<PieceRef>
     return out;
 }
 
+static int64_t sane_sec(const json &e) {
+    if (!e.is_object() || !e.contains("start_sec")) return 0;
+    const json &v = e["start_sec"];
+    if (v.is_number_integer()) return std::max<int64_t>(0, v.get<int64_t>());
+    if (v.is_number_float()) {
+        double d = v.get<double>();
+        if (!(d > 0)) return 0;  // negative or NaN
+        return d >= 9.0e15 ? (int64_t)9.0e15 : (int64_t)d;
+    }
+    return 0;
+}
+
+std::string plan_sections_json(const std::string &pieces_json, int64_t end_sec_of_last, bool is_final) {
+    json arr = json::parse(pieces_json, nullptr, false);
+    json out = json::array();
+    if (!arr.is_array() || arr.empty()) return out.dump();
+    std::vector<int64_t> starts;
+    starts.reserve(arr.size());
+    for (const auto &e : arr) {
+        int64_t s = sane_sec(e);
+        if (!starts.empty()) s = std::max(s, starts.back());
+        starts.push_back(s);
+    }
+    std::vector<PieceRef> refs;
+    refs.reserve(starts.size());
+    for (size_t i = 0; i < starts.size(); ++i)
+        refs.push_back({starts[i], i + 1 < starts.size() ? starts[i + 1] : std::max(end_sec_of_last, starts[i])});
+    for (const auto &r : plan_sections(refs, is_final)) out.push_back(json::array({r.first, r.second}));
+    return out.dump();
+}
 
 std::string section_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line) {
     const bool te = lang == "te";

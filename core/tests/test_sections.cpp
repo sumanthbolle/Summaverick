@@ -54,6 +54,34 @@ TEST(plan_sections_avoids_passing_max_len) {
     CHECK(r[0].second == 2 && r[1].first == 2);
 }
 
+TEST(plan_sections_json_api) {
+    // 14 pieces of 28 s: the first 11 (308 s) close a section; the last 3 wait while not final.
+    json pieces = json::array();
+    for (int i = 0; i < 14; ++i) pieces.push_back({{"start_sec", i * 28}, {"text", "p"}});
+    CHECK_EQ(plan_sections_json(pieces.dump(), 14 * 28, false), std::string("[[0,11]]"));
+    CHECK_EQ(plan_sections_json(pieces.dump(), 14 * 28, true), std::string("[[0,11],[11,14]]"));
+    // The last piece's end comes from the caller: a short tail waits, a long one closes.
+    json ten = json::array();
+    for (int i = 0; i < 10; ++i) ten.push_back({{"start_sec", i * 28}, {"text", "p"}});
+    CHECK_EQ(plan_sections_json(ten.dump(), 280, false), std::string("[]"));
+    CHECK_EQ(plan_sections_json(ten.dump(), 300, false), std::string("[[0,10]]"));
+    // Not an array, empty, missing input: no ranges.
+    CHECK_EQ(plan_sections_json("{}", 0, true), std::string("[]"));
+    CHECK_EQ(plan_sections_json("[]", 0, true), std::string("[]"));
+    CHECK_EQ(plan_sections_json("not json", 0, true), std::string("[]"));
+    // Not sane: a start going backwards, negative, a string, an end before the last start. Still covers all pieces in order.
+    json bad = json::parse(R"([{"start_sec":0},{"start_sec":200},{"start_sec":150},{"start_sec":-5},{"start_sec":"x"},{"start_sec":320.7}])");
+    json r = json::parse(plan_sections_json(bad.dump(), 10, true));
+    CHECK(r.is_array() && !r.empty());
+    size_t next = 0;
+    for (const auto &g : r) {
+        CHECK_EQ(g[0].get<size_t>(), next);
+        CHECK(g[1].get<size_t>() > g[0].get<size_t>());
+        next = g[1].get<size_t>();
+    }
+    CHECK_EQ(next, (size_t)6);
+}
+
 static json sec(int idx, int first, int last, int s, int e, const char *title) {
     return {{"idx", idx}, {"first_piece", first}, {"last_piece", last}, {"start_sec", s}, {"end_sec", e},
             {"summary", {{"title", title}, {"points", json::array()}}}};

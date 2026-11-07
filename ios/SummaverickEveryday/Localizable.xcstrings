@@ -4599,6 +4599,33 @@
           }
         }
       }
+    },
+    "Chapters": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chapters"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అధ్యాయాలు"
+          }
+        }
+      }
+    },
+    "Summarising part %lld of %lld…": {
+      "comment": "Part number, total parts of a long recording",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld భాగాల్లో %1$lldవ భాగం సారాంశం రాస్తోంది…"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

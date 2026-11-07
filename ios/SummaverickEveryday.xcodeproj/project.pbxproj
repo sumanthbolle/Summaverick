@@ -23,6 +23,10 @@
 			isa = PBXBuildFile;
 			fileRef = 9E2ACA831A68C5FC7568EFA9;
 		};
+		24F70CD5F7748FDEB63B8BB1 = {
+			isa = PBXBuildFile;
+			fileRef = 3127CE4AFD13AD5C3FEDC05B;
+		};
 		25A6412A3165EE7261515DB6 = {
 			isa = PBXBuildFile;
 			fileRef = 613ACEA909B6A4FB1BE80F73;
@@ -40,6 +44,10 @@
 		334316FE5AD49DBFE79A28C1 = {
 			isa = PBXBuildFile;
 			fileRef = FC581254F5C135DB22FD9C42;
+		};
+		408386E2C748923A7048D478 = {
+			isa = PBXBuildFile;
+			fileRef = 8A6F757330F3179FB40BD3E2;
 		};
 		53208D279FD7D4526A01C523 = {
 			isa = PBXBuildFile;
@@ -270,6 +278,13 @@
 			path = SummaverickEveryday/Engine/ProcessingPipeline.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		3127CE4AFD13AD5C3FEDC05B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ChaptersView.swift;
+			path = SummaverickEveryday/Views/ChaptersView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		393C976A09F0C61C5B20B9DE = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -401,6 +416,13 @@
 			lastKnownFileType = text.json.xcstrings;
 			name = Localizable.xcstrings;
 			path = SummaverickEveryday/Localizable.xcstrings;
+			sourceTree = SOURCE_ROOT;
+		};
+		8A6F757330F3179FB40BD3E2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SectionWriter.swift;
+			path = SummaverickEveryday/Engine/SectionWriter.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		8B7A0A18322F15224FEF40CC = {
@@ -707,6 +729,7 @@
 				B05E051B8E13E602C77A96F0,
 				2E361774B975154A11567968,
 				FC685B2FB5E51229E33B1F2C,
+				8A6F757330F3179FB40BD3E2,
 				0B08BF124CD0B2571A98FABA,
 			);
 			name = Engine;
@@ -737,6 +760,7 @@
 		9808AA3855D4662F673FBFD8 = {
 			isa = PBXGroup;
 			children = (
+				3127CE4AFD13AD5C3FEDC05B,
 				4E9F0134C12B9B82D2B2A856,
 				63A8A83C123E5491CBE9E84F,
 				5B6316DBD705D039EA15B281,
@@ -894,9 +918,11 @@
 				5997944FB95EF3E94D57974F,
 				5809D5B858D8CE07F8518B8C,
 				74F26ED096628426F957DD0E,
+				408386E2C748923A7048D478,
 				C2AF1244993225350DDBDC94,
 				E38796377CD701DE27D4E42D,
 				ECB5419178B062460383B28A,
+				24F70CD5F7748FDEB63B8BB1,
 				82BAF8328F881FAFD6AEC039,
 				8FB71A3DAC10CCF263B21175,
 				9543CFE6FE3AF9374A448E0F,

@@ -151,6 +151,11 @@ int   sve_note_set_sections(sve_ctx *ctx, int64_t note_id, const char *sections_
 /* Same array; "[]" when none. */
 char *sve_note_sections(sve_ctx *ctx, int64_t note_id);
 
+/* Plans pieces ([{"start_sec":0,"text":"…"}], in order) into ~5 minute sections; returns half-open piece index
+ * ranges "[[first,last),…]" ("[]" when none). The last piece ends at end_sec_of_last (live: cursor seconds;
+ * after Stop: the note duration). Not final: only ranges that are closed are returned, an open tail waits. Pure. */
+char *sve_plan_sections(const char *pieces_json, int64_t end_sec_of_last, int is_final);
+
 /* Summary of one section. pieces_json: [{"start_sec":0,"text":"…"}]; lang "en"/"te". Returns the summary JSON
  * ({"title","topic","points":[{"text","start_sec"}],"terms","hints"}). Sampled first try, one greedy retry,
  * then a plain-text fallback ("fallback":true) built from the first sentences, so a model that ran never

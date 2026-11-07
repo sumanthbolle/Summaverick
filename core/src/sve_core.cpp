@@ -208,6 +208,14 @@ char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang_c)
     }
 }
 
+char *sve_plan_sections(const char *pieces_json, int64_t end_sec_of_last, int is_final) {
+    try {
+        return dup_str(sve::plan_sections_json(pieces_json ? pieces_json : "[]", end_sec_of_last, is_final != 0));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 char *sve_chapters_json(sve_ctx *ctx, int64_t note_id) {
     try {
         if (!ctx) return nullptr;

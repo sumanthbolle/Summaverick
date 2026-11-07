@@ -13,6 +13,7 @@ struct NoteDetailView: View {
     @State private var note: Note?
     @State private var loaded = false
     @State private var pieces: [TranscriptPiece] = []
+    @State private var chapters: [Chapter] = []
     @State private var tab: Tab
     @State private var title = ""
     @State private var question = ""
@@ -70,7 +71,11 @@ struct NoteDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task {
+            await load()
+            // An older note without section summaries gets them now (while this screen is open), for chapters.
+            await pipeline.backfillSections(noteID: noteID)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await load() } }
         .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await load() } }
         .onChange(of: presenting) { _, open in PresentationGate.shared.set(gateKey, open) }
@@ -111,6 +116,8 @@ struct NoteDetailView: View {
                         }
                         .font(.caption).foregroundStyle(.secondary)
                     }
+
+                    ChaptersView(chapters: chapters, onPlay: audioPath.map { p in { sec in playChapter(p, sec) } })
 
                     if isThisNoteBusy {
                         StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
@@ -378,6 +385,7 @@ struct NoteDetailView: View {
         let previous = note
         let n = await CoreEngine.shared.note(noteID)
         let ps = await CoreEngine.shared.pieces(noteID)
+        chapters = await CoreEngine.shared.chapters(noteID)
         extracted = await CoreEngine.shared.noteExtracted(noteID)
         note = n
         pieces = ps
@@ -436,6 +444,13 @@ struct NoteDetailView: View {
     private func playFrom(_ path: String, _ sec: Int, piece: Int) {
         seekPending = false
         highlighted = piece
+        play(path, from: sec)
+    }
+
+    /// A chapter tapped: play from its start and highlight the piece it starts in.
+    private func playChapter(_ path: String, _ sec: Int) {
+        seekPending = false
+        highlighted = pieces.lastIndex(where: { $0.startSec <= sec })
         play(path, from: sec)
     }
 

@@ -19,6 +19,8 @@ final class ProcessingPipeline {
         case transcribing(Double)
         case loadingModel
         case extracting
+        /// Section summaries: done so far, total to write now.
+        case sections(Int, Int)
         case generating(OutputKind, String, Int, Int)   // kind, phase, done, total
         case done
         case failed(String)
@@ -33,6 +35,9 @@ final class ProcessingPipeline {
             case .transcribing(let p): return String(localized: "Transcribing… \(Int(p * 100))%")
             case .loadingModel: return String(localized: "Loading AI model…")
             case .extracting: return String(localized: "Finding reminders and tasks…")
+            case .sections(let d, let t):
+                return String(localized: "Summarising part \(min(d + 1, max(t, 1))) of \(max(t, 1))…",
+                              comment: "Part number, total parts of a long recording")
             case .generating(let k, let phase, let d, let t):
                 return phase == "chunk" && t > 1 ? String(localized: "Reading part \(d + 1) of \(t) for \(k.title.lowercased())…") : String(localized: "Writing \(k.title.lowercased())…")
             case .done: return String(localized: "Done")
@@ -203,17 +208,17 @@ final class ProcessingPipeline {
 
         // 1. transcript
         stage = .transcribing(0)
-        let pieces: [TranscriptPiece]
+        let done: TranscriptSidecar
         do {
-            pieces = try await transcribe(audio, noteID: id, durationSeconds: duration)
+            done = try await transcribe(audio, noteID: id, durationSeconds: duration)
         } catch {
             NSLog("[sve] transcription failed: %@", String(describing: error))
             if !pausedForHeat(id) { stage = .failed(error.localizedDescription) }
             return id
         }
+        let pieces = TranscriptRun.pieces(done)
         let transcript = Self.joined(pieces)
-        await engine.setPieces(id, pieces)
-        await engine.setTranscript(id, transcript)
+        await store(done, noteID: id, transcript: transcript)
         TranscriptSidecar.remove(audioPath: audio.path)   // complete and saved to the note
         NotificationCenter.default.post(name: .notesChanged, object: nil)
         if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -249,10 +254,10 @@ final class ProcessingPipeline {
                 stage = .failed(String(localized: "No transcript and the audio is no longer available.")); return
             }
             stage = .transcribing(0)
-            var pieces: [TranscriptPiece] = []
+            let done: TranscriptSidecar
             do {
-                pieces = try await transcribe(URL(fileURLWithPath: path), noteID: noteID, durationSeconds: note.duration_seconds)
-                t = Self.joined(pieces)
+                done = try await transcribe(URL(fileURLWithPath: path), noteID: noteID, durationSeconds: note.duration_seconds)
+                t = Self.joined(TranscriptRun.pieces(done))
             } catch {
                 NSLog("[sve] transcription failed: %@", String(describing: error))
                 if !pausedForHeat(noteID) { stage = .failed(error.localizedDescription) }
@@ -261,8 +266,7 @@ final class ProcessingPipeline {
             if t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 stage = .failed(String(localized: "No speech was detected in the recording.")); return
             }
-            await CoreEngine.shared.setPieces(noteID, pieces)
-            await CoreEngine.shared.setTranscript(noteID, t)
+            await store(done, noteID: noteID, transcript: t)
             TranscriptSidecar.remove(audioPath: path)   // complete and saved to the note
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         } else if let path = AudioRecorder.existingAudioPath(note.audio_path) {
@@ -275,7 +279,7 @@ final class ProcessingPipeline {
     /// hears the recording itself, so any language mix works. Stops (the progress callback cancels) as
     /// soon as the phone gets too hot or the background time runs out; the caller treats that as a pause,
     /// and the next run continues from the saved cursor.
-    private func transcribe(_ audio: URL, noteID: Int64, durationSeconds: Int64) async throws -> [TranscriptPiece] {
+    private func transcribe(_ audio: URL, noteID: Int64, durationSeconds: Int64) async throws -> TranscriptSidecar {
         let duration = Double(max(1, durationSeconds))
         func report(_ s: TranscriptSidecar) {
             stage = .transcribing(min(1, s.transcribedSeconds / duration))
@@ -288,7 +292,17 @@ final class ProcessingPipeline {
                                                        beforePiece: { await self.heatGate(noteID) },
                                                        onPiece: { report($0) })
         if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
-        return TranscriptRun.pieces(done)
+        return done
+    }
+
+    /// A finished transcription into the note: pieces, transcript, and the sections written while recording
+    /// (those that still fit the pieces; replacing whatever the note had, which belonged to older pieces).
+    private func store(_ done: TranscriptSidecar, noteID id: Int64, transcript: String) async {
+        let engine = CoreEngine.shared
+        let pieces = TranscriptRun.pieces(done)
+        await engine.setPieces(id, pieces)
+        await engine.setTranscript(id, transcript)
+        await engine.setSections(id, NoteSection.validPrefix(done.sections, pieceCount: pieces.count))
     }
 
     private static func joined(_ pieces: [TranscriptPiece]) -> String {
@@ -343,7 +357,7 @@ final class ProcessingPipeline {
         // Reminders, tasks and profile changes first, so they are ready even if note writing is interrupted.
         // A failure here never fails the notes.
         let abort = self.abort
-        let steps = 2 + OutputKind.allCases.count   // reminders, title, three outputs
+        let steps = 3 + OutputKind.allCases.count   // reminders, sections, title, three outputs
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 0, outputsTotal: steps))
         do {
             if await engine.pieces(id).isEmpty {   // note from before pieces existed
@@ -361,30 +375,42 @@ final class ProcessingPipeline {
         }
         if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
+
+        // Section summaries the note does not have yet (all of them for a note from before sections). Notes and
+        // title come from them only when they cover the whole recording; otherwise from the transcript.
+        guard let fromSections = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
+        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
         if setTitle, !(await heatGate(id)) { return }
 
         if setTitle, let t = try? await onBackend({ () async throws -> String in
+            if fromSections, let t = await engine.titleFromSections(noteID: id, lang: lang) { return t }
             guard let t = await engine.suggestTitle(transcript: transcript, lang: lang) else { throw CoreError.generationFailed }
             return t
         }) {
             await engine.setTitle(id, t)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
-        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
+        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3, outputsTotal: steps))
 
         for (i, kind) in OutputKind.allCases.enumerated() {
             if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
             if !(await heatGate(id)) { return }
             stage = .generating(kind, "final", 0, 1)
             do {
-                let text = try await onBackend {
-                    try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }) { phase, done, total in
+                let text = try await onBackend { () async throws -> String in
+                    if fromSections, let t = await engine.generateFromSections(noteID: id, kind: kind, lang: lang, shouldStop: { abort.isSet },
+                                                                               onProgress: { phase, done, total in
+                        Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
+                    }) { return t }
+                    // nil: cancelled (our flag) or the sections could not be used, then the transcript as before.
+                    if abort.isSet { throw CoreError.generationFailed }
+                    return try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }) { phase, done, total in
                         Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
                     }
                 }
                 await engine.setOutput(id, kind, text)
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
-                ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3 + i, outputsTotal: steps))
+                ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 4 + i, outputsTotal: steps))
             } catch {
                 stage = .failed(error.localizedDescription)
                 return
@@ -395,6 +421,129 @@ final class ProcessingPipeline {
         }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
+    }
+
+    /// Writes the note's missing section summaries from its stored pieces, one at a time, each stored before the
+    /// next (a note deleted meanwhile refuses the write, which ends this). nil: stopped, the caller returns —
+    /// paused for heat (critical), cut off, or the note is gone; quiet: a recording started, the screen was
+    /// left, or the phone got warm, and nothing is shown or queued. Otherwise whether the sections now cover
+    /// every piece (false after a failure: the notes then come from the transcript, as before sections).
+    /// quiet (backfill when an older note is opened): no failure banner, no pause queue, stops at critical.
+    private func writeSections(noteID id: Int64, lang: String, quiet: Bool) async -> Bool? {
+        let engine = CoreEngine.shared
+        let pieces = await engine.pieces(id)
+        guard !pieces.isEmpty else { return false }
+        let existing = await engine.sections(id)
+        if SectionWriter.coversAll(existing, pieceCount: pieces.count) { return true }
+        let duration = await engine.note(id)?.duration_seconds ?? 0
+        let from = NoteSection.covered(NoteSection.validPrefix(existing, pieceCount: pieces.count))
+        let total = SectionWriter.plan(pieces: Array(pieces[from...]), endSec: duration, isFinal: true).count
+        let abort = self.abort, recording = LiveTranscriber.shared.recordingNow
+        var written = 0, gone = false, stopped = false
+        func stop() -> Bool { abort.isSet || (quiet && LiveTranscriber.shared.isRecording) || Task.isCancelled }
+        do {
+            let done = try await SectionWriter.writeDue(
+                pieces: pieces, existing: existing, isFinal: true, lang: lang, endSec: duration,
+                beforeEach: {
+                    if stop() { stopped = true; return false }
+                    if quiet {
+                        if !(await quietHeatGate(stop)) { stopped = true; return false }
+                    } else if !(await heatGate(id)) {
+                        stopped = true; return false
+                    }
+                    stage = .sections(written, total)
+                    return true
+                },
+                summarize: { ps, lang in
+                    try await onBackend {
+                        try await engine.sectionSummarize(pieces: ps, lang: lang, shouldStop: {
+                            abort.isSet || Self.critical || (quiet && recording.isSet)
+                        })
+                    }
+                },
+                onSection: { secs in
+                    guard await engine.setSections(id, secs) else { gone = true; return false }
+                    written += 1
+                    NotificationCenter.default.post(name: .notesChanged, object: nil)   // chapters appear as they come
+                    return true
+                })
+            if gone {
+                NSLog("[sve] note %lld is gone; not writing its sections", id)
+                stage = .idle
+                return nil
+            }
+            if stopped {
+                if quiet {
+                    stage = .idle
+                } else if case .paused = stage {
+                    // paused for heat: heatGate set the stage and queued the note
+                } else {
+                    stage = .failed(CoreError.generationFailed.localizedDescription)   // cut off (abort: resumed later)
+                }
+                return nil
+            }
+            return SectionWriter.coversAll(done, pieceCount: pieces.count)
+        } catch {
+            if quiet {
+                NSLog("[sve] section backfill stopped: %@", String(describing: error))
+                stage = .idle
+                return nil
+            }
+            if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return nil }
+            if pausedForHeat(id) { return nil }
+            NSLog("[sve] section summaries failed, notes come from the transcript: %@", String(describing: error))
+            return false
+        }
+    }
+
+    /// The heat rule for quiet work: serious rests 30 s (cut short by `stop` or a cooler phone), critical stops.
+    private func quietHeatGate(_ stop: () -> Bool) async -> Bool {
+        switch Heat.beforeRun(Self.thermal) {
+        case .go: return true
+        case .pause: return false
+        case .rest:
+            stage = .cooling
+            let end = Date().addingTimeInterval(Heat.restSeconds)
+            while Date() < end, !stop(), Heat.beforeRun(Self.thermal) == .rest {
+                do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return false }
+            }
+            return !stop() && Heat.beforeRun(Self.thermal) != .pause
+        }
+    }
+
+    /// An older note opened (made before sections, or its sections were cut off) that already has all its
+    /// notes: writes its section summaries from the stored pieces so it gets chapters. Only while nothing else
+    /// runs, the app is in front, nothing is recording and the AI is ready; stops quietly when a recording
+    /// starts, the phone gets too hot or the caller's task is cancelled (the screen was left), keeping every
+    /// finished section. A note that still needs its notes gets its sections from regenerate instead.
+    func backfillSections(noteID: Int64) async {
+        guard !isBusy, appIsActive, ModelManager.shared.isReady, !LiveTranscriber.shared.isRecording,
+              !interrupted.contains(noteID), Heat.beforeRun(Self.thermal) != .pause else { return }
+        starting = true
+        defer { starting = false }
+        let engine = CoreEngine.shared
+        guard let note = await engine.note(noteID), let t = note.transcript,
+              !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !WaitingNotes.needsWork(hasTranscript: true, outputs: OutputKind.allCases.map { note.output($0) != nil }) else { return }
+        if await engine.pieces(noteID).isEmpty {   // note from before pieces existed
+            await engine.setPieces(noteID, PiecesBackfill.pieces(transcript: t, durationSeconds: note.duration_seconds))
+        }
+        let pieces = await engine.pieces(noteID)
+        guard !pieces.isEmpty, !SectionWriter.coversAll(await engine.sections(noteID), pieceCount: pieces.count),
+              !Task.isCancelled, !LiveTranscriber.shared.isRecording else { return }
+        beginBackground()
+        defer { endBackground() }
+        activeNoteID = noteID
+        do {
+            try await loadSelectedModel()
+        } catch {
+            NSLog("[sve] section backfill: model not loaded: %@", String(describing: error))
+            stage = .idle
+            return
+        }
+        // In the language of the notes it already has.
+        guard await writeSections(noteID: noteID, lang: note.lang, quiet: true) != nil else { return }
+        stage = .idle
     }
 
     /// "Find reminders and tasks" on a note that was never extracted (an older recording): extraction

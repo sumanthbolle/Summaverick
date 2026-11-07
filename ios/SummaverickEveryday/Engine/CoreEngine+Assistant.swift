@@ -2,6 +2,12 @@
 // Everything runs inside the CoreEngine actor, so the one sve_ctx is never used from two threads.
 import Foundation
 
+/// A chapter of a note: consecutive sections on the same topic (sve_chapters_json).
+struct Chapter: Decodable, Equatable {
+    let title: String
+    let start_sec: Int
+}
+
 extension CoreEngine {
     enum AssistantError: LocalizedError {
         case failed(String), badJSON
@@ -198,6 +204,55 @@ extension CoreEngine {
     }
 
     func pieces(_ noteID: Int64) -> [TranscriptPiece] { list(TranscriptPiece.self, sve_note_pieces(ctx, noteID)) }
+
+    // MARK: sections
+
+    /// Summary of one section's pieces, on `backend` when given (switched here, in the same actor turn as the
+    /// run). nil when `shouldStart` said no once the engine was free (nothing ran). Throws when the run was
+    /// cancelled (`shouldStop`) or there was nothing it could summarise.
+    func sectionSummarize(pieces: [TranscriptPiece], lang: String, backend: ModelBackend? = nil,
+                          shouldStart: () -> Bool = { true },
+                          shouldStop: @escaping () -> Bool = { false }) throws -> SectionSummary? {
+        guard let ctx else { throw CoreError.initFailed }
+        guard shouldStart() else { return nil }
+        if let backend { try ensureBackend(backend) }
+        guard let json = encodeJSON(pieces) else { throw AssistantError.badJSON }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let out = take(sve_section_summarize(ctx, json, lang, CoreEngine.progressTrampoline, user)) else {
+            throw CoreError.generationFailed
+        }
+        guard let summary = decode(SectionSummary.self, out) else { throw AssistantError.badJSON }
+        return summary
+    }
+
+    /// Replaces the note's sections. False when it could not be stored, for example the note is gone.
+    @discardableResult
+    func setSections(_ noteID: Int64, _ sections: [NoteSection]) -> Bool {
+        guard let json = encodeJSON(sections) else { return false }
+        return sve_note_set_sections(ctx, noteID, json) == 0
+    }
+
+    func sections(_ noteID: Int64) -> [NoteSection] { list(NoteSection.self, sve_note_sections(ctx, noteID)) }
+
+    /// An output written from the note's sections. nil when the note has no sections, or on cancel or failure:
+    /// callers check their own cancel flag before falling back to `generate`.
+    func generateFromSections(noteID: Int64, kind: OutputKind, lang: String, shouldStop: @escaping () -> Bool = { false },
+                              onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) -> String? {
+        guard let ctx else { return nil }
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        return take(sve_generate_from_sections(ctx, noteID, kind.cKind, lang, CoreEngine.progressTrampoline, user))
+    }
+
+    /// A title from the section titles; nil when there are no sections or no model.
+    func titleFromSections(noteID: Int64, lang: String) -> String? {
+        guard let ctx else { return nil }
+        let t = take(sve_title_from_sections(ctx, noteID, lang))?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (t?.isEmpty ?? true) ? nil : t
+    }
+
+    func chapters(_ noteID: Int64) -> [Chapter] { list(Chapter.self, sve_chapters_json(ctx, noteID)) }
 
     /// Same as transcribeAudio, but keeps the start second of each ~28 s piece.
     /// `shouldStop` is asked at every progress step; true cancels the run (it then throws).
