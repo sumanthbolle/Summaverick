@@ -4,6 +4,7 @@
 #include "sve_internal.h"
 #include "sve_prompts.h"
 #include "sve_context.h"
+#include "sve_audio.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -18,6 +19,7 @@
 using sve::reduce_to_fit;
 using sve::split_text;
 using sve::strip_thinking;
+using sve::read_wav16k;
 
 // ---------------------------------------------------------------- logging
 static sve_log_cb g_log = nullptr;
@@ -170,38 +172,6 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang_c
     return dup_str(out);
 }
 
-namespace {
-// Minimal WAV reader: 16‑bit PCM, mono or stereo, any sample rate (we require 16 kHz).
-bool read_wav16k(const std::string &path, std::vector<float> &pcm) {
-    std::ifstream f(path, std::ios::binary);
-    if (!f) return false;
-    std::vector<char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    if (data.size() < 44 || memcmp(data.data(), "RIFF", 4) || memcmp(data.data() + 8, "WAVE", 4)) return false;
-    size_t p = 12;
-    int channels = 1, rate = 0, bits = 16;
-    while (p + 8 <= data.size()) {
-        uint32_t sz; memcpy(&sz, data.data() + p + 4, 4);
-        if (!memcmp(data.data() + p, "fmt ", 4)) {
-            uint16_t ch; memcpy(&ch, data.data() + p + 10, 2); channels = ch;
-            uint32_t r; memcpy(&r, data.data() + p + 12, 4); rate = r;
-            uint16_t b; memcpy(&b, data.data() + p + 22, 2); bits = b;
-        } else if (!memcmp(data.data() + p, "data", 4)) {
-            if (bits != 16 || rate != 16000) { sve_logf(2, "wav must be 16 kHz 16‑bit (got %d Hz, %d bit)", rate, bits); return false; }
-            const int16_t *s = reinterpret_cast<const int16_t *>(data.data() + p + 8);
-            size_t n = std::min<size_t>(sz, data.size() - p - 8) / 2;
-            pcm.reserve(n / channels);
-            for (size_t i = 0; i + channels <= n; i += channels) {
-                float v = 0;
-                for (int c = 0; c < channels; ++c) v += s[i + c];
-                pcm.push_back(v / (channels * 32768.0f));
-            }
-            return true;
-        }
-        p += 8 + sz + (sz & 1);
-    }
-    return false;
-}
-} // namespace
 
 // ---------------------------------------------------------------- audio understanding (Gemma 4 via mtmd)
 #ifdef SVE_WITH_MTMD
@@ -209,7 +179,9 @@ int sve_load_audio(sve_ctx *ctx, const char *mmproj_path) {
     if (!ctx || !ctx->llm || !mmproj_path) return -1;
     sve_unload_audio(ctx);
     mtmd_context_params mp = mtmd_context_params_default();
-    mp.use_gpu = true;
+    // Same backend as the model: a CPU-only load (n_gpu_layers 0) keeps the encoder off the GPU too,
+    // so transcription keeps running while the phone is locked (iOS refuses background GPU work).
+    mp.use_gpu = ctx->llm->n_gpu_layers > 0;
     mp.print_timings = false;
     mp.n_threads = ctx->llm->n_threads;
     mp.warmup = false;
@@ -229,79 +201,111 @@ void sve_unload_audio(sve_ctx *ctx) {
 
 int sve_audio_loaded(const sve_ctx *ctx) { return ctx && ctx->mtmd ? 1 : 0; }
 
+// Transcribes one piece of 16 kHz mono audio with the loaded projector. False on failure/cancel.
+static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const std::string &prev,
+                             const std::string &vocab, sve_progress_cb cb, void *user, int done, int total,
+                             std::string &out) {
+    sve::Llm &llm = *ctx->llm;
+    const std::string prompt = llm.apply_template(sve::kTranscriberSystem,
+                                                  sve::transcription_instruction(mtmd_get_marker(ctx->mtmd), vocab, prev));
+    llama_memory_clear(llama_get_memory(llm.ctx), true);
+    mtmd_bitmap *bmp = mtmd_bitmap_init_from_audio(n, samples);
+    mtmd_input_chunks *chunks = mtmd_input_chunks_init();
+    mtmd_input_text text{};
+    text.text = prompt.c_str();
+    text.text_len = prompt.size();
+    text.add_special = true;
+    text.parse_special = true;
+    const mtmd_bitmap *bmps[1] = {bmp};
+    int rc = mtmd_tokenize(ctx->mtmd, chunks, &text, bmps, 1);
+    llama_pos n_past = 0;
+    if (rc == 0) rc = mtmd_helper_eval_chunks(ctx->mtmd, llm.ctx, chunks, 0, 0, (int32_t)llama_n_batch(llm.ctx), true, &n_past);
+    mtmd_input_chunks_free(chunks);
+    mtmd_bitmap_free(bmp);
+    if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", done + 1, total, rc); return false; }
+    out.clear();
+    int room = std::min(768, llm.n_ctx - (int)n_past - 4);
+    if (!llm.generate(room, true, out, cb, user, "chunk", done, total)) return false;
+    out = strip_thinking(out);
+    return true;
+}
+
+static bool audio_ready(sve_ctx *ctx) {
+    if (!ctx || !ctx->llm || !ctx->mtmd) return false;
+    const int rate = mtmd_get_audio_sample_rate(ctx->mtmd);
+    if (rate > 0 && rate != (int)sve::kAudioRate) { sve_logf(2, "projector wants %d Hz audio", rate); return false; }
+    return true;
+}
+
 // Transcribes in ~28 s pieces; each result is (piece start in whole seconds, text). False on failure/cancel.
 static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user,
                               std::vector<std::pair<int64_t, std::string>> &result) {
-    if (!ctx || !ctx->llm || !ctx->mtmd || !wav_path) return false;
-    sve::Llm &llm = *ctx->llm;
+    if (!wav_path || !audio_ready(ctx)) return false;
     std::vector<float> pcm;
     if (!read_wav16k(wav_path, pcm)) { sve_logf(2, "could not read %s", wav_path); return false; }
-    const int rate = mtmd_get_audio_sample_rate(ctx->mtmd);
-    if (rate > 0 && rate != 16000) { sve_logf(2, "projector wants %d Hz audio", rate); return false; }
 
-    // Gemma 4 takes at most ~30 s per clip. Cut at the quietest point near 28 s so words are not split.
-    const size_t target = 28 * 16000, search = 3 * 16000, win = 1600;
     std::vector<std::pair<size_t, size_t>> pieces;
-    for (size_t pos = 0; pos < pcm.size();) {
-        size_t end = std::min(pcm.size(), pos + target);
-        if (end < pcm.size()) {
-            size_t best = end; float best_e = 1e30f;
-            for (size_t c = end - search; c + win <= end; c += win / 2) {
-                float e = 0;
-                for (size_t k = c; k < c + win; ++k) e += pcm[k] * pcm[k];
-                if (e < best_e) { best_e = e; best = c + win / 2; }
-            }
-            end = best;
-        }
-        if (end - pos >= 8000) pieces.push_back({pos, end}); // skip slivers under 0.5 s
-        pos = end;
+    for (size_t pos = 0;;) {
+        sve::PiecePlan plan = sve::plan_next_piece(pcm, 0, pos, pcm.size(), true);
+        if (plan.kind != sve::PiecePlan::piece) break;
+        pieces.push_back({plan.start, plan.stop});
+        pos = plan.stop;
     }
 
-    const std::string sys =
-        "You are a precise transcriber. Speakers often mix languages, for example Telugu with English words.";
     // Words the person fixed earlier (spec §7.4), bounded so the audio prompt stays small.
     const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
     std::string prev;
     const int total = (int)pieces.size();
     for (int i = 0; i < total; ++i) {
         if (cb && cb("chunk", i, total, user)) return false;
-        std::string instr = std::string(mtmd_get_marker(ctx->mtmd)) +
-            "\nTranscribe this audio exactly as spoken. Write each word in the script of the language it was spoken in: "
-            "Telugu words in Telugu script, Hindi in Devanagari, English words in English. Do not translate. "
-            "Output only the transcript.";
-        if (!vocab.empty()) instr += "\n" + vocab + ".";
-        if (!prev.empty()) {
-            // The tail of the previous piece keeps names and spellings consistent across the 28 s cuts.
-            std::string tail = prev.size() > 400 ? prev.substr(prev.size() - 400) : prev;
-            while (!tail.empty() && (static_cast<unsigned char>(tail.front()) & 0xC0) == 0x80) tail.erase(0, 1);
-            instr += "\nFor context only, the previous part ended with: \"" + tail + "\"";
-        }
-        std::string prompt = llm.apply_template(sys, instr);
-
-        llama_memory_clear(llama_get_memory(llm.ctx), true);
-        mtmd_bitmap *bmp = mtmd_bitmap_init_from_audio(pieces[i].second - pieces[i].first, pcm.data() + pieces[i].first);
-        mtmd_input_chunks *chunks = mtmd_input_chunks_init();
-        mtmd_input_text text{};
-        text.text = prompt.c_str();
-        text.text_len = prompt.size();
-        text.add_special = true;
-        text.parse_special = true;
-        const mtmd_bitmap *bmps[1] = {bmp};
-        int rc = mtmd_tokenize(ctx->mtmd, chunks, &text, bmps, 1);
-        llama_pos n_past = 0;
-        if (rc == 0) rc = mtmd_helper_eval_chunks(ctx->mtmd, llm.ctx, chunks, 0, 0, (int32_t)llama_n_batch(llm.ctx), true, &n_past);
-        mtmd_input_chunks_free(chunks);
-        mtmd_bitmap_free(bmp);
-        if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", i + 1, total, rc); return false; }
-
         std::string piece;
-        int room = std::min(768, llm.n_ctx - (int)n_past - 4);
-        if (!llm.generate(room, true, piece, cb, user, "chunk", i, total)) return false;
-        piece = strip_thinking(piece);
-        if (!piece.empty()) { result.push_back({(int64_t)(pieces[i].first / 16000), piece}); prev = piece; }
+        if (!transcribe_piece(ctx, pcm.data() + pieces[i].first, pieces[i].second - pieces[i].first, prev, vocab,
+                              cb, user, i, total, piece)) return false;
+        if (!piece.empty()) { result.push_back({(int64_t)(pieces[i].first / sve::kAudioRate), piece}); prev = piece; }
     }
     if (cb) cb("final", total, total, user);
     return true;
+}
+
+char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,
+                                const char *prev_text, sve_progress_cb cb, void *user) {
+    try {
+        if (!wav_path || start_sample < 0 || !audio_ready(ctx)) return nullptr;
+        sve::WavInfo info;
+        switch (sve::wav_probe(wav_path, info)) {
+            case sve::WavProbe::ok: break;
+            case sve::WavProbe::incomplete:
+                if (!is_final) return dup_str("{\"status\":\"wait\"}");   // header not written yet
+                sve_logf(2, "could not read %s", wav_path);
+                return nullptr;
+            case sve::WavProbe::bad: sve_logf(2, "%s is not a 16 kHz 16-bit WAV", wav_path); return nullptr;
+        }
+        const size_t start = (size_t)start_sample, total = (size_t)info.frames;
+        std::vector<float> pcm;
+        if (start < total && !sve::wav_read(wav_path, info, start, sve::kPieceTarget, pcm)) {
+            sve_logf(2, "could not read %s", wav_path);
+            return nullptr;
+        }
+        // A short read (I/O error) must not be planned as silence: plan with what was read.
+        const size_t total_read = pcm.size() < std::min(total - std::min(start, total), sve::kPieceTarget) ? start + pcm.size() : total;
+        sve::PiecePlan plan = sve::plan_next_piece(pcm, start, start, total_read, is_final != 0);
+        if (plan.kind == sve::PiecePlan::wait) return dup_str("{\"status\":\"wait\"}");
+        if (plan.kind == sve::PiecePlan::end) return dup_str("{\"status\":\"end\"}");
+        if (cb && cb("chunk", 0, 1, user)) return nullptr;
+        const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
+        std::string text;
+        if (!transcribe_piece(ctx, pcm.data() + (plan.start - start), plan.stop - plan.start, prev_text ? prev_text : "",
+                              vocab, cb, user, 0, 1, text)) return nullptr;
+        sve::json j = {{"status", "piece"}, {"start_sec", (int64_t)(plan.start / sve::kAudioRate)},
+                       {"end_sample", (int64_t)plan.stop}, {"text", text}};
+        return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
+    } catch (const std::exception &e) {
+        sve_logf(2, "transcribe failed: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        sve_logf(2, "transcribe failed");
+        return nullptr;
+    }
 }
 
 char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user) {
@@ -341,6 +345,7 @@ void sve_unload_audio(sve_ctx *) {}
 int sve_audio_loaded(const sve_ctx *) { return 0; }
 char *sve_transcribe_audio(sve_ctx *, const char *, sve_progress_cb, void *) { return nullptr; }
 char *sve_transcribe_audio_pieces(sve_ctx *, const char *, sve_progress_cb, void *) { return nullptr; }
+char *sve_transcribe_next_piece(sve_ctx *, const char *, int64_t, int, const char *, sve_progress_cb, void *) { return nullptr; }
 #endif
 
 // ---------------------------------------------------------------- notes API

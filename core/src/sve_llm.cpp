@@ -16,6 +16,7 @@ Llm::~Llm() {
 
 bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers) {
     llama_model_params mp = llama_model_default_params();
+    this->n_gpu_layers = n_gpu_layers;
     mp.n_gpu_layers = n_gpu_layers; // default load mode is mmap, which is what we want on every host
     model = llama_model_load_from_file(path, mp);
     if (!model) { sve_logf(2, "failed to load model %s", path); return false; }

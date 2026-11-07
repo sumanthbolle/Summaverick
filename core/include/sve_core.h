@@ -80,7 +80,8 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang);
 /* ---- audio understanding (audio-capable models such as Gemma 4) -------- */
 
 /* Loads the audio projector (mmproj GGUF) that belongs to the loaded LLM. Call after sve_load_llm;
- * loading another LLM unloads it. Returns 0 on success, negative if unsupported on this build. */
+ * loading another LLM unloads it. The projector runs where the LLM runs: on the GPU when the LLM was
+ * loaded with n_gpu_layers > 0, else on the CPU. Returns 0 on success, negative if unsupported on this build. */
 int  sve_load_audio(sve_ctx *ctx, const char *mmproj_path);
 void sve_unload_audio(sve_ctx *ctx);
 int  sve_audio_loaded(const sve_ctx *ctx);
@@ -92,6 +93,18 @@ char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb c
 
 /* Same as sve_transcribe_audio, as JSON pieces: [{"start_sec":0,"text":"…"},…] (start in whole seconds). */
 char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user);
+
+/* Incremental transcription of a WAV that may still be being written (the data size in its header may be
+ * 0, 0xFFFFFFFF or larger than the file; the whole frames on disk are used). Plans the next ~28 s piece
+ * from start_sample with the same cut rule, prompt, vocabulary line and previous-text context as
+ * sve_transcribe_audio_pieces (prev_text: the previous piece's text, may be NULL), and transcribes it.
+ * Returns JSON:
+ *   {"status":"piece","start_sec":N,"end_sample":N,"text":"…"}  continue from end_sample (text may be "")
+ *   {"status":"wait"}  not final and under 28 s + 3 s recorded after start_sample: call again later
+ *   {"status":"end"}   nothing left (final: under 0.5 s left)
+ * is_final: the recording has stopped; the last piece takes what is left. NULL on failure or cancel. */
+char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,
+                                const char *prev_text, sve_progress_cb cb, void *user);
 
 /* ---- notes store ------------------------------------------------------- */
 

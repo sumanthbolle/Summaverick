@@ -1,6 +1,8 @@
 // On-device-model smoke test. Env: SVE_GEMMA, SVE_MMPROJ, SVE_TEST_WAV, SVE_FIXTURE.
 // Arg: mode
 //   transcribe  transcribe SVE_TEST_WAV
+//   live        CPU, 4 threads: sve_transcribe_next_piece in a loop over SVE_TEST_WAV as if it were being
+//               recorded (copied in 10 s steps into a WAV whose header says data size 0), then final
 //   extract     doctor-visit fixture: extract, list pending suggestions, two Ask questions
 //   api         assistant C API without a model (accept/reject, medicines, medicine Ask route)
 #include "sve_core.h"
@@ -8,6 +10,7 @@
 #include "third_party/nlohmann/json.hpp"
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -704,6 +707,57 @@ static int run_api(sve_ctx *ctx) {
     return 0;
 }
 
+// Copies the WAV's samples into `dst` in steps, with a header whose data size is 0 (as while recording),
+// and asks for the next piece after every step; after the last step, is_final = 1 until "end".
+static int run_live(sve_ctx *ctx, const char *wav) {
+    std::ifstream in(wav, std::ios::binary);
+    std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    size_t data = bytes.find("data");
+    if (bytes.size() < 44 || data == std::string::npos) { fprintf(stderr, "not a WAV: %s\n", wav); return 1; }
+    const size_t head = data + 8;
+    std::string dst = std::string(getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp/") + "/sve_live_smoke.wav";
+    std::string header = bytes.substr(0, head);
+    memset(&header[data + 4], 0, 4);   // data size 0 until the recorder stops
+    { std::ofstream o(dst, std::ios::binary | std::ios::trunc); o << header; }
+    const size_t step = 10 * 16000 * 2, total = bytes.size() - head;
+    size_t written = 0;
+    int64_t cursor = 0;
+    std::string prev;
+    int pieces = 0, waits = 0;
+    double audio_sec = 0, took_sec = 0;
+    for (bool final = false;;) {
+        if (!final) {
+            size_t n = std::min(step, total - written);
+            std::ofstream o(dst, std::ios::binary | std::ios::app);
+            o.write(bytes.data() + head + written, (std::streamsize)n);
+            written += n;
+            if (written >= total) final = true;
+        }
+        for (;;) {
+            auto t0 = std::chrono::steady_clock::now();
+            json r = take(sve_transcribe_next_piece(ctx, dst.c_str(), cursor, final ? 1 : 0, prev.empty() ? nullptr : prev.c_str(), nullptr, nullptr));
+            double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            if (r.is_null()) { fprintf(stderr, "next_piece failed at %lld\n", (long long)cursor); return 1; }
+            std::string st = r.value("status", "");
+            if (st == "wait") { ++waits; printf("[recorded %5.1f s] wait (cursor %.1f s)\n", written / 32000.0, cursor / 16000.0); break; }
+            if (st == "end") { printf("[final] end at %.1f s\n", cursor / 16000.0); goto done; }
+            int64_t end = r.value("end_sample", (int64_t)0);
+            double au = (end - cursor) / 16000.0;
+            audio_sec += au; took_sec += s; ++pieces;
+            std::string text = r.value("text", "");
+            printf("[recorded %5.1f s%s] piece start_sec=%lld end_sample=%lld (%.1f s audio, %.1f s, rtf %.2f)\n  %s\n",
+                   written / 32000.0, final ? ", final" : "", (long long)r.value("start_sec", (int64_t)0), (long long)end, au, s, s / au, text.c_str());
+            if (end <= cursor) { fprintf(stderr, "cursor did not advance\n"); return 1; }
+            cursor = end;
+            if (!text.empty()) prev = text;
+        }
+    }
+done:
+    printf("LIVE OK: %d pieces, %d waits, %.1f s audio in %.1f s (rtf %.2f)\n", pieces, waits, audio_sec, took_sec, took_sec / std::max(1.0, audio_sec));
+    remove(dst.c_str());
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "transcribe";
     const char *gguf = getenv("SVE_GEMMA"), *mmproj = getenv("SVE_MMPROJ"), *wav = getenv("SVE_TEST_WAV");
@@ -716,7 +770,16 @@ int main(int argc, char **argv) {
         return fails ? 1 : 0;
     }
     if (!gguf) { fprintf(stderr, "set SVE_GEMMA\n"); return 2; }
-    if (sve_load_llm(ctx, gguf, 8192, 0, 99) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
+    const bool live = !strcmp(mode, "live");
+    // live runs as on the phone: CPU only (the projector follows), 4 threads.
+    if (sve_load_llm(ctx, gguf, 8192, live ? 4 : 0, live ? 0 : 99) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
+    if (live) {
+        if (!mmproj || !wav) { fprintf(stderr, "set SVE_MMPROJ and SVE_TEST_WAV\n"); return 2; }
+        if (sve_load_audio(ctx, mmproj) != 0) { fprintf(stderr, "sve_load_audio failed\n"); return 1; }
+        int rc = run_live(ctx, wav);
+        sve_free(ctx);
+        return rc;
+    }
     if (!strcmp(mode, "transcribe")) {
         if (!mmproj || !wav) { fprintf(stderr, "set SVE_MMPROJ and SVE_TEST_WAV\n"); return 2; }
         if (sve_load_audio(ctx, mmproj) != 0) { fprintf(stderr, "sve_load_audio failed\n"); return 1; }

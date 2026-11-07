@@ -51,6 +51,7 @@ add_library(svecore STATIC
   src/sve_medcheck.cpp
   src/sve_learn.cpp
   src/sve_store.cpp
+  src/sve_audio.cpp
 )
 target_include_directories(svecore PUBLIC include PRIVATE src)
 target_link_libraries(svecore PUBLIC llama SQLite::SQLite3)
