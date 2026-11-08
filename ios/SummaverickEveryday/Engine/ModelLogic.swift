@@ -403,6 +403,34 @@ enum RegenerateRules {
     static func outcome(written: Bool, stopped: Bool) -> Outcome {
         stopped ? .stopped : (written ? .replaced : .failed)
     }
+
+    /// Lock-screen steps of a regenerate: the title (regenerate all) and each output asked for.
+    static func steps(all: Bool, outputs: Int) -> Int { (all ? 1 : 0) + max(0, outputs) }
+
+    /// 0…1 for a regenerate's lock-screen progress: `part` (0…1) of step `done` of `steps`. No transcription share:
+    /// a regenerate starts from the stored transcript.
+    static func fraction(done: Int, part: Double, steps: Int) -> Double {
+        guard steps > 0 else { return 1 }
+        return min(1, max(0, (Double(max(0, done)) + min(1, max(0, part))) / Double(steps)))
+    }
+}
+
+/// A person's action on an existing note (Generate notes, Regenerate, Try again, Do it now, Find reminders): the
+/// continued-processing task is asked for in the tap, while the app is in front, so the run goes on after the app is
+/// closed, as after Stop.
+enum PersonRun {
+    /// Ask in the tap: the app is in front (a request from the background is refused), the AI is ready, and the run
+    /// may start: nothing runs, or only memories, which yield. Another note's notes running: the tap shows busy (or
+    /// queues the note) and that run keeps the task it has.
+    static func asksForContinuedTask(appActive: Bool, aiReady: Bool, working: Bool, memoriesOnly: Bool) -> Bool {
+        appActive && aiReady && PersonFirst.action(working: working, memoriesOnly: memoriesOnly) != .busy
+    }
+
+    /// The task is released only when nothing runs and no person's run asked for it and has not ended yet (it may be
+    /// waiting for memories to yield, so nothing runs for a moment).
+    static func releasesContinuedTask(working: Bool, personRunsPending: Int) -> Bool {
+        !working && personRunsPending <= 0
+    }
 }
 
 /// The memories of one note, written after its notes: one section at a time (sve_memories_from_section), each

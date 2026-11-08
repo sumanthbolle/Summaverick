@@ -404,6 +404,8 @@ final class ProcessingPipeline {
 
     /// "Generate notes" on a note: memory work yields first; other work still running shows the busy line.
     func regenerate(noteID: Int64) async {
+        let asked = personTapped(noteID, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
+        defer { personRunEnded(asked: asked) }
         guard await personMayStart(noteID) else { return }
         await rerun(noteID: noteID)
     }
@@ -490,6 +492,8 @@ final class ProcessingPipeline {
     /// on success.
     @discardableResult
     func regenerateOutput(noteID id: Int64, kind: OutputKind?) async -> Previous? {
+        let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
+        defer { personRunEnded(asked: asked) }
         guard await personMayStart(id) else { return nil }
         starting = true
         defer { starting = false }
@@ -518,13 +522,16 @@ final class ProcessingPipeline {
         let outcome = RegenerateRules.outcome(written: written != nil, stopped: regenerateStopped)
         if outcome == .replaced, let written, let now = await engine.note(id) {   // deleted meanwhile: nothing is written
             var previous = Previous(title: nil, outputs: [:])
-            if let t = written.title { previous.title = now.title; await engine.setTitle(id, t) }
+            if let t = written.title { previous.title = now.title; await engine.setTitle(id, t); noteTitles[id] = t }
             for k in request.kinds {
                 guard let text = written.outputs[k] else { continue }
                 if let old = now.output(k) { previous.outputs[k] = old }
                 await engine.setOutput(id, k, text)
             }
             NotificationCenter.default.post(name: .notesChanged, object: nil)
+            if noteTitles[id] == nil { noteTitles[id] = now.title }
+            // Written with the app closed: "ready", as for the first notes (nothing is posted with the app in front).
+            notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
             stage = .done
             return previous
         }
@@ -547,18 +554,28 @@ final class ProcessingPipeline {
         let covered = SectionWriter.coversAll(await engine.sections(id), pieceCount: pieces.count)
         let fromSections = await notesFromSections(covered: covered, transcript: transcript, lang: lang)
         var result = Previous(title: nil, outputs: [:])
+        // Lock-screen progress: the title (regenerate all), then each output; the heartbeat runs inside each output.
+        let steps = RegenerateRules.steps(all: request.kind == nil, outputs: request.kinds.count)
+        var done = 0
+        ContinuedWork.shared.update(fraction: RegenerateRules.fraction(done: 0, part: 0, steps: steps))
         if request.kind == nil {
             if abort.isSet { return nil }
             if !(await heatGate(id)) { return nil }
             result.title = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections)
+            done += 1
+            ContinuedWork.shared.update(fraction: RegenerateRules.fraction(done: done, part: 0, steps: steps))
         }
         for kind in request.kinds {
             if abort.isSet { return nil }
             if !(await heatGate(id)) { return nil }
             do {
-                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections)
+                let step = done
+                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections,
+                                                 fraction: { RegenerateRules.fraction(done: step, part: $0, steps: steps) })
                 guard RegenerateRules.accepts(text) else { NSLog("[sve] regenerate: empty %@", kind.title); return nil }
                 result.outputs[kind] = text
+                done += 1
+                ContinuedWork.shared.update(fraction: RegenerateRules.fraction(done: done, part: 0, steps: steps))
             } catch {
                 NSLog("[sve] regenerate failed: %@", String(describing: error))
                 return nil
@@ -585,6 +602,8 @@ final class ProcessingPipeline {
 
     /// "Try again" on a note's failed or paused banner: the usual resume path, now.
     func tryAgain(noteID id: Int64) async {
+        let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
+        defer { personRunEnded(asked: asked) }
         guard await personMayStart(id) else { return }
         interrupted.remove(id)
         heatPaused.remove(id)
@@ -785,8 +804,9 @@ final class ProcessingPipeline {
             if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
             if !(await heatGate(id)) { return }
             do {
+                let step = Self.firstOutputStep + i, total = Self.notesSteps
                 let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections,
-                                                 step: Self.firstOutputStep + i)
+                                                 fraction: { NotesProgress.fraction(outputsDone: step, part: $0, outputsTotal: total) })
                 await engine.setOutput(id, kind, text)
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
                 ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.firstOutputStep + 1 + i, outputsTotal: steps))
@@ -831,22 +851,21 @@ final class ProcessingPipeline {
     }
 
     /// One output (not stored): from the sections when `fromSections`, else (or when the sections cannot be used)
-    /// from the transcript. Throws when it fails or is cancelled (the abort flag). step: its place in the notes
-    /// steps, for the lock-screen progress (nil for a regenerate).
+    /// from the transcript. Throws when it fails or is cancelled (the abort flag). fraction: the lock-screen progress
+    /// for `part` (0…1) of this output (its place in the notes steps, or in a regenerate's); it also turns on the
+    /// heartbeat.
     private func writeOutput(_ kind: OutputKind, noteID id: Int64, transcript: String, lang: String,
-                             fromSections: Bool, step: Int? = nil) async throws -> String {
+                             fromSections: Bool, fraction: @escaping (Double) -> Double) async throws -> String {
         let engine = CoreEngine.shared
         let abort = self.abort
         stage = .generating(kind, "final", 0, 1)
         // Every few tokens (core thread): the stage line, the chunk progress, and the heartbeat.
         let progress: (String, Int, Int) -> Void = { phase, done, total in
-            if step != nil { ContinuedWork.beat() }
+            ContinuedWork.beat()
             Task { @MainActor in
                 self.stage = .generating(kind, phase, done, total)
-                if let step {
-                    let part = total > 0 ? Double(done) / Double(total) : 0
-                    ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: step, part: part, outputsTotal: Self.notesSteps))
-                }
+                let part = total > 0 ? Double(done) / Double(total) : 0
+                ContinuedWork.shared.update(fraction: fraction(part))
             }
         }
         return try await onBackend { () async throws -> String in
@@ -1172,6 +1191,8 @@ final class ProcessingPipeline {
     /// "Find reminders and tasks" on a note that was never extracted (an older recording): extraction
     /// only, with the same busy guard as a recording.
     func findReminders(noteID: Int64) async {
+        let asked = personTapped(noteID, subtitle: Stage.extracting.label)   // before any await: the app is in front
+        defer { personRunEnded(asked: asked) }
         guard await personMayStart(noteID) else { return }
         starting = true
         defer { starting = false }
@@ -1198,7 +1219,8 @@ final class ProcessingPipeline {
         }
         stage = .extracting
         do {
-            let n = try await engine.extract(noteID: noteID)
+            // On the backend for right now, retried once on the CPU when the app is closed mid-run (GPU stopped).
+            let n = try await onBackend { try await engine.extract(noteID: noteID, shouldStop: { ContinuedWork.beat(); return false }) }
             NSLog("[sve] extract added %d suggestions", n)
             stage = .done
         } catch {
@@ -1258,10 +1280,37 @@ final class ProcessingPipeline {
         else if !resuming { Task { self.finishContinuedWork() } }
     }
 
-    /// Nothing is running and nothing more can run now: release the continued-processing task.
+    /// Nothing is running and nothing more can run now: release the continued-processing task. Not while a person's
+    /// run that asked for it has not ended (it may be waiting for memories to yield, so nothing runs for a moment).
     private func finishContinuedWork() {
-        guard !isWorking else { return }
+        guard PersonRun.releasesContinuedTask(working: isWorking, personRunsPending: personRunsPending) else { return }
         ContinuedWork.shared.finish(success: interrupted.isEmpty)
+    }
+
+    /// Person's runs (personTapped) that asked for the continued-processing task and have not ended yet.
+    @ObservationIgnored private var personRunsPending = 0
+
+    /// A person's tap on a note (Generate notes, Regenerate, Try again, Do it now, Find reminders), called before the
+    /// entry point's first await, while the app is in front: asks for the continued-processing task, as
+    /// recordingStopped does, so the run goes on (with lock-screen progress) after the app is closed. Not when the run
+    /// cannot start (the AI is not ready, another note's notes run: that run keeps its task). A task already held or
+    /// asked for is kept. True when it asked: the caller passes it to personRunEnded.
+    private func personTapped(_ id: Int64, subtitle: String) -> Bool {
+        guard PersonRun.asksForContinuedTask(appActive: appIsActive, aiReady: ModelManager.shared.isReady,
+                                             working: isWorking, memoriesOnly: memoryWork) else { return false }
+        personRunsPending += 1
+        ContinuedWork.shared.begin(key: "note-\(id)", subtitle: subtitle)
+        return true
+    }
+
+    /// Every exit of a person's entry point (done, failed, stopped, busy, AI not ready, the note deleted): the task
+    /// asked for in the tap is released once nothing is left, after the caller's other defers (its busy claim), as
+    /// endBackground does. Notes still queued go next (the resume loop releases it when it ends); another run still
+    /// working keeps it.
+    private func personRunEnded(asked: Bool) {
+        if asked { personRunsPending = max(0, personRunsPending - 1) }
+        guard !resuming else { return }   // the resume loop releases it when it ends
+        if interrupted.isEmpty { Task { self.finishContinuedWork() } } else { Task { await self.resumeInterrupted() } }
     }
 
     /// Re-runs cut-off and waiting notes, oldest first, one at a time, while the app is active (or a
@@ -1532,6 +1581,8 @@ final class ProcessingPipeline {
     /// "Do it now" on a note waiting for the charger: the mark is cleared and it runs now (or next, when
     /// another note is being written).
     func doItNow(noteID id: Int64) async {
+        let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
+        defer { personRunEnded(asked: asked) }
         unmarkOvernight(id)
         parkRequested.remove(id)
         lastFailure[id] = nil
