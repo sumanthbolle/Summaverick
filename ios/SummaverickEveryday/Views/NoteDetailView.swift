@@ -545,6 +545,7 @@ struct NoteDetailView: View {
             guard !Heat.isTooHot(ProcessInfo.processInfo.thermalState) else {
                 answer = String(localized: "The phone is too warm. Try again when it has cooled down."); return
             }
+            await pipeline.yieldMemories()   // the person first: memory work stops for the answer
             do {
                 try await models.loadIntoCore()
                 let context = [n.detailed_notes, t].compactMap { $0 }.joined(separator: "\n\n")

@@ -454,6 +454,7 @@ struct AskView: View {
         generating = true
         Task {
             defer { generating = false }
+            await pipeline.yieldMemories()   // the person first: memory work stops for the answer
             do {
                 try await loadSelectedModel()
                 let a = try await CoreEngine.shared.ask(q)
@@ -521,6 +522,7 @@ struct AskView: View {
                 transcribing = false
             }
             if pipeline.isBusy { notice = .busy; return }
+            await pipeline.yieldMemories()
             do {
                 try await loadSelectedModel()
                 let pieces = try await CoreEngine.shared.transcribeAudioPieces(path: url.path)

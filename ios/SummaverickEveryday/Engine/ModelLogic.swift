@@ -338,11 +338,14 @@ enum MemoryPass {
         case gone
         /// -2: cancelled; nothing was stored and the section stays due.
         case cancelled
+        /// -3: the model call itself failed; nothing was stored and the section stays due.
+        case failed
 
         nonisolated init(result: Int32) {
             switch result {
             case 0...: self = .stored(Int(result))
             case -2: self = .cancelled
+            case -3: self = .failed
             default: self = .gone
             }
         }
@@ -353,7 +356,7 @@ enum MemoryPass {
         case finished
         /// A section call said -1: the run ends quietly, nothing more for this note now.
         case gone
-        /// `beforeEach` said no, or a call was cancelled: the sections left stay due for later.
+        /// `beforeEach` said no, or a call was cancelled or failed: the sections left stay due for later.
         case stopped
     }
 
@@ -369,9 +372,33 @@ enum MemoryPass {
                 finished += 1
                 await afterEach(finished, n)
             case .gone: return (.gone, finished)
-            case .cancelled: return (.stopped, finished)
+            case .cancelled, .failed: return (.stopped, finished)
             }
         }
         return (.finished, finished)
     }
+}
+
+/// The person comes first: memory work never makes their controls busy, and their action stops it.
+enum PersonFirst {
+    /// Whether Ask, Regenerate, Try again and Generate notes show busy. `working`: any model work runs;
+    /// `memoriesOnly`: that work is memories.
+    static func controlsBusy(working: Bool, memoriesOnly: Bool) -> Bool { working && !memoriesOnly }
+
+    enum Action: Equatable {
+        /// Nothing runs: go.
+        case start
+        /// Only memories run: stop them (the section in flight stays due), then go.
+        case stopMemoriesThenStart
+        /// Other work runs (a note's notes): busy, as before.
+        case busy
+    }
+
+    static func action(working: Bool, memoriesOnly: Bool) -> Action {
+        guard working else { return .start }
+        return memoriesOnly ? .stopMemoriesThenStart : .busy
+    }
+
+    /// Notes one memory backfill takes: one in front (the next idle pass goes on), `overnightLimit` in the background.
+    static func backfillNotes(inFront: Bool, overnightLimit: Int = 20) -> Int { inFront ? 1 : overnightLimit }
 }

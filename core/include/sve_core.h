@@ -284,8 +284,10 @@ int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
  * quote as source, linked to people and the note's topic, and to a pending reminder/task card of the same
  * note and quote. Marks the section done; a section already done returns 0 and changes nothing.
  * Returns the number of memories stored; -1 for no such note or section, bad input, or no model (for a section
- * with words); -2 on cancel (nothing stored, the section stays due). The notes and section summaries are not
- * touched: the section summary prompt and its output are the same as before memories existed. */
+ * with words); -2 on cancel (nothing stored, the section stays due); -3 when the memory model call itself fails
+ * (not a cancel: nothing stored, the section stays due). A reply that comes back but is empty or unusable marks
+ * the section done with 0. The notes and section summaries are not touched: the section summary prompt and its
+ * output are the same as before memories existed. */
 int   sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sve_progress_cb cb, void *user);
 /* Indexes of the note's sections whose memories are not made yet, e.g. "[0,2]"; "[]" when none. */
 char *sve_memory_sections_due(sve_ctx *ctx, int64_t note_id);

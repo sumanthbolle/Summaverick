@@ -54,7 +54,7 @@ struct SettingsView: View {
 
                 Section {
                     Button(role: .destructive) {
-                        if pipeline.isBusy { wipeBusy = true } else { confirmWipe = true }
+                        if pipeline.isWorking { wipeBusy = true } else { confirmWipe = true }
                     } label: {
                         HStack {
                             Text("Delete everything")
@@ -99,7 +99,7 @@ struct SettingsView: View {
                 Text(AIStatus.unsupportedMessage).font(.footnote).foregroundStyle(.secondary)
                 if models.hasFiles {   // left from an older version; never used on this phone
                     Button("Remove to free space", role: .destructive) {
-                        if pipeline.isBusy { wipeBusy = true } else { confirmRemoveAI = true }
+                        if pipeline.isWorking { wipeBusy = true } else { confirmRemoveAI = true }
                     }
                     .frame(minHeight: 44)
                 }
@@ -115,7 +115,7 @@ struct SettingsView: View {
                 AICellularToggle()
                 if status.isReady {
                     Button("Remove to free space", role: .destructive) {
-                        if pipeline.isBusy { wipeBusy = true } else { confirmRemoveAI = true }
+                        if pipeline.isWorking { wipeBusy = true } else { confirmRemoveAI = true }
                     }
                     .frame(minHeight: 44)
                 }
@@ -128,7 +128,7 @@ struct SettingsView: View {
     /// Any failure (a note left, or the core refusing) shows "Could not delete everything" with Retry.
     private func wipe() {
         guard !wiping else { return }
-        guard !pipeline.isBusy else { wipeBusy = true; return }
+        guard !pipeline.isWorking else { wipeBusy = true; return }
         wiping = true
         Task {
             let engine = CoreEngine.shared

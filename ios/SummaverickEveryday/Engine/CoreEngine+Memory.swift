@@ -8,6 +8,8 @@ extension CoreEngine {
         case unavailable
         /// -2: cancelled by `shouldStop`; nothing was stored and the section stays due.
         case cancelled
+        /// -3: the model call itself failed; nothing was stored and the section stays due.
+        case modelFailed
     }
 
     private func memoryJSON<T: Decodable>(_ type: T.Type, _ json: UnsafeMutablePointer<CChar>?) -> T? {
@@ -31,6 +33,7 @@ extension CoreEngine {
         case .stored(let n): return n
         case .gone: throw MemoryError.unavailable
         case .cancelled: throw MemoryError.cancelled
+        case .failed: throw MemoryError.modelFailed
         }
     }
 

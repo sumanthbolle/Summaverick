@@ -231,7 +231,9 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
                 sve_logf(1, "memories: section %d of note %lld does not fit", section_idx, (long long)note_id);
             } else if (!model_reply(ctx, "memories", sys, prompt, kMemoryMaxOut, 0, 1, out, w)) {
                 if (w.cancelled) return -2;
+                // The call itself failed (e.g. the GPU refused work in the background): nothing stored, still due.
                 sve_logf(1, "memories: model call failed for section %d of note %lld", section_idx, (long long)note_id);
+                return -3;
             } else {
                 json j;
                 const std::string reply = sve::strip_thinking(out);

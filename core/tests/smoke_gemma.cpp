@@ -780,6 +780,23 @@ static void run_api_memories(sve_ctx *ctx) {
     expect(take(sve_memory_get(ctx, pid)).is_null(), "memories go with their only recording");
     expect(sve_memories_from_section(ctx, note, 0, nullptr, nullptr) == -1, "memories: deleted note -> -1");
 
+    // The memory call itself fails (the stand-in returns NULL): -3, nothing stored, the section stays due; a reply
+    // that comes back but is unusable marks it done with 0.
+    int64_t fail_note = make_note(ctx, pieces, "Model failed");
+    expect(sve_note_set_sections(ctx, fail_note, json::array({sec(0, 0, 1, 0, 60), sec(1, 2, 3, 60, 120)}).dump().c_str()) == 0,
+           "model failure: two sections stored");
+    g_sve_model_reply = [](const char *phase, const char *) -> const char * { return !strcmp(phase, "memories") ? nullptr : "Yes"; };
+    expect(sve_memories_from_section(ctx, fail_note, 0, nullptr, nullptr) == -3, "model failure: the call fails -> -3");
+    expect(take(sve_memory_sections_due(ctx, fail_note)) == json::parse("[0,1]") &&
+               take(sve_memories_json(ctx, (R"({"note_id":)" + std::to_string(fail_note) + "}").c_str())).empty(),
+           "model failure: nothing stored, the section stays due");
+    g_sve_model_reply = [](const char *, const char *) -> const char * { return "I cannot help with that."; };
+    expect(sve_memories_from_section(ctx, fail_note, 0, nullptr, nullptr) == 0 &&
+               take(sve_memory_sections_due(ctx, fail_note)) == json::parse("[1]"),
+           "model failure: an unusable reply marks the section done with 0");
+    sve_note_delete(ctx, fail_note);
+    g_sve_model_reply = api_model;
+
     // Review Focus 4, as the app's memory pass runs it (ProcessingPipeline.writeMemories): the due sections are read
     // once, then written one at a time; the recording is deleted between section 0 and section 1.
     int64_t mid_note = make_note(ctx, pieces, "Deleted mid-way");

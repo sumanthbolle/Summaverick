@@ -253,6 +253,7 @@ struct TopicDetailView: View {
         summaryBusy = false
         if pipeline.isBusy { summaryBusy = true; return }
         loadingSummary = true
+        await pipeline.yieldMemories()
         defer { loadingSummary = false }
         summaryError = nil
         // Writing the summary is a model run: not while the phone is too hot.
