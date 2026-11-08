@@ -109,6 +109,10 @@
 			isa = PBXBuildFile;
 			fileRef = D58A3AD4F6AD27CF4A2AB3D8;
 		};
+		98CC0908F97C13DBC19A09B5 = {
+			isa = PBXBuildFile;
+			fileRef = 7098A4559C0419D83AAB1B2A;
+		};
 		A062B0CDA53604F5D8A7D47D = {
 			isa = PBXBuildFile;
 			fileRef = C593582C209D99DB076F4AB2;
@@ -124,6 +128,10 @@
 		A98A4FF70B48BB38E9507E50 = {
 			isa = PBXBuildFile;
 			fileRef = 5B6316DBD705D039EA15B281;
+		};
+		AD33A465D5C223FBF7C16E07 = {
+			isa = PBXBuildFile;
+			fileRef = C6E38749CC30FE0501F34CE0;
 		};
 		B3682618E8A7DB35FCEEE996 = {
 			isa = PBXBuildFile;
@@ -325,6 +333,13 @@
 			path = SummaverickEveryday/Audio/AudioRecorder.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		428A09CCDB67F6F77A72F81A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_memory.h;
+			path = ../core/src/sve_memory.h;
+			sourceTree = SOURCE_ROOT;
+		};
 		43130EEACCC981C89B012095 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -435,6 +450,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = sve_textmatch.cpp;
 			path = ../core/src/sve_textmatch.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		7098A4559C0419D83AAB1B2A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_memory.cpp;
+			path = ../core/src/sve_memory.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
 		8108122AC683F0C05267E8CD = {
@@ -591,6 +613,13 @@
 			path = SummaverickEveryday/Engine/ModelLogic.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		C6E38749CC30FE0501F34CE0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_health.cpp;
+			path = ../core/src/sve_health.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
 		CB86695FC323060A64BB0472 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -694,6 +723,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = sve_suggest.cpp;
 			path = ../core/src/sve_suggest.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		FF0A638FF345E77C239C08DA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_health.h;
+			path = ../core/src/sve_health.h;
 			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXFileReference section */
@@ -857,6 +893,8 @@
 				3C94D64FE92A566816D76B43,
 				EE7D0A38215CFAEEF0A0E2BE,
 				B785295E08BF51AAC35D02B4,
+				C6E38749CC30FE0501F34CE0,
+				FF0A638FF345E77C239C08DA,
 				CB86695FC323060A64BB0472,
 				1FB58A118DF0A48276B00C59,
 				8B7A0A18322F15224FEF40CC,
@@ -864,6 +902,8 @@
 				EFA847D5450308230934F05A,
 				8EDD6E0FBF1E227C55F144C7,
 				6013C41549784B5FC55E61C4,
+				7098A4559C0419D83AAB1B2A,
+				428A09CCDB67F6F77A72F81A,
 				A2C4910B70238965992017BD,
 				DB74CF4044569BF171D6037F,
 				CCB0BF21AAE2BA7678F1B398,
@@ -998,9 +1038,11 @@
 				1D9397B49E2B55EDE5DC3560,
 				66567DD2A6C40F6BC6CB1C24,
 				7CD85F6783D894B9047A2C67,
+				AD33A465D5C223FBF7C16E07,
 				07C4BA787A10CB869B855E1D,
 				02B6E8042D07B8525DD08CA0,
 				DACFC767C169503E4AB3CA4F,
+				98CC0908F97C13DBC19A09B5,
 				FA89EFDB7CFDC888DE748CAB,
 				CE05B940BCBE599A11AE22E8,
 				DC70A4770243CC1CA714EEB5,
