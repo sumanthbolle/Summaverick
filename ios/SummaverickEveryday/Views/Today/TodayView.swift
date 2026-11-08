@@ -1,4 +1,4 @@
-// Today (spec §6.1): greeting, suggestions waiting for a Yes, reminders for the next few days,
+// Today (spec §6.1): greeting, suggestions waiting for a Yes, memories to check, reminders for the next few days,
 // open to-dos, one insight, and a bar that jumps to Ask.
 import SwiftUI
 import UserNotifications
@@ -54,7 +54,11 @@ struct TodayView: View {
     @State private var lock = AppLock.shared
 
     @State private var loaded = false
+    /// Pending suggestions, without those shown inside a memory's card in "To check".
     @State private var suggestions: [Suggestion] = []
+    /// Memories waiting for the person to check, newest recording first.
+    @State private var queue: [ReviewItem] = []
+    @State private var showAllToCheck = false
     @State private var reminders: [Reminder] = []
     @State private var tasks: [TaskItem] = []
     @State private var insight: Insight?
@@ -83,6 +87,7 @@ struct TodayView: View {
                     }
                     if loaded && needsProfile { setupProfileCard }
                     waitingSection
+                    if !queue.isEmpty { toCheckSection }
                     remindersSection
                     tasksSection
                     if let insight { insightCard(insight) }
@@ -163,13 +168,13 @@ struct TodayView: View {
         return "\(weekday) · \(need)"
     }
 
-    /// Pending suggestions + reminders still to come today + open tasks due today or earlier.
+    /// Pending suggestions + memories to check + reminders still to come today + open tasks due today or earlier.
     private var needCount: Int {
         let cal = Calendar.current
         let todayYMD = AssistantFormat.ymd(now)
         let rem = occurrences.filter { cal.isDateInToday($0.day) && $0.date >= now }.count
         let due = tasks.filter { t in t.dueDate.map { $0 <= todayYMD } ?? false }.count
-        return suggestions.count + rem + due
+        return suggestions.count + queue.count + rem + due
     }
 
     private var occurrences: [ReminderOccurrence] {
@@ -211,6 +216,32 @@ struct TodayView: View {
                                isBusy: busyIDs.contains(s.id),
                                onAccept: { edited in beginAccept(s, edited: edited) },
                                onReject: { beginReject(s) })
+            }
+        }
+    }
+
+    /// Cards shown before "Show all": the next one moves up as each is checked.
+    private static let toCheckCollapsed = 3
+
+    private var toCheckSection: some View {
+        let shown = showAllToCheck ? queue : Array(queue.prefix(Self.toCheckCollapsed))
+        return VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("To check", count: queue.count)
+            ForEach(shown) { item in
+                MemoryReviewCard(item: item,
+                                 suggestionBusy: item.suggestion.map { busyIDs.contains($0.id) } ?? false,
+                                 suggestionStale: item.suggestion.map { staleIDs.contains($0.id) } ?? false,
+                                 onAcceptSuggestion: { s, edited in beginAccept(s, edited: edited) },
+                                 onRejectSuggestion: { s in beginReject(s) },
+                                 onPlay: { id, sec in router.openNote = (id, sec) })
+                    .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .leading).combined(with: .opacity)))
+            }
+            if queue.count > Self.toCheckCollapsed {
+                Button { withAnimation { showAllToCheck.toggle() } } label: {
+                    Text(showAllToCheck ? "Show fewer" : "Show all \(queue.count)")
+                        .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
             }
         }
     }
@@ -388,12 +419,15 @@ struct TodayView: View {
     private func reload() async {
         let e = CoreEngine.shared
         let s = await e.suggestions(status: "pending")
+        let q = await e.reviewQueue()
         let r = await e.reminders(activeOnly: true)
         let t = await e.tasks(openOnly: true)
         let i = await e.latestInsight()
         let p = await e.profile()
         let notes = await e.notes()
-        suggestions = s
+        let inCards = ReviewItem.suggestionIDsShown(in: q)
+        suggestions = s.filter { !inCards.contains($0.id) }
+        withAnimation { queue = q }
         reminders = r
         tasks = t
         insight = i.flatMap { $0.dismissed ? nil : $0 }

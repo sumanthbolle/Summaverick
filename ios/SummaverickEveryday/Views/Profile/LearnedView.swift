@@ -1,5 +1,6 @@
-// Settings → "What Summaverick has learned" (spec §6.4, §7.4): every memory item, grouped, each one
+// Settings → "What Summaverick has learned" (spec §6.4, §7.4): words and preferences, grouped, each one
 // editable in place and deletable (a visible button as well as a swipe). The person's own edit applies directly.
+// Facts from recordings are memories now: they show on their note's Remembered section and in "To check".
 import SwiftUI
 
 struct LearnedView: View {
@@ -15,8 +16,6 @@ struct LearnedView: View {
               empty: "No words yet. When you fix a word in a recording, it is added here."),
         MemoryGroup(kind: "preference", title: "Preferences",
               empty: "No preferences yet. They appear when you say Yes to one on Today."),
-        MemoryGroup(kind: "fact", title: "Facts",
-              empty: "No facts yet. They appear when you say Yes to one on Today."),
     ]
 
     @State private var items: [MemoryItem] = []

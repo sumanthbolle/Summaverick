@@ -188,14 +188,6 @@ struct SuggestionCard: View {
     let onReject: () -> Void
 
     @Environment(Router.self) private var router
-    @State private var showEdit = false
-    @State private var confirmFlagged = false
-    /// What Save in the confirmation alert sends: nil = as proposed.
-    @State private var pendingEdit: SuggestionPayload?
-    /// Set by the Edit form; acted on after the sheet has gone, so the alert can show.
-    @State private var afterEdit: (payload: SuggestionPayload?, needsConfirm: Bool)?
-    /// The person's unsaved edits, so "Edit" in the confirmation alert reopens the form with them.
-    @State private var resumeDraft: SuggestionDraft?
 
     private var s: Suggestion { suggestion }
     private func flagged(_ key: String) -> Bool { s.checkFields.contains(key) }
@@ -219,25 +211,11 @@ struct SuggestionCard: View {
             }
             details
             QuoteBlock(suggestion: s, noteTitle: noteTitle) { id, sec in router.openNote = (id, sec) }
-            buttons
+            SuggestionDecisionButtons(suggestion: s, noteTitle: noteTitle, isBusy: isBusy, onAccept: onAccept, onReject: onReject)
         }
         .padding(16)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(s.isFlagged ? Color.orange : Color.clear, lineWidth: 2))
-        .sheet(isPresented: $showEdit, onDismiss: runAfterEdit) {
-            SuggestionEditForm(suggestion: s, noteTitle: noteTitle, resume: resumeDraft) { payload, _, draft in
-                resumeDraft = draft
-                // A flagged card always asks again, edited or not: the core does not enforce the flag.
-                afterEdit = (payload, s.isFlagged)
-                showEdit = false
-            }
-        }
-        .alert("Some details could not be matched to the recording. Save anyway?", isPresented: $confirmFlagged) {
-            Button("Save") { onAccept(pendingEdit) }
-            Button("Edit") { showEdit = true }
-        }
-        .onChange(of: showEdit || confirmFlagged) { _, open in PresentationGate.shared.set("card.\(s.id)", open) }
-        .onDisappear { PresentationGate.shared.set("card.\(s.id)", false) }
     }
 
     private var header: some View {
@@ -335,6 +313,48 @@ struct SuggestionCard: View {
                 .flagHighlight(on)
             }
         }
+    }
+}
+
+// MARK: - Yes / Edit / No
+
+/// Yes / Edit / No for a suggestion, with its Edit form and the "Save anyway?" check of a flagged card.
+/// Used by SuggestionCard, and by a memory's card for the reminder or to-do made from the same words.
+struct SuggestionDecisionButtons: View {
+    let suggestion: Suggestion
+    let noteTitle: String?
+    let isBusy: Bool
+    /// Called with the edited payload, or nil when the person accepts it as proposed.
+    let onAccept: (SuggestionPayload?) -> Void
+    let onReject: () -> Void
+
+    @State private var showEdit = false
+    @State private var confirmFlagged = false
+    /// What Save in the confirmation alert sends: nil = as proposed.
+    @State private var pendingEdit: SuggestionPayload?
+    /// Set by the Edit form; acted on after the sheet has gone, so the alert can show.
+    @State private var afterEdit: (payload: SuggestionPayload?, needsConfirm: Bool)?
+    /// The person's unsaved edits, so "Edit" in the confirmation alert reopens the form with them.
+    @State private var resumeDraft: SuggestionDraft?
+
+    private var s: Suggestion { suggestion }
+
+    var body: some View {
+        buttons
+            .sheet(isPresented: $showEdit, onDismiss: runAfterEdit) {
+                SuggestionEditForm(suggestion: s, noteTitle: noteTitle, resume: resumeDraft) { payload, _, draft in
+                    resumeDraft = draft
+                    // A flagged card always asks again, edited or not: the core does not enforce the flag.
+                    afterEdit = (payload, s.isFlagged)
+                    showEdit = false
+                }
+            }
+            .alert("Some details could not be matched to the recording. Save anyway?", isPresented: $confirmFlagged) {
+                Button("Save") { onAccept(pendingEdit) }
+                Button("Edit") { showEdit = true }
+            }
+            .onChange(of: showEdit || confirmFlagged) { _, open in PresentationGate.shared.set("card.\(s.id)", open) }
+            .onDisappear { PresentationGate.shared.set("card.\(s.id)", false) }
     }
 
     // MARK: buttons

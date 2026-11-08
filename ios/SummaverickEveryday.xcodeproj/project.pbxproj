@@ -31,6 +31,10 @@
 			isa = PBXBuildFile;
 			fileRef = 9E2ACA831A68C5FC7568EFA9;
 		};
+		23C44AF0CB03B5875E813B5F = {
+			isa = PBXBuildFile;
+			fileRef = C9899E0B799571C7B3ED48D8;
+		};
 		24F70CD5F7748FDEB63B8BB1 = {
 			isa = PBXBuildFile;
 			fileRef = 3127CE4AFD13AD5C3FEDC05B;
@@ -109,6 +113,10 @@
 			isa = PBXBuildFile;
 			fileRef = DCE021A147EA4FBC88B74354;
 		};
+		8E779B106668C15FE8259AA8 = {
+			isa = PBXBuildFile;
+			fileRef = 7935477EC4D13C03471CB46B;
+		};
 		8FB71A3DAC10CCF263B21175 = {
 			isa = PBXBuildFile;
 			fileRef = 393C976A09F0C61C5B20B9DE;
@@ -164,6 +172,10 @@
 		C2AF1244993225350DDBDC94 = {
 			isa = PBXBuildFile;
 			fileRef = 0B08BF124CD0B2571A98FABA;
+		};
+		C6FD0A316798F1839A28EADE = {
+			isa = PBXBuildFile;
+			fileRef = F66379AE26FB07E2A8BA2BDA;
 		};
 		CC6072ABC305C2EE3EDCFF78 = {
 			isa = PBXBuildFile;
@@ -492,6 +504,13 @@
 			path = ../core/src/sve_memory.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
+		7935477EC4D13C03471CB46B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = MemoryReviewCard.swift;
+			path = SummaverickEveryday/Views/Memory/MemoryReviewCard.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		8108122AC683F0C05267E8CD = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -653,6 +672,13 @@
 			path = ../core/src/sve_health.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
+		C9899E0B799571C7B3ED48D8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = MemoryCardView.swift;
+			path = SummaverickEveryday/Views/Memory/MemoryCardView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		CB86695FC323060A64BB0472 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -737,6 +763,13 @@
 			path = ../core/src/sve_llm.h;
 			sourceTree = SOURCE_ROOT;
 		};
+		F66379AE26FB07E2A8BA2BDA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = NoteMemoriesSection.swift;
+			path = SummaverickEveryday/Views/Memory/NoteMemoriesSection.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		FB9B4C78668184CF16F3ABA6 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -814,6 +847,16 @@
 			name = Views/Components;
 			sourceTree = "<group>";
 		};
+		3EC16C5E440AEDC2F8EC5F6A = {
+			isa = PBXGroup;
+			children = (
+				C9899E0B799571C7B3ED48D8,
+				7935477EC4D13C03471CB46B,
+				F66379AE26FB07E2A8BA2BDA,
+			);
+			name = Views/Memory;
+			sourceTree = "<group>";
+		};
 		518DA81DB9B99529C0C0AEBE = {
 			isa = PBXGroup;
 			children = (
@@ -872,6 +915,7 @@
 				BECA9321D0D66DAD007659AB,
 				3A82B61681BFF18BB638B388,
 				14170FB9E149C3DD932A78DD,
+				3EC16C5E440AEDC2F8EC5F6A,
 				DA0A32E81D9A4713BC65BFBC,
 				F86C9C201E773F26CECBA845,
 				29A1CD6197C4EBF318C20726,
@@ -1069,6 +1113,9 @@
 				B65B60C3D1ED1A91BF301F39,
 				7145186EECA51AD6A675CA64,
 				25A6412A3165EE7261515DB6,
+				23C44AF0CB03B5875E813B5F,
+				8E779B106668C15FE8259AA8,
+				C6FD0A316798F1839A28EADE,
 				F5DF4BFB0174304CA2197095,
 				F7662F48E1C4D62499CCA46C,
 				E0F7CCE6E724B4A99DCD35CB,

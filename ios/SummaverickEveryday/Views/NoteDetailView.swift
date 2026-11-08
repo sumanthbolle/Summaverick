@@ -39,6 +39,8 @@ struct NoteDetailView: View {
     @State private var extracted = true
     /// What the last successful regenerate replaced, for Undo; kept until the note is left.
     @State private var undo: ProcessingPipeline.Previous?
+    /// A memory's ▶ for another recording: opened on top of this one.
+    @State private var openMoment: NoteMoment?
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -131,6 +133,8 @@ struct NoteDetailView: View {
                     }
 
                     ChaptersView(chapters: chapters, onPlay: audioPath.map { p in { sec in playChapter(p, sec) } })
+
+                    NoteMemoriesSection(noteID: noteID) { id, sec in playMoment(id, sec) }
 
                     if isThisNoteBusy {
                         if !isRegeneratingHere {
@@ -238,6 +242,7 @@ struct NoteDetailView: View {
             Button("Delete", role: .destructive) { deleteNote() }
         }
         .sheet(item: $shareItem) { ActivityView(items: $0.items) }
+        .navigationDestination(item: $openMoment) { NoteDetailView(noteID: $0.noteID, startAt: $0.startSec) }
         .sheet(item: $fixing) { target in
             FixWordSheet(pieceText: target.text) { word in Task { await saveWord(word) } }
         }
@@ -582,6 +587,16 @@ struct NoteDetailView: View {
         seekPending = false
         highlighted = pieces.lastIndex(where: { $0.startSec <= sec })
         play(path, from: sec)
+    }
+
+    /// A memory's ▶: this recording plays from that second (the transcript shows the piece); another one opens.
+    private func playMoment(_ id: Int64, _ sec: Int) {
+        guard id == noteID else { stopPlayback(); openMoment = NoteMoment(noteID: id, startSec: sec); return }
+        if let p = audioPath { playChapter(p, sec) } else { highlighted = pieces.lastIndex(where: { $0.startSec <= sec }) }
+        if !pieces.isEmpty {
+            tab = .transcript
+            scrollRequest = highlighted ?? pieces.lastIndex(where: { $0.startSec <= sec })
+        }
     }
 
     private func play(_ path: String, from sec: Int?) {

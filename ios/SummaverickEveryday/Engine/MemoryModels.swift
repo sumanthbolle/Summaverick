@@ -19,6 +19,13 @@ struct CheckedField: Codable, Equatable, Hashable {
         kind = c.lenient(.kind) ?? ""; text = c.lenient(.text) ?? ""; asWritten = c.lenient(.asWritten)
     }
     enum CodingKeys: String, CodingKey { case kind, text, asWritten = "as_written" }
+
+    /// What the app shows: a name said in Telugu and written in English shows the written form; everything
+    /// else (and a name without one) shows the words as said. The quote itself is always shown as said.
+    var shown: String {
+        let w = asWritten?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return kind == "name" && !w.isEmpty ? w : text
+    }
 }
 
 /// Where a memory was said: the recording, the second and the words.
@@ -117,6 +124,14 @@ struct ReviewItem: Identifiable, Decodable, Equatable {
         suggestion = try decoder.container(keyedBy: CodingKeys.self).lenient(.suggestion)
     }
     enum CodingKeys: String, CodingKey { case suggestion }
+
+    /// The linked card is shown inside the memory's card (one card per thing) only while it is pending.
+    var showsSuggestionRow: Bool { suggestion?.status == "pending" }
+
+    /// Suggestions shown inside a queued memory's card, so the separate suggestion list leaves them out.
+    static func suggestionIDsShown(in queue: [ReviewItem]) -> Set<Int64> {
+        Set(queue.compactMap { $0.showsSuggestionRow ? $0.suggestion?.id : nil })
+    }
 }
 
 /// Which memory rows to read (sve_memories_json). Every field left nil is not sent. Newest first; wrong and

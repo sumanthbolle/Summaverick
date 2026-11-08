@@ -2951,17 +2951,6 @@
         }
       }
     },
-    "Facts": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "విషయాలు"
-          }
-        }
-      },
-      "comment": "Group of facts Summaverick remembers"
-    },
     "From your routine: %@ — change if needed": {
       "localizations": {
         "te": {
@@ -3014,16 +3003,6 @@
         }
       },
       "comment": "Setup: go to the next step"
-    },
-    "No facts yet. They appear when you say Yes to one on Today.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఇంకా విషయాలు లేవు. ఈరోజు పేజీలో మీరు అవును అన్నప్పుడు ఇక్కడ కనిపిస్తాయి."
-          }
-        }
-      }
     },
     "No medicines yet.": {
       "localizations": {
@@ -4768,6 +4747,440 @@
           "stringUnit": {
             "state": "translated",
             "value": "గుర్తుంచుకోవాల్సినవి వెతుకుతోంది… %2$lld భాగాల్లో %1$lldవ భాగం"
+          }
+        }
+      }
+    },
+    "To check": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To check"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సరిచూడాల్సినవి"
+          }
+        }
+      },
+      "comment": "Today section: memories waiting for the person to check"
+    },
+    "Keep": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఉంచండి"
+          }
+        }
+      },
+      "comment": "Memory review: the memory is right"
+    },
+    "Wrong": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrong"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తప్పు"
+          }
+        }
+      },
+      "comment": "Memory review: the memory is wrong"
+    },
+    "Delete memory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete memory"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "జ్ఞాపకాన్ని తొలగించండి"
+          }
+        }
+      }
+    },
+    "Remembered": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remembered"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "గుర్తుంచుకున్నవి"
+          }
+        }
+      },
+      "comment": "Note section: memories made from this recording"
+    },
+    "New": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొత్తది"
+          }
+        }
+      },
+      "comment": "Badge on a memory not checked yet"
+    },
+    "I may have heard this wrong. Listen?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I may have heard this wrong. Listen?"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నేను ఇది తప్పుగా విని ఉండవచ్చు. వింటారా?"
+          }
+        }
+      }
+    },
+    "Said on %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Said on %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ న చెప్పారు"
+          }
+        }
+      },
+      "comment": "%@ is a date"
+    },
+    "Due %@ (\"%@\")": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Due %@ (\"%@\")"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "గడువు %@ (\"%@\")"
+          }
+        }
+      },
+      "comment": "First %@ is a date, second %@ the words that were said for it"
+    },
+    "Waiting for you to check": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for you to check"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు సరిచూడటం కోసం వేచి ఉంది"
+          }
+        }
+      }
+    },
+    "Health-related: please check": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health-related: please check"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆరోగ్యానికి సంబంధించినది: దయచేసి సరిచూడండి"
+          }
+        }
+      }
+    },
+    "Was %@, now %@, said on %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Was %@, now %@, said on %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముందు %@, ఇప్పుడు %@, %@ న చెప్పారు"
+          }
+        }
+      },
+      "comment": "Old wording, new wording, the date it was said"
+    },
+    "Was %@, now %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Was %@, now %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముందు %@, ఇప్పుడు %@"
+          }
+        }
+      },
+      "comment": "Old wording, new wording"
+    },
+    "Fact": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fact"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "విషయం"
+          }
+        }
+      },
+      "comment": "Memory type"
+    },
+    "Decision": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decision"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నిర్ణయం"
+          }
+        }
+      },
+      "comment": "Memory type"
+    },
+    "Promise": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Promise"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇచ్చిన మాట"
+          }
+        }
+      },
+      "comment": "Memory type"
+    },
+    "Question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Question"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రశ్న"
+          }
+        }
+      },
+      "comment": "Memory type"
+    },
+    "Person": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Person"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వ్యక్తి"
+          }
+        }
+      },
+      "comment": "Memory type"
+    },
+    "Idea": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idea"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆలోచన"
+          }
+        }
+      },
+      "comment": "Memory type"
+    },
+    "Names": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Names"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పేర్లు"
+          }
+        }
+      }
+    },
+    "Remind me": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remind me"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నాకు గుర్తు చేయండి"
+          }
+        }
+      },
+      "comment": "A reminder made from the same words as a memory"
+    },
+    "Make a task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make a task"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చేయాల్సిన పనిగా పెట్టండి"
+          }
+        }
+      },
+      "comment": "A to-do made from the same words as a memory"
+    },
+    "Show all %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show all %lld"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్నీ చూపించు (%lld)"
+          }
+        }
+      },
+      "comment": "%lld is how many there are"
+    },
+    "Show fewer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show fewer"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొన్ని మాత్రమే చూపించు"
+          }
+        }
+      }
+    },
+    "This follows your medicine list. Change it there.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This follows your medicine list. Change it there."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇది మీ మందుల జాబితాను అనుసరిస్తుంది. అక్కడే మార్చండి."
+          }
+        }
+      }
+    },
+    "This memory was removed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This memory was removed."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ జ్ఞాపకం తీసివేయబడింది."
           }
         }
       }
