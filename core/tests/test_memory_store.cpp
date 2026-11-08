@@ -173,6 +173,17 @@ std::string make_v0() {
     return p;
 }
 
+void raw_exec(const std::string &p, const char *sql) {
+    sqlite3 *db = nullptr;
+    sqlite3_open(p.c_str(), &db);
+    char *e = nullptr;
+    if (sqlite3_exec(db, sql, nullptr, nullptr, &e) != SQLITE_OK) {
+        std::fprintf(stderr, "raw: %s\n", e ? e : "?");
+        sqlite3_free(e);
+    }
+    sqlite3_close(db);
+}
+
 int user_version(const std::string &p) {
     sqlite3 *db = nullptr;
     sqlite3_open(p.c_str(), &db);
@@ -230,14 +241,14 @@ TEST(migrate_old_db_adds_conf_and_moves_facts) {
         CHECK_EQ(s.search_memory("salt", 5).size(), (size_t)0);
         CHECK_EQ(s.search_memory_items("salt", 5).size(), (size_t)1);
     }
-    CHECK_EQ(user_version(p), 1);
+    CHECK_EQ(user_version(p), 2);
     {
         Store again(p);
         CHECK(again.ok());
         CHECK_EQ(again.memory_items(json::object()).size(), (size_t)1);
         CHECK_EQ(again.memory("").size(), (size_t)2);
     }
-    CHECK_EQ(user_version(p), 1);
+    CHECK_EQ(user_version(p), 2);
     drop_db(p);
 }
 
@@ -369,8 +380,8 @@ TEST(memory_filter_excludes_wrong_and_superseded) {
     CHECK_EQ(s.memory_items({{"limit", 1}}).size(), (size_t)1);
 
     json found = s.search_memory_items("Rent", 10);
-    CHECK_EQ(found.size(), (size_t)2);  // current and the promise; not wrong, not superseded
-    for (const auto &m : found) CHECK(m["id"] == cur || m["id"] == promise);
+    CHECK_EQ(found.size(), (size_t)1);  // the current one: not wrong, not superseded, not the queued promise
+    CHECK(found.size() == 1 && found[0]["id"] == cur);
 
     json c = s.memory_item(cur);
     CHECK(c["checked"].is_array());
@@ -462,4 +473,124 @@ TEST(pieces_store_optional_conf) {
     CHECK_EQ(ps.size(), (size_t)2);
     CHECK(ps[0]["conf"].is_number() && ps[0]["conf"].get<double>() == 0.75);
     CHECK(ps[1].contains("conf") && ps[1]["conf"].is_null());
+}
+
+TEST(sweep_moves_facts_written_at_version_1_once) {
+    std::string p = make_v0();
+    { Store s(p); CHECK_EQ(s.memory_items(json::object()).size(), (size_t)1); }
+    // A build at version 1 accepted a fact card into the old table.
+    raw_exec(p, "INSERT INTO memory(kind,text,note_id,created_at) VALUES ('fact','Gas cylinder due on 20th',1,1762500000);"
+                "INSERT INTO memory(kind,text,note_id,created_at) VALUES ('fact','Wifi password on the fridge',NULL,1762500001);"
+                "PRAGMA user_version=1;");
+    {
+        Store s(p);
+        CHECK(s.ok());
+        CHECK(s.memory("fact").empty());
+        CHECK_EQ(s.memory("").size(), (size_t)2);  // preference and vocab untouched
+        json items = s.memory_items(json::object());
+        CHECK_EQ(items.size(), (size_t)3);
+        for (const auto &m : items) CHECK(m["origin"] == "migrated" && m["review"] == "kept");
+        CHECK_EQ(s.search_memory_items("cylinder", 5).size(), (size_t)1);
+        CHECK_EQ(s.search_memory_items("cylinder", 5)[0]["sources"].size(), (size_t)1);
+        CHECK(s.search_memory_items("Wifi", 5)[0]["sources"].empty());
+    }
+    CHECK_EQ(user_version(p), 2);
+    // Done: a later old-table fact (none are written now) is not swept again.
+    raw_exec(p, "INSERT INTO memory(kind,text,note_id,created_at) VALUES ('fact','Not swept',NULL,1762500002);");
+    {
+        Store s(p);
+        CHECK_EQ(s.memory_items(json::object()).size(), (size_t)3);
+        CHECK_EQ(s.memory("fact").size(), (size_t)1);
+    }
+    drop_db(p);
+}
+
+TEST(accepted_fact_card_becomes_memory_with_source) {
+    Store s(":memory:");
+    int64_t n = s.create("Plumber", "en", nullptr, "tx", 10);
+    int64_t sid = s.add_suggestion(json::parse("{\"kind\":\"fact\",\"payload\":{\"text\":\"Spare key is with Ravi\"},"
+                                               "\"quote\":\"keep the spare key with Ravi\",\"start_sec\":42,\"note_id\":" +
+                                               std::to_string(n) + "}"));
+    int64_t m = s.add_accepted_fact(s.suggestion(sid), "Spare key is with Ravi");
+    CHECK(m > 0);
+    json r = s.memory_item(m);
+    CHECK(r.is_object());
+    if (r.is_object()) {
+        CHECK_EQ(r["type"].get<std::string>(), std::string("fact"));
+        CHECK_EQ(r["review"].get<std::string>(), std::string("kept"));
+        CHECK_EQ(r["origin"].get<std::string>(), std::string("recording"));
+        CHECK_EQ(r["suggestion_id"].get<int64_t>(), sid);
+        CHECK_EQ(r["said_date"].get<std::string>().size(), (size_t)10);
+        CHECK_EQ(r["sources"].size(), (size_t)1);
+        CHECK_EQ(r["sources"][0]["quote"].get<std::string>(), std::string("keep the spare key with Ravi"));
+        CHECK_EQ(r["sources"][0]["start_sec"].get<int64_t>(), (int64_t)42);
+    }
+    CHECK(s.memory("fact").empty());
+    CHECK(sve::relevant_block(s, "spare key", 2000).find("- Spare key is with Ravi\n") != std::string::npos);
+    // A card whose note is gone stores nothing.
+    json orphan = s.suggestion(sid);
+    orphan["note_id"] = n + 99;
+    CHECK(s.add_accepted_fact(orphan, "x") < 0);
+    CHECK_EQ(s.memory_items(json::object()).size(), (size_t)1);
+    // A card without a note keeps no source.
+    int64_t loose = s.add_accepted_fact(json::parse(R"({"kind":"fact","payload":{"text":"Gate code 4411"}})"), "Gate code 4411");
+    CHECK(loose > 0 && s.memory_item(loose)["sources"].empty());
+    CHECK(s.remove(n));
+    CHECK(s.memory_item(m).is_null());
+    CHECK(s.memory_item(loose).is_object());
+}
+
+TEST(learned_memory_lists_new_layer_facts) {
+    std::string p = make_v0();
+    {
+        Store s(p);
+        int64_t kept = s.add_memory_item({{"type", "fact"}, {"text", "Bank visit on Monday"}, {"review", "kept"}});
+        s.add_memory_item({{"type", "fact"}, {"text", "Queued fact"}, {"queue", 1}});
+        s.add_memory_item({{"type", "fact"}, {"text", "Wrong fact"}, {"review", "wrong"}});
+        s.add_memory_item({{"type", "promise"}, {"text", "Call Amma"}});
+        int64_t med = s.add_medicine(json::parse(R"({"name":"Telma"})"));
+        s.add_memory_item({{"type", "fact"}, {"text", "Telma"}, {"origin", "medicine"}, {"medicine_id", med}});
+        json all = s.learned_memory("");
+        CHECK_EQ(all.size(), (size_t)4);  // preference, vocab, migrated fact, kept fact
+        json facts = s.learned_memory("fact");
+        CHECK_EQ(facts.size(), (size_t)2);
+        if (facts.size() == 2) {
+            CHECK_EQ(facts[0]["text"].get<std::string>(), std::string("Dr Rao: less salt"));
+            CHECK_EQ(facts[0]["kind"].get<std::string>(), std::string("fact"));
+            CHECK_EQ(facts[0]["note_id"].get<int64_t>(), (int64_t)1);
+            CHECK_EQ(facts[0]["created_at"].get<int64_t>(), (int64_t)1762400000);
+            CHECK(facts[0]["id"].get<int64_t>() < 0);
+            CHECK_EQ(facts[1]["id"].get<int64_t>(), -kept);
+            CHECK(facts[1]["note_id"].is_null());
+        }
+        CHECK_EQ(s.learned_memory("vocab"), s.memory("vocab"));
+        CHECK_EQ(s.learned_memory("preference"), s.memory("preference"));
+        CHECK(s.update_learned_memory(-kept, "Bank visit on Tuesday"));
+        CHECK_EQ(s.memory_item(kept)["review"].get<std::string>(), std::string("corrected"));
+        CHECK_EQ(s.memory_item(kept)["text"].get<std::string>(), std::string("Bank visit on Tuesday"));
+        int64_t pref = s.memory("preference")[0]["id"].get<int64_t>();
+        CHECK(s.update_learned_memory(pref, "Very short answers"));
+        CHECK_EQ(s.memory("preference")[0]["text"].get<std::string>(), std::string("Very short answers"));
+        CHECK(s.delete_learned_memory(-kept));
+        CHECK(s.memory_item(kept).is_null());
+        CHECK(!s.delete_learned_memory(-kept));
+        CHECK(s.delete_learned_memory(pref));
+        CHECK_EQ(s.learned_memory("").size(), (size_t)2);
+    }
+    drop_db(p);
+}
+
+TEST(queued_memories_never_reach_a_prompt) {
+    Store s(":memory:");
+    int64_t q = s.add_memory_item({{"type", "fact"}, {"text", "Sugar level was high"}, {"queue", 1}, {"health", 1}});
+    int64_t k = s.add_memory_item({{"type", "fact"}, {"text", "Sugar shop closes at nine"}, {"review", "kept"}});
+    CHECK(q > 0 && k > 0);
+    json r = s.search_memory_items("Sugar", 10);
+    CHECK_EQ(r.size(), (size_t)1);
+    CHECK(r.size() == 1 && r[0]["id"] == k);
+    std::string b = sve::relevant_block(s, "sugar", 2000);
+    CHECK(b.find("Sugar shop closes at nine") != std::string::npos);
+    CHECK(b.find("Sugar level was high") == std::string::npos);
+    CHECK(s.update_memory_item(q, {{"queue", 0}, {"review", "kept"}}));  // reviewed: now it may be used
+    CHECK_EQ(s.search_memory_items("Sugar", 10).size(), (size_t)2);
 }

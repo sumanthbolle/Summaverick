@@ -260,7 +260,8 @@ int   sve_topic_merge(sve_ctx *ctx, int64_t from_id, int64_t into_id);
  * topic's notes; cached until a new recording joins the topic or another lang is asked for. */
 char *sve_topic_summary(sve_ctx *ctx, int64_t topic_id, const char *lang, sve_progress_cb cb, void *user);
 
-/* kind "fact" | "preference" | "vocab" | NULL/"" = all: [{"id","kind","text","note_id","created_at"}] */
+/* kind "fact" | "preference" | "vocab" | NULL/"" = all: [{"id","kind","text","note_id","created_at"}].
+   Facts come from the memory layer with negative ids; update/delete accept those ids. */
 char *sve_memory_json(sve_ctx *ctx, const char *kind);
 int   sve_memory_update(sve_ctx *ctx, int64_t id, const char *text);
 int   sve_memory_delete(sve_ctx *ctx, int64_t id);

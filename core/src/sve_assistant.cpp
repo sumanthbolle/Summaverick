@@ -336,6 +336,7 @@ int64_t accept_memory(sve::Store &st, const json &s, const json &p, const std::s
     if (kind == "vocab")
         for (const auto &m : st.memory("vocab"))
             if (lower(jstr(m, "text")) == lower(t)) return jint(m, "id", -1);
+    if (kind == "fact") return st.add_accepted_fact(s, t);  // the memory layer, with the card's quote as source
     json note = int_or_null(s, "note_id");
     return st.add_memory(kind, t, note.is_null() ? std::nullopt : std::optional<int64_t>(note.get<int64_t>()));
 }
@@ -791,13 +792,13 @@ int sve_topic_merge(sve_ctx *ctx, int64_t from_id, int64_t into_id) {
     return guard("sve_topic_merge", -1, [&] { return ctx && ctx->store->merge_topics(from_id, into_id) ? 0 : -1; });
 }
 char *sve_memory_json(sve_ctx *ctx, const char *kind) {
-    return guard<char *>("sve_memory_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->memory(kind ? kind : "")) : nullptr; });
+    return guard<char *>("sve_memory_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->learned_memory(kind ? kind : "")) : nullptr; });
 }
 int sve_memory_update(sve_ctx *ctx, int64_t id, const char *text) {
-    return guard("sve_memory_update", -1, [&] { return ctx && text && *text && ctx->store->update_memory(id, text) ? 0 : -1; });
+    return guard("sve_memory_update", -1, [&] { return ctx && text && *text && ctx->store->update_learned_memory(id, text) ? 0 : -1; });
 }
 int sve_memory_delete(sve_ctx *ctx, int64_t id) {
-    return guard("sve_memory_delete", -1, [&] { return ctx && ctx->store->delete_memory(id) ? 0 : -1; });
+    return guard("sve_memory_delete", -1, [&] { return ctx && ctx->store->delete_learned_memory(id) ? 0 : -1; });
 }
 
 int64_t sve_vocab_add(sve_ctx *ctx, const char *term) {

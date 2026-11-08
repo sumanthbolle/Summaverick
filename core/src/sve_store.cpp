@@ -190,32 +190,38 @@ Store::Store(const std::string &path) {
     if (!exec(kSchema) || !migrate()) { sqlite3_close(db_); db_ = nullptr; }
 }
 
-bool Store::migrate() {
-    json v = query_rows("PRAGMA user_version", {});
-    int64_t version = v.empty() ? 0 : v[0].value("user_version", (int64_t)0);
-    if (version >= 1) return true;
-    if (!exec("BEGIN")) return false;
-    // A database from before the memory layer: its pieces table has no conf column.
-    bool ok = true;
-    if (query_rows("SELECT 1 FROM pragma_table_info('transcript_pieces') WHERE name='conf'", {}).empty())
-        ok = exec("ALTER TABLE transcript_pieces ADD COLUMN conf REAL");
-    // Facts move to memories, kept as they were; preferences and vocabulary stay in `memory`.
-    json facts = ok ? query_rows("SELECT id,text,note_id,created_at,date(created_at,'unixepoch','localtime') AS said "
-                                 "FROM memory WHERE kind='fact' ORDER BY id", {})
-                    : json::array();
+// Moves every old-table fact into memories, kept as it was (preferences and vocabulary stay in
+// `memory`). Its recording becomes a source (no quote was kept), so deleting the recording still
+// removes it. Each old row is deleted only after it is copied. Runs inside migrate's transaction.
+bool Store::move_old_facts() {
+    json facts = query_rows("SELECT id,text,note_id,created_at,date(created_at,'unixepoch','localtime') AS said "
+                            "FROM memory WHERE kind='fact' ORDER BY id", {});
     for (const auto &f : facts) {
-        if (!ok) break;
         int64_t id = add_memory_item({{"type", "fact"}, {"text", f["text"]}, {"said_date", f["said"]}, {"origin", "migrated"},
                                       {"review", "kept"}, {"confidence", "high"}, {"first_seen", f["created_at"]},
                                       {"last_seen", f["created_at"]}, {"created_at", f["created_at"]}});
-        ok = id > 0;
-        // Its recording becomes a source (no quote was kept), so deleting the recording still removes it.
-        if (ok && !f["note_id"].is_null())
-            ok = run("INSERT INTO memory_sources(memory_id,note_id,start_sec,quote) SELECT ?,id,0,'' FROM notes WHERE id=?",
-                     {id, f["note_id"]});
-        ok = ok && run("DELETE FROM memory WHERE id=?", {f["id"]});  // only rows copied above leave the old table
+        if (id <= 0) return false;
+        if (!f["note_id"].is_null() &&
+            !run("INSERT INTO memory_sources(memory_id,note_id,start_sec,quote) SELECT ?,id,0,'' FROM notes WHERE id=?",
+                 {id, f["note_id"]}))
+            return false;
+        if (!run("DELETE FROM memory WHERE id=?", {f["id"]})) return false;
     }
-    ok = ok && exec("PRAGMA user_version=1");
+    return true;
+}
+
+bool Store::migrate() {
+    json v = query_rows("PRAGMA user_version", {});
+    int64_t version = v.empty() ? 0 : v[0].value("user_version", (int64_t)0);
+    if (version >= 2) return true;
+    if (!exec("BEGIN")) return false;
+    bool ok = true;
+    // 0 -> 1: a database from before the memory layer; its pieces table has no conf column.
+    if (version < 1 && query_rows("SELECT 1 FROM pragma_table_info('transcript_pieces') WHERE name='conf'", {}).empty())
+        ok = exec("ALTER TABLE transcript_pieces ADD COLUMN conf REAL");
+    // 0 -> 1 moves the facts; 1 -> 2 sweeps, once, facts a build at version 1 still wrote to `memory`
+    // (accepted fact cards, before they went to memories).
+    ok = ok && move_old_facts() && exec("PRAGMA user_version=2");
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
 }
@@ -789,12 +795,55 @@ json Store::search_memory_items(const std::string &q, int limit) {
     if (fq.empty()) return json::array();
     json rows = query_rows((std::string("SELECT ") + kMemoryCols +
                             " FROM memories_fts f JOIN memories m ON m.id=f.rowid WHERE memories_fts MATCH ? "
-                            "AND m.review<>'wrong' AND m.superseded_by IS NULL ORDER BY bm25(memories_fts) LIMIT ?")
+                            "AND m.review<>'wrong' AND m.superseded_by IS NULL AND m.queue=0 ORDER BY bm25(memories_fts) LIMIT ?")
                                .c_str(),
                            {fq, limit});
     json out = json::array();
     for (auto &r : rows) out.push_back(memory_full(r));
     return out;
+}
+
+int64_t Store::add_accepted_fact(const json &suggestion, const std::string &text) {
+    json note = jget(suggestion, "note_id");
+    json said = nullptr;
+    if (note.is_number_integer()) {
+        json r = query_rows("SELECT date(created_at,'unixepoch','localtime') AS d FROM notes WHERE id=?", {note});
+        if (r.empty()) { err_ = "the card's note is gone"; return -1; }
+        said = r[0]["d"];
+    }
+    int64_t id = add_memory_item({{"type", "fact"}, {"text", text}, {"review", "kept"}, {"said_date", said},
+                                  {"suggestion_id", jget(suggestion, "id")}});
+    if (id <= 0 || !note.is_number_integer()) return id;
+    json start = jget(suggestion, "start_sec"), quote = jget(suggestion, "quote");
+    if (!add_memory_source(id, note.get<int64_t>(), start.is_number_integer() ? start.get<int64_t>() : 0,
+                           quote.is_string() ? quote.get<std::string>() : "", std::nullopt)) {
+        std::string e = err_;
+        delete_memory_item(id);
+        err_ = e;
+        return -1;
+    }
+    return id;
+}
+
+json Store::learned_memory(const std::string &kind) {
+    json out = memory(kind);
+    if (!kind.empty() && kind != "fact") return out;
+    json facts = query_rows(
+        "SELECT -m.id AS id, 'fact' AS kind, m.text AS text, "
+        "(SELECT s.note_id FROM memory_sources s WHERE s.memory_id=m.id ORDER BY s.note_id, s.start_sec LIMIT 1) AS note_id, "
+        "m.first_seen AS created_at FROM memories m WHERE m.type='fact' AND m.origin<>'medicine' AND m.review<>'wrong' "
+        "AND m.superseded_by IS NULL AND m.queue=0 ORDER BY m.first_seen, m.id", {});
+    for (auto &f : facts) out.push_back(f);
+    return out;
+}
+
+bool Store::update_learned_memory(int64_t id, const std::string &text) {
+    if (id < 0) return update_memory_item(-id, {{"text", text}, {"review", "corrected"}});
+    return update_memory(id, text);
+}
+
+bool Store::delete_learned_memory(int64_t id) {
+    return id < 0 ? delete_memory_item(-id) : delete_memory(id);
 }
 
 bool Store::mark_memory_section(int64_t note_id, int idx) {

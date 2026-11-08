@@ -341,6 +341,17 @@ static void run_api_fixes2(sve_ctx *ctx, int64_t note) {
     printf("--- ask fact\n%s\n", f.dump(2).c_str());
     expect(f.is_object() && f["medicine"] == true && contains(f["answer"], "Take the iron tablet with orange juice"),
            "medicine fact quoted verbatim");
+    // An accepted fact card is a kept memory with the card's quote; the Learned list shows and deletes it.
+    json fc = {{"kind", "fact"}, {"note_id", note}, {"quote", "Keep the spare key with Ravi"}, {"start_sec", 0},
+               {"payload", {{"text", "Spare key is with Ravi"}}}};
+    int64_t fm = sve_suggestion_accept(ctx, add_sugg(ctx, fc), nullptr);
+    json fmem = ctx->store->memory_item(fm);
+    expect(fm > 0 && fmem.is_object() && fmem["review"] == "kept" && fmem["sources"].size() == 1 &&
+           fmem["sources"][0]["quote"] == "Keep the spare key with Ravi" && ctx->store->memory("fact").empty(),
+           "accepted fact card becomes a memory with its quote");
+    bool listed = false;
+    for (const auto &m : take(sve_memory_json(ctx, "fact"))) listed = listed || (m["id"] == -fm && m["text"] == "Spare key is with Ravi");
+    expect(listed && sve_memory_delete(ctx, -fm) == 0 && ctx->store->memory_item(fm).is_null(), "Learned lists and deletes memory facts");
     run_api_fixes3(ctx, note);
 }
 

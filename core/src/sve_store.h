@@ -105,10 +105,20 @@ public:
     json memory_item(int64_t id);  // null when missing; adds "history" (rows it superseded, newest first)
     bool update_memory_item(int64_t id, const json &fields);  // whitelisted columns only
     bool delete_memory_item(int64_t id);
-    json search_memory_items(const std::string &q, int limit);  // current rows only: not wrong, not superseded
+    // Rows that may reach a prompt: not wrong, not superseded, not waiting in the review queue.
+    json search_memory_items(const std::string &q, int limit);
     bool mark_memory_section(int64_t note_id, int idx);
     json memory_sections_done(int64_t note_id);  // [idx,…]
     json notes_needing_memories(int limit);      // [note id,…]: a section without memories done, newest first
+    // An accepted fact card becomes a kept fact memory whose source is the card's note, start_sec and
+    // quote (said_date = the note's local date). No transaction of its own. -1 on failure.
+    int64_t add_accepted_fact(const json &suggestion, const std::string &text);
+    // The Learned list, in the old row shape {id,kind,text,note_id,created_at}: preferences and vocab
+    // from `memory`, plus current fact memories (not medicine, wrong, superseded or queued) with
+    // id = -(memories.id). update/delete take those ids; an edited memory becomes review 'corrected'.
+    json learned_memory(const std::string &kind_or_empty);
+    bool update_learned_memory(int64_t id, const std::string &text);
+    bool delete_learned_memory(int64_t id);
 
     int64_t add_medicine(const json &m);
     json medicines();
@@ -134,8 +144,10 @@ public:
     bool wipe_assistant();
 
 private:
-    // PRAGMA user_version upgrades, run once per version at open (0 -> 1: pieces conf, facts to memories).
+    // PRAGMA user_version upgrades, run once per version at open (0 -> 1: pieces conf, facts to memories;
+    // 1 -> 2: facts written to the old table at version 1 move too).
     bool migrate();
+    bool move_old_facts();
     json memory_full(json row);  // adds sources and people to a memories row
     bool exec(const char *sql);
     json query_rows(const char *sql, const std::vector<json> &binds);
