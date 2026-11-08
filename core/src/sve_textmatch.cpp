@@ -72,7 +72,7 @@ const Word kNumWords[] = {
     {"ఇరవై", N_SMALL, 20}, {"ముప్పై", N_SMALL, 30}, {"నలభై", N_SMALL, 40}, {"యాభై", N_SMALL, 50},
     {"ఏభై", N_SMALL, 50}, {"అరవై", N_SMALL, 60}, {"డెబ్బై", N_SMALL, 70}, {"డెబ్భై", N_SMALL, 70},
     {"ఎనభై", N_SMALL, 80}, {"తొంభై", N_SMALL, 90},
-    {"వంద", N_HUNDRED, 100}, {"నూరు", N_HUNDRED, 100}, {"వందలు", N_HUNDRED, 100}, {"వందల", N_HUNDRED, 100},
+    {"వంద", N_HUNDRED, 100}, {"నూట", N_HUNDRED, 100}, {"నూరు", N_HUNDRED, 100}, {"వందలు", N_HUNDRED, 100}, {"వందల", N_HUNDRED, 100},
     {"వెయ్యి", N_THOUSAND, 1000}, {"వేయి", N_THOUSAND, 1000}, {"వేలు", N_THOUSAND, 1000}, {"వేల", N_THOUSAND, 1000},
     {"లక్ష", N_LAKH, 100000}, {"లక్షలు", N_LAKH, 100000}, {"లక్షల", N_LAKH, 100000},
 };
@@ -178,6 +178,19 @@ template <size_t N>
 const char *lookup(const Map (&m)[N], const std::string &t) {
     for (auto &e : m) if (t == e.w) return e.c;
     return nullptr;
+}
+
+// English words that are also ordinary words; they map only next to a date cue.
+bool ambiguous_english(const std::string &t) {
+    static const char *k[] = {"may", "mar", "march", "sat", "sun", "mon", "wed", "sep", "dec"};
+    for (auto *w : k) if (t == w) return true;
+    return false;
+}
+
+bool is_date_cue(const std::string &t, bool before) {
+    if (num_of(t).kind != N_NONE || (!t.empty() && t[0] >= '0' && t[0] <= '9')) return true;
+    if (lookup(kWeekdays, t) || lookup(kMonths, t)) return true;
+    return before && (t == "on" || t == "next" || t == "this" || t == "last" || t == "వచ్చే");
 }
 
 bool is_fact(const std::string &t) {
@@ -306,7 +319,10 @@ std::vector<std::string> match_tokens(const std::string &s) {
             if (k == p.w.size()) { out.push_back(p.c); i += p.w.size() - 1; done = true; break; }
         }
         if (done) continue;
-        if (const char *c = lookup(kWeekdays, t[i])) out.push_back(c);
+        bool plain = ambiguous_english(t[i]) &&
+                     !((i > 0 && is_date_cue(t[i - 1], true)) || (i + 1 < t.size() && is_date_cue(t[i + 1], false)));
+        if (plain) out.push_back(t[i]);
+        else if (const char *c = lookup(kWeekdays, t[i])) out.push_back(c);
         else if (const char *c2 = lookup(kMonths, t[i])) out.push_back(c2);
         else if (const char *c3 = lookup(kRelative1, t[i])) out.push_back(c3);
         else out.push_back(t[i]);

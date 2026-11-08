@@ -34,7 +34,7 @@ TEST(match_tokens_numbers) {
 TEST(match_tokens_days) {
     CHECK_EQ(canonical_facts("శుక్రవారం"), V{"wd5"});
     CHECK_EQ(canonical_facts("Friday"), V{"wd5"});
-    CHECK_EQ(canonical_facts("sun"), V{"wd7"});
+    CHECK_EQ(canonical_facts("Sunday"), V{"wd7"});
     CHECK_EQ(canonical_facts("సోమవారం"), V{"wd1"});
     CHECK_EQ(canonical_facts("రేపు"), V{"rd1"});
     CHECK_EQ(canonical_facts("day after tomorrow"), V{"rd2"});
@@ -46,6 +46,19 @@ TEST(match_tokens_days) {
     CHECK_EQ(canonical_facts("15 January"), (V{"15", "mo1"}));
     CHECK_EQ(canonical_facts("డిసెంబర్"), V{"mo12"});
     CHECK_EQ(canonical_facts("call Ravi"), V{});
+}
+TEST(ambiguous_english_words_need_a_date_cue) {
+    CHECK_EQ(canonical_facts("I may come"), V{});
+    CHECK_EQ(canonical_facts("he sat down"), V{});
+    CHECK_EQ(canonical_facts("the sun is out"), V{});
+    CHECK_EQ(canonical_facts("march forward"), V{});
+    CHECK_EQ(canonical_facts("may 5"), (V{"mo5", "5"}));
+    CHECK_EQ(canonical_facts("5 may"), (V{"5", "mo5"}));
+    CHECK_EQ(canonical_facts("on sat"), V{"wd6"});
+    CHECK_EQ(canonical_facts("next sun"), V{"wd7"});
+    CHECK_EQ(canonical_facts("monday"), V{"wd1"});
+    CHECK_EQ(canonical_facts("september"), V{"mo9"});
+    CHECK_EQ(canonical_facts("నూట యాభై"), V{"150"});
 }
 TEST(name_in_case_endings) {
     CHECK(name_in("రవి", "రవికి చెప్పాను"));
