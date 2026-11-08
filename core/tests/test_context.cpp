@@ -67,7 +67,7 @@ TEST(relevant_block_labels_sources) {
     Store s(":memory:");
     int64_t id = s.create("Doctor visit", "en", "a.m4a", "tx", 300);
     s.set_pieces(id, json::parse(R"([{"start_sec":252,"text":"reduce salt in food"},{"start_sec":65,"text":"also less salt at dinner"}])"));
-    s.add_memory("fact", "avoids salt", std::nullopt);
+    s.add_memory_item({{"type", "fact"}, {"text", "avoids salt"}, {"review", "kept"}});
     std::string b = sve::relevant_block(s, "salt", 2000);
     CHECK(b.find("[S1]") != std::string::npos);
     CHECK(b.find("[S2]") != std::string::npos);
@@ -91,7 +91,7 @@ TEST(relevant_budget_keeps_labels_and_sources_in_sync) {
     json ps = json::array();
     for (int i = 0; i < 6; i++) ps.push_back({{"start_sec", i * 10}, {"text", "salt note number " + std::to_string(i) + " with some padding words"}});
     s.set_pieces(id, ps);
-    s.add_memory("fact", "avoids salt", std::nullopt);
+    s.add_memory_item({{"type", "fact"}, {"text", "avoids salt"}, {"review", "kept"}});
     for (size_t budget : {60u, 120u, 200u, 400u, 2000u}) {
         sve::Relevant r = sve::relevant(s, "salt", budget);
         CHECK(r.block.size() <= budget);
@@ -155,7 +155,7 @@ TEST(transcription_vocab_line_from_saved_vocab) {
     Store s(":memory:");
     CHECK_EQ(sve::transcription_vocab_line(s), std::string());
     s.add_medicine(json::parse(R"({"name":"Amlodipine","dose":"5 mg"})"));
-    s.add_memory("fact", "avoids salt", std::nullopt);
+    s.add_memory_item({{"type", "fact"}, {"text", "avoids salt"}, {"review", "kept"}});
     CHECK_EQ(sve::transcription_vocab_line(s), std::string());  // vocabulary only
     s.add_memory("vocab", "Lakshmi", std::nullopt);
     s.add_memory("vocab", "Dr Rao", std::nullopt);

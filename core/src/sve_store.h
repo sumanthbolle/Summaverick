@@ -83,11 +83,32 @@ public:
     bool rename_topic(int64_t id, const std::string &name);
     bool merge_topics(int64_t from, int64_t into);
 
+    // Old learned-memory table: preferences and vocabulary (facts moved to `memories` at migration).
     int64_t add_memory(const std::string &kind, const std::string &text, std::optional<int64_t> note_id);
     json memory(const std::string &kind_or_empty);
     json search_memory(const std::string &q, int limit);
     bool update_memory(int64_t id, const std::string &text);
     bool delete_memory(int64_t id);
+
+    // Memory layer (`memories` and its sources, people/topic links and per-section progress).
+    // Row JSON: {id,type,text,who,to_whom,due_date,due_text,said_date,checked:[..],confidence,review,
+    // queue,health,done,importance,origin,medicine_id,suggestion_id,superseded_by,conflict_with,
+    // first_seen,last_seen,sources:[{note_id,start_sec,quote,title}],people:[{id,name,role}]}.
+    // A recording/chat/migrated memory is deleted with its last source (note delete, clear_transcript).
+    int64_t add_memory_item(const json &row);
+    bool add_memory_source(int64_t memory_id, int64_t note_id, int64_t start_sec, const std::string &quote,
+                           std::optional<double> conf);
+    bool link_memory_entity(int64_t memory_id, int64_t topic_id, const std::string &role);
+    // filter: note_id, types [], reviews [], queue 0/1, include_wrong (false), include_superseded (false),
+    // limit. Newest first. Listing "wrong" in reviews includes wrong rows.
+    json memory_items(const json &filter);
+    json memory_item(int64_t id);  // null when missing; adds "history" (rows it superseded, newest first)
+    bool update_memory_item(int64_t id, const json &fields);  // whitelisted columns only
+    bool delete_memory_item(int64_t id);
+    json search_memory_items(const std::string &q, int limit);  // current rows only: not wrong, not superseded
+    bool mark_memory_section(int64_t note_id, int idx);
+    json memory_sections_done(int64_t note_id);  // [idx,…]
+    json notes_needing_memories(int limit);      // [note id,…]: a section without memories done, newest first
 
     int64_t add_medicine(const json &m);
     json medicines();
@@ -108,11 +129,14 @@ public:
     bool was_extracted(int64_t note_id);
 
     // Deletes everything the assistant stored, in one transaction: profile and other assistant settings,
-    // medicines, memory, reminders, tasks, topics and links, suggestions, decisions, insights, transcript
-    // pieces. Notes and other settings are kept (the host deletes notes). Not nested in begin().
+    // medicines, memory, memories (with sources, links, progress), reminders, tasks, topics and links,
+    // suggestions, decisions, insights, transcript pieces. Notes and other settings are kept (the host deletes notes). Not nested in begin().
     bool wipe_assistant();
 
 private:
+    // PRAGMA user_version upgrades, run once per version at open (0 -> 1: pieces conf, facts to memories).
+    bool migrate();
+    json memory_full(json row);  // adds sources and people to a memories row
     bool exec(const char *sql);
     json query_rows(const char *sql, const std::vector<json> &binds);
     bool run(const char *sql, const std::vector<json> &binds, int64_t *last_id = nullptr);

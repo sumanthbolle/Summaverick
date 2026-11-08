@@ -291,6 +291,9 @@ TEST(wipe_clears_everything) {
     CHECK(s.add_suggestion(json::parse(R"({"kind":"task","payload":{"text":"x"}})")) > 0);
     CHECK(s.add_memory("vocab", "Amlodipine", std::nullopt) > 0);
     CHECK(s.add_memory("fact", "Lives in Guntur", note) > 0);
+    int64_t mem = s.add_memory_item(json::parse(R"({"type":"promise","text":"Call Amma on Sunday"})"));
+    CHECK(mem > 0 && s.add_memory_source(mem, note, 0, "Call Amma on Sunday", std::nullopt));
+    CHECK(s.link_memory_entity(mem, topic, "topic") && s.mark_memory_section(note, 0));
     CHECK(s.log_decision("reminder", "decision", "", "yes"));
     CHECK(s.add_insight("Walk more", note) > 0);
 
@@ -307,6 +310,8 @@ TEST(wipe_clears_everything) {
     CHECK(s.suggestions("").empty());
     CHECK(s.memory("").empty());
     CHECK(s.search_memory("Amlodipine", 5).empty());
+    CHECK(s.memory_items(json::parse(R"({"include_wrong":true,"include_superseded":true})")).empty());
+    CHECK(s.memory_sections_done(note).empty());
     CHECK(s.decisions("", "", 10).empty());
     CHECK(s.latest_insight().is_null());
     CHECK(s.pieces(note).empty());

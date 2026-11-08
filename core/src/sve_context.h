@@ -27,7 +27,7 @@ struct Relevant {
     json sources;  // [{"label":"S1","note_id":..,"start_sec":..,"title":..}], exactly the labels in block
 };
 
-// Memory facts and transcript pieces matching `query`, within max_bytes. Whole items only
+// Memories (current, not wrong) and transcript pieces matching `query`, within max_bytes. Whole items only
 // (pieces first, then facts); an oversized first piece is included truncated.
 Relevant relevant(Store &store, const std::string &query, size_t max_bytes);
 

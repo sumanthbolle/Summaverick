@@ -92,7 +92,7 @@ struct Selection {
 // Single source of truth for what relevant_block labels and relevant_sources returns.
 Selection select_relevant(Store &store, const std::string &query) {
     Selection sel;
-    sel.facts = texts(store.search_memory(query, 5));
+    sel.facts = texts(store.search_memory_items(query, 5));  // current memories: not wrong, not superseded
     json p = store.search_pieces(query, 6);
     if (p.is_array()) sel.pieces = p;
     return sel;

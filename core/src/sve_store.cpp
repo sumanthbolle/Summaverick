@@ -41,7 +41,7 @@ END;
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS transcript_pieces (
     note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-    idx INTEGER NOT NULL, start_sec INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL,
+    idx INTEGER NOT NULL, start_sec INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, conf REAL,
     PRIMARY KEY(note_id, idx)
 );
 CREATE TABLE IF NOT EXISTS sections (
@@ -120,6 +120,56 @@ CREATE TRIGGER IF NOT EXISTS memory_au AFTER UPDATE ON memory BEGIN
   INSERT INTO memory_fts(memory_fts,rowid,text) VALUES ('delete',old.id,old.text);
   INSERT INTO memory_fts(rowid,text) VALUES (new.id,new.text);
 END;
+CREATE TABLE IF NOT EXISTS memories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL CHECK(type IN ('fact','decision','promise','question','person','idea')),
+    text TEXT NOT NULL, who TEXT, to_whom TEXT, due_date TEXT, due_text TEXT, said_date TEXT,
+    checked TEXT NOT NULL DEFAULT '[]',
+    confidence TEXT NOT NULL DEFAULT 'high' CHECK(confidence IN ('high','low')),
+    review TEXT NOT NULL DEFAULT 'new' CHECK(review IN ('new','kept','corrected','wrong')),
+    queue INTEGER NOT NULL DEFAULT 0, health INTEGER NOT NULL DEFAULT 0, done INTEGER NOT NULL DEFAULT 0,
+    importance REAL NOT NULL DEFAULT 0,
+    origin TEXT NOT NULL DEFAULT 'recording' CHECK(origin IN ('recording','chat','medicine','migrated')),
+    medicine_id INTEGER REFERENCES medicines(id) ON DELETE CASCADE,
+    suggestion_id INTEGER REFERENCES suggestions(id) ON DELETE SET NULL,
+    superseded_by INTEGER REFERENCES memories(id) ON DELETE SET NULL,
+    conflict_with INTEGER REFERENCES memories(id) ON DELETE SET NULL,
+    first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, last_used INTEGER, created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS memory_sources (
+    memory_id INTEGER NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE, start_sec INTEGER NOT NULL,
+    quote TEXT NOT NULL, conf REAL, PRIMARY KEY(memory_id, note_id, start_sec)
+);
+CREATE TABLE IF NOT EXISTS memory_entities (
+    memory_id INTEGER NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    topic_id INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK(role IN ('who','to_whom','mentioned','topic')), PRIMARY KEY(memory_id, topic_id, role)
+);
+CREATE TABLE IF NOT EXISTS memory_progress (
+    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE, section_idx INTEGER NOT NULL,
+    PRIMARY KEY(note_id, section_idx)
+);
+CREATE INDEX IF NOT EXISTS memory_sources_note ON memory_sources(note_id);
+CREATE INDEX IF NOT EXISTS memory_entities_topic ON memory_entities(topic_id);
+-- A memory backed only by recordings goes with its last source (note delete cascades here).
+CREATE TRIGGER IF NOT EXISTS memory_sources_ad AFTER DELETE ON memory_sources BEGIN
+  DELETE FROM memories WHERE id=old.memory_id AND origin IN ('recording','chat','migrated')
+    AND NOT EXISTS (SELECT 1 FROM memory_sources WHERE memory_id=old.memory_id);
+END;
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+    text, content='memories', content_rowid='id', tokenize='unicode61 remove_diacritics 0'
+);
+CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+  INSERT INTO memories_fts(rowid,text) VALUES (new.id,new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+  INSERT INTO memories_fts(memories_fts,rowid,text) VALUES ('delete',old.id,old.text);
+END;
+CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE OF text ON memories BEGIN
+  INSERT INTO memories_fts(memories_fts,rowid,text) VALUES ('delete',old.id,old.text);
+  INSERT INTO memories_fts(rowid,text) VALUES (new.id,new.text);
+END;
 CREATE TABLE IF NOT EXISTS decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, field TEXT NOT NULL,
     from_value TEXT, to_value TEXT, created_at INTEGER NOT NULL
@@ -137,7 +187,37 @@ Store::Store(const std::string &path) {
         if (db_) { sqlite3_close(db_); db_ = nullptr; }
         return;
     }
-    if (!exec(kSchema)) { sqlite3_close(db_); db_ = nullptr; }
+    if (!exec(kSchema) || !migrate()) { sqlite3_close(db_); db_ = nullptr; }
+}
+
+bool Store::migrate() {
+    json v = query_rows("PRAGMA user_version", {});
+    int64_t version = v.empty() ? 0 : v[0].value("user_version", (int64_t)0);
+    if (version >= 1) return true;
+    if (!exec("BEGIN")) return false;
+    // A database from before the memory layer: its pieces table has no conf column.
+    bool ok = true;
+    if (query_rows("SELECT 1 FROM pragma_table_info('transcript_pieces') WHERE name='conf'", {}).empty())
+        ok = exec("ALTER TABLE transcript_pieces ADD COLUMN conf REAL");
+    // Facts move to memories, kept as they were; preferences and vocabulary stay in `memory`.
+    json facts = ok ? query_rows("SELECT id,text,note_id,created_at,date(created_at,'unixepoch','localtime') AS said "
+                                 "FROM memory WHERE kind='fact' ORDER BY id", {})
+                    : json::array();
+    for (const auto &f : facts) {
+        if (!ok) break;
+        int64_t id = add_memory_item({{"type", "fact"}, {"text", f["text"]}, {"said_date", f["said"]}, {"origin", "migrated"},
+                                      {"review", "kept"}, {"confidence", "high"}, {"first_seen", f["created_at"]},
+                                      {"last_seen", f["created_at"]}, {"created_at", f["created_at"]}});
+        ok = id > 0;
+        // Its recording becomes a source (no quote was kept), so deleting the recording still removes it.
+        if (ok && !f["note_id"].is_null())
+            ok = run("INSERT INTO memory_sources(memory_id,note_id,start_sec,quote) SELECT ?,id,0,'' FROM notes WHERE id=?",
+                     {id, f["note_id"]});
+        ok = ok && run("DELETE FROM memory WHERE id=?", {f["id"]});  // only rows copied above leave the old table
+    }
+    ok = ok && exec("PRAGMA user_version=1");
+    if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
+    return exec("COMMIT");
 }
 
 Store::~Store() { if (db_) sqlite3_close(db_); }
@@ -325,7 +405,7 @@ static bool is_flag_col(const std::string &n) {
     return n == "done" || n == "active" || n == "from_deleted" || n == "dismissed";
 }
 static bool is_json_col(const std::string &n) {
-    return n == "times" || n == "check_fields" || n == "payload";
+    return n == "times" || n == "check_fields" || n == "payload" || n == "checked";
 }
 
 json Store::query_rows(const char *sql, const std::vector<json> &binds) {
@@ -393,15 +473,16 @@ bool Store::set_pieces(int64_t note_id, const json &pieces) {
     int idx = 0;
     for (const auto &p : pieces) {
         if (!ok) break;
-        ok = run("INSERT INTO transcript_pieces(note_id,idx,start_sec,text) VALUES(?,?,?,?)",
-                 {note_id, idx++, jget(p, "start_sec", 0), jget(p, "text", "")});
+        json conf = jget(p, "conf");
+        ok = run("INSERT INTO transcript_pieces(note_id,idx,start_sec,text,conf) VALUES(?,?,?,?,?)",
+                 {note_id, idx++, jget(p, "start_sec", 0), jget(p, "text", ""), conf.is_number() ? conf : json(nullptr)});
     }
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
 }
 
 json Store::pieces(int64_t note_id) {
-    return query_rows("SELECT idx,start_sec,text FROM transcript_pieces WHERE note_id=? ORDER BY idx", {note_id});
+    return query_rows("SELECT idx,start_sec,text,conf FROM transcript_pieces WHERE note_id=? ORDER BY idx", {note_id});
 }
 
 json Store::search_pieces(const std::string &q, int limit) {
@@ -532,6 +613,9 @@ bool Store::merge_topics(int64_t from, int64_t into) {
         query_rows("SELECT id FROM topics WHERE id=?", {into}).empty()) return false;
     if (!exec("BEGIN")) return false;
     bool ok = run("INSERT OR IGNORE INTO note_topics(note_id,topic_id) SELECT note_id,? FROM note_topics WHERE topic_id=?", {into, from}) &&
+              // Memory links move too: deleting `from` would otherwise cascade them away.
+              run("INSERT OR IGNORE INTO memory_entities(memory_id,topic_id,role) SELECT memory_id,?,role FROM memory_entities "
+                  "WHERE topic_id=?", {into, from}) &&
               run("DELETE FROM topics WHERE id=?", {from}) &&
               run("UPDATE topics SET summary_stale=1 WHERE id=?", {into});
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
@@ -567,6 +651,171 @@ bool Store::update_memory(int64_t id, const std::string &text) {
 
 bool Store::delete_memory(int64_t id) {
     return run("DELETE FROM memory WHERE id=?", {id}) && sqlite3_changes(db_) > 0;
+}
+
+// memories -------------------------------------------------------------------
+
+static const char *kMemoryCols =
+    "m.id AS id, m.type AS type, m.text AS text, m.who AS who, m.to_whom AS to_whom, m.due_date AS due_date, "
+    "m.due_text AS due_text, m.said_date AS said_date, m.checked AS checked, m.confidence AS confidence, "
+    "m.review AS review, m.queue AS queue, m.health AS health, m.done AS done, m.importance AS importance, "
+    "m.origin AS origin, m.medicine_id AS medicine_id, m.suggestion_id AS suggestion_id, "
+    "m.superseded_by AS superseded_by, m.conflict_with AS conflict_with, m.first_seen AS first_seen, "
+    "m.last_seen AS last_seen";
+
+// Columns update_memory_item may change; id, origin, first_seen and created_at are fixed at insert.
+static const char *kMemoryEditable[] = {"type", "text", "who", "to_whom", "due_date", "due_text", "said_date", "checked",
+                                        "confidence", "review", "queue", "health", "done", "importance", "medicine_id",
+                                        "suggestion_id", "superseded_by", "conflict_with", "last_seen", "last_used"};
+
+int64_t Store::add_memory_item(const json &row) {
+    json text = jget(row, "text");
+    if (!text.is_string() || text.get<std::string>().empty()) { err_ = "memory text is required"; return -1; }
+    json now = now_j();
+    json first = jget(row, "first_seen", now);
+    int64_t id = -1;
+    bool ok = run("INSERT INTO memories(type,text,who,to_whom,due_date,due_text,said_date,checked,confidence,review,queue,health,"
+                  "done,importance,origin,medicine_id,suggestion_id,superseded_by,conflict_with,first_seen,last_seen,last_used,"
+                  "created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  {jget(row, "type"), text, jget(row, "who"), jget(row, "to_whom"), jget(row, "due_date"), jget(row, "due_text"),
+                   jget(row, "said_date"), jtext(jget(row, "checked"), false), jget(row, "confidence", "high"),
+                   jget(row, "review", "new"), jget(row, "queue", 0), jget(row, "health", 0), jget(row, "done", 0),
+                   jget(row, "importance", 0.0), jget(row, "origin", "recording"), jget(row, "medicine_id"),
+                   jget(row, "suggestion_id"), jget(row, "superseded_by"), jget(row, "conflict_with"), first,
+                   jget(row, "last_seen", first), jget(row, "last_used"), jget(row, "created_at", now)},
+                  &id);
+    return ok ? id : -1;
+}
+
+bool Store::add_memory_source(int64_t memory_id, int64_t note_id, int64_t start_sec, const std::string &quote,
+                              std::optional<double> conf) {
+    // The same source twice is not an error; a missing memory or note is (foreign keys).
+    return run("INSERT INTO memory_sources(memory_id,note_id,start_sec,quote,conf) VALUES(?,?,?,?,?) "
+               "ON CONFLICT(memory_id,note_id,start_sec) DO NOTHING",
+               {memory_id, note_id, start_sec, quote, conf ? json(*conf) : json(nullptr)});
+}
+
+bool Store::link_memory_entity(int64_t memory_id, int64_t topic_id, const std::string &role) {
+    return run("INSERT INTO memory_entities(memory_id,topic_id,role) VALUES(?,?,?) "
+               "ON CONFLICT(memory_id,topic_id,role) DO NOTHING", {memory_id, topic_id, role});
+}
+
+json Store::memory_full(json row) {
+    json id = row["id"];
+    row["sources"] = query_rows("SELECT s.note_id AS note_id, s.start_sec AS start_sec, s.quote AS quote, n.title AS title "
+                                "FROM memory_sources s JOIN notes n ON n.id=s.note_id WHERE s.memory_id=? "
+                                "ORDER BY n.created_at, s.note_id, s.start_sec", {id});
+    row["people"] = query_rows("SELECT t.id AS id, t.name AS name, e.role AS role FROM memory_entities e "
+                               "JOIN topics t ON t.id=e.topic_id WHERE e.memory_id=? AND t.kind='person' ORDER BY e.rowid", {id});
+    if (!row["checked"].is_array()) row["checked"] = json::array();
+    return row;
+}
+
+json Store::memory_items(const json &filter) {
+    std::string sql = std::string("SELECT ") + kMemoryCols + " FROM memories m WHERE 1=1";
+    std::vector<json> binds;
+    auto in_list = [&](const char *col, const json &vals) {
+        if (!vals.is_array() || vals.empty()) return;
+        sql += std::string(" AND m.") + col + " IN (";
+        for (size_t i = 0; i < vals.size(); i++) {
+            sql += i ? ",?" : "?";
+            binds.push_back(vals[i]);
+        }
+        sql += ")";
+    };
+    json note = jget(filter, "note_id");
+    if (note.is_number_integer()) {
+        sql += " AND m.id IN (SELECT memory_id FROM memory_sources WHERE note_id=?)";
+        binds.push_back(note);
+    }
+    json types = jget(filter, "types"), reviews = jget(filter, "reviews");
+    in_list("type", types);
+    in_list("review", reviews);
+    json queue = jget(filter, "queue");
+    if (queue.is_number_integer() || queue.is_boolean()) {
+        sql += " AND m.queue=?";
+        binds.push_back(queue);
+    }
+    bool wants_wrong = jget(filter, "include_wrong", false) == true;
+    if (reviews.is_array())
+        for (const auto &r : reviews) if (r == "wrong") wants_wrong = true;
+    if (!wants_wrong) sql += " AND m.review<>'wrong'";
+    if (jget(filter, "include_superseded", false) != true) sql += " AND m.superseded_by IS NULL";
+    json limit = jget(filter, "limit");
+    sql += " ORDER BY m.last_seen DESC, m.id DESC LIMIT ?";
+    binds.push_back(limit.is_number_integer() ? limit : json(-1));
+    json out = json::array();
+    for (auto &r : query_rows(sql.c_str(), binds)) out.push_back(memory_full(r));
+    return out;
+}
+
+json Store::memory_item(int64_t id) {
+    json r = query_rows((std::string("SELECT ") + kMemoryCols + " FROM memories m WHERE m.id=?").c_str(), {id});
+    if (r.empty()) return nullptr;
+    json row = memory_full(r[0]);
+    // Older versions: every row whose superseded_by chain ends here, the one it replaced directly first.
+    json hist = query_rows((std::string("WITH RECURSIVE older(id,depth) AS (SELECT id,1 FROM memories WHERE superseded_by=?1 "
+                                        "UNION SELECT x.id,o.depth+1 FROM memories x JOIN older o ON x.superseded_by=o.id "
+                                        "WHERE o.depth<1000) SELECT ") +
+                            kMemoryCols + " FROM memories m JOIN older o ON o.id=m.id "
+                                          "ORDER BY o.depth, m.first_seen DESC, m.id DESC")
+                               .c_str(),
+                           {id});
+    row["history"] = json::array();
+    for (auto &h : hist) row["history"].push_back(memory_full(h));
+    return row;
+}
+
+bool Store::update_memory_item(int64_t id, const json &fields) {
+    if (!fields.is_object()) return false;
+    std::string sets;
+    std::vector<json> binds;
+    for (const char *col : kMemoryEditable) {
+        if (!fields.contains(col)) continue;
+        sets += std::string(sets.empty() ? "" : ",") + col + "=?";
+        binds.push_back(std::strcmp(col, "checked") == 0 ? jtext(fields[col], false) : fields[col]);
+    }
+    if (sets.empty()) return false;
+    binds.push_back(id);
+    return run(("UPDATE memories SET " + sets + " WHERE id=?").c_str(), binds) && sqlite3_changes(db_) > 0;
+}
+
+bool Store::delete_memory_item(int64_t id) {
+    return run("DELETE FROM memories WHERE id=?", {id}) && sqlite3_changes(db_) > 0;
+}
+
+json Store::search_memory_items(const std::string &q, int limit) {
+    std::string fq = to_fts(q);
+    if (fq.empty()) return json::array();
+    json rows = query_rows((std::string("SELECT ") + kMemoryCols +
+                            " FROM memories_fts f JOIN memories m ON m.id=f.rowid WHERE memories_fts MATCH ? "
+                            "AND m.review<>'wrong' AND m.superseded_by IS NULL ORDER BY bm25(memories_fts) LIMIT ?")
+                               .c_str(),
+                           {fq, limit});
+    json out = json::array();
+    for (auto &r : rows) out.push_back(memory_full(r));
+    return out;
+}
+
+bool Store::mark_memory_section(int64_t note_id, int idx) {
+    return run("INSERT INTO memory_progress(note_id,section_idx) VALUES(?,?) ON CONFLICT(note_id,section_idx) DO NOTHING",
+               {note_id, idx});
+}
+
+json Store::memory_sections_done(int64_t note_id) {
+    json out = json::array();
+    for (const auto &r : query_rows("SELECT section_idx FROM memory_progress WHERE note_id=? ORDER BY section_idx", {note_id}))
+        out.push_back(r["section_idx"]);
+    return out;
+}
+
+json Store::notes_needing_memories(int limit) {
+    json out = json::array();
+    for (const auto &r : query_rows("SELECT n.id AS id FROM notes n WHERE EXISTS (SELECT 1 FROM sections s WHERE s.note_id=n.id "
+                                    "AND NOT EXISTS (SELECT 1 FROM memory_progress p WHERE p.note_id=s.note_id AND p.section_idx=s.idx)) "
+                                    "ORDER BY n.created_at DESC, n.id DESC LIMIT ?", {limit}))
+        out.push_back(r["id"]);
+    return out;
 }
 
 // medicines ------------------------------------------------------------------
@@ -669,7 +918,9 @@ json Store::sections(int64_t note_id) {
 
 bool Store::clear_transcript(int64_t note_id) {
     if (!exec("BEGIN")) return false;
-    bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id});
+    bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id}) &&
+              run("DELETE FROM memory_progress WHERE note_id=?", {note_id}) &&
+              run("DELETE FROM memory_sources WHERE note_id=?", {note_id});  // single-source memories go too
     ok = ok && set_text_column(note_id, "transcript", nullptr);
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
@@ -690,7 +941,8 @@ static const char *kAssistantSettings[] = {"profile", "insight.last_date"};
 
 bool Store::wipe_assistant() {
     // Children before parents, so no foreign key blocks a delete; the FTS triggers clean the indexes.
-    static const char *kTables[] = {"suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
+    static const char *kTables[] = {"memory_entities", "memory_sources", "memory_progress", "memories",
+                                    "suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
                                     "medicines", "decisions", "insights", "sections", "transcript_pieces"};
     if (!exec("BEGIN")) return false;
     bool ok = true;

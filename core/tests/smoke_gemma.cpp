@@ -336,7 +336,7 @@ static void run_api_fixes2(sve_ctx *ctx, int64_t note) {
     printf("--- ask night\n%s\n", a.dump(2).c_str());
     expect(a.is_object() && a["medicine"] == true && a["sources"].size() <= 3 && contains(a["answer"], "Take Nitrest 10 mg at night.") &&
            a["sources"].size() > 0, "medicine piece quoted first, at most 3");
-    ctx->store->add_memory("fact", "Take the iron tablet with orange juice", std::nullopt);
+    ctx->store->add_memory_item({{"type", "fact"}, {"text", "Take the iron tablet with orange juice"}, {"review", "kept"}});
     json f = take(sve_assistant_ask(ctx, "Anything about orange juice?", nullptr, nullptr));
     printf("--- ask fact\n%s\n", f.dump(2).c_str());
     expect(f.is_object() && f["medicine"] == true && contains(f["answer"], "Take the iron tablet with orange juice"),
