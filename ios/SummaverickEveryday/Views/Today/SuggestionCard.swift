@@ -211,7 +211,8 @@ struct SuggestionCard: View {
             }
             details
             QuoteBlock(suggestion: s, noteTitle: noteTitle) { id, sec in router.openNote = (id, sec) }
-            SuggestionDecisionButtons(suggestion: s, noteTitle: noteTitle, isBusy: isBusy, onAccept: onAccept, onReject: onReject)
+            SuggestionDecisionButtons(suggestion: s, noteTitle: noteTitle, isBusy: isBusy, onAccept: onAccept, onReject: onReject,
+                                      mustConfirm: isStale)
         }
         .padding(16)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
@@ -327,6 +328,9 @@ struct SuggestionDecisionButtons: View {
     /// Called with the edited payload, or nil when the person accepts it as proposed.
     let onAccept: (SuggestionPayload?) -> Void
     let onReject: () -> Void
+    /// The core re-flagged this card (an accept came back stale) and the fresh flags may not be loaded yet:
+    /// confirm as if flagged, so "Save anyway?" is never skipped.
+    var mustConfirm = false
 
     @State private var showEdit = false
     @State private var confirmFlagged = false
@@ -338,6 +342,7 @@ struct SuggestionDecisionButtons: View {
     @State private var resumeDraft: SuggestionDraft?
 
     private var s: Suggestion { suggestion }
+    private var flagged: Bool { s.isFlagged || mustConfirm }
 
     var body: some View {
         buttons
@@ -345,7 +350,7 @@ struct SuggestionDecisionButtons: View {
                 SuggestionEditForm(suggestion: s, noteTitle: noteTitle, resume: resumeDraft) { payload, _, draft in
                     resumeDraft = draft
                     // A flagged card always asks again, edited or not: the core does not enforce the flag.
-                    afterEdit = (payload, s.isFlagged)
+                    afterEdit = (payload, flagged)
                     showEdit = false
                 }
             }
@@ -383,7 +388,7 @@ struct SuggestionDecisionButtons: View {
         // A reminder needs a time; the core refuses one without. Ask for it in the form instead.
         if s.kind == .reminder && (s.payload.times ?? []).allSatisfy({ ReminderScheduler.clock($0) == nil }) {
             showEdit = true
-        } else if s.isFlagged {
+        } else if flagged {
             pendingEdit = nil
             confirmFlagged = true
         } else {

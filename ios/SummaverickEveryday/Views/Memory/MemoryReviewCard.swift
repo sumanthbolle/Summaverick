@@ -83,7 +83,8 @@ struct MemoryReviewCard: View {
             SuggestionDecisionButtons(suggestion: s, noteTitle: s.noteID == m.sources.first?.noteID ? m.sources.first?.title : nil,
                                       isBusy: suggestionBusy || busy,
                                       onAccept: { decide(.suggestionYes(edited: $0 != nil), payload: $0) },
-                                      onReject: { decide(.suggestionNo) })
+                                      onReject: { decide(.suggestionNo) },
+                                      mustConfirm: suggestionStale)
         }
     }
 
