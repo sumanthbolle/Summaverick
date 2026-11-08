@@ -39,6 +39,7 @@ REASONS = [("words", "wrong words heard"), ("meaning", "wrong meaning"),
 REASON_LABEL = dict(REASONS)
 
 # A memory is "shown" when it passed every check and is stored, queued or not (not a medicine one, not marked wrong).
+# Facts migrated from the old extraction (origin 'migrated') never went through these checks, so they are not measured.
 
 
 # ---------------------------------------------------------------- database helpers
@@ -64,7 +65,7 @@ def shown_memories(con, note_ids=None):
         "SELECT m.id, m.type, m.text, m.who, m.due_date, m.due_text, m.queue, "
         "       s.note_id, s.start_sec, s.quote "
         "FROM memories m JOIN memory_sources s ON s.memory_id = m.id "
-        "WHERE m.origin != 'medicine' AND m.review != 'wrong' "
+        "WHERE m.origin NOT IN ('medicine', 'migrated') AND m.review != 'wrong' "
         "ORDER BY m.id, s.start_sec").fetchall()
     out, seen = [], set()
     for r in rows:
@@ -96,6 +97,7 @@ def decile_bins(pieces):
 def sample_pieces(pieces, count, seed=1):
     """`count` pieces spread evenly over the conf deciles (and the null bin); a short bin gives its share away."""
     rng = random.Random(seed)
+    pieces = [p for p in pieces if p["conf"] is not None]   # score ignores null conf: do not spend marking time on it
     bins = decile_bins(pieces)
     pools = {k: rng.sample(v, len(v)) for k, v in bins.items()}
     keys = sorted(pools, key=str)
@@ -417,9 +419,11 @@ DATA.notes.forEach(note => {
   t.value = store.missed[note.id] || ""; t.oninput = () => { store.missed[note.id] = t.value; persist(); };
   main.append(t);
 });
-main.append(el("h2", null, "Part 2: was it heard right?"),
-  el("div", "help", "Listen to the piece and compare it with the text. Heard right means the words are what was said."));
-DATA.pieces.forEach(p => main.append(pieceCard(p)));
+if (DATA.pieces.length) {
+  main.append(el("h2", null, "Part 2: was it heard right?"),
+    el("div", "help", "Listen to the piece and compare it with the text. Heard right means the words are what was said."));
+  DATA.pieces.forEach(p => main.append(pieceCard(p)));
+}
 
 let at = -1;
 function focusCard(i) {
@@ -500,7 +504,7 @@ def score(con, marks, out=print):
     mem_marks = marks.get("memories", {})
     # Only memories that are in the db and still count as shown (an id not in this db is skipped).
     types = {r["id"]: r["type"] for r in con.execute(
-        "SELECT id, type FROM memories WHERE origin != 'medicine' AND review != 'wrong'")}
+        "SELECT id, type FROM memories WHERE origin NOT IN ('medicine', 'migrated') AND review != 'wrong'")}
     right = wrong = 0
     by_type, by_reason = {}, {}
     for mid, m in mem_marks.items():
@@ -615,7 +619,7 @@ def cmd_selftest(_args):
         assert abs(auc_low_conf_is_wrong([0.2, 0.5], [0.5, 0.9]) - 0.875) < 1e-9
         pieces = [{"rowid": i, "note_id": 1, "start_sec": i, "text": "t", "conf": None if i < 5 else i / 100} for i in range(105)]
         picked = sample_pieces(pieces, 33)
-        assert len(picked) == 33 and sum(p["conf"] is None for p in picked) == 3, "null conf has a bin of its own"
+        assert len(picked) == 33 and all(p["conf"] is not None for p in picked), "null conf is never sampled"
         # 100 marked memories, 96 right: gate passes; 95/100 also passes (>= 95%), 94/100 fails.
         big = os.path.join(tmp, "big.sqlite")
         bc = sqlite3.connect(big)
