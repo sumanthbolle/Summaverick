@@ -165,7 +165,9 @@ struct NoteDetailView: View {
 
                     regenerateControls
 
-                    if needsGeneration && !isThisNoteBusy && models.isReady && !pipeline.isOvernight(noteID) {
+                    // Hidden while the failure banner offers "Try again" (same action).
+                    if needsGeneration && !isThisNoteBusy && models.isReady && !pipeline.isOvernight(noteID)
+                        && pipeline.lastFailure[noteID] == nil {
                         Button {
                             Task { await pipeline.regenerate(noteID: noteID) }
                         } label: { Label("Generate notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
