@@ -154,6 +154,7 @@ extension RecordingController.StartResult {
         case .needsConsent: return .needsConsent
         case .micDenied: return .micDenied
         case .failed: return .failed
+        case .stoppedWhileStarting: return .stoppedWhileStarting
         }
     }
 }

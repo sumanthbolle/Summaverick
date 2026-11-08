@@ -52,6 +52,8 @@ struct RecordView: View {
         .background(Color(.systemBackground))
         .interactiveDismissDisabled()
         .task { await begin() }
+        // Stopped from the Live Activity, a shortcut or the control: this screen has nothing left to show.
+        .onChange(of: controller.isRecording) { was, now in if was && !now { dismiss() } }
         .alert("Microphone access needed", isPresented: $permissionDenied) {
             Button("Open Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }; dismiss() }
             Button("Cancel", role: .cancel) { dismiss() }
@@ -91,6 +93,7 @@ struct RecordView: View {
         case .started, .alreadyRecording, .failed: break
         case .micDenied: permissionDenied = true
         case .needsConsent: dismiss()   // the record button asks for it first; never record without it
+        case .stoppedWhileStarting: dismiss()   // stopped from a shortcut or the control before it began
         }
     }
 

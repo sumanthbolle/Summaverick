@@ -22,6 +22,8 @@ final class RecordingController {
         case micDenied
         /// The audio session or the recorder refused (the reason is in `lastError`).
         case failed
+        /// A stop (or cancel) came while it was starting (the microphone question): nothing records.
+        case stoppedWhileStarting
     }
 
     /// The recorder itself (level and error, for the record screen).
@@ -30,6 +32,8 @@ final class RecordingController {
     var elapsed: TimeInterval { recorder.elapsed }
     /// Between start() and the recorder running (the microphone question): a second start is a no-op.
     private(set) var isStarting = false
+    /// Stop or cancel came while starting: the start ends without recording (RecordingIntentLogic.startMayRecord).
+    private var stopRequestedWhileStarting = false
     /// A shortcut asked to record before the recording reminder was acknowledged: the app shows it when it opens
     /// (RootView), shortly after only (RecordingIntentLogic.consentRequestWindow).
     private(set) var consentRequestedAt: Date?
@@ -51,12 +55,17 @@ final class RecordingController {
         guard !recorder.isRecording, !isStarting else { return .alreadyRecording }
         guard AppSettings.shared.consentAcknowledged else { return .needsConsent }
         isStarting = true
-        defer { isStarting = false }
+        stopRequestedWhileStarting = false
+        defer { isStarting = false; stopRequestedWhileStarting = false }
         recorder.lastError = nil
         guard await recorder.requestPermission() else { return .micDenied }
         guard !recorder.isRecording else { return .alreadyRecording }
         // The record screen closed while the microphone question was up: nothing records without it.
         guard !Task.isCancelled else { return .failed }
+        guard RecordingIntentLogic.startMayRecord(stopRequested: stopRequestedWhileStarting) else {
+            NSLog("[sve] recording not started: stopped while starting")
+            return .stoppedWhileStarting
+        }
         recorder.start()
         guard recorder.isRecording, let url = recorder.currentURL else { return .failed }
         UnfinishedRecordings.add(url.path)
@@ -72,6 +81,7 @@ final class RecordingController {
     /// the tap (or the shortcut). False when nothing was recording.
     @discardableResult
     func stop() -> Bool {
+        if isStarting { stopRequestedWhileStarting = true }
         guard let (url, duration) = recorder.stop() else { return false }
         RecordControlState.recordingChanged(false)
         ProcessingPipeline.shared.recordingStopped(audio: url, duration: duration)
@@ -83,6 +93,7 @@ final class RecordingController {
 
     /// Cancel: the recording and its transcription so far are deleted.
     func cancel() {
+        if isStarting { stopRequestedWhileStarting = true }
         guard let (url, _) = recorder.stop() else { return }
         RecordControlState.recordingChanged(false)
         RecordingActivities.shared.update(audioPath: url.path, .cancelled, line: "", percent: 0)

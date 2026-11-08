@@ -6,6 +6,8 @@ enum RecordingIntentLogic {
     /// RecordingController.StartResult, one for one (the app maps it with an exhaustive switch).
     enum Start: CaseIterable, Equatable {
         case started, alreadyRecording, needsConsent, micDenied, failed
+        /// A stop came while starting (the microphone question): nothing was recorded.
+        case stoppedWhileStarting
     }
 
     /// What a start does after the controller answered.
@@ -32,8 +34,13 @@ enum RecordingIntentLogic {
         case .needsConsent: return .openForConsent
         case .micDenied: return .say(.allowMicrophone)
         case .failed: return .say(.couldNotStart)
+        case .stoppedWhileStarting: return .say(.notRecording)
         }
     }
+
+    /// After the start's awaits: a stop (the control turned off, a Stop shortcut) or a cancel that came meanwhile
+    /// wins, so nothing records after it.
+    static func startMayRecord(stopRequested: Bool) -> Bool { !stopRequested }
 
     static func reply(stopped: Bool) -> Line { stopped ? .stopped : .notRecording }
 

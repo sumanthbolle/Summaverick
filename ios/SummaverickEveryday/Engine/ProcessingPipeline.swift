@@ -125,6 +125,8 @@ final class ProcessingPipeline {
     /// the AI to download; resumed one at a time while the app is active.
     private(set) var interrupted: Set<Int64> = []
     private var wentToBackground = false
+    /// The last Stop came with the app not in front (Live Activity, shortcut, control).
+    @ObservationIgnored private var stoppedWhileNotActive = false
     @ObservationIgnored private var backgroundObserver: NSObjectProtocol?
     @ObservationIgnored private var thermalObserver: NSObjectProtocol?
     @ObservationIgnored private var resuming = false
@@ -294,6 +296,7 @@ final class ProcessingPipeline {
         LiveTranscriber.shared.stop(audioPath: audio.path)
         handingOver.insert(audio.path)
         ReminderScheduler.shared.requestAuthorizationIfUndetermined()   // in the tap: "notes ready" can be told
+        stoppedWhileNotActive = !appIsActive   // a Stop from the Live Activity or a shortcut (backgroundTimeEnded)
         var claimed = false
         if ModelManager.shared.isReady {
             // Keyed on the file name: the note id is not known until the engine is free.
@@ -336,7 +339,13 @@ final class ProcessingPipeline {
         UnfinishedRecordings.remove(audio.path)   // the note has it now
         RecordingActivities.shared.attach(audioPath: audio.path, noteID: id)
         defer { activityRunEnded(id) }
-        if claimed { activeNoteID = id }
+        if claimed {
+            activeNoteID = id
+            // The notes run starts now, before the live piece in flight is handed over (up to ~30 s on the CPU):
+            // a cut-off from here on enrols the note and posts "paused" (backgroundTimeEnded).
+            startNotesRun(id)
+        }
+        defer { if claimed { notesRun = false } }
         noteTitles[id] = title
         lastFailure[id] = nil
         memoriesMayBeDue = true
@@ -359,8 +368,8 @@ final class ProcessingPipeline {
             beginBackground()
             ownsBackground = true
             activeNoteID = id
+            startNotesRun(id)
         }
-        startNotesRun(id)
         defer { notesRun = false }
         defer { if !interrupted.contains(id) { markAutoTried(id) } }
         defer { settleOvernight(id) }
@@ -1222,14 +1231,25 @@ final class ProcessingPipeline {
     /// Activity or a shortcut with the app in the background) and nothing else keeps the app running, the app is
     /// about to be suspended: the run is cut off now, as when a continued-processing task expires, so the note goes on
     /// the overnight list by itself, the overnight task is asked for and "paused" is posted once.
+    /// Before iOS 26 there is no continued-processing task: a Stop with the app not in front is treated the same.
+    /// When the note does not exist yet (the engine had not saved it), the recording is still an unfinished one:
+    /// the overnight task (or the next launch) turns it into a note first (recoverUnfinishedRecordings).
     private func backgroundTimeEnded() {
-        if isWorking, !appIsActive, ContinuedWork.shared.refused, !ContinuedWork.shared.isHeld, overnightRun == nil {
-            NSLog("[sve] bg: background time ended without continued processing; the notes finish in the overnight task")
+        var noContinuedTask = ContinuedWork.shared.refused
+        if #unavailable(iOS 26) { noContinuedTask = stoppedWhileNotActive }
+        if isWorking, !appIsActive, noContinuedTask, !ContinuedWork.shared.isHeld, overnightRun == nil {
+            if let id = activeNoteID {
+                NSLog("[sve] bg: background time ended without continued processing; note %lld finishes in the overnight task", id)
+            } else {
+                NSLog("[sve] bg: background time ended without continued processing before the note was saved; the overnight task saves and finishes it")
+            }
             continuedWorkExpired(hold: NotesNotifier.Hold())
+            OvernightWork.shared.schedule()   // also when no note was cut off (not saved yet)
         }
         endBackground()
     }
     private func endBackground() {
+        stoppedWhileNotActive = false   // this run's; a later run is not one stopped from the background
         UIApplication.shared.isIdleTimerDisabled = false
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
         // A recording queued behind this run (or a paused note) goes next.
@@ -1618,6 +1638,8 @@ final class ProcessingPipeline {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
         if !expired.isSet {
+            // A recording whose note was never saved (the app was suspended or closed first) becomes a note now.
+            await recoverUnfinishedRecordings()
             await pruneOvernight()   // deleted notes are skipped
             await queueWaitingNotes()
             await resumeInterrupted()
