@@ -1,7 +1,7 @@
 # Second Brain: memory layer, living mind map, recall — Design
 
 Date: 2026-11-08
-Status: draft for approval
+Status: draft for approval (builder check done)
 Replaces: §5.6 (per-recording mind map) of `2026-11-08-long-recordings-chat-mindmap-design.md`. That document's §5.5 (Mini ChatGPT) stays and is extended here (§5.7). Phase 1 of that document is built and on the owner's phone.
 
 ## 1. Intent
@@ -126,6 +126,8 @@ Each step is crash-safe and resumable like transcription and sections (sidecar /
 ## 7. Owner decisions
 1. Serve both groups fully (2026-11-08: "let's not make this unfinished product").
 2. Accuracy over quantity: a missing memory is acceptable, a wrong one is not (from "should be way accurate").
+3. **Accuracy test set (owner, 2026-11-08):** the builder extracts about 100 memories from the owner's real recordings and shows each next to its quote; the owner marks each right or wrong (about 30-40 minutes). The 95% gate is measured on that set.
+4. **Meaning model (owner, 2026-11-08):** add EmbeddingGemma (about 200 MB, Wi-Fi download with the main model), shipped only if it passes the §5.5 gate. The owner checks the Gemma terms before release.
 
 ## 8. Left to the builder
 Prompt wording, schema, how confidence is computed from token probabilities and its threshold (measured on the owner's recordings), map layout algorithm, practice question wording, the transliteration table's contents, batching of the background work.
