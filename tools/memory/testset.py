@@ -9,6 +9,7 @@
 Python 3 standard library only. The original database is never opened for writing: export works on a copy.
 """
 import argparse
+import collections
 import hashlib
 import html
 import json
@@ -19,6 +20,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SMOKE = os.path.join(ROOT, "core", "tests", "smoke_gemma.sh")
@@ -107,17 +109,23 @@ def sample_pieces(pieces, count, seed=1):
 
 # ---------------------------------------------------------------- export
 
-def run_smoke(db_copy, note_ids):
-    env = dict(os.environ, SVE_DB=db_copy, SVE_NOTES=",".join(str(i) for i in note_ids))
-    for name in ("SVE_GEMMA", "SVE_MMPROJ"):
-        if name not in env:
-            print("note: %s is not set" % name, file=sys.stderr)
-    # Build the smoke binary once and reuse it for every batch.
+def run_smoke(db_copy, note_id, position, total):
+    """Run the memories smoke on one note of the copy, echoing its output as it comes. Returns (ok, tail lines)."""
+    env = dict(os.environ, SVE_DB=db_copy, SVE_NOTES=str(note_id))
+    for seed in ("SVE_SEED_FIXTURE", "SVE_SEED_WAV"):   # seeding would add notes to the copy
+        env.pop(seed, None)
+    if "SVE_GEMMA" not in env:
+        print("note: SVE_GEMMA is not set", file=sys.stderr)
+    # Build the smoke binary once and reuse it for every note.
     env.setdefault("SVE_SMOKE_BIN", os.path.join(os.path.dirname(db_copy), "smoke_gemma"))
-    result = subprocess.run(["bash", SMOKE, "memories"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    sys.stdout.write(result.stdout[-4000:])
-    if result.returncode != 0:
-        sys.exit("smoke_gemma.sh memories failed (exit %d)" % result.returncode)
+    print("=== note %d (%d/%d): running the memories smoke" % (note_id, position, total), flush=True)
+    tail = collections.deque(maxlen=40)
+    proc = subprocess.Popen(["bash", SMOKE, "memories"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for line in proc.stdout:
+        tail.append(line.rstrip("\n"))
+        sys.stdout.write("    " + line)
+        sys.stdout.flush()
+    return proc.wait() == 0, list(tail)
 
 
 def copy_database(src, work_dir):
@@ -142,91 +150,155 @@ def settle_database(path):
 
 
 def load_previous(path):
-    """Marks from an earlier sheet, keyed by (text, quote) for memories and by piece text for pieces."""
+    """Marks from an earlier sheet: memories keyed by (text, quote), pieces by (text, audio file name, start_sec)."""
     if not path:
         return {}, {}
     with open(path) as f:
         prev = json.load(f)
     mem = {(m["text"], m["quote"]): {"v": m["verdict"], "r": m.get("reason")}
            for m in prev.get("memories", {}).values() if m.get("verdict")}
-    pcs = {p["text"]: p["verdict"] for p in prev.get("pieces", {}).values() if p.get("verdict")}
+    pcs = {(p["text"], p.get("audio_name"), p.get("start_sec")): p["verdict"]
+           for p in prev.get("pieces", {}).values() if p.get("verdict")}
     return mem, pcs
 
 
-def cmd_export(args):
-    os.makedirs(args.out, exist_ok=True)
-    work = copy_database(args.db, os.path.join(args.out, "work"))
-    # Newest notes first, only notes that have transcript pieces.
-    con = sqlite3.connect(work)
-    notes = [r[0] for r in con.execute(
-        "SELECT n.id FROM notes n WHERE EXISTS (SELECT 1 FROM transcript_pieces p WHERE p.note_id = n.id) "
-        "ORDER BY n.created_at DESC, n.id DESC")]
-    con.close()
-    chosen = []
-    for nid in notes:
-        chosen.append(nid)
-        if not args.skip_run:
-            run_smoke(work, [nid])
-        settle_database(work)
-        con = open_readonly(work)
-        have = shown_count_for_notes(con, chosen)
-        con.close()
-        print("note %d: %d shown memories so far (%d notes)" % (nid, have, len(chosen)))
-        if have >= args.target:
-            break
-    # Reopen read-write only to be sure nothing is left in a WAL, then hash the finished copy.
-    settle_database(work)
-    final = os.path.join(args.out, "notes.sqlite")
-    shutil.move(work, final)
-    shutil.rmtree(os.path.join(args.out, "work"), ignore_errors=True)
-    digest = sha256_file(final)
+def read_state(out_dir):
+    path = os.path.join(out_dir, "state.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return {"done": [], "failed": {}}
 
+
+def write_state(out_dir, state):
+    with open(os.path.join(out_dir, "state.json"), "w") as f:
+        json.dump(state, f, indent=1)
+
+
+def build_sheet(out_dir, audio_dir, piece_count, previous_marks):
+    """Write sheet.html from out_dir/notes.sqlite and the done notes in state.json. No model needed."""
+    state = read_state(out_dir)
+    chosen = state["done"]
+    if not chosen:
+        sys.exit("no finished notes in %s; run export first" % out_dir)
+    final = os.path.join(out_dir, "notes.sqlite")
+    digest = sha256_file(final)
     con = open_readonly(final)
+    marks = ",".join("?" * len(chosen))
     memories = shown_memories(con, set(chosen))
     notes_info = {r["id"]: dict(r) for r in con.execute(
-        "SELECT id, title, lang, created_at, audio_path FROM notes WHERE id IN (%s)" % ",".join("?" * len(chosen)), chosen)}
+        "SELECT id, title, lang, created_at, audio_path FROM notes WHERE id IN (%s)" % marks, chosen)}
     all_pieces = [dict(r) for r in con.execute(
         "SELECT rowid, note_id, idx, start_sec, text, conf FROM transcript_pieces WHERE note_id IN (%s) "
-        "AND trim(text) != ''" % ",".join("?" * len(chosen)), chosen)]
+        "AND trim(text) != ''" % marks, chosen)]
     con.close()
-    pieces = sample_pieces(all_pieces, args.pieces)
+    pieces = sample_pieces(all_pieces, piece_count)
 
-    # Audio: .m4a (or whatever the phone stored), found by file name in --audio, copied beside the sheet.
-    audio_dir = os.path.join(args.out, "audio")
-    os.makedirs(audio_dir, exist_ok=True)
-    audio_rel = {}
+    # Audio: .m4a (or whatever the phone stored), found by file name in audio_dir, copied beside the sheet.
+    os.makedirs(os.path.join(out_dir, "audio"), exist_ok=True)
+    audio_name = {}
     for nid, info in notes_info.items():
         base = os.path.basename(info["audio_path"] or "")
-        src = os.path.join(args.audio, base) if base else ""
+        src = os.path.join(audio_dir, base) if base else ""
         if base and os.path.isfile(src):
-            shutil.copyfile(src, os.path.join(audio_dir, base))
-            audio_rel[nid] = "audio/" + base
+            shutil.copyfile(src, os.path.join(out_dir, "audio", base))
+            audio_name[nid] = base
         else:
             print("warning: no audio file for note %d (%s)" % (nid, base or "no audio_path"))
 
-    prev_mem, prev_pcs = load_previous(args.previous_marks)
+    prev_mem, prev_pcs = load_previous(previous_marks)
     carried = 0
     for m in memories:
         m["carry"] = prev_mem.get((m["text"], m["quote"]))
         carried += m["carry"] is not None
     for p in pieces:
-        p["carry"] = prev_pcs.get(p["text"])
+        p["audio_name"] = audio_name.get(p["note_id"])
+        p["carry"] = prev_pcs.get((p["text"], p["audio_name"], p["start_sec"]))
 
     data = {
         "db_sha256": digest,
         "reasons": REASONS,
-        "notes": [{"id": nid, "title": notes_info[nid]["title"], "audio": audio_rel.get(nid),
+        "failed": sorted(int(k) for k in state["failed"]),
+        "notes": [{"id": nid, "title": notes_info[nid]["title"], "audio": audio_src(audio_name.get(nid)),
                    "memories": [m for m in memories if m["note_id"] == nid]}
                   for nid in chosen if nid in notes_info],
-        "pieces": [dict(p, audio=audio_rel.get(p["note_id"])) for p in pieces],
+        "pieces": [dict(p, audio=audio_src(p["audio_name"])) for p in pieces],
     }
-    sheet = os.path.join(args.out, "sheet.html")
+    sheet = os.path.join(out_dir, "sheet.html")
     with open(sheet, "w") as f:
         f.write(render_sheet(data))
     print("notes: %d  shown memories: %d  (carried-over marks: %d)  pieces: %d" % (len(chosen), len(memories), carried, len(pieces)))
     print("db copy: %s\nsha256: %s\nsheet: %s" % (final, digest, sheet))
-    if len(memories) < args.target:
-        print("warning: only %d shown memories, target was %d" % (len(memories), args.target))
+    return len(memories)
+
+
+def audio_src(name):
+    """Relative, URL-encoded path of a recording copied under audio/ (None if there is none)."""
+    return "audio/" + urllib.parse.quote(name) if name else None
+
+
+def cmd_export(args):
+    os.makedirs(args.out, exist_ok=True)
+    work_dir = os.path.join(args.out, "work")
+    work = os.path.join(work_dir, "notes.sqlite")
+    state = read_state(args.out)
+    if args.resume and os.path.exists(work):
+        print("resuming: %d notes already done" % len(state["done"]))
+    else:
+        work = copy_database(args.db, work_dir)
+        state = {"done": [], "failed": {}}
+        write_state(args.out, state)
+    con = sqlite3.connect(work)
+    notes = [r[0] for r in con.execute(
+        "SELECT n.id FROM notes n WHERE EXISTS (SELECT 1 FROM transcript_pieces p WHERE p.note_id = n.id) "
+        "ORDER BY n.created_at DESC, n.id DESC")]
+    con.close()
+    if args.notes:                       # exactly these notes, newest first; --target does not pick
+        wanted = [int(x) for x in args.notes.split(",") if x.strip()]
+        missing = [n for n in wanted if n not in notes]
+        if missing:
+            sys.exit("notes without transcript pieces or not in the db: %s" % missing)
+        notes = [n for n in notes if n in wanted]
+    for pos, nid in enumerate(notes, 1):
+        if str(nid) in state["failed"] and not args.resume:
+            continue
+        if nid not in state["done"]:
+            if args.skip_run:
+                ok, tail = True, []
+            else:
+                ok, tail = run_smoke(work, nid, pos, len(notes))
+            settle_database(work)
+            if not ok:
+                state["failed"][str(nid)] = "\n".join(tail[-15:])
+                write_state(args.out, state)
+                print("!!! note %d FAILED; last output:\n%s" % (nid, "\n".join(tail[-15:])), flush=True)
+                continue
+            state["failed"].pop(str(nid), None)
+            state["done"].append(nid)
+            write_state(args.out, state)
+        con = open_readonly(work)
+        have = shown_count_for_notes(con, state["done"])
+        con.close()
+        print("note %d done: %d shown memories so far (%d notes)" % (nid, have, len(state["done"])), flush=True)
+        if not args.notes and have >= args.target:
+            break
+    settle_database(work)
+    shutil.copyfile(work, os.path.join(args.out, "notes.sqlite"))   # the work copy stays, for --resume
+    if not state["done"]:
+        sys.exit("no note finished; failed: %s" % sorted(state["failed"]))
+    shown = build_sheet(args.out, args.audio, args.pieces, args.previous_marks)
+    if shown < MIN_MARKED_MEMORIES:
+        print("shown memories: %d (below the %d the gate needs; the result will be reported as a smaller set)" %
+              (shown, MIN_MARKED_MEMORIES))
+    elif not args.notes and shown < args.target:
+        print("warning: only %d shown memories, target was %d" % (shown, args.target))
+    if state["failed"]:
+        print("FAILED NOTES (left out of the sheet): %s. Re-run with --resume to try them again." % sorted(int(k) for k in state["failed"]))
+        sys.exit(1)
+
+
+def cmd_render(args):
+    build_sheet(args.out, args.audio, args.pieces, args.previous_marks)
 
 
 # ---------------------------------------------------------------- sheet
@@ -258,12 +330,19 @@ audio{width:100%;max-width:420px;height:34px}textarea{width:100%;box-sizing:bord
 <header><b id="count"></b><div class="bar"><i id="fill"></i></div>
 <span class="help">Keys: J/K next/previous, R right, W wrong, 1-4 reason, H/G piece heard right/wrong</span>
 <button class="save" id="save">Save marks</button></header>
+<div id="warn" style="display:none;background:#fde8c8;padding:8px 16px">Marks are not saved automatically here. Press Save marks often.</div>
+<div id="failed" style="display:none;background:#f8d7d7;padding:8px 16px"></div>
 <main id="main"></main>
 <script>
 const DATA = __DATA__;
 const KEY = "svemarks:" + DATA.db_sha256;
-const store = JSON.parse(localStorage.getItem(KEY) || '{"memories":{},"pieces":{},"missed":{}}');
-const persist = () => { localStorage.setItem(KEY, JSON.stringify(store)); progress(); };
+let store = { memories: {}, pieces: {}, missed: {} }, canSave = true;
+try { store = JSON.parse(localStorage.getItem(KEY) || JSON.stringify(store)); } catch (e) { canSave = false; }
+const persist = () => {
+  if (canSave) { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { canSave = false; } }
+  document.getElementById("warn").style.display = canSave ? "none" : "block";
+  progress();
+};
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const cards = [];
 
@@ -302,6 +381,7 @@ function memoryCard(m, note) {
     why.append(radio("r" + key, code, label + " (" + (i + 1) + ")", false, () => { st().r = code; persist(); paint(); })));
   card.append(row, why);
   if (m.carry) card.append(el("div", "carry", "Marked in an earlier round (same text and quote); change it if it is wrong."));
+  card.key = key;
   card.setVal = (v) => { st().v = v; if (v === "right") delete st().r; delete st().carried; persist(); paint(); };
   card.setReason = (r) => { if (st().v === "wrong") { st().r = r; persist(); paint(); } };
   card.isDone = () => { const s = store.memories[key]; return !!s && (s.v === "right" || (s.v === "wrong" && !!s.r)); };
@@ -325,6 +405,8 @@ function pieceCard(p) {
   card.pieceMode = true; paint(); cards.push(card); return card;
 }
 
+if (DATA.failed.length) { const f = document.getElementById("failed"); f.style.display = "block";
+  f.textContent = "Left out: recordings " + DATA.failed.join(", ") + " failed to process, so this sheet does not cover them."; }
 const main = document.getElementById("main");
 main.append(el("h2", null, "Part 1: the memories"),
   el("div", "help", "Play the recording at the quote. Mark Right only if the memory is true to what was said. If Wrong, pick why. Write anything the recording said that is missing in the box under it."));
@@ -368,10 +450,14 @@ document.getElementById("save").onclick = () => {
     const s = store.memories[String(m.id)]; if (!s || !s.v) return;
     out.memories[m.id] = { verdict: s.v, reason: s.v === "wrong" ? (s.r || null) : null, text: m.text, quote: m.quote };
   }));
-  DATA.pieces.forEach(p => { const v = store.pieces[String(p.rowid)]; if (v) out.pieces[p.rowid] = { verdict: v, text: p.text }; });
+  DATA.pieces.forEach(p => { const v = store.pieces[String(p.rowid)];
+    if (v) out.pieces[p.rowid] = { verdict: v, text: p.text, audio_name: p.audio_name, start_sec: p.start_sec }; });
+  const unmarked = cards.filter(c => !c.pieceMode && !(store.memories[c.key] || {}).v).length + cards.filter(c => c.pieceMode && !c.isDone()).length;
+  const noReason = cards.filter(c => !c.pieceMode && (store.memories[c.key] || {}).v === "wrong" && !store.memories[c.key].r).length;
+  if ((unmarked || noReason) && !confirm(unmarked + " cards are unmarked and " + noReason + " Wrong cards have no reason. Save anyway?")) return;
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
-  a.download = "marks.json"; a.click();
+  a.download = "marks.json"; document.body.appendChild(a); a.click(); a.remove();
 };
 persist(); focusCard(0);
 </script></body></html>
@@ -412,13 +498,15 @@ def pct(a, b):
 def score(con, marks, out=print):
     """Print the gate lines. Returns (shown_correct_pass, conf_pass)."""
     mem_marks = marks.get("memories", {})
-    types = {r["id"]: r["type"] for r in con.execute("SELECT id, type FROM memories")}
+    # Only memories that are in the db and still count as shown (an id not in this db is skipped).
+    types = {r["id"]: r["type"] for r in con.execute(
+        "SELECT id, type FROM memories WHERE origin != 'medicine' AND review != 'wrong'")}
     right = wrong = 0
     by_type, by_reason = {}, {}
     for mid, m in mem_marks.items():
-        if m.get("verdict") not in ("right", "wrong"):
+        if m.get("verdict") not in ("right", "wrong") or int(mid) not in types:
             continue
-        t = by_type.setdefault(types.get(int(mid), "unknown"), [0, 0])
+        t = by_type.setdefault(types[int(mid)], [0, 0])
         t[0 if m["verdict"] == "right" else 1] += 1
         if m["verdict"] == "right":
             right += 1
@@ -528,6 +616,77 @@ def cmd_selftest(_args):
         pieces = [{"rowid": i, "note_id": 1, "start_sec": i, "text": "t", "conf": None if i < 5 else i / 100} for i in range(105)]
         picked = sample_pieces(pieces, 33)
         assert len(picked) == 33 and sum(p["conf"] is None for p in picked) == 3, "null conf has a bin of its own"
+        # 100 marked memories, 96 right: gate passes; 95/100 also passes (>= 95%), 94/100 fails.
+        big = os.path.join(tmp, "big.sqlite")
+        bc = sqlite3.connect(big)
+        bc.executescript("""
+            CREATE TABLE memories(id INTEGER PRIMARY KEY, type TEXT, origin TEXT DEFAULT 'recording', review TEXT DEFAULT 'new');
+            CREATE TABLE transcript_pieces(note_id INTEGER, idx INTEGER, conf REAL);""")
+        bc.executemany("INSERT INTO memories(id,type) VALUES (?, 'fact')", [(i,) for i in range(1, 101)])
+        # 80 pieces: 10 heard wrong with conf 0.1..0.55, 70 heard right with conf 0.3..1.0 (low conf separates well).
+        wrong_conf = [0.10 + 0.05 * i for i in range(10)]
+        right_conf = [0.30 + 0.01 * i for i in range(70)]
+        bc.executemany("INSERT INTO transcript_pieces VALUES (1, ?, ?)", list(enumerate(wrong_conf + right_conf)))
+        bc.execute("UPDATE memories SET origin='medicine' WHERE id=100")   # shown filter: id 100 does not count
+        bc.commit()
+        bc.close()
+        bdb = open_readonly(big)
+        rowids = [r[0] for r in bdb.execute("SELECT rowid FROM transcript_pieces ORDER BY idx")]
+        def big_marks(n_wrong):
+            return {"memories": {str(i): {"verdict": "wrong" if i <= n_wrong else "right", "reason": "meaning"} for i in range(1, 100)},
+                    "pieces": {str(r): {"verdict": "wrong" if k < 10 else "right"} for k, r in enumerate(rowids)}, "missed": {}}
+        lines = []
+        ok, conf_ok = score(bdb, dict(big_marks(4), memories=dict(big_marks(4)["memories"], **{"100": {"verdict": "wrong"}, "999": {"verdict": "wrong"}})),
+                            out=lines.append)
+        assert lines[0] == "SHOWN-CORRECT: 95/99 = 96.0%  GATE: FAIL (>= 95%)", lines[0]  # 99 marked < 100: medicine and unknown ids skipped
+        assert not ok
+        # 100 shown: add one more shown memory.
+        bdb.close()
+        bc = sqlite3.connect(big)
+        bc.execute("UPDATE memories SET origin='recording' WHERE id=100")
+        bc.commit()
+        bc.close()
+        bdb = open_readonly(big)
+        m = big_marks(4)
+        m["memories"]["100"] = {"verdict": "right"}
+        lines = []
+        ok, conf_ok = score(bdb, m, out=lines.append)
+        assert lines[0] == "SHOWN-CORRECT: 96/100 = 96.0%  GATE: PASS (>= 95%)", lines[0]
+        assert ok and conf_ok and lines[-1] == "CONF-GATE: PASS", "\n".join(lines)
+        print("\n".join(lines[:2] + lines[-4:]))
+        m = big_marks(6)
+        m["memories"]["100"] = {"verdict": "right"}
+        lines = []
+        assert score(bdb, m, out=lines.append)[0] is False and lines[0].startswith("SHOWN-CORRECT: 94/100 = 94.0%  GATE: FAIL")
+        bdb.close()
+
+        # score refuses marks made for another database.
+        mfile = os.path.join(tmp, "marks.json")
+        with open(mfile, "w") as f:
+            json.dump({"db_sha256": "0" * 64, "memories": {}}, f)
+        try:
+            cmd_score(argparse.Namespace(db=path, marks=mfile))
+            raise AssertionError("sha mismatch was accepted")
+        except SystemExit as e:
+            assert "different database" in str(e)
+
+        # carry-over: same text+quote keeps its mark; a piece needs the same text, audio file and start.
+        with open(mfile, "w") as f:
+            json.dump({"memories": {"7": {"verdict": "wrong", "reason": "person", "text": "A", "quote": "qa"}},
+                       "pieces": {"3": {"verdict": "right", "text": "p0", "audio_name": "x.m4a", "start_sec": 0}}}, f)
+        prev_mem, prev_pcs = load_previous(mfile)
+        assert prev_mem[("A", "qa")] == {"v": "wrong", "r": "person"} and ("A", "other quote") not in prev_mem
+        assert prev_pcs[("p0", "x.m4a", 0)] == "right" and ("p0", "y.m4a", 0) not in prev_pcs
+
+        # the sheet: text is escaped (cannot close the script), audio src is URL-encoded, #t= is added by the page.
+        data = {"db_sha256": "ab", "reasons": REASONS, "failed": [], "pieces": [],
+                "notes": [{"id": 1, "title": "T", "audio": audio_src("my rec #1.m4a"),
+                           "memories": [{"id": 1, "type": "fact", "text": "x</script><b>y", "who": None, "due_date": None,
+                                         "due_text": None, "queue": 0, "note_id": 1, "start_sec": 3, "quote": "q", "carry": None}]}]}
+        page = render_sheet(data)
+        assert "x</script><b>y" not in page and "x<\\/script><b>y" in page, "text must not close the script tag"
+        assert "audio/my%20rec%20%231.m4a" in page and "my rec #1" not in page
+        assert page.count("</script>") == 1
     print("selftest ok")
 
 
@@ -541,8 +700,17 @@ def main():
     e.add_argument("--target", type=int, default=100, help="stop adding notes once this many memories are shown")
     e.add_argument("--pieces", type=int, default=60, help="transcript pieces to sample for part 2")
     e.add_argument("--previous-marks", help="marks.json from an earlier round; identical text+quote keeps its mark")
+    e.add_argument("--notes", help="comma-separated note ids to use (newest first); --target then does not pick notes")
+    e.add_argument("--resume", action="store_true",
+                   help="reuse out/work/notes.sqlite and skip finished notes (a note stopped part way redoes only its undone sections)")
     e.add_argument("--skip-run", action="store_true", help="do not run the smoke; use the memories already in the db")
     e.set_defaults(fn=cmd_export)
+    r = sub.add_parser("render", help="write sheet.html again from a finished export dir, without the model")
+    r.add_argument("--out", required=True)
+    r.add_argument("--audio", required=True)
+    r.add_argument("--pieces", type=int, default=60)
+    r.add_argument("--previous-marks")
+    r.set_defaults(fn=cmd_render)
     s = sub.add_parser("score", help="compute the two gates from marks.json")
     s.add_argument("--db", required=True, help="the notes.sqlite that export wrote (out/notes.sqlite)")
     s.add_argument("--marks", required=True)

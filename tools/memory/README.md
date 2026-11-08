@@ -27,6 +27,21 @@ Output in `--out`: `sheet.html` (open it in Safari or Chrome), `audio/` (the rec
 
 The smoke only reads transcript pieces, so no WAVs are needed; the audio is for playback in the sheet.
 
+### Long runs, failures, resume
+
+The smoke runs once per note, with its output echoed and a `=== note N (i/total)` line before each. A note
+whose smoke fails is logged (last lines of output) and skipped; the other notes continue, the sheet leaves it
+out and says so at the top, and `export` ends with a non-zero exit listing the failed notes.
+
+- The work copy lives in `<out>/work/notes.sqlite` and progress in `<out>/state.json`. `--resume` reuses them
+  instead of re-copying the original, skips finished notes, and retries failed ones. A note stopped part
+  way redoes only its undone sections (the core records each finished section in `memory_progress`).
+- `--notes 17,16` uses exactly those notes (newest first) and ignores `--target`. If fewer than 100 memories
+  are shown it prints that the result will be reported as a smaller set.
+- Re-render the sheet without the model: `export --resume` once all notes are done, or
+
+      python3 tools/memory/testset.py render --out <out> --audio <recordings dir> [--pieces 60] [--previous-marks marks.json]
+
 ### Marking (30-40 minutes)
 
 - Part 1: each memory has its recording, played from the quote. Mark Right or Wrong; for Wrong choose
@@ -40,7 +55,7 @@ The smoke only reads transcript pieces, so no WAVs are needed; the audio is for 
 ### Next round
 
 Pass `--previous-marks marks.json` to `export`. A memory whose text and quote are identical to a marked one
-keeps that mark (shown as carried over; change it if needed). Pieces carry over by identical text.
+keeps that mark (shown as carried over; change it if needed). Pieces carry over when text, audio file name and start second are all identical.
 
 ## 3. Score
 
