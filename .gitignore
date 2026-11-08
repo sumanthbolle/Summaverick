@@ -7,3 +7,6 @@ xcuserdata/
 ios/Frameworks/llama.xcframework/
 tools/model/testset/*
 !tools/model/testset/README.md
+
+# Owner recordings, copies of the database, sheets and marks for the memory accuracy test
+tools/memory/private/
