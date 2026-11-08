@@ -16,6 +16,7 @@
 #include "whisper.h"
 #endif
 
+#include <cstdio>
 #include <memory>
 
 // Logging: routes to the host callback (sve_set_log) or stderr.
@@ -23,6 +24,11 @@ void sve_logf(int level, const char *fmt, ...);
 
 // Test hook: output token cap of sve_section_summarize (smoke sets a tiny value to force the fallback).
 extern int g_sve_section_max_out;
+// Test hooks (tools/model/compare_outputs.sh): every generation greedy; token ids written to a file
+// ("i <id>" prompt, "o <id>" generated). Off by default; the app never sets them.
+extern bool g_sve_force_greedy;
+extern FILE *g_sve_token_log;
+void sve_log_tokens(char tag, const int32_t *ids, size_t n);
 
 struct sve_ctx {
     std::unique_ptr<sve::Store> store;

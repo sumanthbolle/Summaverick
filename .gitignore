@@ -5,3 +5,5 @@ xcuserdata/
 *.xcuserstate
 .superpowers/
 ios/Frameworks/llama.xcframework/
+tools/model/testset/*
+!tools/model/testset/README.md

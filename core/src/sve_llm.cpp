@@ -51,6 +51,7 @@ std::vector<llama_token> Llm::tokenize(const std::string &text, bool add_special
     int n = -llama_tokenize(vocab, text.c_str(), (int)text.size(), nullptr, 0, add_special, parse_special);
     std::vector<llama_token> out(std::max(n, 0));
     if (n > 0) llama_tokenize(vocab, text.c_str(), (int)text.size(), out.data(), n, add_special, parse_special);
+    sve_log_tokens('i', out.data(), out.size());
     return out;
 }
 
@@ -111,7 +112,7 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
     llama_sampler_chain_params sp = llama_sampler_chain_default_params();
     sp.no_perf = true;
     llama_sampler *smpl = llama_sampler_chain_init(sp);
-    if (greedy) {
+    if (greedy || g_sve_force_greedy) {
         // light penalty only: real speech repeats words, but a stuck model repeats whole phrases
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.05f, 0.0f, 0.0f));
         llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
@@ -127,6 +128,7 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
     char piece[256];
     for (int i = 0; i < max_new_tokens; ++i) {
         llama_token id = llama_sampler_sample(smpl, ctx, -1);
+        sve_log_tokens('o', &id, 1);
         if (llama_vocab_is_eog(vocab, id)) break;
         llama_sampler_accept(smpl, id);
         int n = llama_token_to_piece(vocab, id, piece, sizeof piece, 0, false);

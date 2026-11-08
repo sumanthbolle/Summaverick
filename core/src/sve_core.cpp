@@ -310,6 +310,12 @@ static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const
     text.parse_special = true;
     const mtmd_bitmap *bmps[1] = {bmp};
     int rc = mtmd_tokenize(ctx->mtmd, chunks, &text, bmps, 1);
+    if (rc == 0 && g_sve_token_log)
+        for (size_t i = 0; i < mtmd_input_chunks_size(chunks); ++i) {
+            size_t nt = 0;
+            const llama_token *t = mtmd_input_chunk_get_tokens_text(mtmd_input_chunks_get(chunks, i), &nt);
+            if (t) sve_log_tokens('i', t, nt);
+        }
     llama_pos n_past = 0;
     if (rc == 0) rc = mtmd_helper_eval_chunks(ctx->mtmd, llm.ctx, chunks, 0, 0, (int32_t)llama_n_batch(llm.ctx), true, &n_past);
     mtmd_input_chunks_free(chunks);
@@ -360,6 +366,13 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
 }
 
 int g_sve_section_max_out = 512;
+bool g_sve_force_greedy = false;
+FILE *g_sve_token_log = nullptr;
+
+void sve_log_tokens(char tag, const int32_t *ids, size_t n) {
+    if (!g_sve_token_log) return;
+    for (size_t i = 0; i < n; ++i) fprintf(g_sve_token_log, "%c %d\n", tag, (int)ids[i]);
+}
 
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang_c, sve_progress_cb cb, void *user) {
     try {

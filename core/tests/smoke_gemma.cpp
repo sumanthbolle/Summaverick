@@ -5,6 +5,10 @@
 //               recorded (copied in 10 s steps into a WAV whose header says data size 0), then final
 //   extract     doctor-visit fixture: extract, list pending suggestions, two Ask questions
 //   api         assistant C API without a model (accept/reject, medicines, medicine Ask route)
+//   notes       SVE_TEST_WAV: pieces, then the three note kinds from the transcript (SVE_LANG, default te),
+//               then one chat question over the note (SVE_QUESTION)
+// SVE_GREEDY=1 makes every generation greedy; SVE_TOKEN_LOG=<file> appends prompt/generated token ids
+// (both for tools/model/compare_outputs.sh).
 #include "sve_core.h"
 #include "sve_internal.h"
 #include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
@@ -844,6 +848,26 @@ static int run_longnotes(sve_ctx *ctx, const char *wav, const char *lang) {
     return 0;
 }
 
+// Transcribes SVE_TEST_WAV into pieces, writes the three note kinds from the transcript, asks one question.
+static int run_notes(sve_ctx *ctx, const char *wav, const char *lang, const char *question) {
+    json pieces = take(sve_transcribe_audio_pieces(ctx, wav, nullptr, nullptr));
+    if (!pieces.is_array() || pieces.empty()) { fprintf(stderr, "no pieces\n"); return 1; }
+    printf("--- pieces\n%s\n", pieces.dump(2).c_str());
+    std::string transcript;
+    for (const auto &p : pieces) transcript += p["text"].get<std::string>() + "\n";
+    const char *names[] = {"short summary", "detailed notes", "revision questions"};
+    for (int k = 0; k < 3; ++k) {
+        char *o = sve_generate(ctx, transcript.c_str(), (sve_output_kind)k, lang, nullptr, nullptr);
+        printf("--- %s\n%s\n", names[k], o ? o : "(NULL)");
+        sve_free_string(o);
+    }
+    int64_t id = sve_note_create(ctx, "test note", lang, nullptr, transcript.c_str(), 60);
+    sve_note_set_pieces(ctx, id, pieces.dump().c_str());
+    json a = take(sve_assistant_ask(ctx, question, nullptr, nullptr));
+    printf("--- ask %s\n%s\n", question, a.dump(2).c_str());
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "transcribe";
     const char *gguf = getenv("SVE_GEMMA"), *mmproj = getenv("SVE_MMPROJ"), *wav = getenv("SVE_TEST_WAV");
@@ -856,6 +880,8 @@ int main(int argc, char **argv) {
         return fails ? 1 : 0;
     }
     if (!gguf) { fprintf(stderr, "set SVE_GEMMA\n"); return 2; }
+    if (getenv("SVE_GREEDY")) g_sve_force_greedy = true;
+    if (const char *p = getenv("SVE_TOKEN_LOG")) g_sve_token_log = fopen(p, "a");
     const bool live = !strcmp(mode, "live") || !strcmp(mode, "sections") || !strcmp(mode, "longnotes");
     // live and sections run as on the phone: CPU only (the projector follows), 4 threads.
     if (sve_load_llm(ctx, gguf, 8192, live ? 4 : 0, live ? 0 : 99) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
@@ -883,7 +909,13 @@ int main(int argc, char **argv) {
         int rc = run_extract(ctx, fx ? fx : SVE_FIXTURE_DIR "/doctor_visit.txt");
         if (rc) return rc;
         printf("%d expectation(s) missed (judged qualitatively)\n", fails);
+    } else if (!strcmp(mode, "notes")) {
+        if (!mmproj || !wav) { fprintf(stderr, "set SVE_MMPROJ and SVE_TEST_WAV\n"); return 2; }
+        if (sve_load_audio(ctx, mmproj) != 0) { fprintf(stderr, "sve_load_audio failed\n"); return 1; }
+        const char *lang = getenv("SVE_LANG"), *q = getenv("SVE_QUESTION");
+        if (int rc = run_notes(ctx, wav, lang ? lang : "te", q ? q : "What are the main points of this recording?")) return rc;
     } else { fprintf(stderr, "unknown mode %s\n", mode); return 2; }
+    if (g_sve_token_log) fclose(g_sve_token_log);
     sve_free(ctx);
     return 0;
 }
