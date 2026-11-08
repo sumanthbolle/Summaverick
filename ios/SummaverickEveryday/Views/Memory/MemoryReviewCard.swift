@@ -5,9 +5,6 @@
 // The card waits for the core before it goes: a failed change keeps it, with a short message.
 import SwiftUI
 
-/// How the linked suggestion's step went.
-enum SuggestionStepResult { case done, stale, failed }
-
 struct MemoryReviewCard: View {
     let item: ReviewItem
     /// The linked suggestion's Yes / No is running (TodayView owns it).
@@ -29,7 +26,6 @@ struct MemoryReviewCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if m.health { healthBanner }
             MemoryDetails(memory: m, onPlay: onPlay, showsWaiting: false)
             if failed {
                 Label("Could not save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
@@ -54,16 +50,6 @@ struct MemoryReviewCard: View {
         }
         .onChange(of: editing) { _, open in PresentationGate.shared.set("review.\(m.id)", open) }
         .onDisappear { PresentationGate.shared.set("review.\(m.id)", false) }
-    }
-
-    private var healthBanner: some View {
-        Label("Health-related: please check", systemImage: "heart.text.square.fill")
-            .font(.headline)
-            .foregroundStyle(.primary)
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.yellow.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange, lineWidth: 1.5))
     }
 
     // MARK: the linked reminder or to-do
@@ -122,24 +108,20 @@ struct MemoryReviewCard: View {
         busy = true
         failed = false
         Task {
-            var changed = false, ok = true
-            if let step = plan.suggestion, let s = linked {
-                switch step {
-                case .accept:
-                    switch await onAcceptSuggestion(s, payload) {
-                    case .done: changed = true
-                    case .stale: ok = false
-                    case .failed: ok = false; failed = true
+            let r = await plan.perform(
+                suggestionStep: { step in
+                    guard let s = linked else { return .failed }
+                    switch step {
+                    case .accept: return await onAcceptSuggestion(s, payload)
+                    case .reject: return await onRejectSuggestion(s) ? .done : .failed
                     }
-                case .reject:
-                    if await onRejectSuggestion(s) { changed = true } else { ok = false; failed = true }
-                }
-            }
-            if ok, let review = plan.memoryReview {
-                if await CoreEngine.shared.reviewMemory(memoryID, review == "kept") { changed = true } else { failed = true }
-            }
+                },
+                memoryStep: { review in await CoreEngine.shared.reviewMemory(memoryID, review == "kept") },
+                removeStep: { await CoreEngine.shared.removeMemory(memoryID) })
             busy = false
-            if changed { NotificationCenter.default.post(name: .assistantChanged, object: nil) }
+            failed = r.failed
+            // Also after a re-flagged accept: the row must show the new check fields before the next Yes.
+            if r.needsReload { NotificationCenter.default.post(name: .assistantChanged, object: nil) }
         }
     }
 

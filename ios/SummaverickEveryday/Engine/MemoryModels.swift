@@ -141,6 +141,20 @@ enum ReviewTap: Equatable {
     case suggestionYes(edited: Bool)
     /// No on the linked reminder or to-do row.
     case suggestionNo
+    /// Delete on a memory's card (MemoryCardView), for a memory waiting in the queue.
+    case delete
+}
+
+/// How the linked suggestion's step went.
+enum SuggestionStepResult: Equatable { case done, stale, failed }
+
+/// What running a LinkedDecision did.
+struct LinkedRunResult: Equatable {
+    /// A step failed: the card stays and shows the inline message.
+    var failed = false
+    /// The views must read again: something changed, or the accept came back re-flagged (its new check fields
+    /// must reach the card before the next Yes, so a flagged card asks "Save anyway?" again).
+    var needsReload = false
 }
 
 /// The changes one tap makes, run in this order: the linked suggestion first, then the memory. When the
@@ -150,6 +164,30 @@ struct LinkedDecision: Equatable {
     var suggestion: SuggestionStep?
     /// "kept" | "wrong" | nil (unchanged)
     var memoryReview: String?
+    /// Delete the memory (after the suggestion's step).
+    var removesMemory = false
+
+    /// Runs the steps in order with the given calls: the suggestion, then the memory's review, then its removal.
+    /// A failed step stops there; a re-flagged accept stops without a failure and asks for a reload.
+    func perform(suggestionStep: (SuggestionStep) async -> SuggestionStepResult,
+                 memoryStep: (String) async -> Bool,
+                 removeStep: () async -> Bool) async -> LinkedRunResult {
+        var r = LinkedRunResult()
+        if let suggestion {
+            switch await suggestionStep(suggestion) {
+            case .done: r.needsReload = true
+            case .stale: r.needsReload = true; return r
+            case .failed: r.failed = true; return r
+            }
+        }
+        if let memoryReview {
+            if await memoryStep(memoryReview) { r.needsReload = true } else { r.failed = true; return r }
+        }
+        if removesMemory {
+            if await removeStep() { r.needsReload = true } else { r.failed = true }
+        }
+        return r
+    }
 }
 
 extension ReviewItem {
@@ -170,7 +208,31 @@ extension ReviewItem {
             return LinkedDecision(suggestion: .accept, memoryReview: reviewable && !edited ? "kept" : nil)
         case .suggestionNo:
             return LinkedDecision(suggestion: linked ? .reject : nil, memoryReview: nil)
+        case .delete:
+            return LinkedDecision(suggestion: linked ? .reject : nil, memoryReview: nil, removesMemory: reviewable)
         }
+    }
+
+    /// The review queue from the core's JSON; nil when it could not be read (not the same as an empty queue).
+    /// Medicine memories are left out: the core never queues them (they follow the saved medicine and refuse
+    /// review), so one here would have no way out.
+    static func queue(fromJSON json: String?) -> [ReviewItem]? {
+        guard let json, let items = try? JSONDecoder().decode([ReviewItem].self, from: Data(json.utf8)) else { return nil }
+        return items.filter { $0.memory.origin != "medicine" }
+    }
+}
+
+/// One memory read by id: there, gone (deleted, "null"), or not readable (a read error, which is not "gone").
+enum MemoryLookup: Equatable {
+    case found(BrainMemory)
+    case gone
+    case failed
+
+    init(json: String?) {
+        guard let json else { self = .failed; return }
+        if json.trimmingCharacters(in: .whitespacesAndNewlines) == "null" { self = .gone; return }
+        guard let m = try? JSONDecoder().decode(BrainMemory.self, from: Data(json.utf8)) else { self = .failed; return }
+        self = .found(m)
     }
 }
 

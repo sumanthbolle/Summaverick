@@ -5233,6 +5233,39 @@
           }
         }
       }
+    },
+    "Could not load this.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not load this."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీన్ని తెరవలేకపోయాం."
+          }
+        }
+      }
+    },
+    "Play from %@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play from %@: %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ నుంచి వినిపించు: %@"
+          }
+        }
+      },
+      "comment": "First %@ is a time in the recording, second %@ the memory's words"
     }
   },
   "version": "1.0"

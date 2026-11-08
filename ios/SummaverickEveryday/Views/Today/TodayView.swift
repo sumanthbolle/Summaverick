@@ -59,6 +59,8 @@ struct TodayView: View {
     /// Memories waiting for the person to check, newest recording first.
     @State private var queue: [ReviewItem] = []
     @State private var showAllToCheck = false
+    /// The last read of the queue failed: the cards from before stay, with a line to try again.
+    @State private var queueFailed = false
     @State private var reminders: [Reminder] = []
     @State private var tasks: [TaskItem] = []
     @State private var insight: Insight?
@@ -87,7 +89,7 @@ struct TodayView: View {
                     }
                     if loaded && needsProfile { setupProfileCard }
                     waitingSection
-                    if !queue.isEmpty { toCheckSection }
+                    if !queue.isEmpty || queueFailed { toCheckSection }
                     remindersSection
                     tasksSection
                     if let insight { insightCard(insight) }
@@ -227,6 +229,15 @@ struct TodayView: View {
         let shown = showAllToCheck ? queue : Array(queue.prefix(Self.toCheckCollapsed))
         return VStack(alignment: .leading, spacing: 12) {
             sectionTitle("To check", count: queue.count)
+            if queueFailed {
+                HStack(spacing: 12) {
+                    Label("Could not load this.", systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout.weight(.medium)).foregroundStyle(.red)
+                    Spacer(minLength: 0)
+                    Button("Try again") { Task { await reload() } }
+                        .buttonStyle(.bordered).frame(minHeight: 44)
+                }
+            }
             ForEach(shown) { item in
                 MemoryReviewCard(item: item,
                                  suggestionBusy: item.suggestion.map { busyIDs.contains($0.id) } ?? false,
@@ -425,9 +436,11 @@ struct TodayView: View {
         let i = await e.latestInsight()
         let p = await e.profile()
         let notes = await e.notes()
-        let inCards = ReviewItem.suggestionIDsShown(in: q)
+        // A failed read keeps the cards from before (and so the suggestions they hold stay out of the list).
+        queueFailed = q == nil
+        if let q { withAnimation { queue = q } }
+        let inCards = ReviewItem.suggestionIDsShown(in: queue)
         suggestions = s.filter { !inCards.contains($0.id) }
-        withAnimation { queue = q }
         reminders = r
         tasks = t
         insight = i.flatMap { $0.dismissed ? nil : $0 }

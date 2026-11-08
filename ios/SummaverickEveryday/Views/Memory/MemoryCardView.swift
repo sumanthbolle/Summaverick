@@ -69,6 +69,7 @@ struct MemoryDetails: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if m.health && m.waitingForCheck { HealthCheckBanner() }
             header
             Text(verbatim: m.text).font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
@@ -195,6 +196,19 @@ struct MemoryDetails: View {
     }
 }
 
+/// The yellow line on a health-related memory that is still waiting to be checked.
+struct HealthCheckBanner: View {
+    var body: some View {
+        Label("Health-related: please check", systemImage: "heart.text.square.fill")
+            .font(.headline)
+            .foregroundStyle(.primary)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.yellow.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange, lineWidth: 1.5))
+    }
+}
+
 // MARK: - edit sheet
 
 /// The person's own words for a memory. Save waits for the core: a failure keeps the sheet open with a message.
@@ -271,7 +285,10 @@ struct MemoryCardView: View {
     var onRemoved: (() -> Void)? = nil
 
     @State private var memory: BrainMemory?
-    @State private var loaded = false
+    /// The core said it no longer exists.
+    @State private var gone = false
+    /// The last read failed (not the same as gone): a line with Try again.
+    @State private var readFailed = false
     @State private var busy = false
     @State private var failed = false
     @State private var editing = false
@@ -285,12 +302,14 @@ struct MemoryCardView: View {
 
     var body: some View {
         Group {
-            if let m = memory, m.review != "wrong" {
+            if let m = memory, !gone, m.review != "wrong" {
                 card(m)
-            } else if loaded {
+            } else if gone || memory != nil {
                 Text("This memory was removed.").font(.body).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
+            } else if readFailed {
+                loadFailedLine.padding(16)
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 88)
             }
@@ -316,15 +335,17 @@ struct MemoryCardView: View {
                     .font(.callout.weight(.medium)).foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if readFailed { loadFailedLine }
         }
         .padding(16)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(m.health && m.waitingForCheck ? Color.orange : Color.clear, lineWidth: 2))
         .sheet(isPresented: $editing) {
             MemoryEditSheet(memory: m) { text in await run { await CoreEngine.shared.editMemory(m.id, text) } }
         }
         .confirmationDialog(Text("Delete memory"), isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete memory", role: .destructive) {
-                Task { if await run({ await CoreEngine.shared.removeMemory(m.id) }) { onRemoved?() } }
+                decideLinked(.delete, m)
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -344,9 +365,7 @@ struct MemoryCardView: View {
             }
             MemoryActionButtons(busy: busy, buttons: [
                 .init(title: "Edit", icon: "pencil", tint: nil) { failed = false; editing = true },
-                .init(title: "Wrong", icon: "xmark", tint: .red) {
-                    Task { if await run({ await CoreEngine.shared.reviewMemory(m.id, false) }) { onRemoved?() } }
-                },
+                .init(title: "Wrong", icon: "xmark", tint: .red) { decideLinked(.wrong, m) },
                 .init(title: "Delete memory", icon: "trash", tint: .red) { confirmDelete = true },
             ])
         }
@@ -365,9 +384,56 @@ struct MemoryCardView: View {
         return ok
     }
 
+    private var loadFailedLine: some View {
+        HStack(spacing: 12) {
+            Label("Could not load this.", systemImage: "exclamationmark.triangle.fill")
+                .font(.callout.weight(.medium)).foregroundStyle(.red)
+            Spacer(minLength: 0)
+            Button("Try again") { Task { await reload() } }
+                .buttonStyle(.bordered).frame(minHeight: 44)
+        }
+    }
+
+    /// Wrong or Delete. A memory waiting in the queue with a pending reminder or to-do in its card declines that
+    /// first (ReviewItem.linkedDecision), so it does not come back on its own in "Waiting for you". When the queue
+    /// cannot be read, nothing is changed and the inline message shows.
+    private func decideLinked(_ tap: ReviewTap, _ m: BrainMemory) {
+        guard !busy else { return }
+        busy = true
+        failed = false
+        Task {
+            var plan = LinkedDecision(memoryReview: tap == .wrong ? "wrong" : nil, removesMemory: tap == .delete)
+            var linked: Suggestion?
+            var r = LinkedRunResult()
+            if m.waitingForCheck {
+                if let q = await CoreEngine.shared.reviewQueue() {
+                    if let item = q.first(where: { $0.id == m.id }) { plan = item.linkedDecision(tap); linked = item.suggestion }
+                } else {
+                    r.failed = true
+                }
+            }
+            if !r.failed {
+                r = await plan.perform(
+                    suggestionStep: { step in
+                        guard step == .reject, let s = linked else { return .failed }
+                        return await CoreEngine.shared.reject(s.id) ? .done : .failed
+                    },
+                    memoryStep: { review in await CoreEngine.shared.reviewMemory(m.id, review == "kept") },
+                    removeStep: { await CoreEngine.shared.removeMemory(m.id) })
+            }
+            busy = false
+            failed = r.failed
+            if r.needsReload { NotificationCenter.default.post(name: .assistantChanged, object: nil) }
+            if !r.failed { onRemoved?() }
+        }
+    }
+
     private func reload() async {
-        memory = await CoreEngine.shared.memory(memoryID)
-        loaded = true
+        switch await CoreEngine.shared.lookupMemory(memoryID) {
+        case .found(let m): memory = m; gone = false; readFailed = false
+        case .gone: gone = true; readFailed = false
+        case .failed: readFailed = true
+        }
     }
 }
 

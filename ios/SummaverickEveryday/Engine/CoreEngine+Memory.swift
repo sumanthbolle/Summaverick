@@ -55,8 +55,12 @@ extension CoreEngine {
     /// One memory with its history (the versions it replaced); nil when it is gone.
     func memory(_ id: Int64) -> BrainMemory? { memoryJSON(BrainMemory.self, sve_memory_get(ctx, id)) }
 
-    /// Memories waiting for the person, newest recording first, each with its pending card (if any).
-    func reviewQueue() -> [ReviewItem] { memoryJSON([ReviewItem].self, sve_review_queue_json(ctx)) ?? [] }
+    /// One memory with its history, telling "gone" apart from "could not read".
+    func lookupMemory(_ id: Int64) -> MemoryLookup { MemoryLookup(json: take(sve_memory_get(ctx, id))) }
+
+    /// Memories waiting for the person, newest recording first, each with its pending card (if any);
+    /// nil when the queue could not be read.
+    func reviewQueue() -> [ReviewItem]? { ReviewItem.queue(fromJSON: take(sve_review_queue_json(ctx))) }
 
     // MARK: the person's changes (medicine memories follow their medicine: these refuse them)
 

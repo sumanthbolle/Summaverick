@@ -101,7 +101,7 @@ struct NoteMemoriesSection: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.accentColor)
                 .padding(.trailing, 4)
-                .accessibilityLabel(Text("Play from \(stamp)"))
+                .accessibilityLabel(Text("Play from \(stamp): \(m.text)"))
             }
         }
     }
