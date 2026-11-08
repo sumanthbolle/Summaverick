@@ -34,7 +34,7 @@ The owner's model (pasted 2026-11-08): people do not store a perfect recording; 
 - **A wrong memory.** A memory the recording does not support, a promise attributed to the wrong person, a wrong date, number, name or medicine. Worse than a missing memory.
 - A memory presented as certain when the transcript itself was unclear.
 - Memories the person cannot correct or delete. Anything leaving the phone.
-- Recall practice that nags (people who struggle with memory must never feel tested or scolded).
+- Recall practice that nags or that people learn to swipe away (people who struggle with memory must never feel tested or scolded; nobody should feel it is busywork).
 - All existing medicine safety rules (quote checks, answers built from stored facts, "I didn't hear that in your recordings", the health guard of the chat design) apply unchanged.
 
 ## 5. How it works
@@ -95,13 +95,41 @@ Each step is crash-safe and resumable like transcription and sections (sidecar /
 - Tap a point: card with text, quote, recording and time (▶ play), who, date, confidence. Actions: **Remind me / Make a task** (Yes / Edit / No), **Ask about this** (opens chat with it), **Practise this**, **Done** (promises, open questions), **Wrong**, **Edit**.
 - Pinch to zoom, drag, tap to fold; large touch targets; readable in Telugu and English. A mockup is shown to the owner before building. Few memories: a simple list instead of a sparse map.
 
-### 5.7 Boosting the person's own memory
-- **Try to recall first.** After a recording, an optional "What do you remember?" card: the person says or types what they recall, then sees what they missed and got right (compared against the memories). Never scored harshly; "You remembered 4 of 6. Here are the other 2."
-- **Spaced practice** (for improvers, opt-in per recording or topic): kept memories come back as short questions at growing intervals (1, 3, 7, 14, 30 days), adjusted by how well they were recalled. One small daily set, never more than the person chose.
-- **Daily recap** (for everyone, opt-in): a short evening or morning card: "Today: you met Dr. Rao; you promised Ravi the report by Friday; one question was left open." Tap to hear.
-- **"Who is this?"**: ask by name or by "the doctor I saw last week"; answered from person memories with sources.
-- **Before you meet**: when a reminder or calendar-free task mentions a person, the card shows what was said with them last time.
-- Home screen (Today) shows, in order: due promises and reminders, the review queue, today's practice (if on), the recap. Each part can be turned off.
+### 5.7 Boosting the person's own memory (the adaptive recall engine)
+
+Owner, 2026-11-08: "the trick you play to improve human memory must be adaptive, not just playing cards or something someone can skip easily; this is our major area where we beat competitors." So recall is not a separate deck the person must remember to open. It is woven into the moments the person already uses the app, and it adapts to each person and each memory. Methods are the ones memory research supports (retrieval practice, expanding spaced retrieval, vanishing cues and errorless learning, elaboration, interleaving); none is presented as therapy.
+
+**1. Recall is the way in, not an extra step.** At the moments the person already reaches for a memory, Summaverick first invites them to recall, then shows the answer:
+- Opening a note: "What was decided?" or "What did Dr. Rao say about the dose?" above the summary, with a hint ready. Answering takes one tap or a few words; "Show me" is always there (never locked) but is the second option, not the first.
+- Asking chat about something already in their memories: "You heard this on Tuesday. Want to try first?" for improvers; for people whose memory lets them down, a cue instead ("It was about the evening tablet…") and then the answer.
+- Before a reminder, promise or meeting with a person: "Before you see Ravi: what did you promise him?"
+- The daily recap is built as recall: the person fills in the day from cues, then hears what they missed.
+These moments come from real needs (a meeting today, a due promise, a note opened), so practice is never busywork.
+
+**2. Every memory has its own memory model.** Each memory the person keeps gets a recall state: how stable it is in the person's memory, how hard it is for them, when it is next due, and its history. After each recall attempt the next due time is computed from that state (an FSRS-style scheduler: success at a harder cue stretches the interval more; failure shortens it). Expanding intervals start around 1 day and grow from there; no fixed 1/3/7 list. Promises, medicines and dated items are scheduled to be strong *before* their date.
+
+**3. The cue adapts to the person.** Each attempt picks a cue level from the memory's state:
+- Free recall ("What did you promise Ravi?") when the memory is strong.
+- Partial cue ("You promised Ravi the r… by F…") when weaker.
+- Choice of two or three (built only from the person's own memories, never invented facts) when weak.
+- Errorless mode: the answer is shown with a gap to complete, so wrong answers are not rehearsed. This mode is the default for people whose memory lets them down, and used for medicines for everyone.
+Cues vanish step by step as the memory strengthens (vanishing cues).
+
+**4. The engine adapts to how the person uses it.** It learns, per person:
+- Which moments they respond to (note open, chat, before meetings, recap) and the times of day they answer; it moves prompts there and away from moments they skip.
+- How many prompts a day they accept; it keeps a little under that, never piling up. Skipping is treated as a signal ("not now", "too hard", "don't care about this one"): it changes timing, cue level or drops a memory from practice; it never repeats the same prompt straight away.
+- Which mode suits them, based on outcomes, not a one-time setting: someone who often fails free recall moves toward cues and errorless mode; someone who easily succeeds gets harder cues and longer intervals (desirable difficulty). The person can see and change the mode.
+- Mixing: practice sets mix topics and recordings (interleaving) for improvers; for people whose memory lets them down, one thing at a time.
+
+**5. Making the person think, not just repeat.** For improvers, after a correct answer, sometimes a "why" or "how does this connect" question ("Why did the team pick Monday?") built from linked memories on the map (elaboration). For everyone, connecting a new memory to a person or topic they already know, on the map.
+
+**6. Grading is accurate and kind.** The person's spoken or typed answer is compared with the memory's checked fields (names, numbers, dates, the key words) using the same Telugu/English normalisation as §5.3, then Gemma judges "same meaning?" only for the rest. Numbers, names, dates and medicines must match exactly to count as correct. Unsure grading counts as "partly", never as wrong. Feedback never scolds: "Almost: it was Monday, not Friday."
+
+**7. Visible progress.** A "Your memory" view shows, over weeks: how many kept memories the person can recall without help, how long memories last for them (their personal forgetting curve), promises kept on time, and streak-free consistency (no streaks to lose). Shown as encouragement, not a score to fear.
+
+**8. Daily recap and "who is this?"** stay as designed (recap built as recall, above). "Who is this?" answers from person memories with sources. "Before you meet" is part of point 1.
+
+**Gate (measured, designer's call):** on the owner's own use over two weeks, recall of kept memories at their due time must be at least 80% (the scheduler's target), and the owner must not have turned the prompts off. Reported, with the engine's per-moment response rates.
 
 ### 5.8 Chat (extends the Mini ChatGPT design)
 - Chat answers use memories first (with sources), then pieces, then general knowledge (labelled), as already designed. Regenerate the last answer, Copy, and edit-and-resend the last question (owner request). "Remember this" on any answer creates a memory, which goes through the same review.
@@ -124,6 +152,7 @@ Each step is crash-safe and resumable like transcription and sections (sidecar /
 - Device checks with the owner: a real conversation gives a short correct memory list; every memory plays its source; the map is readable and every action works; recall practice and recap appear when turned on and never when off.
 
 ## 7. Owner decisions
+0. **Adaptive recall is the core differentiator (owner, 2026-11-08):** woven into real moments and adapting to the person, not skippable cards (§5.7).
 1. Serve both groups fully (2026-11-08: "let's not make this unfinished product").
 2. Accuracy over quantity: a missing memory is acceptable, a wrong one is not (from "should be way accurate").
 3. **Accuracy test set (owner, 2026-11-08):** the builder extracts about 100 memories from the owner's real recordings and shows each next to its quote; the owner marks each right or wrong (about 30-40 minutes). The 95% gate is measured on that set.
