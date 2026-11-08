@@ -370,6 +370,13 @@ enum MemoryPass {
         case stopped
     }
 
+    /// What a thrown -2 / -3 from one section counts as: a -3 (the model call failed) is the note's failure only
+    /// when nothing was stopping the run; otherwise (the app left the front on the GPU, the run was cut off, the
+    /// person asked for something, a recording started, critical heat) it is a cancel, like -2.
+    nonisolated static func stepAfterError(modelFailed: Bool, stopping: Bool) -> Step {
+        modelFailed && !stopping ? .failed : .cancelled
+    }
+
     /// After one note of a backfill: a real stop ends it; a finished, gone or failed note lets the next one go.
     static func backfillGoesOn(after outcome: Outcome) -> Bool { outcome != .stopped }
 

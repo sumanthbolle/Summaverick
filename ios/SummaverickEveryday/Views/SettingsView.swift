@@ -84,6 +84,8 @@ struct SettingsView: View {
             .confirmationDialog("Remove Summaverick's AI?", isPresented: $confirmRemoveAI, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) {
                     Task {
+                        pipeline.memoriesHeld = true   // no memory backfill starts while the AI is removed
+                        defer { pipeline.memoriesHeld = false }
                         // Memory work stops for it (K42); a note still being written: busy, as before.
                         guard await pipeline.yieldMemories(), !pipeline.isWorking else { wipeBusy = true; return }
                         await models.remove()
@@ -137,6 +139,8 @@ struct SettingsView: View {
         guard !pipeline.isBusy else { wipeBusy = true; return }
         wiping = true
         Task {
+            pipeline.memoriesHeld = true   // no memory backfill starts while everything is deleted
+            defer { pipeline.memoriesHeld = false }
             // Memory work stops for it (K42); a note still being written: busy, as before.
             guard await pipeline.yieldMemories(), !pipeline.isWorking else { wiping = false; wipeBusy = true; return }
             let engine = CoreEngine.shared

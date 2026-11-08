@@ -123,6 +123,8 @@ final class ProcessingPipeline {
     @ObservationIgnored private var memoryFailed: Set<Int64> = []
     /// A person's action on this note could not start (other work still ran): the note shows the busy line.
     private(set) var busyNotice: Int64?
+    /// Set by Settings while "Delete everything" or "Remove AI" runs: no memory backfill starts meanwhile.
+    var memoriesHeld = false
     /// Set when the app stops being active (read on any thread): cancels a memory run on the GPU before iOS refuses
     /// GPU work in the background, where a failed reply would mark the section done with no memories.
     @ObservationIgnored private let leftFront = AtomicFlag()
@@ -299,9 +301,16 @@ final class ProcessingPipeline {
         return id
     }
 
-    /// Re-runs the AI stage for an existing note (resume after interruption, or after a model change).
+    /// "Generate notes" on a note: memory work yields first; other work still running shows the busy line.
     func regenerate(noteID: Int64) async {
         guard await personMayStart(noteID) else { return }
+        await rerun(noteID: noteID)
+    }
+
+    /// Re-runs the AI stage for an existing note (resume after interruption, or after a model change). Internal
+    /// callers (the resume loop, Do it now, Try again) come here directly: no busy line without a tap.
+    private func rerun(noteID: Int64) async {
+        guard !isWorking else { return }
         starting = true
         defer { starting = false }
         guard let note = await CoreEngine.shared.note(noteID) else { unmarkOvernight(noteID); return }   // deleted
@@ -471,7 +480,7 @@ final class ProcessingPipeline {
         guard await personMayStart(id) else { return }
         interrupted.remove(id)
         heatPaused.remove(id)
-        await regenerate(noteID: id)
+        await rerun(noteID: id)
     }
 
     /// Audio → text, on the CPU, from where live transcription (or an interrupted run) stopped. The model
@@ -823,6 +832,7 @@ final class ProcessingPipeline {
             })
         switch outcome {
         case .finished:
+            memoryFailed.remove(id)
             return .finished
         case .stopped:
             NSLog("[sve] note %lld: memories stopped after %ld of %ld sections; the rest wait", id, finished, due.count)
@@ -879,8 +889,13 @@ final class ProcessingPipeline {
                     retried = true
                     continue
                 }
-                if e == .modelFailed { NSLog("[sve] memories: the model call failed for section %ld; it stays due", idx) }
-                return e == .modelFailed ? .failed : .cancelled
+                // A -3 while stopping (left the front on the GPU, cut off, the person, a recording, critical heat) is a
+                // stop, not a failing note: it never lands in memoryFailed.
+                let step = MemoryPass.stepAfterError(
+                    modelFailed: e == .modelFailed,
+                    stopping: (gpu && leftFront.isSet) || abort.isSet || memoryStop.isSet || recording.isSet || Self.critical)
+                if step == .failed { NSLog("[sve] memories: the model call failed for section %ld; it stays due", idx) }
+                return step
             } catch {
                 NSLog("[sve] memories: model not ready: %@", String(describing: error))
                 return .cancelled   // stops; the section stays due
@@ -895,7 +910,7 @@ final class ProcessingPipeline {
     /// starts, a note's notes may start, the phone gets too hot, the run is cut off, or the person asks for something
     /// (yieldMemories). Never keeps the screen on.
     func backfillMemories() async {
-        guard !isWorking, !resuming, ModelManager.shared.isReady, !LiveTranscriber.shared.isRecording,
+        guard !isWorking, !resuming, !memoriesHeld, ModelManager.shared.isReady, !LiveTranscriber.shared.isRecording,
               appIsActive || overnightRun != nil, !(overnightRun?.isSet ?? false),
               Heat.beforeRun(Self.thermal) != .pause, nextToResume(tried: []) == nil else { return }
         starting = true
@@ -1042,7 +1057,7 @@ final class ProcessingPipeline {
             let owned = OvernightList.ownsRun(inOvernightTask: overnightRun != nil, appActive: appIsActive,
                                               continuedTaskHeld: ContinuedWork.shared.isHeld)
             overnightOwnsRun.set(owned)
-            await regenerate(noteID: id)
+            await rerun(noteID: id)
             overnightOwnsRun.set(false)
             if !interrupted.contains(id) { markAutoTried(id) }
         }
@@ -1231,7 +1246,7 @@ final class ProcessingPipeline {
         lastFailure[id] = nil
         await yieldMemories()
         guard !isWorking else { interrupted.insert(id); return }
-        await regenerate(noteID: id)
+        await rerun(noteID: id)
     }
 
     func isOvernight(_ id: Int64) -> Bool { overnight.contains(id) }
