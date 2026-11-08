@@ -69,6 +69,10 @@
 			isa = PBXBuildFile;
 			fileRef = 3C94D64FE92A566816D76B43;
 		};
+		6676C0DB08957FBDC042C54F = {
+			isa = PBXBuildFile;
+			fileRef = 6F60E66F2FF8D363A05C6C95;
+		};
 		7145186EECA51AD6A675CA64 = {
 			isa = PBXBuildFile;
 			fileRef = 91B7437CBCDFB5FF9D4AD20B;
@@ -426,6 +430,13 @@
 			path = SummaverickEveryday/Engine/AssistantModels.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		6F60E66F2FF8D363A05C6C95 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_textmatch.cpp;
+			path = ../core/src/sve_textmatch.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
 		8108122AC683F0C05267E8CD = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -515,6 +526,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_prompts.h;
 			path = ../core/src/sve_prompts.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		ACA29E21DABD1A9615823569 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_textmatch.h;
+			path = ../core/src/sve_textmatch.h;
 			sourceTree = SOURCE_ROOT;
 		};
 		ADEEFA19D57BA7D03687B2E4 = {
@@ -853,6 +871,8 @@
 				D3DFAF817EC8F3EB79853B54,
 				FDA9E084D501D8D1690658ED,
 				E5E3C7E62C1B0998F7D272BF,
+				6F60E66F2FF8D363A05C6C95,
+				ACA29E21DABD1A9615823569,
 			);
 			name = Core;
 			sourceTree = "<group>";
@@ -984,6 +1004,7 @@
 				FA89EFDB7CFDC888DE748CAB,
 				CE05B940BCBE599A11AE22E8,
 				DC70A4770243CC1CA714EEB5,
+				6676C0DB08957FBDC042C54F,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

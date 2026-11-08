@@ -49,6 +49,7 @@ add_library(svecore STATIC
   src/sve_extract.cpp
   src/sve_context.cpp
   src/sve_medcheck.cpp
+  src/sve_textmatch.cpp
   src/sve_learn.cpp
   src/sve_store.cpp
   src/sve_audio.cpp

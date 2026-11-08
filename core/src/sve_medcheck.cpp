@@ -95,6 +95,8 @@ std::vector<std::string> tokens(const std::string &raw, bool split = true) {
     return out;
 }
 
+}  // namespace
+
 bool contains_run(const std::vector<std::string> &hay, const std::vector<std::string> &needle) {
     if (needle.empty()) return true;
     if (needle.size() > hay.size()) return false;
@@ -105,6 +107,8 @@ bool contains_run(const std::vector<std::string> &hay, const std::vector<std::st
     }
     return false;
 }
+
+namespace {
 
 bool is_filler(const std::string &t) {
     static const char *kFiller[] = {"tab", "tabs", "tablet", "tablets", "cap", "caps",
@@ -132,6 +136,8 @@ bool name_window_match(const std::vector<std::string> &q, const std::vector<std:
     return false;
 }
 
+}  // namespace
+
 bool name_ok(const std::string &value, const std::string &quote) {
     std::vector<std::string> v = tokens(value, false), q = tokens(quote, false);
     if (v.empty()) return false;
@@ -140,6 +146,8 @@ bool name_ok(const std::string &value, const std::string &quote) {
     for (auto &t : v) if (!is_filler(t)) nf.push_back(t);
     return name_window_match(q, nf);
 }
+
+namespace {
 
 std::string unit_key(const std::string &t) {
     static const char *kPlural[] = {"tablets", "drops", "capsules", "caps", "tabs"};
@@ -169,6 +177,8 @@ bool field_ok(const std::string &value, const std::vector<std::string> &q, bool 
 }
 
 }  // namespace
+
+std::vector<std::string> med_tokens(const std::string &s, bool split) { return tokens(s, split); }
 
 std::string normalize_for_match(const std::string &s) {
     std::string o;
