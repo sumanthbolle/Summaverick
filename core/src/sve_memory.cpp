@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 
+#include "sve_english_words.h"
 #include "sve_health.h"
 #include "sve_medcheck.h"
 #include "sve_suggest.h"
@@ -88,9 +89,147 @@ bool name_said(const std::string &name, const std::string &text) {
     return false;
 }
 
-// Capitalised Latin words that are not common words: the names, places and labels a text names.
-// Weekdays and months are left to the canonical-facts check.
-std::vector<std::string> name_words(const std::string &text) {
+// ---------------------------------------------------------------- names across scripts
+
+// A name the memory relies on: as said in the quote, and as written in the memory's text.
+struct Name { std::string said, written; };
+
+std::vector<Name> name_list(const json &cand) {
+    std::vector<Name> out;
+    for (const auto &v : jarr(cand, "names")) {
+        Name n;
+        if (v.is_string()) n.said = n.written = trim_copy(v.get<std::string>());
+        else if (v.is_object()) { n.said = trim_copy(jstr(v, "as_said")); n.written = trim_copy(jstr(v, "as_written")); }
+        if (n.written.empty()) n.written = n.said;
+        if (!n.said.empty()) out.push_back(n);
+    }
+    return out;
+}
+
+bool mostly_telugu(const std::string &s) {
+    size_t te = 0, latin = 0;
+    for (size_t i = 0; i < s.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if ((c | 0x20) >= 'a' && (c | 0x20) <= 'z') ++latin;
+        else if (c == 0xE0 && i + 1 < s.size() &&
+                 (static_cast<unsigned char>(s[i + 1]) == 0xB0 || static_cast<unsigned char>(s[i + 1]) == 0xB1)) {
+            ++te;
+            i += 2;
+        }
+    }
+    return te > latin;
+}
+
+bool has_telugu(const std::string &s) {
+    for (size_t i = 0; i + 1 < s.size(); ++i)
+        if (static_cast<unsigned char>(s[i]) == 0xE0 &&
+            (static_cast<unsigned char>(s[i + 1]) == 0xB0 || static_cast<unsigned char>(s[i + 1]) == 0xB1))
+            return true;
+    return false;
+}
+
+std::string collapse(const std::string &s) {
+    std::string out;
+    for (char c : s) if (out.empty() || out.back() != c) out += c;
+    return out;
+}
+
+// Consonant skeleton of a Latin spelling: aspirates as their plain consonant (th -> t, sh -> s, ...),
+// w as v, no vowels, y or h, doubles collapsed.
+std::string latin_skeleton(const std::string &word) {
+    std::string w = ascii_lower(word), out;
+    for (size_t i = 0; i < w.size(); ++i) {
+        char c = w[i], n = i + 1 < w.size() ? w[i + 1] : 0;
+        if (c < 'a' || c > 'z') continue;
+        if (c == 'x') { out += "ks"; continue; }
+        if (n == 'h' && std::string("tdkbgpcjs").find(c) != std::string::npos) { out += c; ++i; continue; }
+        switch (c) {
+            case 'a': case 'e': case 'i': case 'o': case 'u': case 'y': case 'h': continue;
+            case 'w': out += 'v'; continue;
+            case 'f': out += 'p'; continue;
+            case 'z': out += 'j'; continue;
+            case 'q': out += 'k'; continue;
+            case 'c': out += 'k'; continue;
+            case 'm': out += (n == 'b' || n == 'p') ? 'n' : 'm'; continue;
+            default: out += c;
+        }
+    }
+    return collapse(out);
+}
+
+// Consonant skeleton of a Telugu word, on the same letters as latin_skeleton.
+std::string telugu_skeleton(const std::string &word) {
+    static const char *kCons[] = {
+        "k", "k", "g", "g", "n", "c", "c", "j", "j", "n",  // U+0C15 క .. U+0C1E ఞ
+        "t", "t", "d", "d", "n", "t", "t", "d", "d", "n",  // ట .. న
+        "",  "p", "p", "b", "b", "m", "",  "r", "r", "l",  // U+0C29, ప .. ల (య dropped)
+        "l", "l", "v", "s", "s", "s", "",                  // ళ ఴ వ శ ష స హ
+    };
+    std::string out;
+    const std::string w = nfc_clean(word);
+    for (size_t i = 0; i < w.size();) {
+        unsigned char b0 = static_cast<unsigned char>(w[i]);
+        if (b0 < 0x80) { ++i; continue; }
+        size_t len = b0 >= 0xF0 ? 4 : b0 >= 0xE0 ? 3 : 2;
+        if (i + len > w.size()) break;
+        unsigned cp = len == 3 ? ((b0 & 0x0F) << 12) | ((static_cast<unsigned char>(w[i + 1]) & 0x3F) << 6) |
+                                     (static_cast<unsigned char>(w[i + 2]) & 0x3F)
+                               : 0;
+        i += len;
+        if (cp >= 0x0C15 && cp <= 0x0C39) out += kCons[cp - 0x0C15];
+        else if (cp == 0x0C02) out += 'n';                                    // anusvara
+        else if (cp == 0x0C0B || cp == 0x0C43 || cp == 0x0C44) out += 'r';   // ఋ, ృ, ౄ
+    }
+    return collapse(out);
+}
+
+// True when `written` (Latin) plausibly spells `said` (Telugu quote words): their consonant skeletons
+// agree, after dropping honorifics (గారు ...) and the last word's case ending. A final వు may be
+// silent in English ("Rao" for రావు).
+bool transliterates(const std::string &written, const std::string &said) {
+    static const std::set<std::string> kHonorific = {"గారు", "గారికి", "గారితో", "గారిని", "గారి", "గారూ"};
+    if (!has_telugu(said) || has_telugu(written)) return false;
+    std::string lat;
+    for (const auto &t : med_tokens(written, false)) lat += latin_skeleton(t);
+    lat = collapse(lat);
+    if (lat.empty()) return false;
+    Tokens words;
+    for (const auto &t : med_tokens(nfc_clean(said), false))
+        if (!kHonorific.count(t)) words.push_back(t);
+    if (words.empty()) return false;
+    std::string head;
+    for (size_t i = 0; i + 1 < words.size(); ++i) head += telugu_skeleton(words[i]);
+    std::vector<std::string> lasts = {words.back()};
+    for (const auto &e : kTeluguCaseEndings)
+        if (words.back().size() > e.size() && words.back().compare(words.back().size() - e.size(), e.size(), e) == 0)
+            lasts.push_back(words.back().substr(0, words.back().size() - e.size()));
+    for (const auto &l : lasts) {
+        std::string sk = collapse(head + telugu_skeleton(l));
+        if (sk == lat) return true;
+        if (sk.size() > 1 && sk.back() == 'v' && sk.substr(0, sk.size() - 1) == lat) return true;
+    }
+    return false;
+}
+
+// names as [{"as_said","as_written"}]; a plain string is both.
+json names_json(const json &cand) {
+    json out = json::array();
+    for (const auto &n : name_list(cand)) out.push_back({{"as_said", n.said}, {"as_written", n.written}});
+    return out;
+}
+
+// The Latin words of a name, lowercase.
+std::set<std::string> written_words(const std::vector<Name> &names) {
+    std::set<std::string> out;
+    for (const auto &n : names)
+        for (const auto &t : med_tokens(n.written, false)) out.insert(t);
+    return out;
+}
+
+// Capitalised Latin words that may be names. Not counted: weekdays and months (the canonical-facts
+// check has them), words with digits, a short list of everyday words anywhere, and a sentence's first
+// word when it is a common English word. A word some name is written as always counts.
+std::vector<std::string> name_words(const std::string &raw, const std::set<std::string> &written) {
     static const std::set<std::string> kCommon = {
         "i", "a", "an", "the", "we", "he", "she", "they", "it", "you", "me", "us", "him", "her", "them", "my", "our",
         "your", "his", "their", "its", "this", "that", "these", "those", "there", "here", "today", "tomorrow",
@@ -105,18 +244,39 @@ std::vector<std::string> name_words(const std::string &text) {
         "start", "stop", "keep", "move", "find", "try", "learn", "talk", "see", "look", "use", "decide", "decided",
         "promise", "promised", "said", "say", "agreed", "agree", "follow", "renew", "clean", "repair", "transfer",
     };
+    std::string text;  // curly apostrophes as '
+    for (size_t i = 0; i < raw.size(); ++i) {
+        if (raw.compare(i, 3, "\xE2\x80\x99") == 0) { text += '\''; i += 2; }
+        else text += raw[i];
+    }
     std::vector<std::string> out;
     std::string cur;
+    bool initial = true, next_initial = true;
     auto flush = [&] {
-        bool digit = std::any_of(cur.begin(), cur.end(), [](char c) { return c >= '0' && c <= '9'; });
-        if (!cur.empty() && cur[0] >= 'A' && cur[0] <= 'Z' && !digit && !kCommon.count(ascii_lower(cur)) &&
-            canonical_facts(cur).empty())
-            out.push_back(cur);
+        if (cur.empty()) return;
+        std::string w = cur;
         cur.clear();
+        if (w.size() >= 2 && (w.compare(w.size() - 2, 2, "'s") == 0)) w.resize(w.size() - 2);
+        while (!w.empty() && w.back() == '\'') w.pop_back();
+        const bool first = initial;
+        initial = false;
+        if (w.empty() || w[0] < 'A' || w[0] > 'Z') return;
+        if (std::any_of(w.begin(), w.end(), [](char c) { return c >= '0' && c <= '9'; })) return;
+        if (!canonical_facts(w).empty()) return;
+        std::string lower = ascii_lower(w), bare;
+        for (char c : lower) if (c != '\'') bare += c;
+        if (!written.count(bare) && (kCommon.count(lower) || (first && common_english_word(lower)))) return;
+        out.push_back(w.substr(0, w.find('\'')));
     };
     for (char c : text) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) cur += c;
-        else flush();
+        bool letter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+        if (letter || (c == '\'' && !cur.empty())) {
+            if (cur.empty()) { initial = next_initial; next_initial = false; }
+            cur += c;
+            continue;
+        }
+        flush();
+        if (c == '.' || c == '!' || c == '?' || c == ':' || c == '\n') next_initial = true;
     }
     flush();
     return out;
@@ -130,25 +290,40 @@ bool is_pronoun(const std::string &who) {
     return kPronouns.count(ascii_lower(nfc_clean(trim_copy(who)))) > 0;
 }
 
+// The ways a person may be said: as given, and the quote words of a listed name written that way
+// (when the spelling fits).
+std::vector<std::string> said_forms(const std::string &who, const std::vector<Name> &names) {
+    std::vector<std::string> out = {who};
+    for (const auto &n : names)
+        if (ascii_lower(n.written) == ascii_lower(who) && n.said != who && transliterates(n.written, n.said))
+            out.push_back(n.said);
+    return out;
+}
+
 // A spoken person is kept only when the recording says it: in the quote, or (a name, not a pronoun)
-// just before it with no other name in between. `others`: the candidate's other names.
+// just before it with no other name in between. `others`: how the candidate's other names are said.
 std::string keep_person(const std::string &who, const std::string &quote, const std::string &before,
-                        const std::vector<std::string> &others) {
+                        const std::vector<Name> &names, const std::vector<std::string> &others) {
     std::string w = trim_copy(who);
     if (w.empty()) return "";
-    if (name_said(w, quote)) return w;
+    const std::vector<std::string> forms = said_forms(w, names);
+    for (const auto &f : forms) if (name_said(f, quote)) return w;
     if (is_pronoun(w)) return "";
     const std::vector<size_t> starts = word_starts(before);
     for (size_t k = starts.size(); k-- > 0;) {
-        if (!name_said(w, before.substr(starts[k]))) continue;
+        std::string form;
+        for (const auto &f : forms) if (name_said(f, before.substr(starts[k]))) { form = f; break; }
+        if (form.empty()) continue;
         // The last place it is said: everything after its words must name nobody else.
-        size_t words = word_starts(w).size(), after = k + words;
+        size_t after = k + word_starts(form).size();
         std::string between = after < starts.size() ? before.substr(starts[after]) : "";
         const std::string wl = ascii_lower(w);
-        for (const auto &nw : name_words(between))
+        for (const auto &nw : name_words(between, {}))
             if (wl.find(ascii_lower(nw)) == std::string::npos) return "";
-        for (const auto &o : others)
-            if (!o.empty() && ascii_lower(o) != wl && name_said(o, between)) return "";
+        for (const auto &o : others) {
+            bool self = std::find(forms.begin(), forms.end(), o) != forms.end() || ascii_lower(o) == wl;
+            if (!o.empty() && !self && name_said(o, between)) return "";
+        }
         return w;
     }
     return "";
@@ -188,7 +363,7 @@ json parse_memory_candidates(const json &arr) {
         out.push_back({{"type", type}, {"text", text}, {"quote", q->get<std::string>()},
                        {"who", trim_copy(jstr(c, "who"))}, {"to_whom", trim_copy(jstr(c, "to_whom"))},
                        {"due_text", trim_copy(jstr(c, "due_text"))},
-                       {"names", string_list(c, "names")}, {"numbers", string_list(c, "numbers")},
+                       {"names", names_json(c)}, {"numbers", string_list(c, "numbers")},
                        {"dates", string_list(c, "dates")}, {"times", string_list(c, "times")},
                        {"start_sec", std::max<int64_t>(0, jint(c, "start_sec", 0))}});
     }
@@ -204,7 +379,12 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
     if (mentions_medicine(text + " " + given_quote, med_names)) { g.reason = "medicine"; return g; }
 
     // A quote of a word or two ("okay") cannot support a memory.
-    if (med_tokens(nfc_clean(given_quote)).size() < 4) { g.reason = "quote_too_short"; return g; }
+    // A quote of a word or two ("okay") cannot support a memory: 4 words, or 3 in Telugu, whose words
+    // carry their own case endings and person.
+    if (med_tokens(nfc_clean(given_quote)).size() < (mostly_telugu(given_quote) ? 3u : 4u)) {
+        g.reason = "quote_too_short";
+        return g;
+    }
 
     // 2. The quote is said in the section: inside one piece, or across one piece boundary.
     const Tokens qtok = match_tokens(given_quote);
@@ -232,14 +412,17 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
 
     // 3. Every name, number, date and time the memory relies on is in the quote.
     json checked = json::array();
-    const struct { const char *key, *kind; } kFields[] = {
-        {"names", "name"}, {"numbers", "number"}, {"dates", "date"}, {"times", "time"}};
+    const std::vector<Name> names = name_list(cand);
+    for (const auto &n : names) {
+        if (!name_said(n.said, quote)) { g.reason = "field_not_in_quote:name"; return g; }
+        checked.push_back({{"kind", "name"}, {"text", n.said}, {"as_written", n.written}});
+    }
+    const struct { const char *key, *kind; } kFields[] = {{"numbers", "number"}, {"dates", "date"}, {"times", "time"}};
     for (const auto &f : kFields)
         for (const auto &v : jarr(cand, f.key)) {
             std::string s = v.is_string() ? trim_copy(v.get<std::string>()) : "";
             if (s.empty()) continue;
-            bool ok = std::string(f.kind) == "name" ? name_said(s, quote) : in_run(qtok, s);
-            if (!ok) { g.reason = std::string("field_not_in_quote:") + f.kind; return g; }
+            if (!in_run(qtok, s)) { g.reason = std::string("field_not_in_quote:") + f.kind; return g; }
             checked.push_back({{"kind", f.kind}, {"text", s}});
         }
 
@@ -248,19 +431,27 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
     for (const auto &t : canonical_facts(quote)) ++have[t];
     for (const auto &t : canonical_facts(text))
         if (--have[t] < 0) { g.reason = "text_not_in_quote"; return g; }
-    // Every name the text shows (a capitalised word that is not a common word) is said in the quote.
-    for (const auto &w : name_words(text))
-        if (!name_said(w, quote)) { g.reason = "text_name_not_in_quote"; return g; }
+    // Every name the text shows (a capitalised word that is not a common word) is said in the quote,
+    // or is how a listed name is written and plausibly spells the quote's words for it.
+    for (const auto &w : name_words(text, written_words(names))) {
+        if (name_said(w, quote)) continue;
+        const std::string wl = ascii_lower(w);
+        bool listed = std::any_of(names.begin(), names.end(), [&](const Name &n) {
+            const Tokens ws = med_tokens(n.written, false);
+            return std::find(ws.begin(), ws.end(), wl) != ws.end() && transliterates(n.written, n.said);
+        });
+        if (!listed) { g.reason = "text_name_not_in_quote"; return g; }
+    }
 
     // 5. who / to_whom only when said.
     const std::string before = bytes_before(joined, offset[first] + span.first, 80);
-    std::vector<std::string> names;
-    for (const auto &v : jarr(cand, "names")) if (v.is_string()) names.push_back(trim_copy(v.get<std::string>()));
-    std::vector<std::string> others_w = names, others_t = names;
-    others_w.push_back(jstr(cand, "to_whom"));
-    others_t.push_back(jstr(cand, "who"));
-    const std::string who = keep_person(jstr(cand, "who"), quote, before, others_w);
-    const std::string to_whom = keep_person(jstr(cand, "to_whom"), quote, before, others_t);
+    std::vector<std::string> said_names;
+    for (const auto &n : names) said_names.push_back(n.said);
+    std::vector<std::string> others_w = said_names, others_t = said_names;
+    for (const auto &f : said_forms(trim_copy(jstr(cand, "to_whom")), names)) others_w.push_back(f);
+    for (const auto &f : said_forms(trim_copy(jstr(cand, "who")), names)) others_t.push_back(f);
+    const std::string who = keep_person(jstr(cand, "who"), quote, before, names, others_w);
+    const std::string to_whom = keep_person(jstr(cand, "to_whom"), quote, before, names, others_t);
 
     // 6. A deadline only in the quote's words, resolved against the day it was said.
     std::string due_text = trim_copy(jstr(cand, "due_text"));

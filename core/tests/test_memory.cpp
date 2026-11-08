@@ -72,6 +72,9 @@ TEST(parse_candidates_shape) {
     CHECK_EQ(out[0]["type"], "question");
     CHECK_EQ(out[0]["who"], "");
     CHECK_EQ(out[0]["names"], json::array());
+    json named = parse_memory_candidates(json::array({{{"type", "fact"}, {"text", "t"}, {"quote", "q"},
+        {"names", json::array({"Ravi", {{"as_said", "రవికి"}, {"as_written", "Ravi"}}, {{"as_written", "x"}}, 5})}}}));
+    CHECK_EQ(named[0]["names"], json::parse(R"([{"as_said":"Ravi","as_written":"Ravi"},{"as_said":"రవికి","as_written":"Ravi"}])"));
     CHECK_EQ(out[0]["start_sec"], 0);
     json many = json::array();
     for (int i = 0; i < 12; ++i) many.push_back({{"type", "idea"}, {"text", "idea"}, {"quote", "q"}});
@@ -125,8 +128,8 @@ TEST(ground_number_must_be_in_quote) {
 }
 
 TEST(ground_name_with_case_ending) {
-    SectionPieces p = {{12, "సరే సాయంత్రం రవికి రిపోర్ట్ పంపుతాను"}};
-    json c = cand("promise", "రవికి రిపోర్ట్ పంపాలి", "సాయంత్రం రవికి రిపోర్ట్ పంపుతాను");
+    SectionPieces p = {{12, "సాయంత్రం రవికి రిపోర్ట్ పంపుతాను"}};
+    json c = cand("promise", "రవికి రిపోర్ట్ పంపాలి", "రవికి రిపోర్ట్ పంపుతాను");
     c["names"] = V{"రవి"};
     Grounded g = ground(c, p);
     CHECK(g.ok);
@@ -136,12 +139,60 @@ TEST(ground_name_with_case_ending) {
     g = ground(c, p);
     CHECK(!g.ok);
     CHECK_EQ(g.reason, "field_not_in_quote:name");
-    // A transliterated name in the text alone is dropped too.
+    // A plain string is as_said = as_written: an English spelling in the text has nothing to match.
     c["names"] = V{"రవి"};
     c["text"] = "Send the report to Ravi";
     g = ground(c, p);
     CHECK(!g.ok);
     CHECK_EQ(g.reason, "text_name_not_in_quote");
+}
+
+TEST(ground_names_across_scripts) {
+    SectionPieces p = {{12, "సాయంత్రం రవికి రిపోర్ట్ పంపుతాను"}};
+    json c = cand("promise", "Ravi will send the report", "రవికి రిపోర్ట్ పంపుతాను");
+    c["names"] = json::array({{{"as_said", "రవికి"}, {"as_written", "Ravi"}}});
+    c["to_whom"] = "Ravi";
+    Grounded g = ground(c, p);
+    CHECK(g.ok);
+    CHECK_EQ(g.row["checked"][0]["text"], "రవికి");
+    CHECK_EQ(g.row["checked"][0]["as_written"], "Ravi");
+    CHECK_EQ(g.row["to_whom"], "Ravi");  // said in the quote as రవికి
+    c["text"] = "Kiran will send the report";
+    c["names"] = json::array({{{"as_said", "రవికి"}, {"as_written", "Kiran"}}});
+    g = ground(c, p);
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "text_name_not_in_quote");
+    c["names"] = json::array({{{"as_said", "కిరణ్"}, {"as_written", "Kiran"}}});  // not said at all
+    g = ground(c, p);
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "field_not_in_quote:name");
+
+    SectionPieces s = {{0, "సురేష్ రేపు డబ్బులు ఇస్తాడు"}};
+    json d = cand("promise", "Suresh will pay tomorrow", "సురేష్ రేపు డబ్బులు ఇస్తాడు");
+    d["names"] = json::array({{{"as_said", "సురేష్"}, {"as_written", "Suresh"}}});
+    CHECK(ground(d, s).ok);
+
+    SectionPieces r = {{0, "రావు గారు రేపు ఆఫీసుకు వస్తారు"}};
+    json e = cand("fact", "Rao comes to the office tomorrow", "రావు గారు రేపు ఆఫీసుకు వస్తారు");
+    e["names"] = json::array({{{"as_said", "రావు గారు"}, {"as_written", "Rao"}}});
+    CHECK(ground(e, r).ok);
+    e["names"] = json::array({{{"as_said", "రావు గారు"}, {"as_written", "Kumar"}}});
+    e["text"] = "Kumar comes to the office tomorrow";
+    CHECK_EQ(ground(e, r).reason, "text_name_not_in_quote");
+
+    // Common spellings of common names.
+    const std::vector<std::pair<std::string, std::string>> kPairs = {
+        {"వెంకటేష్", "Venkatesh"}, {"లక్ష్మి", "Lakshmi"}, {"కృష్ణ", "Krishna"}, {"సాయి", "Sai"},
+        {"ఆనంద్", "Anand"}, {"శ్రీనివాస్", "Srinivas"}, {"భాస్కర్", "Bhaskar"}, {"చరణ్", "Charan"},
+        {"రాజుకి", "Raju"}, {"పద్మ", "Padma"}, {"అంబిక", "Ambika"}, {"విజయ్", "Vijay"}};
+    for (const auto &pr : kPairs) {
+        const std::string q = pr.first + " రేపు ఆఫీసుకు వస్తారు";
+        json f = cand("fact", pr.second + " comes to the office tomorrow", q);
+        f["names"] = json::array({{{"as_said", pr.first}, {"as_written", pr.second}}});
+        Grounded h = ground(f, {{0, q}});
+        if (!h.ok) std::fprintf(stderr, "  name pair failed: %s\n", pr.second.c_str());
+        CHECK(h.ok);
+    }
 }
 
 TEST(ground_multiword_name_is_one_run) {
@@ -161,14 +212,29 @@ TEST(ground_text_names_must_be_said) {
     CHECK(!g.ok);
     CHECK_EQ(g.reason, "text_name_not_in_quote");
     CHECK(ground(cand("promise", "Suresh will pay tomorrow", "Suresh will pay tomorrow evening"), p).ok);
+    // A sentence's first word that is a common English word is not a name.
+    SectionPieces a = {{0, "we must arrange chairs for Friday"}};
+    CHECK(ground(cand("promise", "Arrange chairs for Friday", "arrange chairs for Friday"), a).ok);
+    CHECK(ground(cand("fact", "Chairs needed. Arrange them for Friday", "arrange chairs for Friday"), a).ok);
+    // ...unless it is how a listed name is written.
+    json k = cand("promise", "Will arrange chairs for Friday", "must arrange chairs for Friday");
+    k["names"] = json::array({{{"as_said", "అరవింద్"}, {"as_written", "Will"}}});
+    CHECK(!ground(k, a).ok);
+    // A capitalised word mid-sentence is a name even when it is a common word elsewhere.
+    CHECK_EQ(ground(cand("promise", "We arrange Delhi chairs for Friday", "arrange chairs for Friday"), a).reason,
+             "text_name_not_in_quote");
 }
 
 TEST(ground_short_quote_drops) {
     Grounded g = ground(cand("fact", "Ravi is moving to Delhi", "okay"), {{0, "okay"}});
     CHECK(!g.ok);
     CHECK_EQ(g.reason, "quote_too_short");
-    g = ground(cand("fact", "They had lunch", "we had lunch"), kTwo);  // three words
+    g = ground(cand("fact", "They had lunch", "we had lunch"), kTwo);  // three Latin words
     CHECK(!g.ok);
+    CHECK_EQ(g.reason, "quote_too_short");
+    SectionPieces t = {{0, "సాయంత్రం రవికి రిపోర్ట్ పంపుతాను"}};
+    CHECK(ground(cand("fact", "రిపోర్ట్ పంపాలి", "రవికి రిపోర్ట్ పంపుతాను"), t).ok);  // three Telugu words
+    g = ground(cand("fact", "రిపోర్ట్ పంపాలి", "రిపోర్ట్ పంపుతాను"), t);               // two
     CHECK_EQ(g.reason, "quote_too_short");
 }
 

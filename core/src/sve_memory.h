@@ -21,7 +21,8 @@ constexpr double kLowConfidence = 0.0;
 // Up to 8 valid candidates: type is one of fact/decision/promise/question/person/idea
 // ("open question" -> question), text non-empty and at most 300 bytes, quote a string.
 // Output keys: type, text, quote, who, to_whom, due_text (strings, "" when missing),
-// names, numbers, dates, times (arrays of non-empty strings), start_sec (>= 0, default 0).
+// numbers, dates, times (arrays of non-empty strings), start_sec (>= 0, default 0), and
+// names: [{"as_said": the quote's words, "as_written": the form the text uses}] (a plain string is both).
 json parse_memory_candidates(const json &arr);
 
 struct Grounded {
@@ -30,6 +31,7 @@ struct Grounded {
     // text_not_in_quote, text_name_not_in_quote.
     std::string reason;
     // type,text,who,to_whom,due_text,due_date,said_date,checked,confidence,health,sources:[{start_sec,quote,conf}].
+    // checked: [{"kind","text"}], text in the quote's words; names also carry "as_written".
     // sources[0].quote is the transcript's own words that matched, not the model's copy.
     json row;
     // Names, numbers, dates, promises, and every memory that could skip the review queue.

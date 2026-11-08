@@ -256,6 +256,13 @@
 			path = SummaverickEveryday/Engine/TranscriptSidecar.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		10A99A9004D029F7A08C362A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_english_words.h;
+			path = ../core/src/sve_english_words.h;
+			sourceTree = SOURCE_ROOT;
+		};
 		171A4CC9E4CFD6CB1704585A = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -891,6 +898,7 @@
 				9E2ACA831A68C5FC7568EFA9,
 				E6FD595D542BBAD86BA1B59B,
 				3C94D64FE92A566816D76B43,
+				10A99A9004D029F7A08C362A,
 				EE7D0A38215CFAEEF0A0E2BE,
 				B785295E08BF51AAC35D02B4,
 				C6E38749CC30FE0501F34CE0,
