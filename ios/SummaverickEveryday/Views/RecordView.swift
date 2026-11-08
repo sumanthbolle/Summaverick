@@ -31,6 +31,9 @@ struct RecordView: View {
 
             if let e = controller.recorder.lastError { Text(e).font(.footnote).foregroundStyle(.red) }
 
+            // Stop when quiet: in front, this line takes the place of the notification.
+            if controller.isRecording && controller.quietWarning { quietWarning }
+
             if controller.isRecording { liveTranscript }
 
             Spacer()
@@ -52,12 +55,26 @@ struct RecordView: View {
         .background(Color(.systemBackground))
         .interactiveDismissDisabled()
         .task { await begin() }
+        .onAppear { controller.recordScreenShown = true }
+        .onDisappear { controller.recordScreenShown = false }
         // Stopped from the Live Activity, a shortcut or the control: this screen has nothing left to show.
         .onChange(of: controller.isRecording) { was, now in if was && !now { dismiss() } }
         .alert("Microphone access needed", isPresented: $permissionDenied) {
             Button("Open Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }; dismiss() }
             Button("Cancel", role: .cancel) { dismiss() }
         } message: { Text("Allow the microphone for Summaverick in Settings.") }
+    }
+
+    private var quietWarning: some View {
+        VStack(spacing: 8) {
+            Text("No voice for a while — stopping in 30 seconds")
+                .font(.footnote.weight(.medium)).foregroundStyle(.orange)
+                .multilineTextAlignment(.center)
+            Button("Keep recording") { controller.keepRecording() }
+                .buttonStyle(.bordered)
+                .frame(minHeight: 44)
+        }
+        .padding(.horizontal, 32)
     }
 
     /// The transcript so far (last lines, newest at the bottom) and one status line.

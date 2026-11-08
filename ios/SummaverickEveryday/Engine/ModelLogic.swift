@@ -576,3 +576,123 @@ enum WAVHeaderRepair {
         return nil
     }
 }
+
+/// "Stop when quiet" (ruling B11): a recording with no voice for the chosen time stops by itself and keeps what was
+/// said. Fed the recorder's level (AVAudioRecorder averagePower, dBFS) about five times a second, with the recorded
+/// time, by RecordingController; it decides when to warn, when the warning is off again and when to stop.
+///
+/// Voice is a level at least `margin` dB above an adaptive noise floor (and never quieter than `minVoiceLevel`) for at
+/// least `voicedNeeded` of the last `window` seconds. The floor follows quieter levels quickly and louder ones only
+/// slowly, so steady noise (a fan, traffic hum) becomes the floor and counts as quiet, while speech, which keeps
+/// rising well above it between its own pauses, does not.
+enum QuietStop {
+    /// The settings' choices, in minutes; 0 is Off.
+    static let choices = [0, 2, 5, 10]
+    static let defaultMinutes = 5
+    /// The one warning comes this long before the stop.
+    static let warnBefore: TimeInterval = 30
+    /// Audio kept after the last voice when it stops.
+    static let keepAfterVoice: TimeInterval = 2
+
+    /// dB above the floor that can be voice.
+    static let margin: Double = 8
+    /// dBFS: quieter than this is never voice (a near-silent room's floor sits around -65…-75).
+    static let minVoiceLevel: Double = -60
+    /// Voice needs this much loud time within the last `window` seconds: a click, a cough or a door is not voice.
+    static let window: TimeInterval = 1.0
+    static let voicedNeeded: TimeInterval = 0.3
+    /// The floor rises at most this fast (dB per second) and falls toward a quieter level with this time constant.
+    static let floorRise: Double = 1.0
+    static let floorFallTime: TimeInterval = 0.5
+    /// Levels are clamped to this range (the recorder says -160 for digital silence).
+    static let levelRange: ClosedRange<Double> = -90...0
+    /// A gap between two readings counts as at most this much (a late timer does not pump the floor).
+    static let maxStep: TimeInterval = 1.0
+
+    enum Event: Equatable {
+        case none
+        /// `warnBefore` seconds are left: warn once.
+        case warn
+        /// Voice came back after the warning: take it away.
+        case warningCancelled
+        /// Stop now and keep the audio up to this recorded time (seconds).
+        case stop(keepUntil: TimeInterval)
+    }
+
+    struct Detector {
+        /// Seconds of quiet that stop the recording; 0: Off, never stops.
+        let limit: TimeInterval
+        /// The noise floor (dBFS), known after the first reading.
+        private(set) var floor: Double?
+        /// The quiet timer counts from here: the last voice, the last "Keep recording", or the start.
+        private(set) var quietSince: TimeInterval = 0
+        private(set) var warned = false
+        private(set) var stopped = false
+        private var lastTime: TimeInterval?
+        /// Recent loud readings: (time, how long each one stands for).
+        private var loud: [(t: TimeInterval, dt: TimeInterval)] = []
+
+        init(minutes: Int) { limit = TimeInterval(max(0, minutes)) * 60 }
+
+        /// time: seconds recorded so far; level: dBFS.
+        mutating func feed(time t: TimeInterval, level db: Double) -> Event {
+            let level = min(max(db, QuietStop.levelRange.lowerBound), QuietStop.levelRange.upperBound)
+            let dt = lastTime.map { max(0, min(t - $0, QuietStop.maxStep)) } ?? 0
+            lastTime = t
+            let voiced = hearVoice(level, at: t, dt: dt)
+            followFloor(level, dt: dt)
+            var event = Event.none
+            if voiced {
+                quietSince = t
+                if warned { warned = false; event = .warningCancelled }
+            }
+            guard limit > 0, !stopped else { return event }
+            let quiet = t - quietSince
+            if quiet >= limit {
+                stopped = true
+                return .stop(keepUntil: quietSince + QuietStop.keepAfterVoice)
+            }
+            if !warned, quiet >= max(0, limit - QuietStop.warnBefore) {
+                warned = true
+                return .warn
+            }
+            return event
+        }
+
+        /// "Keep recording": the warning goes and the quiet timer starts again from now.
+        mutating func keepRecording(at t: TimeInterval) {
+            quietSince = t
+            warned = false
+            stopped = false
+        }
+
+        private mutating func hearVoice(_ level: Double, at t: TimeInterval, dt: TimeInterval) -> Bool {
+            if let floor, level >= QuietStop.minVoiceLevel, level >= floor + QuietStop.margin, dt > 0 {
+                loud.append((t, dt))
+            }
+            loud.removeAll { $0.t <= t - QuietStop.window }
+            return loud.reduce(0) { $0 + $1.dt } >= QuietStop.voicedNeeded - 1e-9
+        }
+
+        private mutating func followFloor(_ level: Double, dt: TimeInterval) {
+            guard let f = floor else { floor = level; return }
+            if level < f {
+                floor = f + (level - f) * min(1, dt / QuietStop.floorFallTime)
+            } else {
+                floor = min(level, f + QuietStop.floorRise * dt)
+            }
+        }
+    }
+
+    /// Cutting a finished recording (16 kHz mono 16-bit WAV, 32 000 bytes a second) after `keepSeconds` of audio:
+    /// the new file size and the header fields to write (WAVHeaderRepair). nil: not a WAV the repair understands
+    /// (left as it is). The size is the current one when there is no more audio than that.
+    static func trim(head: [UInt8], fileSize: Int64, keepSeconds: TimeInterval,
+                     bytesPerSecond: Int64 = 32_000) -> (fileSize: Int64, dataBytes: Int64, patches: [WAVHeaderRepair.Patch])? {
+        guard let r = WAVHeaderRepair.repair(head: head, fileSize: fileSize) else { return nil }
+        let keep = Int64((max(0, keepSeconds) * Double(bytesPerSecond)).rounded()) / 2 * 2   // whole sample frames
+        let size = r.dataOffset + min(r.dataBytes, keep)
+        guard let t = WAVHeaderRepair.repair(head: head, fileSize: size) else { return nil }
+        return (size, t.dataBytes, t.patches)
+    }
+}

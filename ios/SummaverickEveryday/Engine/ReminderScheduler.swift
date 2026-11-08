@@ -244,6 +244,13 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
     /// Reminders, and a note's notes notifications (NotesNotifier: their userInfo has the note id), open their note.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let identifier = response.notification.request.identifier
+        // Stop when quiet's warning: Keep recording carries on (a tap only opens the app).
+        if identifier == QuietNotifier.identifier {
+            if response.actionIdentifier == QuietNotifier.keepAction {
+                await MainActor.run { RecordingController.shared.keepRecording() }
+            }
+            return
+        }
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
               identifier.hasPrefix(Self.prefix) || identifier.hasPrefix(NotesNotifier.prefix) else { return }
         let route = Self.route(from: response.notification.request.content.userInfo)

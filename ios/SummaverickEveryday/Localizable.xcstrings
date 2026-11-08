@@ -5424,6 +5424,96 @@
           }
         }
       }
+    },
+    "Stop when quiet": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నిశ్శబ్దంగా ఉంటే ఆపు"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆఫ్"
+          }
+        }
+      }
+    },
+    "2 min": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 నిమిషాలు"
+          }
+        }
+      }
+    },
+    "5 min": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 నిమిషాలు"
+          }
+        }
+      }
+    },
+    "10 min": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 నిమిషాలు"
+          }
+        }
+      }
+    },
+    "A recording stops by itself after this long without voice and keeps everything said. You are told 30 seconds before, and can keep recording.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంత సేపు ఎవరి గొంతూ వినిపించకపోతే రికార్డింగ్ తనంతట తానే ఆగిపోతుంది, అప్పటివరకు మాట్లాడినదంతా ఉంచుతుంది. 30 సెకన్ల ముందే మీకు చెబుతుంది, మీరు రికార్డింగ్ కొనసాగించవచ్చు."
+          }
+        }
+      }
+    },
+    "Keep recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ కొనసాగించు"
+          }
+        }
+      }
+    },
+    "No voice for a while — stopping in 30 seconds": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొంతసేపుగా గొంతు వినిపించలేదు — 30 సెకన్లలో ఆగిపోతుంది"
+          }
+        }
+      }
+    },
+    "Stopped after %lld min of quiet": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld నిమిషాలు నిశ్శబ్దంగా ఉండటంతో ఆగిపోయింది"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

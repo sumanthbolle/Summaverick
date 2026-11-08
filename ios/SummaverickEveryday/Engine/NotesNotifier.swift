@@ -72,3 +72,50 @@ enum NotesNotifier {
         }
     }
 }
+
+/// Stop when quiet (ruling B11): the one warning before a recording stops by itself ("No voice for a while — stopping
+/// in 30 seconds", with Keep recording), and then the line that says it stopped. One identifier, so the second replaces
+/// the first, and voice coming back or Keep recording withdraws it. The action is answered in ReminderScheduler (the
+/// notification delegate); the app is running anyway, since it records. Same notification permission as reminders.
+@MainActor
+enum QuietNotifier {
+    nonisolated static let identifier = "quiet.recording"
+    nonisolated static let category = "sve.quiet"
+    nonisolated static let keepAction = "sve.quiet.keep"
+
+    /// At launch, before a notification can be answered. The app's only notification category.
+    nonisolated static func registerCategory() {
+        let keep = UNNotificationAction(identifier: keepAction, title: String(localized: "Keep recording"), options: [])
+        let c = UNNotificationCategory(identifier: category, actions: [keep], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([c])
+    }
+
+    static func warn(_ line: String) { post(line, category: category) }
+
+    static func stopped(_ line: String) { post(line, category: nil) }
+
+    static func withdraw() {
+        let c = UNUserNotificationCenter.current()
+        c.removePendingNotificationRequests(withIdentifiers: [identifier])
+        c.removeDeliveredNotifications(withIdentifiers: [identifier])
+    }
+
+    private static func post(_ body: String, category: String?) {
+        let hold = NotesNotifier.Hold()
+        let content = UNMutableNotificationContent()
+        content.title = "Summaverick"
+        content.body = body
+        content.sound = .default
+        if let category { content.categoryIdentifier = category }
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        Task {
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+                NSLog("[sve] quiet: notification posted")
+            } catch {
+                NSLog("[sve] quiet: notification not posted: %@", String(describing: error))
+            }
+            hold.end()
+        }
+    }
+}

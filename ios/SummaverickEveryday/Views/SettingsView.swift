@@ -36,6 +36,14 @@ struct SettingsView: View {
 
                 aiSection
 
+                Section("Stop when quiet") {
+                    Picker("Stop when quiet", selection: $settings.quietStopMinutes) {
+                        Text("Off").tag(0); Text("2 min").tag(2); Text("5 min").tag(5); Text("10 min").tag(10)
+                    }
+                    Text("A recording stops by itself after this long without voice and keeps everything said. You are told 30 seconds before, and can keep recording.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+
                 Section("Keep recordings for") {
                     Picker("Audio retention", selection: $settings.retentionDays) {
                         Text("1 day").tag(1); Text("7 days").tag(7); Text("30 days").tag(30); Text("Forever").tag(0)

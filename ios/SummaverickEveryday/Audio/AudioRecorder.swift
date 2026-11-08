@@ -13,6 +13,10 @@ final class AudioRecorder {
     private(set) var currentURL: URL?
     var lastError: String?
 
+    /// Every reading (about 5 a second, also with the phone locked: the audio background mode keeps the app running
+    /// while it records): seconds recorded so far and the level in dBFS. Stop when quiet listens here.
+    @ObservationIgnored var onLevel: (@MainActor (_ recordedSeconds: TimeInterval, _ decibels: Float) -> Void)?
+
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
     private var startDate: Date?
@@ -65,6 +69,9 @@ final class AudioRecorder {
         for f in files { try? FileManager.default.removeItem(at: f) }
     }
 
+    /// Seconds recorded so far (0 when not recording).
+    var recordedSeconds: TimeInterval { recorder?.currentTime ?? 0 }
+
     func requestPermission() async -> Bool {
         if #available(iOS 17.0, *) {
             return await AVAudioApplication.requestRecordPermission()
@@ -112,9 +119,11 @@ final class AudioRecorder {
             startDate = Date()
             isRecording = true
             elapsed = 0
-            timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            let t = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
                 Task { @MainActor in self?.tick() }
             }
+            RunLoop.main.add(t, forMode: .common)   // keeps ticking while a scroll view is being dragged
+            timer = t
         } catch {
             lastError = error.localizedDescription
         }
@@ -126,6 +135,8 @@ final class AudioRecorder {
         r.updateMeters()
         let db = r.averagePower(forChannel: 0) // -160…0
         level = max(0, min(1, (db + 50) / 50))
+        // Recorded time, not wall time: an interruption (a call) pauses the recorder and its quiet timer alike.
+        if r.isRecording { onLevel?(r.currentTime, db) }
     }
 
     /// Stops and returns (file, duration in seconds).

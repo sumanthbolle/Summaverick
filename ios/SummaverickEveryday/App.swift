@@ -11,6 +11,7 @@ struct SummaverickEverydayApp: App {
     init() {
         // Must be set before launch finishes so a tap that cold-starts the app is delivered.
         UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
+        QuietNotifier.registerCategory()   // Keep recording on Stop when quiet's warning
         AudioRecorder.sweepAskVoice()
         // Live Activities left by a closed app go before this launch can start its own.
         RecordingActivities.endStale()
@@ -82,12 +83,17 @@ final class AppSettings {
     var consentAcknowledged: Bool { didSet { d.set(consentAcknowledged, forKey: "consentAck") } }
     /// Language the summary, notes and questions are written in (the model hears any spoken language).
     var notesLanguage: String { didSet { d.set(notesLanguage, forKey: "notesLang") } }
+    /// Stop when quiet: minutes without voice after which a recording stops by itself; 0 is Off. Read when a
+    /// recording starts.
+    var quietStopMinutes: Int { didSet { d.set(quietStopMinutes, forKey: "quietStopMinutes") } }
 
     private init() {
         retentionDays = d.object(forKey: "retentionDays") as? Int ?? 7
         requireUnlock = d.bool(forKey: "requireUnlock")
         consentAcknowledged = d.bool(forKey: "consentAck")
         notesLanguage = d.string(forKey: "notesLang") ?? "en"
+        let quiet = d.object(forKey: "quietStopMinutes") as? Int ?? QuietStop.defaultMinutes
+        quietStopMinutes = QuietStop.choices.contains(quiet) ? quiet : QuietStop.defaultMinutes
     }
 }
 
