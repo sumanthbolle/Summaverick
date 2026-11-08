@@ -134,6 +134,46 @@ struct ReviewItem: Identifiable, Decodable, Equatable {
     }
 }
 
+/// What the person tapped on a memory's card in the review queue (Edit is not here: it stays separate).
+enum ReviewTap: Equatable {
+    case keep, wrong
+    /// Yes on the linked reminder or to-do row; edited: saved from its Edit form.
+    case suggestionYes(edited: Bool)
+    /// No on the linked reminder or to-do row.
+    case suggestionNo
+}
+
+/// The changes one tap makes, run in this order: the linked suggestion first, then the memory. When the
+/// suggestion's step fails (or comes back re-flagged), the memory is not changed and the card stays.
+struct LinkedDecision: Equatable {
+    enum SuggestionStep: Equatable { case accept, reject }
+    var suggestion: SuggestionStep?
+    /// "kept" | "wrong" | nil (unchanged)
+    var memoryReview: String?
+}
+
+extension ReviewItem {
+    /// One card, one decision (K45): Yes on the linked row also keeps the memory, as Keep would; Wrong on the
+    /// memory also declines its pending linked suggestion, so it does not come back on its own. Keep and No touch
+    /// only their own half, and a Yes saved from the Edit form is the person's own reminder: the memory still
+    /// waits to be checked. Medicine memories (the core refuses their review) are never changed from here.
+    func linkedDecision(_ tap: ReviewTap) -> LinkedDecision {
+        let linked = showsSuggestionRow
+        let reviewable = memory.origin != "medicine"
+        switch tap {
+        case .keep:
+            return LinkedDecision(suggestion: nil, memoryReview: reviewable ? "kept" : nil)
+        case .wrong:
+            return LinkedDecision(suggestion: linked ? .reject : nil, memoryReview: reviewable ? "wrong" : nil)
+        case .suggestionYes(let edited):
+            guard linked else { return LinkedDecision() }
+            return LinkedDecision(suggestion: .accept, memoryReview: reviewable && !edited ? "kept" : nil)
+        case .suggestionNo:
+            return LinkedDecision(suggestion: linked ? .reject : nil, memoryReview: nil)
+        }
+    }
+}
+
 /// Which memory rows to read (sve_memories_json). Every field left nil is not sent. Newest first; wrong and
 /// superseded rows only when asked for.
 struct MemoryFilter: Encodable, Equatable {

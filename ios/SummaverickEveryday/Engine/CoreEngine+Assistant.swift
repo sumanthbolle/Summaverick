@@ -86,7 +86,8 @@ extension CoreEngine {
         }
     }
 
-    func reject(_ id: Int64) { _ = sve_suggestion_reject(ctx, id) }
+    /// false when it is gone or no longer pending.
+    @discardableResult func reject(_ id: Int64) -> Bool { sve_suggestion_reject(ctx, id) == 0 }
 
     // MARK: reminders and tasks
 

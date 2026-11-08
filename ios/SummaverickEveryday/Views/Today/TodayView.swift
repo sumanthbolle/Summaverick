@@ -231,8 +231,8 @@ struct TodayView: View {
                 MemoryReviewCard(item: item,
                                  suggestionBusy: item.suggestion.map { busyIDs.contains($0.id) } ?? false,
                                  suggestionStale: item.suggestion.map { staleIDs.contains($0.id) } ?? false,
-                                 onAcceptSuggestion: { s, edited in beginAccept(s, edited: edited) },
-                                 onRejectSuggestion: { s in beginReject(s) },
+                                 onAcceptSuggestion: { s, edited in await acceptLinked(s, edited: edited) },
+                                 onRejectSuggestion: { s in await rejectLinked(s) },
                                  onPlay: { id, sec in router.openNote = (id, sec) })
                     .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .leading).combined(with: .opacity)))
             }
@@ -470,19 +470,26 @@ struct TodayView: View {
     /// Only called through beginAccept, which has already marked the card busy.
     private func accept(_ s: Suggestion, edited: SuggestionPayload?) async {
         defer { busyIDs.remove(s.id) }
-        let makesReminder = s.kind == .reminder || (s.kind == .profile && s.payload.medicine != nil)
         do {
-            switch try await CoreEngine.shared.accept(s.id, edited: edited) {
-            case .staleReflagged:
-                staleIDs.insert(s.id)
-            case .created, .applied:
-                staleIDs.remove(s.id)
-                if makesReminder { await ensureNotificationsAllowed() }
-            }
+            _ = try await acceptInCore(s, edited: edited)
         } catch {
             errorMessage = error.localizedDescription
         }
         await changed()
+    }
+
+    /// true when accepted; false when it came back re-flagged (the card then says it changed).
+    private func acceptInCore(_ s: Suggestion, edited: SuggestionPayload?) async throws -> Bool {
+        let makesReminder = s.kind == .reminder || (s.kind == .profile && s.payload.medicine != nil)
+        switch try await CoreEngine.shared.accept(s.id, edited: edited) {
+        case .staleReflagged:
+            staleIDs.insert(s.id)
+            return false
+        case .created, .applied:
+            staleIDs.remove(s.id)
+            if makesReminder { await ensureNotificationsAllowed() }
+            return true
+        }
     }
 
     private func reject(_ s: Suggestion) async {
@@ -490,6 +497,28 @@ struct TodayView: View {
         await CoreEngine.shared.reject(s.id)
         staleIDs.remove(s.id)
         await changed()
+    }
+
+    /// Yes on a memory card's linked row. The memory card shows a failure inline and tells the app when done;
+    /// notifications are rescheduled here.
+    private func acceptLinked(_ s: Suggestion, edited: SuggestionPayload?) async -> SuggestionStepResult {
+        guard !busyIDs.contains(s.id) else { return .failed }
+        busyIDs.insert(s.id)
+        defer { busyIDs.remove(s.id) }
+        let result: SuggestionStepResult
+        do { result = try await acceptInCore(s, edited: edited) ? .done : .stale } catch { result = .failed }
+        if result == .done { await ReminderScheduler.shared.resync() }
+        return result
+    }
+
+    /// No on a memory card's linked row, or Wrong on its memory.
+    private func rejectLinked(_ s: Suggestion) async -> Bool {
+        guard !busyIDs.contains(s.id) else { return false }
+        busyIDs.insert(s.id)
+        defer { busyIDs.remove(s.id) }
+        let ok = await CoreEngine.shared.reject(s.id)
+        if ok { staleIDs.remove(s.id) }
+        return ok
     }
 
     private func setDone(_ t: TaskItem) async {

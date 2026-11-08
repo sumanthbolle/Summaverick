@@ -1,8 +1,12 @@
 // A memory waiting in the review queue ("To check" on Today), as a card with Keep / Edit / Wrong: the same
 // pattern as SuggestionCard's Yes / Edit / No. A pending reminder or to-do made from the same words shows inside
-// the card as one row with its own Yes / Edit / No, so one thing said is one card.
+// the card as one row with its own Yes / Edit / No, so one thing said is one card and one decision
+// (ReviewItem.linkedDecision): Yes on the row also keeps the memory; Wrong also declines the row.
 // The card waits for the core before it goes: a failed change keeps it, with a short message.
 import SwiftUI
+
+/// How the linked suggestion's step went.
+enum SuggestionStepResult { case done, stale, failed }
 
 struct MemoryReviewCard: View {
     let item: ReviewItem
@@ -10,8 +14,10 @@ struct MemoryReviewCard: View {
     let suggestionBusy: Bool
     /// The linked suggestion changed since it was suggested (accept came back re-flagged).
     let suggestionStale: Bool
-    let onAcceptSuggestion: (Suggestion, SuggestionPayload?) -> Void
-    let onRejectSuggestion: (Suggestion) -> Void
+    /// Accepts the linked suggestion (nil payload: as proposed). TodayView owns it (reminders, notifications).
+    let onAcceptSuggestion: (Suggestion, SuggestionPayload?) async -> SuggestionStepResult
+    /// Declines the linked suggestion; false when it failed.
+    let onRejectSuggestion: (Suggestion) async -> Bool
     /// ▶: open the recording (note id, second).
     let onPlay: (Int64, Int) -> Void
 
@@ -32,13 +38,9 @@ struct MemoryReviewCard: View {
             }
             if !m.isMedicine {
                 MemoryActionButtons(busy: busy, buttons: [
-                    .init(title: "Keep", icon: "checkmark", tint: .green, prominent: true) {
-                        Task { await run { await CoreEngine.shared.reviewMemory(m.id, true) } }
-                    },
+                    .init(title: "Keep", icon: "checkmark", tint: .green, prominent: true) { decide(.keep) },
                     .init(title: "Edit", icon: "pencil", tint: nil) { failed = false; editing = true },
-                    .init(title: "Wrong", icon: "xmark", tint: .red) {
-                        Task { await run { await CoreEngine.shared.reviewMemory(m.id, false) } }
-                    },
+                    .init(title: "Wrong", icon: "xmark", tint: .red) { decide(.wrong) },
                 ])
             }
             if item.showsSuggestionRow, let s = item.suggestion { suggestionRow(s) }
@@ -93,8 +95,9 @@ struct MemoryReviewCard: View {
                     .background(Color.orange.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
             }
             SuggestionDecisionButtons(suggestion: s, noteTitle: s.noteID == m.sources.first?.noteID ? m.sources.first?.title : nil,
-                                      isBusy: suggestionBusy,
-                                      onAccept: { onAcceptSuggestion(s, $0) }, onReject: { onRejectSuggestion(s) })
+                                      isBusy: suggestionBusy || busy,
+                                      onAccept: { decide(.suggestionYes(edited: $0 != nil), payload: $0) },
+                                      onReject: { decide(.suggestionNo) })
         }
     }
 
@@ -107,6 +110,37 @@ struct MemoryReviewCard: View {
         if let r = AssistantFormat.repeatLabel(p.repeat) { parts.append(r) }
         if let d = p.dueDate { parts.append(String(localized: "Due \(AssistantFormat.day(d))")) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Runs what one tap decides: the linked suggestion first, then the memory. A failed step stops there with the
+    /// inline message and the card stays; a re-flagged accept stops quietly (the row says it changed).
+    private func decide(_ tap: ReviewTap, payload: SuggestionPayload? = nil) {
+        guard !busy else { return }
+        let plan = item.linkedDecision(tap)
+        let memoryID = m.id
+        let linked = item.suggestion
+        busy = true
+        failed = false
+        Task {
+            var changed = false, ok = true
+            if let step = plan.suggestion, let s = linked {
+                switch step {
+                case .accept:
+                    switch await onAcceptSuggestion(s, payload) {
+                    case .done: changed = true
+                    case .stale: ok = false
+                    case .failed: ok = false; failed = true
+                    }
+                case .reject:
+                    if await onRejectSuggestion(s) { changed = true } else { ok = false; failed = true }
+                }
+            }
+            if ok, let review = plan.memoryReview {
+                if await CoreEngine.shared.reviewMemory(memoryID, review == "kept") { changed = true } else { failed = true }
+            }
+            busy = false
+            if changed { NotificationCenter.default.post(name: .assistantChanged, object: nil) }
+        }
     }
 
     /// One change at a time; on success the app reloads (the card leaves the queue), on failure it stays.
