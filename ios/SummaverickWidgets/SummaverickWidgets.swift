@@ -1,4 +1,4 @@
-// The widget extension: the recording's Live Activity (R3 adds the Control Center record control).
+// The widget extension: the recording's Live Activity and the Control Center / Lock Screen record control.
 import SwiftUI
 import WidgetKit
 
@@ -6,5 +6,6 @@ import WidgetKit
 struct SummaverickWidgets: WidgetBundle {
     var body: some Widget {
         RecordingLiveActivity()
+        RecordControl()
     }
 }

@@ -54,6 +54,8 @@ struct RootView: View {
     @State private var scheduler = ReminderScheduler.shared
     @State private var lock = AppLock.shared
     @State private var gate = PresentationGate.shared
+    @State private var recording = RecordingController.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showRecorder = false
     @State private var showConsent = false
     /// The tab bar hides while a keyboard is up, so screens below it keep normal keyboard avoidance.
@@ -91,9 +93,12 @@ struct RootView: View {
         .alert("This came from a deleted recording.", isPresented: $router.showDeletedRecording) {
             Button("OK", role: .cancel) {}
         }
-        .onAppear { handlePendingRoute() }
+        .onAppear { handlePendingRoute(); showConsentAskedByShortcut() }
+        // A shortcut asked to record before the reminder was acknowledged, and the app came to the front for it.
+        .onChange(of: recording.consentRequestedAt) { _, _ in showConsentAskedByShortcut() }
+        .onChange(of: scenePhase) { _, _ in showConsentAskedByShortcut() }
         .onChange(of: scheduler.pendingRoute) { _, _ in handlePendingRoute() }
-        .onChange(of: lock.isLocked) { _, _ in handlePendingRoute() }
+        .onChange(of: lock.isLocked) { _, _ in handlePendingRoute(); showConsentAskedByShortcut() }
         // These flip when a presentation starts to close; wait for it to finish before presenting.
         .onChange(of: showRecorder) { _, _ in handlePendingRouteSoon() }
         .onChange(of: showConsent) { _, _ in handlePendingRouteSoon() }
@@ -119,6 +124,13 @@ struct RootView: View {
 
     private func startRecordingFlow() {
         if settings.consentAcknowledged { showRecorder = true } else { showConsent = true }
+    }
+
+    /// The shortcut's request, once the app is in front and unlocked (a request from long ago is dropped).
+    private func showConsentAskedByShortcut() {
+        guard scenePhase == .active, !lock.isLocked, recording.consentRequestedAt != nil,
+              recording.takeConsentRequest(), !showRecorder else { return }
+        startRecordingFlow()
     }
 
     /// Handles the route once a closing presentation has finished animating away.

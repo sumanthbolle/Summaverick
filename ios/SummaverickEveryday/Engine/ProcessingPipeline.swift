@@ -1214,8 +1214,20 @@ final class ProcessingPipeline {
             }
         }
         bgTask = UIApplication.shared.beginBackgroundTask(withName: "sve.process") { [weak self] in
-            self?.endBackground()
+            self?.backgroundTimeEnded()
         }
+    }
+
+    /// The plain background time ran out. When iOS refused the continued-processing task (a Stop from the Live
+    /// Activity or a shortcut with the app in the background) and nothing else keeps the app running, the app is
+    /// about to be suspended: the run is cut off now, as when a continued-processing task expires, so the note goes on
+    /// the overnight list by itself, the overnight task is asked for and "paused" is posted once.
+    private func backgroundTimeEnded() {
+        if isWorking, !appIsActive, ContinuedWork.shared.refused, !ContinuedWork.shared.isHeld, overnightRun == nil {
+            NSLog("[sve] bg: background time ended without continued processing; the notes finish in the overnight task")
+            continuedWorkExpired(hold: NotesNotifier.Hold())
+        }
+        endBackground()
     }
     private func endBackground() {
         UIApplication.shared.isIdleTimerDisabled = false

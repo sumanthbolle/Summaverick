@@ -5334,6 +5334,96 @@
           }
         }
       }
+    },
+    "Already recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పటికే రికార్డ్ అవుతోంది"
+          }
+        }
+      }
+    },
+    "Nothing is being recorded.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఏదీ రికార్డ్ కావడం లేదు."
+          }
+        }
+      }
+    },
+    "Open Summaverick to read the recording reminder first.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముందుగా రికార్డింగ్ గురించిన గుర్తును చదవడానికి Summaverick తెరవండి."
+          }
+        }
+      }
+    },
+    "Recording stopped. Your notes are being written.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ ఆగింది. మీ నోట్స్ రాస్తోంది."
+          }
+        }
+      }
+    },
+    "Start or stop a recording for notes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ కోసం రికార్డింగ్ మొదలుపెట్టండి లేదా ఆపండి."
+          }
+        }
+      }
+    },
+    "Start recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ మొదలుపెట్టు"
+          }
+        }
+      }
+    },
+    "Starts recording for notes, without opening the app.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "యాప్ తెరవకుండానే నోట్స్ కోసం రికార్డింగ్ మొదలుపెడుతుంది."
+          }
+        }
+      }
+    },
+    "Stop recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ ఆపు"
+          }
+        }
+      }
+    },
+    "Stops the recording; its notes are written on this phone.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్‌ను ఆపుతుంది; దాని నోట్స్ ఈ ఫోన్‌లోనే తయారవుతాయి."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

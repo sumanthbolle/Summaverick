@@ -1,8 +1,9 @@
 // The recording's Live Activity. The iPhone 16e has no Dynamic Island, so the Lock Screen / banner view is the one
-// that matters; the island regions are kept short. Recording: a red dot, the elapsed time and Stop (a plain mark
-// here; R3 makes it stop the recording). After Stop: the stage line and a progress bar. Then "Notes ready" with the
+// that matters; the island regions are kept short. Recording: a red dot, the elapsed time and Stop
+// (StopRecordingIntent, performed in the app). After Stop: the stage line and a progress bar. Then "Notes ready" with the
 // title, or the paused / failed line.
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -51,11 +52,13 @@ private struct RecordingActivityView: View {
             }
             Spacer(minLength: 0)
             if state.phase == .recording {
-                // Inert in R2: R3 turns it into Button(intent: StopRecordingIntent()).
-                Label("Stop", systemImage: "stop.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(Capsule().fill(Color.white.opacity(0.2)))
+                Button(intent: StopRecordingIntent()) {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Capsule().fill(Color.white.opacity(0.2)))
+                }
+                .buttonStyle(.plain)
             }
         }
         .foregroundStyle(.white)

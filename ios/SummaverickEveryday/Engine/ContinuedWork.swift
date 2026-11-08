@@ -40,6 +40,10 @@ final class ContinuedWork {
     /// The app may keep working in the background now.
     var isHeld: Bool { held != nil }
 
+    /// The last request was refused (submit threw: for example a Stop from the Live Activity or a shortcut while the
+    /// app is in the background). The run then has only the plain background time, and is cut off when it ends.
+    private(set) var refused = false
+
     /// The progress shown now, in whole percent (for the "paused at" notification).
     var percent: Int { Int((fraction * 100).rounded(.down)) }
 
@@ -92,6 +96,7 @@ final class ContinuedWork {
         guard #available(iOS 26, *) else { return }
         self.subtitle = subtitle
         guard !wanted else { apply(); return }
+        refused = false
         fraction = 0
         let id = Self.identifier(key: key)
         registerHandler(id)
@@ -102,6 +107,7 @@ final class ContinuedWork {
             wanted = true
             NSLog("[sve] bg: continued processing asked for (%@)", id)
         } catch {
+            refused = true
             NSLog("[sve] bg: continued processing not available: %@", String(describing: error))
         }
     }
@@ -137,6 +143,7 @@ final class ContinuedWork {
     func finish(success: Bool) {
         if wanted || held != nil { NSLog("[sve] bg: continued processing finished (%@)", success ? "all done" : "work left") }
         wanted = false
+        refused = false
         complete(success: success)
     }
 

@@ -282,9 +282,12 @@ target_settings = {
 
 
 # WidgetKit + ActivityKit + SwiftUI (linked automatically). 18.0: the Live Activity is iOS 18+ (the app only starts
-# it there), and R3's ControlWidget needs 18. Same team and signing as the app.
+# it there), and the record ControlWidget needs 18. Same team and signing as the app. SVE_WIDGET_EXTENSION: the
+# extension's copy of the recording intents never records (they are performed in the app). Both targets share the
+# App Group group.com.summaverick.everyday (the record control's state).
 widget_settings = {
     "APPLICATION_EXTENSION_API_ONLY": "YES",
+    "CODE_SIGN_ENTITLEMENTS": f"{WIDGETS_DIR}/SummaverickWidgets.entitlements",
     "CODE_SIGN_STYLE": "Automatic",
     "DEVELOPMENT_TEAM": "3JVSNB8RYM",
     "GENERATE_INFOPLIST_FILE": "NO",
@@ -294,6 +297,7 @@ widget_settings = {
     "PRODUCT_BUNDLE_IDENTIFIER": WIDGETS_BUNDLE_ID,
     "PRODUCT_NAME": "$(TARGET_NAME)",
     "SKIP_INSTALL": "YES",
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS": ["$(inherited)", "SVE_WIDGET_EXTENSION"],
     "SWIFT_EMIT_LOC_STRINGS": "YES",
 }
 

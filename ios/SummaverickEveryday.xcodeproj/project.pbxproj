@@ -81,6 +81,10 @@
 			isa = PBXBuildFile;
 			fileRef = B05E051B8E13E602C77A96F0;
 		};
+		5E7D376B796A9DEC0100AD23 = {
+			isa = PBXBuildFile;
+			fileRef = 85C6DEF5C197B0C18C2FC34D;
+		};
 		66567DD2A6C40F6BC6CB1C24 = {
 			isa = PBXBuildFile;
 			fileRef = 3C94D64FE92A566816D76B43;
@@ -153,6 +157,10 @@
 			isa = PBXBuildFile;
 			fileRef = C30CC5397DAA09FBACA85197;
 		};
+		A1CD78667A723270125077DD = {
+			isa = PBXBuildFile;
+			fileRef = 65E363A7B54CBC6FC72BFA66;
+		};
 		A5B14A3A01B9BFEF4EB193D3 = {
 			isa = PBXBuildFile;
 			fileRef = 43130EEACCC981C89B012095;
@@ -168,6 +176,10 @@
 		AD33A465D5C223FBF7C16E07 = {
 			isa = PBXBuildFile;
 			fileRef = C6E38749CC30FE0501F34CE0;
+		};
+		AECF9004BF6C64F9CF4640B9 = {
+			isa = PBXBuildFile;
+			fileRef = 9C35A7555407BE9AE72D84A6;
 		};
 		B3682618E8A7DB35FCEEE996 = {
 			isa = PBXBuildFile;
@@ -212,6 +224,10 @@
 		CE05B940BCBE599A11AE22E8 = {
 			isa = PBXBuildFile;
 			fileRef = 171A4CC9E4CFD6CB1704585A;
+		};
+		CFAE66CBEA2F64C482C52CCD = {
+			isa = PBXBuildFile;
+			fileRef = 9C35A7555407BE9AE72D84A6;
 		};
 		D24548A80F6EDBB04A261E7D = {
 			isa = PBXBuildFile;
@@ -273,6 +289,10 @@
 		ECB5419178B062460383B28A = {
 			isa = PBXBuildFile;
 			fileRef = EAF88B4A3FB9A8689FADBD2C;
+		};
+		F4F570D994C6AAFF90AECBAF = {
+			isa = PBXBuildFile;
+			fileRef = 65E363A7B54CBC6FC72BFA66;
 		};
 		F5DF4BFB0174304CA2197095 = {
 			isa = PBXBuildFile;
@@ -566,6 +586,13 @@
 			path = SummaverickEveryday/Views/RecordView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		65E363A7B54CBC6FC72BFA66 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingIntents.swift;
+			path = Shared/RecordingIntents.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		68019339B3FB26EF022BB32A = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -620,6 +647,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = NotesNotifier.swift;
 			path = SummaverickEveryday/Engine/NotesNotifier.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		85C6DEF5C197B0C18C2FC34D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordControl.swift;
+			path = SummaverickWidgets/RecordControl.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		892E4DF51BC5A1D8EB706A7A = {
@@ -690,6 +724,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = AIStatusViews.swift;
 			path = SummaverickEveryday/Views/Components/AIStatusViews.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		9C35A7555407BE9AE72D84A6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingIntentLogic.swift;
+			path = Shared/RecordingIntentLogic.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		9E2ACA831A68C5FC7568EFA9 = {
@@ -1073,6 +1114,8 @@
 			isa = PBXGroup;
 			children = (
 				2CC5EFA566DA98ADF20EDEAF,
+				9C35A7555407BE9AE72D84A6,
+				65E363A7B54CBC6FC72BFA66,
 			);
 			name = Shared;
 			sourceTree = "<group>";
@@ -1147,6 +1190,7 @@
 		EC78298F69778BA6D4D34D39 = {
 			isa = PBXGroup;
 			children = (
+				85C6DEF5C197B0C18C2FC34D,
 				33C50C60642D8852C316CF41,
 				05DE663E1F9B875F3C1ABC94,
 				52C1022F6F542158C732AD92,
@@ -1267,9 +1311,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5E7D376B796A9DEC0100AD23,
 				287BB893A1AA69C067C08137,
 				A8D78741F45FACAC32C29FBB,
 				C6AAA9F998388DF8734C616C,
+				CFAE66CBEA2F64C482C52CCD,
+				A1CD78667A723270125077DD,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1335,6 +1382,8 @@
 				DC70A4770243CC1CA714EEB5,
 				6676C0DB08957FBDC042C54F,
 				7930BD02F74FE1E998D43E14,
+				AECF9004BF6C64F9CF4640B9,
+				F4F570D994C6AAFF90AECBAF,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1353,6 +1402,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SummaverickWidgets/SummaverickWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3JVSNB8RYM;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1366,6 +1416,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday.widgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					SVE_WIDGET_EXTENSION,
+				);
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Release;
@@ -1468,6 +1522,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SummaverickWidgets/SummaverickWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3JVSNB8RYM;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1481,6 +1536,10 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday.widgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					SVE_WIDGET_EXTENSION,
+				);
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Debug;

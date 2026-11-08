@@ -1,4 +1,5 @@
 // The one recording for notes, without any screen: RecordView shows it, and shortcuts (R3) start and stop it.
+// Shortcuts, Siri, the Action button and the record control reach it through RecordingIntents.swift.
 // Start checks consent and the microphone, records, starts live transcription and the Live Activity. Stop hands
 // the audio to ProcessingPipeline.recordingStopped synchronously, exactly as the Stop button always did. Cancel
 // drops the piece in flight and deletes the audio. A recording that was going when the app was closed is turned into
@@ -29,8 +30,22 @@ final class RecordingController {
     var elapsed: TimeInterval { recorder.elapsed }
     /// Between start() and the recorder running (the microphone question): a second start is a no-op.
     private(set) var isStarting = false
+    /// A shortcut asked to record before the recording reminder was acknowledged: the app shows it when it opens
+    /// (RootView), shortly after only (RecordingIntentLogic.consentRequestWindow).
+    private(set) var consentRequestedAt: Date?
 
     private init() {}
+
+    func requestConsentFromShortcut() {
+        consentRequestedAt = Date()
+        NSLog("[sve] intent: recording reminder not acknowledged yet; opening the app")
+    }
+
+    /// True once for a fresh request (it is cleared either way).
+    func takeConsentRequest(now: Date = Date()) -> Bool {
+        defer { consentRequestedAt = nil }
+        return RecordingIntentLogic.consentRequestIsFresh(requestedAt: consentRequestedAt, now: now)
+    }
 
     func start() async -> StartResult {
         guard !recorder.isRecording, !isStarting else { return .alreadyRecording }
@@ -48,6 +63,7 @@ final class RecordingController {
         let recorder = self.recorder
         LiveTranscriber.shared.recordingStarted(audio: url) { recorder.elapsed }
         RecordingActivities.shared.recordingStarted(audioPath: url.path, startedAt: Date().addingTimeInterval(-recorder.elapsed))
+        RecordControlState.recordingChanged(true)
         NSLog("[sve] recording started")
         return .started
     }
@@ -57,6 +73,7 @@ final class RecordingController {
     @discardableResult
     func stop() -> Bool {
         guard let (url, duration) = recorder.stop() else { return false }
+        RecordControlState.recordingChanged(false)
         ProcessingPipeline.shared.recordingStopped(audio: url, duration: duration)
         RecordingActivities.shared.update(audioPath: url.path, .transcribing(0),
                                           line: ProcessingPipeline.Stage.transcribing(0).label, percent: 0)
@@ -67,6 +84,7 @@ final class RecordingController {
     /// Cancel: the recording and its transcription so far are deleted.
     func cancel() {
         guard let (url, _) = recorder.stop() else { return }
+        RecordControlState.recordingChanged(false)
         RecordingActivities.shared.update(audioPath: url.path, .cancelled, line: "", percent: 0)
         UnfinishedRecordings.remove(url.path)
         // Drop the piece in flight first, so nothing is written next to the deleted recording.

@@ -14,6 +14,8 @@ struct SummaverickEverydayApp: App {
         AudioRecorder.sweepAskVoice()
         // Live Activities left by a closed app go before this launch can start its own.
         RecordingActivities.endStale()
+        // Nothing records at launch: a record control left on by a closed app shows off again.
+        RecordControlState.recordingChanged(false)
         // Lets notes keep being written with the phone locked after Stop (iOS 26+).
         ContinuedWork.register()
         // Finishes long recordings overnight while charging: a fixed identifier, registered before launch ends.
