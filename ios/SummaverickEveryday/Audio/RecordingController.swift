@@ -106,26 +106,26 @@ enum UnfinishedRecordings {
         UserDefaults.standard.set(p, forKey: key)
     }
 
-    /// Length of a 16 kHz mono 16-bit WAV from its size, so a file the recorder never finished (its header still
-    /// says 0 bytes) is measured too.
-    static func seconds(ofWAV path: String) -> Int64 {
-        guard let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int64 else { return 0 }
-        return max(0, size - dataOffset(path)) / 32_000
-    }
-
-    /// Where the samples start: after the "data" chunk header (AVAudioRecorder writes a padding chunk first).
-    private static func dataOffset(_ path: String) -> Int64 {
-        guard let h = FileHandle(forReadingAtPath: path) else { return 44 }
+    /// A WAV the recorder never finished still says 0 (or an old size) in its header: the RIFF and data sizes are
+    /// written to match the file (WAVHeaderRepair), so it plays, compresses and keeps its tail. Returns its length in
+    /// seconds (16 kHz mono 16-bit), or nil when it is not a WAV the repair understands (left as it is).
+    static func finishWAV(atPath path: String) -> Int64? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int64,
+              let h = FileHandle(forUpdatingAtPath: path) else { return nil }
         defer { try? h.close() }
         let head = [UInt8](h.readData(ofLength: 8192))
-        var i = 12   // "RIFF" size "WAVE"
-        while i + 8 <= head.count {
-            let id = String(bytes: head[i..<i + 4], encoding: .ascii)
-            let len = Int(head[i + 4]) | Int(head[i + 5]) << 8 | Int(head[i + 6]) << 16 | Int(head[i + 7]) << 24
-            if id == "data" { return Int64(i + 8) }
-            i += 8 + len + (len & 1)
+        guard let r = WAVHeaderRepair.repair(head: head, fileSize: size) else { return nil }
+        do {
+            for p in r.patches {
+                try h.seek(toOffset: p.offset)
+                var v = p.value.littleEndian
+                try h.write(contentsOf: Data(bytes: &v, count: 4))
+            }
+            if !r.patches.isEmpty { try h.synchronize() }
+        } catch {
+            NSLog("[sve] unfinished recording: header not written: %@", String(describing: error))
         }
-        return 44
+        return r.dataBytes / 32_000
     }
 }
 
@@ -160,7 +160,8 @@ final class RecordingActivities {
     /// is read before this launch can start one of its own.
     static func endStale() {
         guard #available(iOS 18, *) else { return }
-        let stale = Activity<RecordingActivity>.activities
+        // Only those still showing as live: an ended "Notes ready" card keeps its own dismissal time.
+        let stale = Activity<RecordingActivity>.activities.filter { $0.activityState == .active || $0.activityState == .stale }
         guard !stale.isEmpty else { return }
         NSLog("[sve] live activity: ending %ld left from before", stale.count)
         Task {

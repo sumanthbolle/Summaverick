@@ -5267,19 +5267,19 @@
       },
       "comment": "First %@ is a time in the recording, second %@ the memory's words"
     },
-    "Waiting for the recording before it to finish": {
+    "Waiting for the earlier recording to finish": {
       "comment": "Live Activity line: this recording was stopped while an earlier recording's notes were still being written",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for the recording before it to finish"
+            "value": "Waiting for the earlier recording to finish"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ముందు రికార్డింగ్ పూర్తయ్యే వరకు వేచి ఉంది"
+            "value": "ముందటి రికార్డింగ్ పూర్తయ్యే వరకు వేచి ఉంది"
           }
         }
       }

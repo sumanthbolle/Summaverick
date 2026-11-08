@@ -501,3 +501,50 @@ enum PersonFirst {
     /// Notes one memory backfill takes: one in front (the next idle pass goes on), `overnightLimit` in the background.
     static func backfillNotes(inFront: Bool, overnightLimit: Int = 20) -> Int { inFront ? 1 : overnightLimit }
 }
+
+/// A WAV the recorder never finished (the app was closed mid-recording) still has the sizes written at its start: 0,
+/// 0xFFFFFFFF or an older value. The core reads past them, but AVAudioPlayer and AVAudioFile (playback, compression)
+/// trust them. This gives the two size fields to write so the header matches the file on disk.
+enum WAVHeaderRepair {
+    struct Patch: Equatable {
+        /// Byte offset of the little-endian UInt32 to write.
+        let offset: UInt64
+        let value: UInt32
+    }
+    struct Result: Equatable {
+        /// Where the samples start (after the "data" chunk header; AVAudioRecorder writes a padding chunk first).
+        let dataOffset: Int64
+        /// Bytes of audio on disk, whole sample frames only.
+        let dataBytes: Int64
+        /// Only the fields that differ; empty for a finished header.
+        let patches: [Patch]
+    }
+
+    /// head: the first bytes of the file (enough to reach the "data" chunk header; 8 KB is plenty). nil: not a WAV,
+    /// cut inside its header, or no data chunk; nothing should be written.
+    static func repair(head: [UInt8], fileSize: Int64) -> Result? {
+        func le32(_ i: Int) -> UInt32 {
+            UInt32(head[i]) | UInt32(head[i + 1]) << 8 | UInt32(head[i + 2]) << 16 | UInt32(head[i + 3]) << 24
+        }
+        guard head.count >= 12, head[0..<4].elementsEqual("RIFF".utf8), head[8..<12].elementsEqual("WAVE".utf8) else { return nil }
+        var align = 2
+        var i = 12
+        while i + 8 <= head.count {
+            let len = Int(le32(i + 4))
+            if head[i..<i + 4].elementsEqual("fmt ".utf8), i + 8 + 14 <= head.count {
+                align = max(1, Int(head[i + 8 + 12]) | Int(head[i + 8 + 13]) << 8)
+            } else if head[i..<i + 4].elementsEqual("data".utf8) {
+                let offset = Int64(i + 8)
+                guard fileSize >= offset else { return nil }
+                let bytes = min((fileSize - offset) / Int64(align) * Int64(align), Int64(UInt32.max))
+                let riff = UInt32(min(fileSize - 8, Int64(UInt32.max)))
+                var patches: [Patch] = []
+                if le32(4) != riff { patches.append(Patch(offset: 4, value: riff)) }
+                if le32(i + 4) != UInt32(bytes) { patches.append(Patch(offset: UInt64(i + 4), value: UInt32(bytes))) }
+                return Result(dataOffset: offset, dataBytes: bytes, patches: patches)
+            }
+            i += 8 + len + (len & 1)
+        }
+        return nil
+    }
+}

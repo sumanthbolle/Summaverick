@@ -154,7 +154,7 @@ final class ProcessingPipeline {
     static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
     /// Stopped while another recording's notes are being written.
-    static var queuedMessage: String { String(localized: "Waiting for the recording before it to finish") }
+    static var queuedMessage: String { String(localized: "Waiting for the earlier recording to finish") }
     nonisolated static var overnightMessage: String { String(localized: "Waiting for the charger — finishes overnight") }
     nonisolated private static var thermal: ProcessInfo.ThermalState { ProcessInfo.processInfo.thermalState }
     /// Critical: the only heat that cancels a model run in the middle.
@@ -325,8 +325,11 @@ final class ProcessingPipeline {
         // The recording is always kept, even when the AI cannot run yet.
         let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
         guard id > 0 else {
+            // The marker stays on purpose (ruling B7): the next launch tries to save the recording as a note again.
             let line = String(localized: "Could not save the note.")
-            stage = .failed(line)
+            // Only this run's own claim shows the failure as the stage (and ends it, so nothing stays busy). Another
+            // note running keeps its stage and its Live Activity; only this recording's activity ends.
+            if claimed { stage = .failed(line) }
             RecordingActivities.shared.update(audioPath: audio.path, .failed, line: line, percent: 0)
             return nil
         }
@@ -1237,7 +1240,7 @@ final class ProcessingPipeline {
     func resumeInterrupted() async {
         guard !resuming else { return }
         resuming = true
-        defer { resuming = false; finishContinuedWork() }
+        defer { resuming = false; finishContinuedWork(); endWaitingActivities() }
         var tried: Set<Int64> = []
         while !isWorking, appIsActive || ContinuedWork.shared.isHeld || overnightRun != nil,
               !(overnightRun?.isSet ?? false), !LiveTranscriber.shared.isRecording,
@@ -1256,6 +1259,16 @@ final class ProcessingPipeline {
             await rerun(noteID: id)
             overnightOwnsRun.set(false)
             if !interrupted.contains(id) { markAutoTried(id) }
+        }
+    }
+
+    /// The resume loop stopped with the app not in front and nothing running: notes still waiting their turn will not
+    /// start until the app is opened (or the overnight task runs), so their Live Activities end as paused instead of
+    /// staying on "Waiting for the earlier recording to finish".
+    private func endWaitingActivities() {
+        guard !appIsActive, !isWorking else { return }
+        for id in interrupted.sorted() where RecordingActivities.shared.isFollowing(noteID: id) {
+            RecordingActivities.shared.update(noteID: id, .cutOff, line: lastFailure[id] ?? Self.cutOffMessage, percent: 0)
         }
     }
 
@@ -1313,7 +1326,10 @@ final class ProcessingPipeline {
     /// from the saved cursor, then the notes.
     func recoverUnfinishedRecordings() async {
         let unfinished = UnfinishedRecordings.paths
-        guard !unfinished.isEmpty else { return }
+        // One pass at a time (another window or a scene reconnect may call this too).
+        guard !unfinished.isEmpty, !recovering else { return }
+        recovering = true
+        defer { recovering = false }
         let engine = CoreEngine.shared
         var known: Set<String> = []
         for n in await engine.notes(limit: 10_000) where n.has_audio {
@@ -1326,12 +1342,15 @@ final class ProcessingPipeline {
                 UnfinishedRecordings.remove(stored)   // already a note, or the file is gone
                 continue
             }
-            let duration = UnfinishedRecordings.seconds(ofWAV: path)
+            // Still unfinished after the awaits above (a Stop or another pass may have taken it meanwhile).
+            guard UnfinishedRecordings.paths.contains(stored), !isHandingOver(stored) else { continue }
+            let duration = UnfinishedRecordings.finishWAV(atPath: path) ?? 0
             let ms = Double(name.dropFirst("rec-".count).prefix { $0.isNumber }) ?? 0
             let started = ms > 0 ? Date(timeIntervalSince1970: ms / 1000) : Date()
             let title = "Recording " + Self.titleFormatter.string(from: started)
             let id = await engine.createNote(title: title, lang: AppSettings.shared.notesLanguage, audioPath: path,
                                              transcript: nil, durationSeconds: duration)
+            // Not saved: the marker stays on purpose, so the next launch tries again (ruling B7).
             guard id > 0 else { NSLog("[sve] unfinished recording %@: note not saved", name); continue }
             UnfinishedRecordings.remove(stored)
             noteTitles[id] = title
@@ -1340,6 +1359,9 @@ final class ProcessingPipeline {
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
     }
+
+    /// A recovery pass is running (recoverUnfinishedRecordings).
+    @ObservationIgnored private var recovering = false
 
     /// At launch: removes transcription progress files whose recording is gone or belongs to no note. The recordings
     /// themselves are left alone, and so is the progress of a recording that was going when the app was closed (it
