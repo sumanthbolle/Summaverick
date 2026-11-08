@@ -7,7 +7,8 @@
 // Stop when quiet (ruling B11): every recording, however it was started, is watched for voice through the recorder's
 // level (QuietStop). 30 s before the quiet limit it warns once (the Live Activity, and a notification with Keep recording,
 // or RecordView's line while that screen is in front); voice or Keep recording takes the warning away. At the limit it
-// goes through stop() like the Stop button, after cutting the trailing quiet (2 s after the last voice are kept).
+// goes through stop() like the Stop button, after cutting the trailing quiet (2 s after the last voice are kept; with no
+// voice ever heard nothing is cut, ruling B12).
 import ActivityKit
 import Foundation
 import Observation
@@ -94,16 +95,17 @@ final class RecordingController {
     @discardableResult
     func stop() -> Bool { stop(quietStop: nil) }
 
-    /// quietStop: stopped by Stop when quiet; the audio after keepUntil (seconds) is cut before the notes are made,
-    /// and line says why it stopped (the Live Activity, and a notification when the app is not in front).
+    /// quietStop: stopped by Stop when quiet; the audio after keepUntil (seconds) is cut before the notes are made
+    /// (nil: no voice was ever heard, nothing is cut), and line says why it stopped (the Live Activity, and a
+    /// notification when the app is not in front).
     @discardableResult
-    private func stop(quietStop: (keepUntil: TimeInterval, line: String)?) -> Bool {
+    private func stop(quietStop: (keepUntil: TimeInterval?, line: String)?) -> Bool {
         if isStarting { stopRequestedWhileStarting = true }
         guard let (url, recorded) = recorder.stop() else { return false }
         recorder.onLevel = nil
         var duration = recorded
         if let q = quietStop {
-            if let trimmed = Self.trimWAV(atPath: url.path, keepSeconds: q.keepUntil) {
+            if let keep = q.keepUntil, let trimmed = Self.trimWAV(atPath: url.path, keepSeconds: keep) {
                 NSLog("[sve] quiet: kept %lld of %lld s", trimmed, recorded)
                 duration = trimmed
             }
@@ -182,7 +184,7 @@ final class RecordingController {
             clearQuietWarning()
         case .stop(let keepUntil):
             let minutes = Int((quiet.limit / 60).rounded())
-            NSLog("[sve] quiet: stopping at %.0f s, keeping %.0f s", t, keepUntil)
+            NSLog("[sve] quiet: stopping at %.0f s, keeping %.0f s", t, keepUntil ?? -1)
             stop(quietStop: (keepUntil, String(localized: "Stopped after \(minutes) min of quiet")))
         }
     }

@@ -615,8 +615,9 @@ enum QuietStop {
         case warn
         /// Voice came back after the warning: take it away.
         case warningCancelled
-        /// Stop now and keep the audio up to this recorded time (seconds).
-        case stop(keepUntil: TimeInterval)
+        /// Stop now and keep the audio up to this recorded time (seconds). nil: keep it all, because no voice was
+        /// ever heard and nothing was confirmed (ruling B12: a faint speaker the detector missed loses nothing).
+        case stop(keepUntil: TimeInterval?)
     }
 
     struct Detector {
@@ -626,6 +627,9 @@ enum QuietStop {
         private(set) var floor: Double?
         /// The quiet timer counts from here: the last voice, the last "Keep recording", or the start.
         private(set) var quietSince: TimeInterval = 0
+        /// The quiet timer started at real voice or at "Keep recording", not at the start: only then is the audio
+        /// after it cut (ruling B12).
+        private(set) var mayTrim = false
         private(set) var warned = false
         private(set) var stopped = false
         private var lastTime: TimeInterval?
@@ -644,13 +648,14 @@ enum QuietStop {
             var event = Event.none
             if voiced {
                 quietSince = t
+                mayTrim = true
                 if warned { warned = false; event = .warningCancelled }
             }
             guard limit > 0, !stopped else { return event }
             let quiet = t - quietSince
             if quiet >= limit {
                 stopped = true
-                return .stop(keepUntil: quietSince + QuietStop.keepAfterVoice)
+                return .stop(keepUntil: mayTrim ? quietSince + QuietStop.keepAfterVoice : nil)
             }
             if !warned, quiet >= max(0, limit - QuietStop.warnBefore) {
                 warned = true
@@ -662,6 +667,7 @@ enum QuietStop {
         /// "Keep recording": the warning goes and the quiet timer starts again from now.
         mutating func keepRecording(at t: TimeInterval) {
             quietSince = t
+            mayTrim = true
             warned = false
             stopped = false
         }
