@@ -14,6 +14,11 @@ os.chdir(ROOT)
 APP = "SummaverickEveryday"
 BUNDLE_ID = "com.summaverick.everyday"
 SWIFT_DIR = "SummaverickEveryday"
+# Widget extension (the recording Live Activity), embedded in the app. Shared/*.swift is compiled into both targets.
+WIDGETS = "SummaverickWidgets"
+WIDGETS_BUNDLE_ID = BUNDLE_ID + ".widgets"
+WIDGETS_DIR = "SummaverickWidgets"
+SHARED_DIR = "Shared"
 CORE_SRC = "../core/src"
 XCFRAMEWORK = "Frameworks/llama.xcframework"
 
@@ -36,6 +41,16 @@ for dirpath, _, files in os.walk(SWIFT_DIR):
         if f.endswith(".swift"):
             swift_files.append(os.path.join(dirpath, f).replace("\\", "/"))
 swift_files.sort()
+
+def swift_in(d):
+    out = []
+    for dirpath, _, files in os.walk(d):
+        out += [os.path.join(dirpath, f).replace("\\", "/") for f in files if f.endswith(".swift")]
+    return sorted(out)
+
+
+shared_files = swift_in(SHARED_DIR)
+widget_files = swift_in(WIDGETS_DIR)
 
 xcstrings_files = []
 for dirpath, _, files in os.walk(SWIFT_DIR):
@@ -94,6 +109,10 @@ assets_ref = file_ref(assets, "folder.assetcatalog", name="Assets.xcassets")
 assets_build = build_file(assets_ref, "resources")
 xcstrings_refs = [file_ref(p, "text.json.xcstrings", name=os.path.basename(p)) for p in xcstrings_files]
 xcstrings_builds = [build_file(r, "resources") for r in xcstrings_refs]
+shared_refs = [file_ref(p, "sourcecode.swift", name=os.path.basename(p)) for p in shared_files]
+widget_refs = [file_ref(p, "sourcecode.swift", name=os.path.basename(p)) for p in widget_files]
+widget_plist = f"{WIDGETS_DIR}/Info.plist"
+widget_plist_ref = file_ref(widget_plist, "text.plist.xml", name="Info.plist")
 xcf_ref = file_ref(XCFRAMEWORK, "wrapper.xcframework", name="llama.xcframework")
 product_ref = uid("ref:product")
 objects[product_ref] = ("PBXFileReference", {
@@ -101,7 +120,17 @@ objects[product_ref] = ("PBXFileReference", {
     "path": f"{APP}.app", "sourceTree": "BUILT_PRODUCTS_DIR"})
 
 source_builds = [build_file(r, "sources") for r in swift_refs] + \
-                [build_file(r, "sources") for r, p in zip(core_refs, core_files) if p.endswith(".cpp")]
+                [build_file(r, "sources") for r, p in zip(core_refs, core_files) if p.endswith(".cpp")] + \
+                [build_file(r, "sources") for r in shared_refs]
+widget_product_ref = uid("ref:product:" + WIDGETS)
+objects[widget_product_ref] = ("PBXFileReference", {
+    "isa": "PBXFileReference", "explicitFileType": "wrapper.app-extension", "includeInIndex": "0",
+    "path": f"{WIDGETS}.appex", "sourceTree": "BUILT_PRODUCTS_DIR"})
+widget_source_builds = [build_file(r, "widget-sources") for r in widget_refs + shared_refs]
+# The extension shows the app's strings: the same catalog, as its own resource.
+widget_resource_builds = [build_file(r, "widget-resources") for r, p in zip(xcstrings_refs, xcstrings_files)
+                          if os.path.basename(p) == "Localizable.xcstrings"]
+embed_widget_build = build_file(widget_product_ref, "embed-extensions", settings={"ATTRIBUTES": ["RemoveHeadersOnCopy"]})
 link_build = build_file(xcf_ref, "frameworks")
 embed_build = build_file(xcf_ref, "embed", settings={"ATTRIBUTES": ["CodeSignOnCopy", "RemoveHeadersOnCopy"]})
 
@@ -130,10 +159,12 @@ for d in sorted(by_dir):
 swift_children += [bridging_ref, plist_ref, assets_ref] + xcstrings_refs
 
 app_group = group("app", APP, swift_children)
+shared_group = group("shared", SHARED_DIR, shared_refs)
+widgets_group = group("widgets", WIDGETS, widget_refs + [widget_plist_ref])
 core_group = group("core", "Core", core_refs)
 fw_group = group("frameworks", "Frameworks", [xcf_ref])
-products_group = group("products", "Products", [product_ref])
-main_group = group("main", None, [app_group, core_group, fw_group, products_group])
+products_group = group("products", "Products", [product_ref, widget_product_ref])
+main_group = group("main", None, [app_group, shared_group, widgets_group, core_group, fw_group, products_group])
 
 # build phases
 sources_phase = uid("phase:sources")
@@ -152,6 +183,24 @@ embed_phase = uid("phase:embed")
 objects[embed_phase] = ("PBXCopyFilesBuildPhase", {
     "isa": "PBXCopyFilesBuildPhase", "buildActionMask": "2147483647", "dstPath": "",
     "dstSubfolderSpec": "10", "files": [embed_build], "name": "Embed Frameworks",
+    "runOnlyForDeploymentPostprocessing": "0"})
+
+embed_ext_phase = uid("phase:embed-extensions")
+objects[embed_ext_phase] = ("PBXCopyFilesBuildPhase", {
+    "isa": "PBXCopyFilesBuildPhase", "buildActionMask": "2147483647", "dstPath": "",
+    "dstSubfolderSpec": "13", "files": [embed_widget_build], "name": "Embed Foundation Extensions",
+    "runOnlyForDeploymentPostprocessing": "0"})
+widget_sources_phase = uid("phase:widget-sources")
+objects[widget_sources_phase] = ("PBXSourcesBuildPhase", {
+    "isa": "PBXSourcesBuildPhase", "buildActionMask": "2147483647", "files": widget_source_builds,
+    "runOnlyForDeploymentPostprocessing": "0"})
+widget_frameworks_phase = uid("phase:widget-frameworks")
+objects[widget_frameworks_phase] = ("PBXFrameworksBuildPhase", {
+    "isa": "PBXFrameworksBuildPhase", "buildActionMask": "2147483647", "files": [],
+    "runOnlyForDeploymentPostprocessing": "0"})
+widget_resources_phase = uid("phase:widget-resources")
+objects[widget_resources_phase] = ("PBXResourcesBuildPhase", {
+    "isa": "PBXResourcesBuildPhase", "buildActionMask": "2147483647", "files": widget_resource_builds,
     "runOnlyForDeploymentPostprocessing": "0"})
 
 # build settings
@@ -232,6 +281,23 @@ target_settings = {
 }
 
 
+# WidgetKit + ActivityKit + SwiftUI (linked automatically). 18.0: the Live Activity is iOS 18+ (the app only starts
+# it there), and R3's ControlWidget needs 18. Same team and signing as the app.
+widget_settings = {
+    "APPLICATION_EXTENSION_API_ONLY": "YES",
+    "CODE_SIGN_STYLE": "Automatic",
+    "DEVELOPMENT_TEAM": "3JVSNB8RYM",
+    "GENERATE_INFOPLIST_FILE": "NO",
+    "INFOPLIST_FILE": widget_plist,
+    "IPHONEOS_DEPLOYMENT_TARGET": "18.0",
+    "LD_RUNPATH_SEARCH_PATHS": ["$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks"],
+    "PRODUCT_BUNDLE_IDENTIFIER": WIDGETS_BUNDLE_ID,
+    "PRODUCT_NAME": "$(TARGET_NAME)",
+    "SKIP_INSTALL": "YES",
+    "SWIFT_EMIT_LOC_STRINGS": "YES",
+}
+
+
 def config(key, name, settings):
     oid = uid("config:" + key)
     objects[oid] = ("XCBuildConfiguration", {"isa": "XCBuildConfiguration", "buildSettings": settings, "name": name})
@@ -251,23 +317,41 @@ proj_cl = config_list("project", [config("project/Debug", "Debug", project_debug
 target_cl = config_list("target", [config("target/Debug", "Debug", target_settings),
                                    config("target/Release", "Release", target_settings)])
 
+widget_cl = config_list("widget", [config("widget/Debug", "Debug", widget_settings),
+                                   config("widget/Release", "Release", widget_settings)])
+widget_target = uid("target:" + WIDGETS)
+objects[widget_target] = ("PBXNativeTarget", {
+    "isa": "PBXNativeTarget", "buildConfigurationList": widget_cl,
+    "buildPhases": [widget_sources_phase, widget_frameworks_phase, widget_resources_phase],
+    "buildRules": [], "dependencies": [], "name": WIDGETS, "productName": WIDGETS,
+    "productReference": widget_product_ref, "productType": "com.apple.product-type.app-extension"})
+
+project = uid("project")
+widget_proxy = uid("proxy:" + WIDGETS)
+objects[widget_proxy] = ("PBXContainerItemProxy", {
+    "isa": "PBXContainerItemProxy", "containerPortal": project, "proxyType": "1",
+    "remoteGlobalIDString": widget_target, "remoteInfo": WIDGETS})
+widget_dep = uid("dependency:" + WIDGETS)
+objects[widget_dep] = ("PBXTargetDependency", {
+    "isa": "PBXTargetDependency", "target": widget_target, "targetProxy": widget_proxy})
+
 target = uid("target:app")
 objects[target] = ("PBXNativeTarget", {
     "isa": "PBXNativeTarget", "buildConfigurationList": target_cl,
-    "buildPhases": [sources_phase, frameworks_phase, resources_phase, embed_phase],
-    "buildRules": [], "dependencies": [], "name": APP, "productName": APP,
+    "buildPhases": [sources_phase, frameworks_phase, resources_phase, embed_phase, embed_ext_phase],
+    "buildRules": [], "dependencies": [widget_dep], "name": APP, "productName": APP,
     "productReference": product_ref, "productType": "com.apple.product-type.application"})
 
-project = uid("project")
 objects[project] = ("PBXProject", {
     "isa": "PBXProject",
     "attributes": {"BuildIndependentTargetsInParallel": "1", "LastSwiftUpdateCheck": "1600",
                    "LastUpgradeCheck": "2720",
-                   "TargetAttributes": {target: {"CreatedOnToolsVersion": "16.0"}}},
+                   "TargetAttributes": {target: {"CreatedOnToolsVersion": "16.0"},
+                                        widget_target: {"CreatedOnToolsVersion": "16.0"}}},
     "buildConfigurationList": proj_cl, "compatibilityVersion": "Xcode 14.0",
     "developmentRegion": "en", "hasScannedForEncodings": "0", "knownRegions": ["en", "te", "Base"],
     "mainGroup": main_group, "productRefGroup": products_group, "projectDirPath": "",
-    "projectRoot": "", "targets": [target]})
+    "projectRoot": "", "targets": [target, widget_target]})
 
 # ---- serialise -----------------------------------------------------------
 def fmt(v, indent):
@@ -296,4 +380,5 @@ lines += ["\t};", f"\trootObject = {project};", "}", ""]
 os.makedirs(f"{APP}.xcodeproj", exist_ok=True)
 with open(f"{APP}.xcodeproj/project.pbxproj", "w") as f:
     f.write("\n".join(lines))
-print(f"Created {APP}.xcodeproj ({len(swift_files)} Swift files, {sum(p.endswith('.cpp') for p in core_files)} C++ files)")
+print(f"Created {APP}.xcodeproj ({len(swift_files)} Swift files, {sum(p.endswith('.cpp') for p in core_files)} C++ files; "
+      f"{WIDGETS}: {len(widget_files)} Swift files; {len(shared_files)} shared)")

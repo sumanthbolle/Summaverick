@@ -33,6 +33,8 @@
 	<string>Unlock your notes.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Summaverick records lectures, meetings and notes only when you press Record. Audio never leaves this device.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

@@ -64,12 +64,29 @@ final class ProcessingPipeline {
         var isWorking: Bool {
             switch self { case .idle, .done, .failed, .paused, .overnight: return false; default: return true }
         }
+        /// The same stage for the recording's Live Activity (LiveActivityLogic decides what it shows).
+        var activityStage: LiveActivityLogic.Stage {
+            switch self {
+            case .idle: return .idle
+            case .transcribing(let p): return .transcribing(p)
+            case .loadingModel: return .loadingModel
+            case .extracting: return .extracting
+            case .sections(let d, let t): return .sections(d, t)
+            case .generating(_, _, let d, let t): return .generating(d, t)
+            case .done: return .done
+            case .failed: return .failed
+            case .paused: return .paused
+            case .cooling: return .cooling
+            case .overnight: return .overnight
+            case .memories(let d, let t): return .memories(d, t)
+            }
+        }
     }
 
     private(set) var stage: Stage = .idle {
         didSet {
             if stage.isWorking { ContinuedWork.shared.update(subtitle: stage.label) }
-            guard case .failed(let msg) = stage, let id = activeNoteID else { return }
+            guard case .failed(let msg) = stage, let id = activeNoteID else { followStage(); return }
             if BackendChoice.failureIsCutOff(aborted: abort.isSet, wentToBackground: wentToBackground, gpuStep: stepOnGPU,
                                              continuedTaskHeld: ContinuedWork.shared.isHeld) {
                 // iOS stops the AI model on the GPU once the app is in the background, and an expiry cancels the
@@ -81,8 +98,28 @@ final class ProcessingPipeline {
             } else {
                 lastFailure[id] = msg
                 notifyFailed(id, line: msg)
+                RecordingActivities.shared.update(noteID: id, .failed, line: msg, percent: ContinuedWork.shared.percent)
             }
         }
+    }
+
+    /// The note being worked on has a recording Live Activity: it shows this stage (failures are handled above).
+    private func followStage() {
+        guard let id = activeNoteID, RecordingActivities.shared.isFollowing(noteID: id) else { return }
+        let line: String
+        switch stage {
+        case .idle: line = lastFailure[id] ?? Self.waitingMessage
+        case .done, .memories: line = noteTitles[id] ?? ""
+        default: line = stage.label
+        }
+        RecordingActivities.shared.update(noteID: id, stage.activityStage, line: line, percent: ContinuedWork.shared.percent)
+    }
+
+    /// A run of this note ended: an activity still showing its work ends now, unless the note waits its turn (queued,
+    /// shown as such). Every other ending (ready, paused, cut off, failed) has already ended it.
+    private func activityRunEnded(_ id: Int64) {
+        guard RecordingActivities.shared.isFollowing(noteID: id), !interrupted.contains(id) else { return }
+        RecordingActivities.shared.update(noteID: id, .idle, line: lastFailure[id] ?? "", percent: ContinuedWork.shared.percent)
     }
     /// Notes whose processing was cut off (app in the background, phone too hot) or that waited for
     /// the AI to download; resumed one at a time while the app is active.
@@ -116,6 +153,8 @@ final class ProcessingPipeline {
     static var cutOffMessage: String { String(localized: "Paused when the phone locked. It will finish by itself later, or when you open Summaverick.") }
     static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
+    /// Stopped while another recording's notes are being written.
+    static var queuedMessage: String { String(localized: "Waiting for the recording before it to finish") }
     nonisolated static var overnightMessage: String { String(localized: "Waiting for the charger — finishes overnight") }
     nonisolated private static var thermal: ProcessInfo.ThermalState { ProcessInfo.processInfo.thermalState }
     /// Critical: the only heat that cancels a model run in the middle.
@@ -188,7 +227,10 @@ final class ProcessingPipeline {
     }
 
     private init() {
-        ContinuedWork.shared.onExpire = { [weak self] in self?.continuedWorkExpired() }
+        ContinuedWork.shared.onExpire = { [weak self] hold in
+            guard let self else { hold.end(); return }
+            self.continuedWorkExpired(hold: hold)
+        }
         let leftFront = self.leftFront
         resignObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in leftFront.set(true) }
@@ -282,7 +324,15 @@ final class ProcessingPipeline {
         let noteLang = AppSettings.shared.notesLanguage
         // The recording is always kept, even when the AI cannot run yet.
         let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
-        guard id > 0 else { stage = .failed(String(localized: "Could not save the note.")); return nil }
+        guard id > 0 else {
+            let line = String(localized: "Could not save the note.")
+            stage = .failed(line)
+            RecordingActivities.shared.update(audioPath: audio.path, .failed, line: line, percent: 0)
+            return nil
+        }
+        UnfinishedRecordings.remove(audio.path)   // the note has it now
+        RecordingActivities.shared.attach(audioPath: audio.path, noteID: id)
+        defer { activityRunEnded(id) }
         if claimed { activeNoteID = id }
         noteTitles[id] = title
         lastFailure[id] = nil
@@ -292,10 +342,17 @@ final class ProcessingPipeline {
         // Live transcription finishes the piece in flight and hands over; this run continues from its cursor.
         await LiveTranscriber.shared.finish(audioPath: audio.path)
         // Not downloaded yet: the note waits and is processed when the AI is ready (processWaitingNotes).
-        guard ModelManager.shared.isReady else { return id }
+        guard ModelManager.shared.isReady else {
+            RecordingActivities.shared.update(noteID: id, .waitingForAI, line: Self.waitingMessage, percent: 0)
+            return id
+        }
         if !claimed {
             // Another note is being written: queue this one behind it.
-            guard !isWorking else { interrupted.insert(id); return id }
+            guard !isWorking else {
+                interrupted.insert(id)
+                RecordingActivities.shared.update(noteID: id, .queued, line: Self.queuedMessage, percent: 0)
+                return id
+            }
             beginBackground()
             ownsBackground = true
             activeNoteID = id
@@ -347,11 +404,15 @@ final class ProcessingPipeline {
         defer { starting = false }
         guard let note = await CoreEngine.shared.note(noteID) else { unmarkOvernight(noteID); return }   // deleted
         noteTitles[noteID] = note.title
+        defer { activityRunEnded(noteID) }
         guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
         defer { settleOvernight(noteID) }
         // Already finished (for example queued twice): nothing to do, and no duplicate suggestions.
         guard WaitingNotes.needsWork(hasTranscript: !(note.transcript ?? "").isEmpty,
-                                     outputs: OutputKind.allCases.map { note.output($0) != nil }) else { return }
+                                     outputs: OutputKind.allCases.map { note.output($0) != nil }) else {
+            RecordingActivities.shared.update(noteID: noteID, .ready, line: note.title, percent: 100)
+            return
+        }
         beginBackground()
         defer { endBackground() }
         activeNoteID = noteID
@@ -526,8 +587,9 @@ final class ProcessingPipeline {
         stepOnGPU = false   // transcription always runs on the CPU
         let duration = Double(max(1, durationSeconds))
         func report(_ s: TranscriptSidecar) {
-            stage = .transcribing(min(1, s.transcribedSeconds / duration))
+            // The fraction first: the stage change sends it to the recording's Live Activity.
             ContinuedWork.shared.update(fraction: NotesProgress.fraction(transcribedSeconds: s.transcribedSeconds, durationSeconds: duration))
+            stage = .transcribing(min(1, s.transcribedSeconds / duration))
         }
         report(TranscriptSidecar.load(audioPath: audio.path))   // from where live transcription got to
         let abort = self.abort
@@ -586,7 +648,10 @@ final class ProcessingPipeline {
 
     /// The system ended the continued-processing task: stop the run; the note resumes from where it was, by itself
     /// in the overnight task (cutOff) or when the app is opened.
-    private func continuedWorkExpired() {
+    /// hold: background time taken in the expiration handler itself, before the hop here; it ends once every
+    /// notification and Live Activity end below has taken its own.
+    private func continuedWorkExpired(hold: NotesNotifier.Hold) {
+        defer { hold.end() }
         abort.set(true)
         // Memories run after the notes are done: stopping them leaves nothing to resume or show.
         var running: Int64?
@@ -613,6 +678,8 @@ final class ProcessingPipeline {
     /// The run in flight was cancelled; every piece, section and output already finished is kept.
     /// queued: the note was waiting its turn, not running (its progress is not known: 0%).
     private func cutOff(_ id: Int64, queued: Bool = false) {
+        RecordingActivities.shared.update(noteID: id, .cutOff, line: lastFailure[id] ?? Self.cutOffMessage,
+                                          percent: queued ? 0 : ContinuedWork.shared.percent)
         guard OvernightList.enrolsAfterCutOff(notesRun: queued || notesRun, memoriesOnly: !queued && memoryWork,
                                               appActive: appIsActive) else { return }
         let percent = queued ? 0 : ContinuedWork.shared.percent
@@ -719,6 +786,7 @@ final class ProcessingPipeline {
         // The notes are stored: "ready" now (when the app is not in front), not after the memories.
         NSLog("[sve] bg: note %lld: notes ready (app %@)", id, appIsActive ? "in front" : "not in front")
         notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
+        RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
         // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
         memoryStop.set(false)
@@ -1239,9 +1307,46 @@ final class ProcessingPipeline {
         handingOver.contains(path) || LiveTranscriber.shared.isTranscribing(audioPath: path)
     }
 
-    /// At launch: removes transcription progress files whose recording is gone or belongs to no note
-    /// (for example the app was closed during a recording). The recordings themselves are left alone.
+    /// At launch, before the waiting notes are queued: a recording that was going when the app was closed (killed, or
+    /// ended by iOS), started in the app or by a shortcut, becomes a note now. Its audio and transcription progress
+    /// (sidecar) are kept, and it is processed like any recording whose work was interrupted: transcription goes on
+    /// from the saved cursor, then the notes.
+    func recoverUnfinishedRecordings() async {
+        let unfinished = UnfinishedRecordings.paths
+        guard !unfinished.isEmpty else { return }
+        let engine = CoreEngine.shared
+        var known: Set<String> = []
+        for n in await engine.notes(limit: 10_000) where n.has_audio {
+            if let p = await engine.note(n.id)?.audio_path { known.insert((p as NSString).lastPathComponent) }
+        }
+        for stored in unfinished {
+            if RecordingController.shared.isRecording(audioPath: stored) || isHandingOver(stored) { continue }   // this launch's
+            let name = (stored as NSString).lastPathComponent
+            guard !known.contains(name), let path = AudioRecorder.existingAudioPath(stored) else {
+                UnfinishedRecordings.remove(stored)   // already a note, or the file is gone
+                continue
+            }
+            let duration = UnfinishedRecordings.seconds(ofWAV: path)
+            let ms = Double(name.dropFirst("rec-".count).prefix { $0.isNumber }) ?? 0
+            let started = ms > 0 ? Date(timeIntervalSince1970: ms / 1000) : Date()
+            let title = "Recording " + Self.titleFormatter.string(from: started)
+            let id = await engine.createNote(title: title, lang: AppSettings.shared.notesLanguage, audioPath: path,
+                                             transcript: nil, durationSeconds: duration)
+            guard id > 0 else { NSLog("[sve] unfinished recording %@: note not saved", name); continue }
+            UnfinishedRecordings.remove(stored)
+            noteTitles[id] = title
+            memoriesMayBeDue = true
+            NSLog("[sve] unfinished recording %@ (%lld s) saved as note %lld; it is processed as interrupted", name, duration, id)
+            NotificationCenter.default.post(name: .notesChanged, object: nil)
+        }
+    }
+
+    /// At launch: removes transcription progress files whose recording is gone or belongs to no note. The recordings
+    /// themselves are left alone, and so is the progress of a recording that was going when the app was closed (it
+    /// becomes a note: recoverUnfinishedRecordings).
     func sweepOrphanSidecars() async {
+        // Read first: a recording recovered meanwhile is a note by the time the notes are read below.
+        let unfinished = UnfinishedRecordings.names
         let dir = AudioRecorder.recordingsDirectory
         let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
         let sidecars = files.filter { $0.hasSuffix(".live.json") }
@@ -1254,7 +1359,7 @@ final class ProcessingPipeline {
         for f in sidecars {
             let audioName = String(f.dropLast(".live.json".count))
             let audioPath = dir.appendingPathComponent(audioName).path
-            if known.contains(audioName) || isHandingOver(audioPath) { continue }
+            if known.contains(audioName) || unfinished.contains(audioName) || isHandingOver(audioPath) { continue }
             NSLog("[sve] removing orphan transcription progress %@", f)
             TranscriptSidecar.remove(audioPath: audioPath)
         }
@@ -1386,6 +1491,7 @@ final class ProcessingPipeline {
 
     /// A note deleted: off the overnight list (and every other queue).
     func forget(noteID id: Int64) {
+        RecordingActivities.shared.update(noteID: id, .deleted, line: "", percent: 0)
         unmarkOvernight(id)
         noteTitles[id] = nil
         parkRequested.remove(id)

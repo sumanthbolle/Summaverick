@@ -43,6 +43,10 @@
 			isa = PBXBuildFile;
 			fileRef = 613ACEA909B6A4FB1BE80F73;
 		};
+		287BB893A1AA69C067C08137 = {
+			isa = PBXBuildFile;
+			fileRef = 33C50C60642D8852C316CF41;
+		};
 		2FD15473B6B920BB015E30EC = {
 			isa = PBXBuildFile;
 			fileRef = C30CC5397DAA09FBACA85197;
@@ -93,6 +97,10 @@
 			isa = PBXBuildFile;
 			fileRef = FC685B2FB5E51229E33B1F2C;
 		};
+		7930BD02F74FE1E998D43E14 = {
+			isa = PBXBuildFile;
+			fileRef = 2CC5EFA566DA98ADF20EDEAF;
+		};
 		7CD85F6783D894B9047A2C67 = {
 			isa = PBXBuildFile;
 			fileRef = EE7D0A38215CFAEEF0A0E2BE;
@@ -133,6 +141,10 @@
 			isa = PBXBuildFile;
 			fileRef = 7098A4559C0419D83AAB1B2A;
 		};
+		9A5EA1AFF3F67FA08253F534 = {
+			isa = PBXBuildFile;
+			fileRef = 8F55E78D0CAB65A7B800E45B;
+		};
 		A062B0CDA53604F5D8A7D47D = {
 			isa = PBXBuildFile;
 			fileRef = C593582C209D99DB076F4AB2;
@@ -144,6 +156,10 @@
 		A5B14A3A01B9BFEF4EB193D3 = {
 			isa = PBXBuildFile;
 			fileRef = 43130EEACCC981C89B012095;
+		};
+		A8D78741F45FACAC32C29FBB = {
+			isa = PBXBuildFile;
+			fileRef = 05DE663E1F9B875F3C1ABC94;
 		};
 		A98A4FF70B48BB38E9507E50 = {
 			isa = PBXBuildFile;
@@ -161,6 +177,10 @@
 			isa = PBXBuildFile;
 			fileRef = 60C1139DF3355429822F7043;
 		};
+		B73BD37B74FFE5DE3C398EE9 = {
+			isa = PBXBuildFile;
+			fileRef = 515BBF6A31C68F3F903DB724;
+		};
 		B939673027A07B580BF6B7A1 = {
 			isa = PBXBuildFile;
 			fileRef = 892E4DF51BC5A1D8EB706A7A;
@@ -172,6 +192,10 @@
 		C2AF1244993225350DDBDC94 = {
 			isa = PBXBuildFile;
 			fileRef = 0B08BF124CD0B2571A98FABA;
+		};
+		C6AAA9F998388DF8734C616C = {
+			isa = PBXBuildFile;
+			fileRef = 2CC5EFA566DA98ADF20EDEAF;
 		};
 		C6FD0A316798F1839A28EADE = {
 			isa = PBXBuildFile;
@@ -188,6 +212,19 @@
 		CE05B940BCBE599A11AE22E8 = {
 			isa = PBXBuildFile;
 			fileRef = 171A4CC9E4CFD6CB1704585A;
+		};
+		D24548A80F6EDBB04A261E7D = {
+			isa = PBXBuildFile;
+			fileRef = 892E4DF51BC5A1D8EB706A7A;
+		};
+		D6FCB3A9A352DEB73CB3880E = {
+			isa = PBXBuildFile;
+			fileRef = EB4D643757F8467F78873D27;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+				);
+			};
 		};
 		DACFC767C169503E4AB3CA4F = {
 			isa = PBXBuildFile;
@@ -255,7 +292,28 @@
 		};
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		736D1CE29F0780E279650A2F = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595;
+			proxyType = 1;
+			remoteGlobalIDString = E157114D15F9748EC61C3AF0;
+			remoteInfo = SummaverickWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
+		13E535E01ED8244C50D6933B = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D6FCB3A9A352DEB73CB3880E,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BAE1492BDE49D13FF7E211EB = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -270,6 +328,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		05DE663E1F9B875F3C1ABC94 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SummaverickWidgets.swift;
+			path = SummaverickWidgets/SummaverickWidgets.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		0A726C07BA65E563FB374790 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -326,6 +391,13 @@
 			path = SummaverickEveryday/Bridging.h;
 			sourceTree = SOURCE_ROOT;
 		};
+		2CC5EFA566DA98ADF20EDEAF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingActivity.swift;
+			path = Shared/RecordingActivity.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		2E361774B975154A11567968 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -345,6 +417,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = "CoreEngine+Memory.swift";
 			path = "SummaverickEveryday/Engine/CoreEngine+Memory.swift";
+			sourceTree = SOURCE_ROOT;
+		};
+		33C50C60642D8852C316CF41 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingLiveActivity.swift;
+			path = SummaverickWidgets/RecordingLiveActivity.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		393C976A09F0C61C5B20B9DE = {
@@ -417,11 +496,25 @@
 			path = SummaverickEveryday/Views/NoteDetailView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		515BBF6A31C68F3F903DB724 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = LiveActivityLogic.swift;
+			path = SummaverickEveryday/Engine/LiveActivityLogic.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		520311627B984B6D041E58B4 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
 			name = AppLock.swift;
 			path = SummaverickEveryday/Security/AppLock.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		52C1022F6F542158C732AD92 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = Info.plist;
+			path = SummaverickWidgets/Info.plist;
 			sourceTree = SOURCE_ROOT;
 		};
 		5B6316DBD705D039EA15B281 = {
@@ -569,6 +662,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = sve_medcheck.cpp;
 			path = ../core/src/sve_medcheck.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		8F55E78D0CAB65A7B800E45B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingController.swift;
+			path = SummaverickEveryday/Audio/RecordingController.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		91B7437CBCDFB5FF9D4AD20B = {
@@ -760,6 +860,13 @@
 			path = SummaverickEveryday/Views/Ask/AskView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		EB4D643757F8467F78873D27 = {
+			isa = PBXFileReference;
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			path = SummaverickWidgets.appex;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
 		EE7D0A38215CFAEEF0A0E2BE = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -827,6 +934,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CBF680522761010FEF9A3105 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -872,6 +986,8 @@
 			isa = PBXGroup;
 			children = (
 				82CF2A43A7100F086D7FCFDD,
+				9CB302E9C7F6377B351DBEAB,
+				EC78298F69778BA6D4D34D39,
 				DA3EB179D6EE613492F299B1,
 				649F037DD903349A9F8F2971,
 				547D009064F7C3F13BEF3460,
@@ -882,6 +998,7 @@
 			isa = PBXGroup;
 			children = (
 				2029A639DD8022543C17416B,
+				EB4D643757F8467F78873D27,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -902,6 +1019,7 @@
 				618A438B4C8E5391746526C9,
 				32B4ECFC6F6AC631FDE8CCFB,
 				3E8C99285C2BD28FE0ECE99B,
+				515BBF6A31C68F3F903DB724,
 				FB9B4C78668184CF16F3ABA6,
 				DAD9D4F5BE940D31ED604618,
 				C593582C209D99DB076F4AB2,
@@ -951,6 +1069,14 @@
 			name = Views;
 			sourceTree = "<group>";
 		};
+		9CB302E9C7F6377B351DBEAB = {
+			isa = PBXGroup;
+			children = (
+				2CC5EFA566DA98ADF20EDEAF,
+			);
+			name = Shared;
+			sourceTree = "<group>";
+		};
 		BECA9321D0D66DAD007659AB = {
 			isa = PBXGroup;
 			children = (
@@ -964,6 +1090,7 @@
 			children = (
 				43130EEACCC981C89B012095,
 				40CF89C460C8558DF1531E3B,
+				8F55E78D0CAB65A7B800E45B,
 			);
 			name = Audio;
 			sourceTree = "<group>";
@@ -1017,6 +1144,16 @@
 			name = Core;
 			sourceTree = "<group>";
 		};
+		EC78298F69778BA6D4D34D39 = {
+			isa = PBXGroup;
+			children = (
+				33C50C60642D8852C316CF41,
+				05DE663E1F9B875F3C1ABC94,
+				52C1022F6F542158C732AD92,
+			);
+			name = SummaverickWidgets;
+			sourceTree = "<group>";
+		};
 		F86C9C201E773F26CECBA845 = {
 			isa = PBXGroup;
 			children = (
@@ -1029,6 +1166,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		E157114D15F9748EC61C3AF0 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B429FCF8E65333911689421;
+			buildPhases = (
+				220C0D6758212FE888A01291,
+				CBF680522761010FEF9A3105,
+				B2EB01E0E895CE4CFAAEAFC4,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SummaverickWidgets;
+			productName = SummaverickWidgets;
+			productReference = EB4D643757F8467F78873D27;
+			productType = "com.apple.product-type.app-extension";
+		};
 		E3435DDA2687639586BF0B70 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 354589B28580510B6EC24620;
@@ -1037,10 +1191,12 @@
 				424153ED3CD079DB4DB459AF,
 				285BB1C1430063331E9F5DD0,
 				BAE1492BDE49D13FF7E211EB,
+				13E535E01ED8244C50D6933B,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BDD53957708D5CF6438C13EB,
 			);
 			name = SummaverickEveryday;
 			productName = SummaverickEveryday;
@@ -1057,6 +1213,9 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 2720;
 				TargetAttributes = {
+					E157114D15F9748EC61C3AF0 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					E3435DDA2687639586BF0B70 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -1077,6 +1236,7 @@
 			projectRoot = "";
 			targets = (
 				E3435DDA2687639586BF0B70,
+				E157114D15F9748EC61C3AF0,
 			);
 		};
 /* End PBXProject section */
@@ -1092,9 +1252,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B2EB01E0E895CE4CFAAEAFC4 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D24548A80F6EDBB04A261E7D,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		220C0D6758212FE888A01291 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				287BB893A1AA69C067C08137,
+				A8D78741F45FACAC32C29FBB,
+				C6AAA9F998388DF8734C616C,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7A70D71C385290AF96BF1031 = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1102,11 +1280,13 @@
 				DB8B42E9546B01810DFCAE5A,
 				A5B14A3A01B9BFEF4EB193D3,
 				1970E5A56D56F7BC7ACE9401,
+				9A5EA1AFF3F67FA08253F534,
 				53208D279FD7D4526A01C523,
 				C23AA49A9EE82365B4F4B783,
 				7DF93800DB3C9D1EB735C3CD,
 				535ACB83EDFCFBACA1FD4F3C,
 				B3682618E8A7DB35FCEEE996,
+				B73BD37B74FFE5DE3C398EE9,
 				F8E97681421A53898F3C82E0,
 				832433C1965C36667340EE3B,
 				A062B0CDA53604F5D8A7D47D,
@@ -1154,12 +1334,42 @@
 				CE05B940BCBE599A11AE22E8,
 				DC70A4770243CC1CA714EEB5,
 				6676C0DB08957FBDC042C54F,
+				7930BD02F74FE1E998D43E14,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		BDD53957708D5CF6438C13EB = {
+			isa = PBXTargetDependency;
+			target = E157114D15F9748EC61C3AF0;
+			targetProxy = 736D1CE29F0780E279650A2F;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		65835F7B11D67B8CB1AC5A3F = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SummaverickWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
 		6D570E41BB43EE5D285D70ED = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1251,6 +1461,27 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CC317D9E164283CAFD144796 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SummaverickWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Debug;
 		};
@@ -1360,6 +1591,15 @@
 			buildConfigurations = (
 				D67D94EB8973E00BE54AD468,
 				6D570E41BB43EE5D285D70ED,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B429FCF8E65333911689421 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC317D9E164283CAFD144796,
+				65835F7B11D67B8CB1AC5A3F,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

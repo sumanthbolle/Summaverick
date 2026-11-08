@@ -15,8 +15,9 @@ final class ContinuedWork {
         return "com.summaverick.everyday.notes.\(safe)"
     }
 
-    /// Called when the system ends the task early: cancel the run, mark the note interrupted.
-    var onExpire: (() -> Void)?
+    /// Called when the system ends the task early: cancel the run, mark the note interrupted. The hold is background
+    /// time taken in the expiration handler itself; the callee ends it (after taking its own for each notice).
+    var onExpire: ((NotesNotifier.Hold) -> Void)?
 
     /// The running task and its "completed" flag, which the expiration handler sets on its own thread.
     private final class Held: @unchecked Sendable {
@@ -153,17 +154,19 @@ final class ContinuedWork {
         t.expirationHandler = {
             // Completed right here, on whatever thread this runs: the app may be suspended before a hop.
             h.complete(success: false)
-            Task { @MainActor in ContinuedWork.shared.expired(h) }
+            // Before the hop as well: without it the app may be suspended before the "paused" notice starts.
+            let hold = NotesNotifier.Hold()
+            Task { @MainActor in ContinuedWork.shared.expired(h, hold: hold) }
         }
         apply()
     }
 
-    private func expired(_ h: Held) {
-        guard held === h else { return }
+    private func expired(_ h: Held, hold: NotesNotifier.Hold) {
+        guard held === h else { hold.end(); return }
         NSLog("[sve] bg: continued processing expired at %ld%%", percent)
         held = nil
         wanted = false
-        onExpire?()
+        if let onExpire { onExpire(hold) } else { hold.end() }
     }
 
     private func apply() {

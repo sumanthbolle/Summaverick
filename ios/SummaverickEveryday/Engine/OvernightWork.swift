@@ -61,10 +61,11 @@ final class OvernightWork {
         // "Finish overnight" waits for the charger, as they were told.
         let onBattery = !OvernightList.requiresExternalPower(automaticPending: ProcessingPipeline.automaticFinishPending)
         request.requiresExternalPower = !onBattery
-        UserDefaults.standard.set(!onBattery, forKey: onPowerKey)
         request.requiresNetworkConnectivity = false
         do {
             try BGTaskScheduler.shared.submit(request)
+            // Only once it is asked for: a refused request leaves the one already waiting (and its key) as it was.
+            UserDefaults.standard.set(!onBattery, forKey: onPowerKey)
             NSLog("[sve] bg: overnight task scheduled (%@)", onBattery ? "may run on battery" : "on the charger")
         } catch {
             NSLog("[sve] bg: overnight task not scheduled: %@", String(describing: error))

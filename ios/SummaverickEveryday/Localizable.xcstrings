@@ -5266,6 +5266,74 @@
         }
       },
       "comment": "First %@ is a time in the recording, second %@ the memory's words"
+    },
+    "Waiting for the recording before it to finish": {
+      "comment": "Live Activity line: this recording was stopped while an earlier recording's notes were still being written",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for the recording before it to finish"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముందు రికార్డింగ్ పూర్తయ్యే వరకు వేచి ఉంది"
+          }
+        }
+      }
+    },
+    "Paused": {
+      "comment": "Live Activity title: a recording's notes stopped for now and will finish later",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆగింది"
+          }
+        }
+      }
+    },
+    "Notes could not be written": {
+      "comment": "Live Activity title: a recording's notes failed",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes could not be written"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ రాయలేకపోయాం"
+          }
+        }
+      }
+    },
+    "Notes ready": {
+      "comment": "Live Activity title: a recording's notes are written; the note's title follows",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes ready"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ సిద్ధం"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

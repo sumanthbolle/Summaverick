@@ -12,6 +12,8 @@ struct SummaverickEverydayApp: App {
         // Must be set before launch finishes so a tap that cold-starts the app is delivered.
         UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
         AudioRecorder.sweepAskVoice()
+        // Live Activities left by a closed app go before this launch can start its own.
+        RecordingActivities.endStale()
         // Lets notes keep being written with the phone locked after Stop (iOS 26+).
         ContinuedWork.register()
         // Finishes long recordings overnight while charging: a fixed identifier, registered before launch ends.
@@ -35,7 +37,11 @@ struct SummaverickEverydayApp: App {
             }
             .task { await ReminderScheduler.shared.resync() }
             .task { await PiecesBackfill.runOnce() }   // older notes become searchable by Ask (one time)
-            .task { await ProcessingPipeline.shared.processWaitingNotes() }
+            .task {
+                // A recording the app was closed in the middle of becomes a note first, so it is queued with the rest.
+                await ProcessingPipeline.shared.recoverUnfinishedRecordings()
+                await ProcessingPipeline.shared.processWaitingNotes()
+            }
             .task { await ProcessingPipeline.shared.sweepOrphanSidecars() }
             .task { await ProcessingPipeline.shared.sweepCompression() }   // finished notes: WAV → AAC; stray .part files go
             // The AI finished downloading: write the notes for recordings made while it downloaded.

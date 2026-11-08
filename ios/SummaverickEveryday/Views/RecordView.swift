@@ -2,7 +2,7 @@ import SwiftUI
 
 struct RecordView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var recorder = AudioRecorder()
+    @State private var controller = RecordingController.shared
     @State private var live = LiveTranscriber.shared
     @State private var permissionDenied = false
 
@@ -16,21 +16,22 @@ struct RecordView: View {
 
             Spacer()
 
-            RecordingPulseView(level: recorder.level, active: recorder.isRecording)
+            RecordingPulseView(level: controller.recorder.level, active: controller.isRecording)
                 .frame(width: live.lines.isEmpty ? 320 : 220, height: live.lines.isEmpty ? 320 : 220)
                 .animation(.easeInOut, value: live.lines.isEmpty)
 
-            Text(timeString(recorder.elapsed))
+            // 0 until this recording runs (the shared recorder keeps the last one's time after Stop).
+            Text(timeString(controller.isRecording ? controller.elapsed : 0))
                 .font(.system(size: 48, weight: .thin, design: .rounded).monospacedDigit())
                 .contentTransition(.numericText())
 
-            Text(recorder.isRecording ? "Recording on this phone. Lock the screen if you like; recording continues." : "Starting…")
+            Text(controller.isRecording ? "Recording on this phone. Lock the screen if you like; recording continues." : "Starting…")
                 .font(.footnote).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).padding(.horizontal, 32)
 
-            if let e = recorder.lastError { Text(e).font(.footnote).foregroundStyle(.red) }
+            if let e = controller.recorder.lastError { Text(e).font(.footnote).foregroundStyle(.red) }
 
-            if recorder.isRecording { liveTranscript }
+            if controller.isRecording { liveTranscript }
 
             Spacer()
 
@@ -43,7 +44,7 @@ struct RecordView: View {
             .buttonBorderShape(.capsule)
             .tint(.primary)
             .foregroundStyle(Color(.systemBackground))
-            .disabled(!recorder.isRecording)
+            .disabled(!controller.isRecording)
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
@@ -83,29 +84,24 @@ struct RecordView: View {
         }
     }
 
+    /// Already recording (started by a shortcut): this screen shows that recording. A start that fails shows the
+    /// recorder's error, as before.
     private func begin() async {
-        guard await recorder.requestPermission() else { permissionDenied = true; return }
-        recorder.start()
-        if recorder.isRecording, let url = recorder.currentURL {
-            live.recordingStarted(audio: url) { [recorder] in recorder.elapsed }
+        switch await controller.start() {
+        case .started, .alreadyRecording, .failed: break
+        case .micDenied: permissionDenied = true
+        case .needsConsent: dismiss()   // the record button asks for it first; never record without it
         }
     }
 
     private func cancel() {
-        let stopped = recorder.stop()
+        controller.cancel()   // deletes the audio after the piece in flight is dropped
         dismiss()
-        // Drop the piece in flight first, so nothing is written next to the deleted recording.
-        Task {
-            guard let (url, _) = stopped else { return }
-            await live.cancel(audioPath: url.path)
-            AudioRecorder.removeAudio(atPath: url.path)
-        }
     }
 
     private func stopAndProcess() {
-        guard let (url, duration) = recorder.stop() else { return }
         // Synchronous, before anything awaits: claims the work and the background time right in the tap.
-        ProcessingPipeline.shared.recordingStopped(audio: url, duration: duration)
+        guard controller.stop() else { return }
         dismiss()
     }
 
