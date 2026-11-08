@@ -117,6 +117,7 @@ public:
     // from `memory`, plus current fact memories (not medicine, wrong, superseded or queued) with
     // id = -(memories.id). update/delete take those ids; an edited memory becomes review 'corrected'.
     json learned_memory(const std::string &kind_or_empty);
+    bool learned_item(int64_t memory_id);
     bool update_learned_memory(int64_t id, const std::string &text);
     bool delete_learned_memory(int64_t id);
 

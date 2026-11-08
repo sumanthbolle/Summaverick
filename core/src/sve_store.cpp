@@ -837,13 +837,20 @@ json Store::learned_memory(const std::string &kind) {
     return out;
 }
 
+// A negative id is a memory the Learned list shows (same filter as learned_memory); anything else is refused.
+bool Store::learned_item(int64_t mid) {
+    return !query_rows("SELECT 1 FROM memories WHERE id=? AND type='fact' AND origin<>'medicine' AND review<>'wrong' "
+                       "AND superseded_by IS NULL AND queue=0", {mid}).empty();
+}
+
 bool Store::update_learned_memory(int64_t id, const std::string &text) {
-    if (id < 0) return update_memory_item(-id, {{"text", text}, {"review", "corrected"}});
+    if (id < 0) return learned_item(-id) && update_memory_item(-id, {{"text", text}, {"review", "corrected"}});
     return update_memory(id, text);
 }
 
 bool Store::delete_learned_memory(int64_t id) {
-    return id < 0 ? delete_memory_item(-id) : delete_memory(id);
+    if (id < 0) return learned_item(-id) && delete_memory_item(-id);
+    return delete_memory(id);
 }
 
 bool Store::mark_memory_section(int64_t note_id, int idx) {
