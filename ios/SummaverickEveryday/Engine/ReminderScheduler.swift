@@ -56,6 +56,16 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
         (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) ?? false
     }
 
+    /// At a Stop, in the tap (the app is in front): asks once, only while the person has not answered yet, so
+    /// "Notes ready" can be told. Same options as reminders.
+    func requestAuthorizationIfUndetermined() {
+        Task {
+            guard await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined else { return }
+            let granted = await requestAuthorization()
+            NSLog("[sve] bg: notification permission asked at Stop: %@", granted ? "granted" : "not granted")
+        }
+    }
+
     /// Rebuilds all `sve.rem.` requests from the active reminders. Safe to call often.
     func resync() async {
         if syncing { dirty = true; return }

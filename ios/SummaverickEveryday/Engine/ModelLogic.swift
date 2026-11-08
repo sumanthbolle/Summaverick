@@ -170,6 +170,13 @@ enum BackendChoice {
 
     /// A GPU run that failed because the app went to the background is retried once on the CPU, but
     /// only while a continued-processing task keeps the app running; otherwise the note is interrupted.
+    /// A notes run's failure is a cut-off (the note resumes later; "paused"), not a real failure, only when the run
+    /// was cancelled (expiry, the overnight task ended) or the GPU was stopped in the background with no
+    /// continued-processing task to retry it on the CPU. Anything else (no speech, a failed CPU load) is a failure.
+    static func failureIsCutOff(aborted: Bool, wentToBackground: Bool, gpuStep: Bool, continuedTaskHeld: Bool) -> Bool {
+        aborted || (wentToBackground && gpuStep && !continuedTaskHeld)
+    }
+
     static func retryOnCPU(failedOn backend: ModelBackend, wentToBackground: Bool, continuedTaskHeld: Bool,
                            cancelled: Bool, alreadyRetried: Bool) -> Bool {
         backend == .gpu && wentToBackground && continuedTaskHeld && !cancelled && !alreadyRetried
@@ -324,7 +331,22 @@ enum OvernightList {
     /// A note marked overnight is only started while plugged in or inside the overnight task; "Do it now"
     /// clears the mark. Unmarked notes always may run.
     static func mayStart(marked: Bool, pluggedIn: Bool, inOvernightTask: Bool) -> Bool {
-        !marked || pluggedIn || inOvernightTask
+        mayStart(mark: marked ? .person : .none, pluggedIn: pluggedIn, inOvernightTask: inOvernightTask, taskOnPower: true)
+    }
+
+    /// Why a note is on the list: not at all, the person's "Finish overnight", or by itself after a cut-off.
+    enum Mark: Equatable { case none, person, automatic }
+
+    static func mark(onList: Bool, automatic: Bool) -> Mark { onList ? (automatic ? .automatic : .person) : .none }
+
+    /// Who may start now. The person's mark waits for power: plugged in, or inside an overnight task that asked for
+    /// the charger (one that runs on battery for automatic notes does not count). An automatic note is a cut-off
+    /// note kept across launches: it may run whenever the resume loop runs (in front at once, or in any task).
+    static func mayStart(mark: Mark, pluggedIn: Bool, inOvernightTask: Bool, taskOnPower: Bool) -> Bool {
+        switch mark {
+        case .none, .automatic: return true
+        case .person: return pluggedIn || (inOvernightTask && taskOnPower)
+        }
     }
 
     /// A notes run (a recording's notes, or resuming them) cut off with the app not in front (the continued-processing
@@ -340,12 +362,6 @@ enum OvernightList {
     /// While an automatic note waits, the task may run on battery (iOS still picks an idle moment); otherwise only
     /// on the charger, as the person was told.
     static func requiresExternalPower(automaticPending: Bool) -> Bool { !automaticPending }
-
-    /// The app came to the front: automatic marks leave the list and those notes resume at once (opening the app
-    /// never waits for the charger); the person's own marks stay.
-    static func releasedInFront(overnight: [Int64], automatic: Set<Int64>) -> (overnight: [Int64], resume: [Int64]) {
-        (overnight.filter { !automatic.contains($0) }, overnight.filter { automatic.contains($0) })
-    }
 }
 
 /// Regenerate, Undo and Try again on a note's screen.

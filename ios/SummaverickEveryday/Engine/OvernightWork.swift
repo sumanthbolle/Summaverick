@@ -32,6 +32,10 @@ final class OvernightWork {
     }
     private var run: Run?
     private static var registered = false
+    nonisolated private static let onPowerKey = "overnight.requestOnPower"
+    /// The running task was asked for with the charger required (read at its start): only then may the person's
+    /// "Finish overnight" notes run in it without checking the battery state.
+    private(set) var runOnPower = true
 
     private init() {}
 
@@ -57,6 +61,7 @@ final class OvernightWork {
         // "Finish overnight" waits for the charger, as they were told.
         let onBattery = !OvernightList.requiresExternalPower(automaticPending: ProcessingPipeline.automaticFinishPending)
         request.requiresExternalPower = !onBattery
+        UserDefaults.standard.set(!onBattery, forKey: onPowerKey)
         request.requiresNetworkConnectivity = false
         do {
             try BGTaskScheduler.shared.submit(request)
@@ -74,7 +79,9 @@ final class OvernightWork {
             task.setTaskCompleted(success: true)
             return
         }
-        NSLog("[sve] bg: overnight task started")
+        // The request that launched it is the last one asked for (asking again replaces the waiting one).
+        runOnPower = (UserDefaults.standard.object(forKey: Self.onPowerKey) as? Bool) ?? true
+        NSLog("[sve] bg: overnight task started (%@)", runOnPower ? "on the charger" : "may be on battery")
         let r = Run(task)
         run = r
         let pipeline = ProcessingPipeline.shared

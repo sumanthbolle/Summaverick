@@ -11,25 +11,30 @@ enum NotesNotifier {
     nonisolated static let prefix = "notes."
 
     /// The note's notes are written (the memories may still follow).
-    static func notesReady(noteID: Int64, title: String) {
-        post(noteID, state: "ready", body: String(localized: "Notes ready: \(title)"))
+    static func notesReady(noteID: Int64, title: String, hold: Hold? = nil) {
+        post(noteID, state: "ready", body: String(localized: "Notes ready: \(title)"), hold: hold)
     }
 
     /// The background work was cut off; the note finishes later by itself (the overnight task) or when tapped.
-    static func paused(noteID: Int64, title: String, percent: Int) {
+    static func paused(noteID: Int64, title: String, percent: Int, hold: Hold? = nil) {
         post(noteID, state: "paused",
              body: String(localized: "\(title): paused at \(percent)%. It will finish while charging, or tap to finish now.",
-                          comment: "Note title, percent of the work done"))
+                          comment: "Note title, percent of the work done"),
+             hold: hold)
     }
 
     /// The notes run failed for real (not a cut-off); `line` is the failure the note shows.
-    static func failed(noteID: Int64, title: String, line: String) {
-        post(noteID, state: "failed", body: String(localized: "\(title): notes could not be written") + "\n" + line)
+    static func failed(noteID: Int64, title: String, line: String, hold: Hold? = nil) {
+        post(noteID, state: "failed", body: String(localized: "\(title): notes could not be written") + "\n" + line, hold: hold)
     }
 
-    private static func post(_ noteID: Int64, state: String, body: String) {
+    /// hold: background time the caller took synchronously, before any await (right after a cut-off the app may be
+    /// suspended at any moment); ended once the request is handed over. Without one, it is taken here.
+    private static func post(_ noteID: Int64, state: String, body: String, hold given: Hold?) {
+        let hold = given ?? Hold()
         guard NotifyRule.shouldNotify(appActive: UIApplication.shared.applicationState == .active) else {
             NSLog("[sve] bg: note %lld %@ with the app in front: no notification", noteID, state)
+            hold.end()
             return
         }
         let content = UNMutableNotificationContent()
@@ -38,9 +43,6 @@ enum NotesNotifier {
         content.sound = .default
         content.userInfo = ["note_id": NSNumber(value: noteID)]
         let request = UNNotificationRequest(identifier: NotifyRule.identifier(noteID: noteID), content: content, trigger: nil)
-        // Right after a cut-off iOS may suspend the app at any moment: hold on long enough to hand the request over.
-        let hold = BackgroundHold()
-        hold.begin()
         Task {
             do {
                 try await UNUserNotificationCenter.current().add(request)
@@ -52,11 +54,12 @@ enum NotesNotifier {
         }
     }
 
-    /// A short background-time assertion, ended exactly once (by the caller or when iOS takes the time back).
+    /// A short background-time assertion, taken when made and ended exactly once (after the post, or when iOS takes
+    /// the time back).
     @MainActor
-    private final class BackgroundHold {
+    final class Hold {
         private var id: UIBackgroundTaskIdentifier = .invalid
-        func begin() {
+        init() {
             // iOS calls the expiration handler on the main thread.
             id = UIApplication.shared.beginBackgroundTask(withName: "sve.notify") { [self] in
                 MainActor.assumeIsolated { end() }
