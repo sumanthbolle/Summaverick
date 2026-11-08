@@ -1,5 +1,4 @@
 #include "sve_sections.h"
-#include "sve_memory.h"  // parse_memory_candidates
 
 #include <algorithm>
 #include <cctype>
@@ -66,41 +65,7 @@ std::string plan_sections_json(const std::string &pieces_json, int64_t end_sec_o
     return out.dump();
 }
 
-const char *kMemoryShape =
-    ",\"memories\":[{\"type\":\"fact|decision|promise|question|person|idea\",\"text\":\"…\",\"who\":\"\",\"to_whom\":\"\","
-    "\"due_text\":\"\",\"quote\":\"…\",\"start_sec\":0,\"names\":[{\"as_said\":\"…\",\"as_written\":\"…\"}],"
-    "\"numbers\":[],\"dates\":[],\"times\":[]}]";
-
-// The rules for the memories themselves (both prompts).
-static std::string memory_lines(const std::string &lang) {
-    std::string r = "- At most 8 \"memories\", only things worth remembering later.\n- Each memory's \"text\" is one sentence in ";
-    r += lang == "te" ? "Telugu" : "English";
-    r += ".\n"
-         "- Each memory's \"quote\" is copied word for word from one or two neighbouring transcript lines, in the script "
-         "it was spoken in.\n"
-         "- \"names\", \"numbers\", \"dates\" and \"times\" hold the exact words of the quote that the memory relies on. "
-         "For each name, \"as_said\" is the quote's exact words and \"as_written\" is the form the text uses.\n"
-         "- \"who\" and \"to_whom\" only when the transcript says them, else \"\".\n"
-         "- \"due_text\" holds the exact words of a deadline, else \"\".\n"
-         "- No memories about medicines or doses.\n";
-    return r;
-}
-
-std::string memory_rules(const std::string &lang) {
-    return memory_lines(lang) + "- Each point may also have a \"type\": fact, decision, promise, question, person or idea.\n";
-}
-
-static std::string transcript_part(const SectionPieces &pieces, const std::string &vocab_line) {
-    std::string p;
-    if (!vocab_line.empty()) p += vocab_line + "\n";
-    p += "\nTranscript (each line starts with its [t=SEC] marker):\n";
-    for (const auto &pc : pieces) p += "[t=" + std::to_string(pc.first) + "] " + pc.second + "\n";
-    p += "\nJSON:\n";
-    return p;
-}
-
-std::string section_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line,
-                           bool with_memories) {
+std::string section_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line) {
     const bool te = lang == "te";
     std::string p = "Summarize this part of a recording. Write the summary in ";
     p += te ? "Telugu" : "English";
@@ -108,22 +73,15 @@ std::string section_prompt(const SectionPieces &pieces, const std::string &lang,
          "and nothing else, in this shape:\n"
          "{\"title\":\"short title, at most 8 words\",\"topic\":\"one line on what this part is about\","
          "\"points\":[{\"text\":\"one key point\",\"start_sec\":0}],\"terms\":[\"important names or technical terms\"],"
-         "\"hints\":[\"things worth following up, if any\"]";
-    if (with_memories) p += kMemoryShape;
-    p += "}\n"
+         "\"hints\":[\"things worth following up, if any\"]}\n"
          "Rules:\n- 3 to 6 points, each one sentence.\n"
          "- Each point's \"start_sec\" is copied from the [t=SEC] marker of the transcript line it came from.\n"
          "- Use only what was said. Use an empty array when nothing applies.\n";
-    if (with_memories) p += memory_rules(lang);
-    return p + transcript_part(pieces, vocab_line);
-}
-
-std::string memory_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line) {
-    std::string p = "List what is worth remembering from this part of a recording. Keep names, places and technical "
-                    "terms in the script they were spoken in. Reply with one JSON object and nothing else, in this shape:\n{";
-    p += kMemoryShape + 1;  // without the leading comma
-    p += "}\nRules:\n- Use only what was said. Use an empty array when nothing applies.\n";
-    return p + memory_lines(lang) + transcript_part(pieces, vocab_line);
+    if (!vocab_line.empty()) p += vocab_line + "\n";
+    p += "\nTranscript (each line starts with its [t=SEC] marker):\n";
+    for (const auto &pc : pieces) p += "[t=" + std::to_string(pc.first) + "] " + pc.second + "\n";
+    p += "\nJSON:\n";
+    return p;
 }
 
 static std::string drop_thinking(std::string s) {
@@ -140,90 +98,35 @@ static std::string drop_thinking(std::string s) {
     return s;
 }
 
-static json strings_of(const json &o, const char *key) {
-    json out = json::array();
-    auto it = o.find(key);
-    if (it == o.end() || !it->is_array()) return out;
-    for (const auto &e : *it)
-        if (e.is_string() && !e.get<std::string>().empty()) out.push_back(e);
-    return out;
+const char *kMemoryShape =
+    "{\"memories\":[{\"type\":\"fact|decision|promise|question|person|idea\",\"text\":\"…\",\"who\":\"\",\"to_whom\":\"\","
+    "\"due_text\":\"\",\"quote\":\"…\",\"start_sec\":0,\"names\":[{\"as_said\":\"…\",\"as_written\":\"…\"}],"
+    "\"numbers\":[],\"dates\":[],\"times\":[]}]}";
+
+std::string memory_rules(const std::string &lang) {
+    std::string r = "- At most 5 \"memories\", only things worth remembering later.\n- Each memory's \"text\" is one sentence in ";
+    r += lang == "te" ? "Telugu" : "English";
+    r += ".\n"
+         "- Each memory's \"quote\" is copied word for word from one or two neighbouring transcript lines, in the script "
+         "it was spoken in.\n"
+         "- \"names\", \"numbers\", \"dates\" and \"times\" hold the exact words of the quote that the memory relies on. "
+         "For each name, \"as_said\" is the quote's exact words and \"as_written\" is the form the text uses.\n"
+         "- \"who\" and \"to_whom\" only when the transcript says them, else \"\".\n"
+         "- \"due_text\" holds the exact words of a deadline, else \"\".\n"
+         "- No memories about medicines or doses.\n";
+    return r;
 }
 
-bool parse_section_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, json &out) {
-    try {
-        json j;
-        // Fences and leading prose sit outside the chosen object; a truncated object never balances.
-        if (!first_json_object(drop_thinking(model_out), j)) return false;
-        if (!j.contains("title") || !j["title"].is_string() || j["title"].get<std::string>().empty()) return false;
-        auto pit = j.find("points");
-        if (pit == j.end() || !pit->is_array()) return false;
-        json points = json::array();
-        for (const auto &e : *pit) {
-            if (points.size() >= 6) break;
-            if (!e.is_object() || !e.contains("text") || !e["text"].is_string() || e["text"].get<std::string>().empty()) continue;
-            int64_t s = 0;
-            if (e.contains("start_sec") && e["start_sec"].is_number()) {
-                double d = e["start_sec"].get<double>();  // non-finite or absurd values count as 0, then clamp to a piece
-                if (std::isfinite(d) && std::fabs(d) < 1e12) s = (int64_t)d;
-            }
-            if (!piece_starts.empty()) {
-                int64_t best = piece_starts[0];
-                for (int64_t c : piece_starts) if (std::llabs(c - s) < std::llabs(best - s)) best = c;
-                s = best;
-            }
-            json point = {{"text", e["text"]}, {"start_sec", s}};
-            std::string type = e.contains("type") && e["type"].is_string() ? e["type"].get<std::string>() : "";
-            for (auto &c : type) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
-            if (type == "open question") type = "question";
-            if (type == "fact" || type == "decision" || type == "promise" || type == "question" || type == "person" ||
-                type == "idea")
-                point["type"] = type;
-            points.push_back(point);
-        }
-        if (points.empty()) return false;
-        out = {{"title", j["title"]},
-               {"topic", j.contains("topic") && j["topic"].is_string() ? j["topic"] : json("")},
-               {"points", points}, {"terms", strings_of(j, "terms")}, {"hints", strings_of(j, "hints")}};
-        auto mit = j.find("memories");
-        if (mit != j.end() && mit->is_array()) out["memories"] = parse_memory_candidates(*mit);
-        else out["memories_missing"] = true;
-        return true;
-    } catch (...) {
-        return false;
-    }
-}
-
-bool salvage_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, json &out) {
-    const std::string s = drop_thinking(model_out);
-    const size_t open = s.find('{');
-    if (open == std::string::npos) return false;
-    int depth = 0;
-    bool in_str = false, esc = false;
-    for (size_t i = open; i < s.size(); ++i) {
-        const char c = s[i];
-        if (in_str) {
-            if (esc) esc = false;
-            else if (c == '\\') esc = true;
-            else if (c == '"') in_str = false;
-            continue;
-        }
-        if (c == '"') in_str = true;
-        else if (c == '{' || c == '[') ++depth;
-        else if (c == '}' || c == ']') { if (--depth <= 0) return false; }  // closed before any "memories" key
-        else if (c == ',' && depth == 1) {
-            size_t k = s.find_first_not_of(" \t\r\n", i + 1);
-            if (k == std::string::npos || s.compare(k, 10, "\"memories\"") != 0) continue;
-            size_t colon = s.find_first_not_of(" \t\r\n", k + 10);
-            if (colon == std::string::npos || s[colon] != ':') continue;
-            json j;
-            if (!parse_section_summary(s.substr(open, i - open) + "}", piece_starts, j)) return false;
-            j.erase("memories");
-            j["memories_missing"] = true;
-            out = std::move(j);
-            return true;
-        }
-    }
-    return false;
+std::string memory_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line) {
+    std::string p = "List what is worth remembering from this part of a recording. Keep names, places and technical "
+                    "terms in the script they were spoken in. Reply with one JSON object and nothing else, in this shape:\n";
+    p += kMemoryShape;
+    p += "\nRules:\n- Use only what was said. Use an empty array when nothing applies.\n" + memory_rules(lang);
+    if (!vocab_line.empty()) p += vocab_line + "\n";
+    p += "\nTranscript (each line starts with its [t=SEC] marker):\n";
+    for (const auto &pc : pieces) p += "[t=" + std::to_string(pc.first) + "] " + pc.second + "\n";
+    p += "\nJSON:\n";
+    return p;
 }
 
 json complete_memory_items(const std::string &model_out) {
@@ -260,6 +163,49 @@ json complete_memory_items(const std::string &model_out) {
     return out;
 }
 
+static json strings_of(const json &o, const char *key) {
+    json out = json::array();
+    auto it = o.find(key);
+    if (it == o.end() || !it->is_array()) return out;
+    for (const auto &e : *it)
+        if (e.is_string() && !e.get<std::string>().empty()) out.push_back(e);
+    return out;
+}
+
+bool parse_section_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, json &out) {
+    try {
+        json j;
+        // Fences and leading prose sit outside the chosen object; a truncated object never balances.
+        if (!first_json_object(drop_thinking(model_out), j)) return false;
+        if (!j.contains("title") || !j["title"].is_string() || j["title"].get<std::string>().empty()) return false;
+        auto pit = j.find("points");
+        if (pit == j.end() || !pit->is_array()) return false;
+        json points = json::array();
+        for (const auto &e : *pit) {
+            if (points.size() >= 6) break;
+            if (!e.is_object() || !e.contains("text") || !e["text"].is_string() || e["text"].get<std::string>().empty()) continue;
+            int64_t s = 0;
+            if (e.contains("start_sec") && e["start_sec"].is_number()) {
+                double d = e["start_sec"].get<double>();  // non-finite or absurd values count as 0, then clamp to a piece
+                if (std::isfinite(d) && std::fabs(d) < 1e12) s = (int64_t)d;
+            }
+            if (!piece_starts.empty()) {
+                int64_t best = piece_starts[0];
+                for (int64_t c : piece_starts) if (std::llabs(c - s) < std::llabs(best - s)) best = c;
+                s = best;
+            }
+            points.push_back({{"text", e["text"]}, {"start_sec", s}});
+        }
+        if (points.empty()) return false;
+        out = {{"title", j["title"]},
+               {"topic", j.contains("topic") && j["topic"].is_string() ? j["topic"] : json("")},
+               {"points", points}, {"terms", strings_of(j, "terms")}, {"hints", strings_of(j, "hints")}};
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 json fallback_section_summary(const SectionPieces &pieces) {
     std::string title;
     int words = 0;
@@ -289,7 +235,7 @@ json fallback_section_summary(const SectionPieces &pieces) {
         if (!sent.empty()) points.push_back({{"text", sent}, {"start_sec", pc.first}});
     }
     return {{"title", title}, {"topic", ""}, {"points", points}, {"terms", json::array()}, {"hints", json::array()},
-            {"fallback", true}, {"memories_missing", true}};
+            {"fallback", true}};
 }
 
 namespace {

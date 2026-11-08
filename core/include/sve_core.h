@@ -164,12 +164,9 @@ char *sve_note_sections(sve_ctx *ctx, int64_t note_id);
 char *sve_plan_sections(const char *pieces_json, int64_t end_sec_of_last, int is_final);
 
 /* Summary of one section. pieces_json: [{"start_sec":0,"text":"…"}]; lang "en"/"te". Returns the summary JSON
- * ({"title","topic","points":[{"text","start_sec","type"?}],"terms","hints"}) plus the section's memory
- * candidates from the same call: "memories":[…], or "memories_missing":true when they did not come through
- * (sve_memories_from_section then asks for them on their own). Sampled first try, one greedy retry; output cut
- * off inside "memories" keeps its summary (salvaged) instead of retrying; then a plain-text fallback
- * ("fallback":true) built from the first sentences, so a model that ran never gives NULL. NULL on cancel,
- * no model or bad input. Output capped at 1024 tokens. Notes and chapters read only the summary part. */
+ * ({"title","topic","points":[{"text","start_sec"}],"terms","hints"}). Sampled first try, one greedy retry,
+ * then a plain-text fallback ("fallback":true) built from the first sentences, so a model that ran never
+ * gives NULL. NULL on cancel, no model or bad input. Output capped at 512 tokens. */
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang, sve_progress_cb cb, void *user);
 
 /* Notes built from a note's stored section summaries instead of the raw transcript. One group of summaries that
@@ -281,13 +278,14 @@ int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
  * A saved medicine has one memory (origin "medicine", review "kept", health 1, text "<name> <dose>, <when>"),
  * kept in step with the medicine and deleted with it. */
 
-/* Makes the memories of one section of a note: the candidates from its stored summary (or, when it has none,
- * one greedy memory-only model call), each checked against the section's own words (sve_memory), double-checked
+/* Makes the memories of one section of a note: one greedy memory-only model call (a reply cut off keeps its
+ * whole items), each candidate checked against the section's own words (sve_memory), double-checked
  * by the model where needed (a "no" drops it; only a "yes" lets it skip the review queue), stored with its
  * quote as source, linked to people and the note's topic, and to a pending reminder/task card of the same
  * note and quote. Marks the section done; a section already done returns 0 and changes nothing.
- * Returns the number of memories stored; -1 for no such note or section, bad input, or no model when one is
- * needed for the candidates; -2 on cancel (nothing stored, the section stays due). */
+ * Returns the number of memories stored; -1 for no such note or section, bad input, or no model (for a section
+ * with words); -2 on cancel (nothing stored, the section stays due). The notes and section summaries are not
+ * touched: the section summary prompt and its output are the same as before memories existed. */
 int   sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sve_progress_cb cb, void *user);
 /* Indexes of the note's sections whose memories are not made yet, e.g. "[0,2]"; "[]" when none. */
 char *sve_memory_sections_due(sve_ctx *ctx, int64_t note_id);

@@ -16,8 +16,6 @@
 #include "sve_core.h"
 #include "sve_internal.h"
 #include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
-#include "sve_context.h"   // memories mode times the summary-only prompt
-#include "sve_prompts.h"
 #include <sqlite3.h>
 #include <map>
 #include "third_party/nlohmann/json.hpp"
@@ -666,16 +664,32 @@ static void run_api_final(sve_ctx *ctx) {
     for (const auto &s : take(sve_suggestions_json(ctx, "pending"))) sve_suggestion_reject(ctx, s["id"]);
 }
 
-// Memory C API without a model: candidates from a stored section summary, grounding drops, the review queue,
-// the person's review/edit/remove, people and card links, medicine memories, a deleted recording.
+// Memory C API without a model (g_sve_model_reply stands in for it): grounding drops, the yes/no check, a cut
+// reply keeping its whole items, the review queue, the person's review/edit/remove, people and card links,
+// medicine memories, a deleted recording.
 static std::vector<std::string> g_api_drops;
 static void api_drop(int64_t, int, const char *reason, const char *) { g_api_drops.push_back(reason); }
+static const char *api_model(const char *phase, const char *prompt) {
+    const std::string p = prompt;
+    if (!strcmp(phase, "memory_check")) return p.find("kitchen pipe") != std::string::npos ? "No." : "Yes";
+    if (p.find("[t=90] The electrician") != std::string::npos)  // cut off at the cap inside the second item
+        return R"({"memories":[{"type":"fact","text":"The electrician comes back on Monday.","quote":"The electrician comes back on Monday morning","start_sec":90},{"type":"idea","text":"cu)";
+    return R"(```json
+{"memories":[
+ {"type":"fact","text":"The kitchen pipe must be replaced soon.","quote":"the kitchen pipe must be replaced soon","start_sec":0},
+ {"type":"promise","text":"Ravi will send the quotation by Friday.","who":"Ravi","due_text":"Friday evening",
+  "quote":"Ravi will send the quotation by Friday evening","start_sec":30,"names":[{"as_said":"Ravi","as_written":"Ravi"}]},
+ {"type":"fact","text":"The roof leaks every monsoon.","quote":"the roof leaks every monsoon","start_sec":0},
+ {"type":"fact","text":"Take Dolo 650 twice for fever.","quote":"Take Dolo 650 twice if the fever comes back","start_sec":60}]}
+```)";
+}
 
 static void run_api_memories(sve_ctx *ctx) {
     g_sve_memory_drop = api_drop;
     json pieces = json::parse(R"([{"start_sec":0,"text":"The plumber said the kitchen pipe must be replaced soon."},
         {"start_sec":30,"text":"Ravi will send the quotation by Friday evening."},
-        {"start_sec":60,"text":"Take Dolo 650 twice if the fever comes back."}])");
+        {"start_sec":60,"text":"Take Dolo 650 twice if the fever comes back."},
+        {"start_sec":90,"text":"The electrician comes back on Monday morning at nine."}])");
     int64_t note = make_note(ctx, pieces, "Plumber visit");
     int64_t tid = ctx->store->upsert_topic("topic", "Kitchen");
     ctx->store->link_topic(note, tid);
@@ -683,44 +697,45 @@ static void run_api_memories(sve_ctx *ctx) {
     int64_t card = ctx->store->add_suggestion({{"kind", "task"}, {"payload", {{"text", "Get the quotation from Ravi"}}},
                                                {"quote", "Ravi will send the quotation by Friday evening."}, {"note_id", note},
                                                {"start_sec", 30}});
-    json cands = json::parse(R"([
-        {"type":"fact","text":"The kitchen pipe must be replaced soon.","quote":"the kitchen pipe must be replaced soon","start_sec":0},
-        {"type":"promise","text":"Ravi will send the quotation by Friday.","who":"Ravi","due_text":"Friday evening",
-         "quote":"Ravi will send the quotation by Friday evening","start_sec":30,"names":[{"as_said":"Ravi","as_written":"Ravi"}]},
-        {"type":"fact","text":"The roof leaks every monsoon.","quote":"the roof leaks every monsoon","start_sec":0},
-        {"type":"fact","text":"Take Dolo 650 twice for fever.","quote":"Take Dolo 650 twice if the fever comes back","start_sec":60}])");
-    json secs = json::array({{{"idx", 0}, {"first_piece", 0}, {"last_piece", 3}, {"start_sec", 0}, {"end_sec", 90},
-                              {"summary", {{"title", "Plumber"}, {"points", json::array({{{"text", "Pipe"}, {"start_sec", 0}}})},
-                                           {"memories", cands}}}},
-                             {{"idx", 1}, {"first_piece", 3}, {"last_piece", 3}, {"start_sec", 90}, {"end_sec", 90},
-                              {"summary", {{"title", "Empty"}, {"memories_missing", true}}}}});
+    auto sec = [](int idx, int a, int b, int s0, int s1) {
+        return json{{"idx", idx}, {"first_piece", a}, {"last_piece", b}, {"start_sec", s0}, {"end_sec", s1},
+                    {"summary", {{"title", "T"}, {"points", json::array({{{"text", "p"}, {"start_sec", s0}}})}}}};
+    };
+    json secs = json::array({sec(0, 0, 3, 0, 90), sec(1, 3, 4, 90, 120), sec(2, 4, 4, 120, 120)});
     expect(sve_note_set_sections(ctx, note, secs.dump().c_str()) == 0, "memories: sections stored");
-    expect(take(sve_memory_sections_due(ctx, note)) == json::parse("[0,1]"), "memories: both sections due");
+    expect(take(sve_memory_sections_due(ctx, note)) == json::parse("[0,1,2]"), "memories: every section due");
     json needing = take(sve_notes_needing_memories(ctx, 10));
     expect(needing.is_array() && std::find(needing.begin(), needing.end(), json(note)) != needing.end(), "memories: note needs memories");
 
+    expect(sve_memories_from_section(ctx, note, 0, nullptr, nullptr) == -1, "memories: no model -> -1");
+    expect(take(sve_memory_sections_due(ctx, note)).size() == 3, "memories: ... and the section stays due");
+    g_sve_model_reply = api_model;
     expect(sve_memories_from_section(ctx, note, 7, nullptr, nullptr) == -1, "memories: unknown section -> -1");
     expect(sve_memories_from_section(ctx, 987654, 0, nullptr, nullptr) == -1, "memories: unknown note -> -1");
     expect(sve_memories_from_section(nullptr, note, 0, nullptr, nullptr) == -1, "memories: no ctx -> -1");
     g_api_drops.clear();
     int n = sve_memories_from_section(ctx, note, 0, nullptr, nullptr);
-    printf("--- memories from section 0 (no model): %d stored, drops:", n);
+    printf("--- memories from section 0 (stand-in model): %d stored, drops:", n);
     for (const auto &d : g_api_drops) printf(" %s", d.c_str());
     printf("\n");
-    expect(n == 2, "memories: two of four candidates stored");
-    expect(g_api_drops.size() == 2 && std::find(g_api_drops.begin(), g_api_drops.end(), "quote_not_found") != g_api_drops.end() &&
-           std::find(g_api_drops.begin(), g_api_drops.end(), "medicine") != g_api_drops.end(),
-           "memories: unsaid and medicine candidates dropped with their reasons");
+    auto dropped = [](const char *r) { return std::find(g_api_drops.begin(), g_api_drops.end(), r) != g_api_drops.end(); };
+    expect(n == 1, "memories: one of four candidates stored");
+    expect(g_api_drops.size() == 3 && dropped("quote_not_found") && dropped("medicine") && dropped("double_check_no"),
+           "memories: unsaid, medicine and checked-no candidates dropped with their reasons");
     expect(sve_memories_from_section(ctx, note, 0, nullptr, nullptr) == 0, "memories: a done section is not made again");
-    expect(sve_memories_from_section(ctx, note, 1, nullptr, nullptr) == 0, "memories: a section with no pieces stores none");
+    g_api_drops.clear();
+    expect(sve_memories_from_section(ctx, note, 1, nullptr, nullptr) == 1 && g_api_drops.empty(),
+           "memories: a cut reply keeps its whole item, no redo");
+    expect(sve_memories_from_section(ctx, note, 2, nullptr, nullptr) == 0, "memories: a section with no pieces stores none");
     expect(take(sve_memory_sections_due(ctx, note)).empty(), "memories: no section due");
 
     json all = take(sve_memories_json(ctx, (R"({"note_id":)" + std::to_string(note) + "}").c_str()));
     printf("--- memories\n%s\n", all.dump(2).c_str());
     json q = take(sve_review_queue_json(ctx));
-    expect(q.is_array() && q.size() == 2, "memories: both wait for review (no double-check without a model)");
+    expect(q.is_array() && q.size() == 2, "memories: both wait for review (direct-to-map is off)");
     json promise, fact;
     for (const auto &m : q) (m["type"] == "promise" ? promise : fact) = m;
+    expect(q.size() == 2 && q[0]["sources"][0]["start_sec"] == 30, "memories: queue in the order said");
     expect(promise.is_object() && promise["who"] == "Ravi" && promise["due_text"] == "Friday evening" &&
            promise["suggestion_id"] == card && promise["suggestion"].is_object() && promise["suggestion"]["id"] == card,
            "memories: promise keeps who/due and links the pending card");
@@ -728,7 +743,8 @@ static void run_api_memories(sve_ctx *ctx) {
            promise["people"][0]["role"] == "who", "memories: Ravi linked once, as who");
     expect(promise.is_object() && promise["sources"].size() == 1 && promise["sources"][0]["start_sec"] == 30 &&
            promise["sources"][0]["quote"] == "Ravi will send the quotation by Friday evening.", "memories: source is the transcript's words");
-    expect(fact.is_object() && fact["suggestion"].is_null() && fact["importance"].get<double>() > 0, "memories: fact has no card, has importance");
+    expect(fact.is_object() && fact["text"] == "The electrician comes back on Monday." && fact["suggestion"].is_null() &&
+           fact["importance"].get<double>() > 0, "memories: the cut reply's fact, no card, has importance");
 
     const int64_t pid = promise.value("id", (int64_t)0), fid = fact.value("id", (int64_t)0);
     expect(sve_memory_review(ctx, pid, "maybe") == -1, "memories: unknown review state refused");
@@ -736,9 +752,9 @@ static void run_api_memories(sve_ctx *ctx) {
     json kept = take(sve_memory_get(ctx, pid));
     expect(kept["review"] == "kept" && kept["queue"] == 0, "memories: kept leaves the queue");
     expect(sve_memory_edit(ctx, fid, "  ") == -1, "memories: empty edit refused");
-    expect(sve_memory_edit(ctx, fid, "The kitchen pipe needs replacing.") == 0, "memories: edit");
+    expect(sve_memory_edit(ctx, fid, "The electrician comes on Monday.") == 0, "memories: edit");
     json ed = take(sve_memory_get(ctx, fid));
-    expect(ed["text"] == "The kitchen pipe needs replacing." && ed["review"] == "corrected" && ed["queue"] == 0, "memories: edit is corrected");
+    expect(ed["text"] == "The electrician comes on Monday." && ed["review"] == "corrected" && ed["queue"] == 0, "memories: edit is corrected");
     expect(take(sve_review_queue_json(ctx)).empty(), "memories: queue empty after review");
     expect(sve_memory_set_done(ctx, pid, 1) == 0 && take(sve_memory_get(ctx, pid))["done"] == true, "memories: set done");
     expect(sve_memory_review(ctx, fid, "wrong") == 0, "memories: wrong");
@@ -762,6 +778,7 @@ static void run_api_memories(sve_ctx *ctx) {
     sve_note_delete(ctx, note);
     expect(take(sve_memory_get(ctx, pid)).is_null(), "memories go with their only recording");
     expect(sve_memories_from_section(ctx, note, 0, nullptr, nullptr) == -1, "memories: deleted note -> -1");
+    g_sve_model_reply = nullptr;
     g_sve_memory_drop = nullptr;
 }
 
@@ -1048,12 +1065,12 @@ static int run_fits(sve_ctx *ctx, const char *lang) {
 }
 
 // Memories on a copy of a notes database (SVE_DB; never the phone's original): writes the sections a note is
-// missing with the combined section call, then sve_memories_from_section for every due section. Drop reasons go
+// missing with sve_section_summarize, then sve_memories_from_section for every due section. Drop reasons go
 // to a table memory_drops(note_id, section_idx, reason, cand_json) that only this mode creates. Optional seeding
 // before that: SVE_SEED_FIXTURE ("[t=SEC] text" file, an English note) and SVE_SEED_WAV (transcribed into a
 // Telugu note). SVE_NOTES: "all" (default) or comma-separated note ids. CPU, 4 threads, as in the background.
-// Per section: the combined call's seconds, the summary-only prompt's seconds on the same pieces (the extra time
-// the memories cost), and sve_memories_from_section's seconds (double-checks, or the memory-only call).
+// Per section: the (unchanged) summary call's seconds when it had to be written, and sve_memories_from_section's
+// seconds (the memory-only call and the double-checks: the extra time memories cost) and whether its reply was cut.
 static sqlite3 *g_drops = nullptr;
 static std::map<std::string, int> g_drop_count;
 static void smoke_drop(int64_t note, int idx, const char *reason, const char *cand) {
@@ -1073,15 +1090,11 @@ static double seconds_since(std::chrono::steady_clock::time_point t0) {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 }
 
-// The summary-only call as it was before memories (first attempt), for timing only.
-static double plain_summary_seconds(sve_ctx *ctx, const sve::SectionPieces &pieces, const std::string &lang) {
-    sve::Llm &llm = *ctx->llm;
-    const std::string prompt = llm.apply_template(sve::context_system(*ctx->store, sve::system_prompt(lang), false),
-                                                  sve::section_prompt(pieces, lang, sve::transcription_vocab_line(*ctx->store, 400), false));
-    std::string out;
-    auto t0 = std::chrono::steady_clock::now();
-    llm.complete(prompt, 512, out, nullptr, nullptr, "section", 0, 2, g_sve_force_greedy);
-    return seconds_since(t0);
+// Core log lines go to stderr as usual; a memory reply cut off at the cap is also counted for the report.
+static int g_cut_replies = 0;
+static void smoke_log(int, const char *msg, void *) {
+    fprintf(stderr, "[sve] %s\n", msg);
+    if (strstr(msg, "memories: reply cut off")) ++g_cut_replies;
 }
 
 static int run_memories(sve_ctx *ctx, const char *db_path) {
@@ -1140,15 +1153,12 @@ static int run_memories(sve_ctx *ctx, const char *db_path) {
                 }
                 auto t0 = std::chrono::steady_clock::now();
                 json sm = take(sve_section_summarize(ctx, arr.dump().c_str(), lang.c_str(), nullptr, nullptr));
-                double both = seconds_since(t0);
-                double plain = sp.empty() ? 0 : plain_summary_seconds(ctx, sp, lang);
-                char b2[160];
-                snprintf(b2, sizeof b2, "summary+memories %.1f s, summary only %.1f s, extra %.1f s", both, plain, both - plain);
+                char b2[96];
+                snprintf(b2, sizeof b2, "summary %.1f s (unchanged call)", seconds_since(t0));
                 timing[(int64_t)k] = b2;
                 printf("section %zu summary: %s\n", k, sm.dump().c_str());
                 expect(sm.is_object() && sm.contains("title"), "section summary written");
                 if (sm.value("fallback", false)) printf("(fallback used)\n");
-                if (sm.value("memories_missing", false)) printf("(memories missing from the combined call)\n");
                 int64_t s0 = pieces[a]["start_sec"], s1 = b < pieces.size() ? pieces[b]["start_sec"].get<int64_t>() : end;
                 secs.push_back({{"idx", (int)k}, {"first_piece", (int)a}, {"last_piece", (int)b}, {"start_sec", s0}, {"end_sec", s1},
                                 {"summary", sm}});
@@ -1158,10 +1168,12 @@ static int run_memories(sve_ctx *ctx, const char *db_path) {
         g_drop_count.clear();
         for (const auto &idx : take(sve_memory_sections_due(ctx, id))) {
             auto t0 = std::chrono::steady_clock::now();
+            const int cut_before = g_cut_replies;
             int n = sve_memories_from_section(ctx, id, idx.get<int>(), nullptr, nullptr);
             double s = seconds_since(t0);
             auto it = timing.find(idx.get<int64_t>());
-            printf("--- section %d: %d stored; memories %.1f s%s%s\n", idx.get<int>(), n, s, it == timing.end() ? "" : "; ",
+            printf("--- section %d: %d stored; memories %.1f s, reply %s%s%s\n", idx.get<int>(), n, s,
+                   g_cut_replies > cut_before ? "cut off (whole items kept)" : "complete", it == timing.end() ? "" : "; ",
                    it == timing.end() ? "" : it->second.c_str());
             expect(n >= 0, "memories from section");
         }
@@ -1204,6 +1216,7 @@ int main(int argc, char **argv) {
         if (sve_load_llm(ctx, gguf, 8192, 4, 0) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
         if (getenv("SVE_SEED_WAV") && (!mmproj || sve_load_audio(ctx, mmproj) != 0)) { fprintf(stderr, "SVE_SEED_WAV needs SVE_MMPROJ\n"); return 1; }
         g_sve_memory_drop = smoke_drop;
+        sve_set_log(smoke_log, nullptr);
         int rc = run_memories(ctx, db);
         printf("%s (%d missed)\n", fails || rc ? "MEMORIES FAIL" : "MEMORIES OK", fails);
         sve_free(ctx);

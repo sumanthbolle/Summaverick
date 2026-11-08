@@ -65,6 +65,10 @@ std::vector<std::string> known_med_names(Store &st);
 // with the reason (sve::Grounded::reason, or "double_check_no") and the candidate JSON. NULL in the app.
 extern void (*g_sve_memory_drop)(int64_t note_id, int section_idx, const char *reason, const char *cand_json);
 
+// Test hook (smoke mode "api"): stands in for the model in sve_memories_from_section. Given the phase
+// ("memories" or "memory_check") and the user prompt, returns the reply (NULL = the call failed). NULL in the app.
+extern const char *(*g_sve_model_reply)(const char *phase, const char *prompt);
+
 // Test hook: output token cap of sve_section_summarize (smoke sets a tiny value to force the fallback).
 extern int g_sve_section_max_out;
 // Test hooks (tools/model/compare_outputs.sh): every generation greedy; token ids written to a file

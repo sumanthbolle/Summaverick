@@ -8,7 +8,7 @@
 #include "sve_medcheck.h"
 #include "sve_memory.h"
 #include "sve_prompts.h"
-#include "sve_sections.h"
+#include "sve_sections.h"  // memory_prompt, complete_memory_items
 #include "sve_suggest.h"
 #include "sve_textmatch.h"
 
@@ -25,6 +25,7 @@ using sve::jarr;
 using sve::jobj;
 
 void (*g_sve_memory_drop)(int64_t, int, const char *, const char *) = nullptr;
+const char *(*g_sve_model_reply)(const char *, const char *) = nullptr;
 
 namespace {
 
@@ -64,6 +65,26 @@ int watch_cb(const char *phase, int done, int total, void *u) {
     Watch *w = static_cast<Watch *>(u);
     if (w->cb && w->cb(phase, done, total, w->user)) w->cancelled = true;
     return w->cancelled ? 1 : 0;
+}
+
+bool fits(sve_ctx *ctx, const std::string &system, const std::string &user_prompt, int max_out) {
+    if (g_sve_model_reply || !ctx->llm) return true;
+    sve::Llm &llm = *ctx->llm;
+    return llm.count_tokens(llm.apply_template(system, user_prompt)) + max_out + 16 <= llm.n_ctx;
+}
+
+// One greedy model call (or the test stand-in). False on failure or cancel (w.cancelled tells which).
+bool model_reply(sve_ctx *ctx, const char *phase, const std::string &system, const std::string &user_prompt, int max_out,
+                 int done, int total, std::string &out, Watch &w) {
+    if (g_sve_model_reply) {
+        const char *r = g_sve_model_reply(phase, user_prompt.c_str());
+        if (!r) return false;
+        out = r;
+        return true;
+    }
+    if (!ctx->llm) return false;
+    sve::Llm &llm = *ctx->llm;
+    return llm.complete(llm.apply_template(system, user_prompt), max_out, out, watch_cb, &w, phase, done, total, true);
 }
 
 std::string self_name(sve::Store &st) {
@@ -198,40 +219,29 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
         section_material(st, note_id, section, pieces, conf);
         const std::string lang = note->lang == "te" ? "te" : "en";
 
-        // Candidates: from the combined section call, else one memory-only call.
+        // Candidates: one memory-only call (the section summary call is left exactly as it was).
         json cands = json::array();
-        const json summary = jobj(section, "summary");
-        const bool have = summary.is_object() && summary.contains("memories") && summary["memories"].is_array() &&
-                          summary.value("memories_missing", false) != true;
-        if (pieces.empty()) {
-            // Nothing was said in this section.
-        } else if (have) {
-            cands = sve::parse_memory_candidates(summary["memories"]);
-        } else {
-            if (!ctx->llm) return -1;
-            sve::Llm &llm = *ctx->llm;
-            const std::string prompt = llm.apply_template(
-                sve::context_system(st, sve::system_prompt(lang), false),
-                sve::memory_prompt(pieces, lang, sve::transcription_vocab_line(st, 400)));
-            if (llm.count_tokens(prompt) + kMemoryMaxOut + 16 > llm.n_ctx) {
+        if (!pieces.empty()) {
+            if (!ctx->llm && !g_sve_model_reply) return -1;
+            const std::string sys = sve::context_system(st, sve::system_prompt(lang), false);
+            const std::string prompt = sve::memory_prompt(pieces, lang, sve::transcription_vocab_line(st, 400));
+            std::string out;
+            Watch w{cb, user, false};
+            if (!fits(ctx, sys, prompt, kMemoryMaxOut)) {
                 sve_logf(1, "memories: section %d of note %lld does not fit", section_idx, (long long)note_id);
+            } else if (!model_reply(ctx, "memories", sys, prompt, kMemoryMaxOut, 0, 1, out, w)) {
+                if (w.cancelled) return -2;
+                sve_logf(1, "memories: model call failed for section %d of note %lld", section_idx, (long long)note_id);
             } else {
-                std::string out;
-                Watch w{cb, user, false};
-                if (!llm.complete(prompt, kMemoryMaxOut, out, watch_cb, &w, "memories", 0, 1, true)) {
-                    if (w.cancelled) return -2;
-                    sve_logf(1, "memories: model call failed for section %d of note %lld", section_idx, (long long)note_id);
+                json j;
+                const std::string reply = sve::strip_thinking(out);
+                if (sve::first_json_object(reply, j) && j.is_object() && j.contains("memories")) {
+                    cands = sve::parse_memory_candidates(j["memories"]);
                 } else {
-                    json j;
-                    const std::string reply = sve::strip_thinking(out);
-                    if (sve::first_json_object(reply, j) && j.is_object() && j.contains("memories")) {
-                        cands = sve::parse_memory_candidates(j["memories"]);
-                    } else {
-                        // Cut off (a long Telugu section can pass the cap): the whole items before the cut still count.
-                        cands = sve::parse_memory_candidates(sve::complete_memory_items(reply));
-                        sve_logf(1, "memories: reply cut off for section %d of note %lld, %zu whole items kept", section_idx,
-                                 (long long)note_id, cands.size());
-                    }
+                    // Cut off at the cap (long Telugu sections): the whole items before the cut count, no redo.
+                    cands = sve::parse_memory_candidates(sve::complete_memory_items(reply));
+                    sve_logf(1, "memories: reply cut off for section %d of note %lld, %zu whole items kept", section_idx,
+                             (long long)note_id, cands.size());
                 }
             }
         }
@@ -245,12 +255,11 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
             sve::Grounded g = sve::ground_memory(cands[i], pieces, conf, said, meds, sve::kLowConfidence);
             if (!g.ok) { dropped(note_id, section_idx, g.reason, cands[i]); continue; }
             int dc = sve::kNotDoubleChecked;
-            if (g.needs_double_check && ctx->llm) {
-                sve::Llm &llm = *ctx->llm;
+            if (g.needs_double_check) {
                 std::string out;
                 Watch w{cb, user, false};
-                if (llm.complete(llm.apply_template(kCheckSystem, sve::double_check_prompt(g.row)), kYesNoMaxOut, out, watch_cb,
-                                 &w, "memory_check", (int)i, (int)cands.size(), true))
+                if (model_reply(ctx, "memory_check", kCheckSystem, sve::double_check_prompt(g.row), kYesNoMaxOut, (int)i,
+                                (int)cands.size(), out, w))
                     dc = sve::parse_yes_no(sve::strip_thinking(out));
                 else if (w.cancelled)
                     return -2;

@@ -161,17 +161,16 @@ TEST(fallback_summary_shape) {
     CHECK_EQ(s["points"][0]["text"].get<std::string>(), std::string("One two three four five six seven eight nine ten."));
     CHECK_EQ(s["points"][1]["start_sec"].get<int64_t>(), (int64_t)28);
     CHECK(s["fallback"].get<bool>());
-    CHECK(s.value("memories_missing", false));  // its memories are made by the memory-only prompt
     CHECK(s["terms"].is_array() && s["hints"].is_array());
 }
 
 TEST(section_prompt_mentions_language_and_starts) {
     Pieces p = {{0, "hello"}, {28, "world"}, {56, "x"}};
-    std::string te = section_prompt(p, "te", "Words: Metformin", false);
+    std::string te = section_prompt(p, "te", "Words: Metformin");
     CHECK(te.find("Telugu") != std::string::npos);
     CHECK(te.find("[t=0]") != std::string::npos && te.find("[t=28]") != std::string::npos && te.find("[t=56]") != std::string::npos);
     CHECK(te.find("Metformin") != std::string::npos);
-    std::string en = section_prompt(p, "en", "", false);
+    std::string en = section_prompt(p, "en", "");
     CHECK(en.find("English") != std::string::npos);
     CHECK(en.find("Telugu") == std::string::npos);
 }
@@ -264,73 +263,31 @@ static const char *kGoldEn =
     "\n"
     "JSON:\n";
 
-static std::string erase_once(std::string s, const std::string &part) {
-    size_t at = s.find(part);
-    if (part.empty() || at == std::string::npos) return "<not found>";
-    s.erase(at, part.size());
-    return s;
-}
-
 TEST(section_prompt_summary_part_unchanged) {
-    CHECK_EQ(section_prompt(kGoldPieces, "te", "Words: Metformin, రవి", false), std::string(kGoldTe));
-    CHECK_EQ(section_prompt(kGoldPieces, "en", "", false), std::string(kGoldEn));
-    for (const auto &lv : {std::make_pair(std::string("te"), std::string("Words: Metformin, రవి")),
-                           std::make_pair(std::string("en"), std::string(""))}) {
-        const std::string plain = section_prompt(kGoldPieces, lv.first, lv.second, false);
-        const std::string both = section_prompt(kGoldPieces, lv.first, lv.second, true);
-        CHECK(both != plain);
-        CHECK_EQ(erase_once(erase_once(both, kMemoryShape), memory_rules(lv.first)), plain);
-        // The shape goes before the shape line's closing brace, the rules after "Use only what was said".
-        CHECK(both.find(std::string("[\"things worth following up, if any\"]") + kMemoryShape + "}\n") != std::string::npos);
-        CHECK(both.find("- Use only what was said. Use an empty array when nothing applies.\n" + memory_rules(lv.first)) !=
-              std::string::npos);
-    }
-    CHECK(memory_rules("te").find("Telugu") != std::string::npos);
-    CHECK(memory_rules("en").find("English") != std::string::npos);
-    CHECK(std::string(kMemoryShape).find("\"as_said\"") != std::string::npos);
-    CHECK(std::string(kMemoryShape).rfind(",\"memories\":[", 0) == 0);
+    // Notes parity: the section summary prompt stays byte for byte as it was; memories have their own prompt.
+    CHECK_EQ(section_prompt(kGoldPieces, "te", "Words: Metformin, రవి"), std::string(kGoldTe));
+    CHECK_EQ(section_prompt(kGoldPieces, "en", ""), std::string(kGoldEn));
 }
 
 TEST(memory_prompt_shape) {
     const std::string m = memory_prompt(kGoldPieces, "te", "Words: Metformin, రవి");
-    CHECK(m.find(std::string("{") + (kMemoryShape + 1) + "}\n") != std::string::npos);  // {"memories":[...]}
-    CHECK(m.find("Telugu") != std::string::npos);
+    CHECK(m.find(std::string(kMemoryShape) + "\n") != std::string::npos);
+    CHECK(std::string(kMemoryShape).rfind("{\"memories\":[", 0) == 0);
+    CHECK(std::string(kMemoryShape).find("\"as_said\"") != std::string::npos);
+    CHECK(m.find(memory_rules("te")) != std::string::npos);
+    CHECK(memory_rules("te").find("Telugu") != std::string::npos);
+    CHECK(memory_rules("en").find("English") != std::string::npos);
+    CHECK(memory_rules("en").find("At most 5 \"memories\"") != std::string::npos);
     CHECK(m.find("[t=42] Meet Ravi on Friday at 5.\n") != std::string::npos);
     CHECK(m.find("Words: Metformin, రవి\n") != std::string::npos);
     CHECK(m.find("\"points\"") == std::string::npos);  // memories only
     CHECK(m.size() > 6 && m.compare(m.size() - 6, 6, "JSON:\n") == 0);
 }
 
-static const char *kSummaryBody =
-    "{\"title\":\"Budget\",\"topic\":\"money\",\"points\":[{\"text\":\"Spend less\",\"start_sec\":28,\"type\":\"decision\"},"
-    "{\"text\":\"Save\",\"start_sec\":56,\"type\":\"nonsense\"}],\"terms\":[\"GST\"],\"hints\":[\"x\"]";
 static const char *kMemoriesPart =
     ",\"memories\":[{\"type\":\"promise\",\"text\":\"Ravi will send the report.\",\"who\":\"Ravi\",\"to_whom\":\"\","
     "\"due_text\":\"\",\"quote\":\"Ravi will send the report\",\"start_sec\":28,\"names\":[{\"as_said\":\"Ravi\","
     "\"as_written\":\"Ravi\"}],\"numbers\":[],\"dates\":[],\"times\":[]}]";
-
-static void check_same_summary(const json &a, const json &b) {
-    for (const char *k : {"title", "topic", "terms", "hints"}) CHECK_EQ(a[k], b[k]);
-    CHECK_EQ(a["points"].size(), b["points"].size());
-    for (size_t i = 0; i < a["points"].size() && i < b["points"].size(); ++i) {
-        CHECK_EQ(a["points"][i]["text"], b["points"][i]["text"]);
-        CHECK_EQ(a["points"][i]["start_sec"], b["points"][i]["start_sec"]);
-    }
-}
-
-TEST(parse_section_summary_ignores_memories) {
-    json with, without;
-    CHECK(parse_section_summary(std::string(kSummaryBody) + kMemoriesPart + "}", kStarts, with));
-    CHECK(parse_section_summary(std::string(kSummaryBody) + "}", kStarts, without));
-    check_same_summary(with, without);
-    CHECK_EQ(with["points"][0]["type"].get<std::string>(), std::string("decision"));  // a valid point type is kept
-    CHECK(!with["points"][1].contains("type"));                                       // an unknown one is not
-    CHECK(with["memories"].is_array() && with["memories"].size() == 1);
-    CHECK_EQ(with["memories"][0]["type"].get<std::string>(), std::string("promise"));
-    CHECK(!with.contains("memories_missing"));
-    CHECK(!without.contains("memories"));
-    CHECK(without.value("memories_missing", false));
-}
 
 TEST(section_groups_ignore_types_and_memories) {
     json plain = json::array(), rich = json::array();
@@ -351,41 +308,6 @@ TEST(section_groups_ignore_types_and_memories) {
         CHECK(g.find("promise") == std::string::npos);
         CHECK(g.find("report") == std::string::npos);
     }
-}
-
-TEST(salvage_summary_from_truncated_memories) {
-    const std::string cut = std::string(kSummaryBody) + ",\"memories\":[{\"type\":\"fact\",\"text\":\"cut";
-    json s;
-    CHECK(!parse_section_summary(cut, kStarts, s));
-    CHECK(salvage_summary(cut, kStarts, s));
-    CHECK_EQ(s["title"].get<std::string>(), std::string("Budget"));
-    CHECK_EQ(s["points"].size(), (size_t)2);
-    CHECK_EQ(s["points"][1]["start_sec"].get<int64_t>(), (int64_t)56);
-    CHECK(s.value("memories_missing", false));
-    CHECK(!s.contains("memories"));
-    // Fenced, with thinking first, and a "memories" key inside a string value that is not the cut.
-    const std::string tricky = "<think>x</think>```json\n{\"title\":\"A ,\\\"memories\\\" b\",\"points\":[{\"text\":\"p\","
-                               "\"start_sec\":0}] , \"memories\" : [{\"type\":\"idea\",\"te";
-    json t;
-    CHECK(salvage_summary(tricky, kStarts, t));
-    CHECK_EQ(t["title"].get<std::string>(), std::string("A ,\"memories\" b"));
-    CHECK(t.value("memories_missing", false));
-    // No summary before the memories, or no memories key at all: nothing to salvage.
-    json u;
-    CHECK(!salvage_summary("{\"memories\":[{\"type\":\"fact\"", kStarts, u));
-    CHECK(!salvage_summary("{\"title\":\"T\",\"points\":[{\"text\":\"abc", kStarts, u));
-    CHECK(!salvage_summary("", kStarts, u));
-}
-
-TEST(parse_memories_bad_array_marks_missing) {
-    json s;
-    CHECK(parse_section_summary(std::string(kSummaryBody) + ",\"memories\":\"none\"}", kStarts, s));
-    CHECK(s.value("memories_missing", false));
-    CHECK(!s.contains("memories"));
-    json e;  // an empty array is valid: the section has nothing worth remembering
-    CHECK(parse_section_summary(std::string(kSummaryBody) + ",\"memories\":[]}", kStarts, e));
-    CHECK(e["memories"].is_array() && e["memories"].empty());
-    CHECK(!e.contains("memories_missing"));
 }
 
 TEST(complete_memory_items_from_a_cut_reply) {
