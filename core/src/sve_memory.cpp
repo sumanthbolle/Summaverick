@@ -284,6 +284,8 @@ std::vector<std::string> name_words(const std::string &raw, const std::set<std::
     return out;
 }
 
+}  // namespace
+
 bool is_pronoun(const std::string &who) {
     static const std::set<std::string> kPronouns = {
         "i", "we", "you", "he", "she", "they",
@@ -291,6 +293,8 @@ bool is_pronoun(const std::string &who) {
     };
     return kPronouns.count(ascii_lower(nfc_clean(trim_copy(who)))) > 0;
 }
+
+namespace {
 
 // The ways a person may be said: as given, and the quote words of a listed name written that way
 // (when the spelling fits).

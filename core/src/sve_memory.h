@@ -43,6 +43,9 @@ struct Grounded {
 Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std::vector<std::optional<double>> &piece_conf,
                        const std::string &said_ymd, const std::vector<std::string> &med_names, double low_conf_threshold);
 
+// "I", "we", "you", "he", "she", "they" and their Telugu forms: a who/to_whom that names nobody.
+bool is_pronoun(const std::string &who);
+
 // Asks the model whether the quote says the memory (its text, who, to whom and deadline), answered yes or no.
 std::string double_check_prompt(const json &row);
 

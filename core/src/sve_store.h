@@ -79,6 +79,7 @@ public:
     bool link_topic(int64_t note_id, int64_t topic_id);
     json topics(const std::string &kind);
     json topic_notes(int64_t topic_id);
+    json note_topics(int64_t note_id, const std::string &kind);  // [{id,kind,name}] in the order they were linked
     bool set_topic_summary(int64_t id, const std::string &summary);
     bool rename_topic(int64_t id, const std::string &name);
     bool merge_topics(int64_t from, int64_t into);
@@ -121,10 +122,15 @@ public:
     bool update_learned_memory(int64_t id, const std::string &text);
     bool delete_learned_memory(int64_t id);
 
+    // add/update also keep the medicine's memory in step (upsert_medicine_memory); delete cascades to it.
     int64_t add_medicine(const json &m);
     json medicines();
     bool update_medicine(int64_t id, const json &m);
     bool delete_medicine(int64_t id);
+    // The one memory of a saved medicine: origin 'medicine', type 'fact', health 1, review 'kept', text
+    // "<name> <dose>, <when_text>" from the row. Inserted, or its text updated; the id, 0 when the row has no
+    // text, -1 on error. Run for every medicine at open, so medicines saved before this existed get one.
+    int64_t upsert_medicine_memory(int64_t medicine_id);
 
     bool log_decision(const std::string &kind, const std::string &field, const std::string &from, const std::string &to);
     json decisions(const std::string &kind, const std::string &field, int limit);

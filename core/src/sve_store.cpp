@@ -1,4 +1,5 @@
 #include "sve_store.h"
+#include "sve_memory.h"  // memory_importance
 #include <sqlite3.h>
 #include <ctime>
 #include <cstring>
@@ -187,7 +188,10 @@ Store::Store(const std::string &path) {
         if (db_) { sqlite3_close(db_); db_ = nullptr; }
         return;
     }
-    if (!exec(kSchema) || !migrate()) { sqlite3_close(db_); db_ = nullptr; }
+    if (!exec(kSchema) || !migrate()) { sqlite3_close(db_); db_ = nullptr; return; }
+    // Medicines saved before medicine memories existed get theirs now (idempotent; a failure leaves the
+    // medicine without one until it is saved again, and does not stop the store from opening).
+    for (const auto &m : query_rows("SELECT id FROM medicines ORDER BY id", {})) upsert_medicine_memory(m["id"].get<int64_t>());
 }
 
 // Moves every old-table fact into memories, kept as it was (preferences and vocabulary stay in
@@ -605,6 +609,11 @@ json Store::topic_notes(int64_t topic_id) {
                       "ORDER BY n.created_at DESC, n.id DESC", {topic_id});
 }
 
+json Store::note_topics(int64_t note_id, const std::string &kind) {
+    return query_rows("SELECT t.id AS id, t.kind AS kind, t.name AS name FROM note_topics nt JOIN topics t ON t.id=nt.topic_id "
+                      "WHERE nt.note_id=? AND t.kind=? ORDER BY nt.rowid", {note_id, kind});
+}
+
 bool Store::set_topic_summary(int64_t id, const std::string &summary) {
     return run("UPDATE topics SET summary=?, summary_stale=0 WHERE id=?", {summary, id}) && sqlite3_changes(db_) > 0;
 }
@@ -876,13 +885,41 @@ json Store::notes_needing_memories(int limit) {
 
 // medicines ------------------------------------------------------------------
 
+// "<name> <dose>, <when_text>", leaving out the parts that are empty.
+static std::string medicine_memory_text(const json &m) {
+    auto str = [&](const char *k) { json v = jget(m, k); return v.is_string() ? v.get<std::string>() : std::string(); };
+    std::string t = str("name");
+    if (!str("dose").empty()) t += (t.empty() ? "" : " ") + str("dose");
+    if (!str("when_text").empty()) t += (t.empty() ? "" : ", ") + str("when_text");
+    return t;
+}
+
+int64_t Store::upsert_medicine_memory(int64_t medicine_id) {
+    json m = query_rows("SELECT id,name,dose,when_text FROM medicines WHERE id=?", {medicine_id});
+    if (m.empty()) { err_ = "no such medicine"; return -1; }
+    const std::string text = medicine_memory_text(m[0]);
+    if (text.empty()) return 0;
+    json have = query_rows("SELECT id,text FROM memories WHERE origin='medicine' AND medicine_id=? ORDER BY id LIMIT 1",
+                           {medicine_id});
+    if (!have.empty()) {
+        int64_t id = have[0]["id"].get<int64_t>();
+        if (have[0]["text"] != text && !run("UPDATE memories SET text=?, last_seen=? WHERE id=?", {text, now_j(), id})) return -1;
+        return id;
+    }
+    json row = {{"type", "fact"}, {"text", text}, {"origin", "medicine"}, {"medicine_id", medicine_id}, {"health", 1},
+                {"review", "kept"}, {"queue", 0}, {"confidence", "high"}, {"checked", json::array()}};
+    row["importance"] = memory_importance(row, 0, 0, now_j().get<int64_t>());
+    return add_memory_item(row);
+}
+
 int64_t Store::add_medicine(const json &m) {
     int64_t id = -1;
     json when = jget(m, "when_text", jget(m, "when"));
     bool ok = run("INSERT INTO medicines(name,dose,when_text,times,repeat,until_date,created_at) VALUES(?,?,?,?,?,?,?)",
                   {jget(m, "name", ""), jget(m, "dose"), when, jtext(jget(m, "times", json::array())),
                    jget(m, "repeat", "daily"), jget(m, "until_date"), now_j()}, &id);
-    return ok ? id : -1;
+    if (!ok) return -1;
+    return upsert_medicine_memory(id) >= 0 ? id : -1;
 }
 
 json Store::medicines() {
@@ -905,7 +942,8 @@ bool Store::update_medicine(int64_t id, const json &m) {
     if (m.contains("times")) add("times", jtext(m["times"], false));
     if (sets.empty()) return false;
     binds.push_back(id);
-    return run(("UPDATE medicines SET " + sets + " WHERE id=?").c_str(), binds) && sqlite3_changes(db_) > 0;
+    return run(("UPDATE medicines SET " + sets + " WHERE id=?").c_str(), binds) && sqlite3_changes(db_) > 0 &&
+           upsert_medicine_memory(id) >= 0;
 }
 
 bool Store::delete_medicine(int64_t id) {

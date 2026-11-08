@@ -164,9 +164,12 @@ char *sve_note_sections(sve_ctx *ctx, int64_t note_id);
 char *sve_plan_sections(const char *pieces_json, int64_t end_sec_of_last, int is_final);
 
 /* Summary of one section. pieces_json: [{"start_sec":0,"text":"…"}]; lang "en"/"te". Returns the summary JSON
- * ({"title","topic","points":[{"text","start_sec"}],"terms","hints"}). Sampled first try, one greedy retry,
- * then a plain-text fallback ("fallback":true) built from the first sentences, so a model that ran never
- * gives NULL. NULL on cancel, no model or bad input. Output capped at 512 tokens. */
+ * ({"title","topic","points":[{"text","start_sec","type"?}],"terms","hints"}) plus the section's memory
+ * candidates from the same call: "memories":[…], or "memories_missing":true when they did not come through
+ * (sve_memories_from_section then asks for them on their own). Sampled first try, one greedy retry; output cut
+ * off inside "memories" keeps its summary (salvaged) instead of retrying; then a plain-text fallback
+ * ("fallback":true) built from the first sentences, so a model that ran never gives NULL. NULL on cancel,
+ * no model or bad input. Output capped at 1024 tokens. Notes and chapters read only the summary part. */
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang, sve_progress_cb cb, void *user);
 
 /* Notes built from a note's stored section summaries instead of the raw transcript. One group of summaries that
@@ -181,7 +184,8 @@ char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang);
 char *sve_chapters_json(sve_ctx *ctx, int64_t note_id);
 
 /* Runs extraction on a note's pieces (greedy, windowed for long recordings). Adds pending suggestions
- * (reminders, tasks, profile changes, vocabulary, facts), each quote and medicine checked in code; links
+ * (reminders, tasks, profile changes, vocabulary; facts are memories now, see sve_memories_from_section),
+ * each quote and medicine checked in code; links
  * topics and people directly. Returns the number of suggestions added (0 if the model output was unusable),
  * negative on error or cancel. Pending suggestions from an earlier run on the same note become "superseded". */
 int   sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user);
@@ -267,6 +271,44 @@ int   sve_memory_update(sve_ctx *ctx, int64_t id, const char *text);
 int   sve_memory_delete(sve_ctx *ctx, int64_t id);
 /* Adds a vocabulary word the person fixed (applied directly). Returns its id (existing id if known). */
 int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
+
+/* ---- memories (the second brain) ---------------------------------------
+ * Memory row JSON: {"id","type":"fact|decision|promise|question|person|idea","text","who","to_whom",
+ * "due_date","due_text","said_date","checked":[{"kind","text"}],"confidence":"high|low",
+ * "review":"new|kept|corrected|wrong","queue","health","done","importance","origin":"recording|chat|medicine|migrated",
+ * "medicine_id","suggestion_id","superseded_by","conflict_with","first_seen","last_seen",
+ * "sources":[{"note_id","start_sec","quote","title"}],"people":[{"id","name","role"}]}.
+ * A saved medicine has one memory (origin "medicine", review "kept", health 1, text "<name> <dose>, <when>"),
+ * kept in step with the medicine and deleted with it. */
+
+/* Makes the memories of one section of a note: the candidates from its stored summary (or, when it has none,
+ * one greedy memory-only model call), each checked against the section's own words (sve_memory), double-checked
+ * by the model where needed (a "no" drops it; only a "yes" lets it skip the review queue), stored with its
+ * quote as source, linked to people and the note's topic, and to a pending reminder/task card of the same
+ * note and quote. Marks the section done; a section already done returns 0 and changes nothing.
+ * Returns the number of memories stored; -1 for no such note or section, bad input, or no model when one is
+ * needed for the candidates; -2 on cancel (nothing stored, the section stays due). */
+int   sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sve_progress_cb cb, void *user);
+/* Indexes of the note's sections whose memories are not made yet, e.g. "[0,2]"; "[]" when none. */
+char *sve_memory_sections_due(sve_ctx *ctx, int64_t note_id);
+/* Note ids with a section whose memories are not made yet, newest note first: "[12,9]". */
+char *sve_notes_needing_memories(sve_ctx *ctx, int limit);
+/* Memory rows. filter_json (NULL = {}): {"note_id","types":[],"reviews":[],"queue":0|1,"include_wrong",
+ * "include_superseded","limit"}. Newest first; wrong and superseded rows only when asked for. */
+char *sve_memories_json(sve_ctx *ctx, const char *filter_json);
+/* One memory row plus "history" (the versions it replaced), or "null". */
+char *sve_memory_get(sve_ctx *ctx, int64_t id);
+/* The person's review: state "kept" or "wrong". Both take it out of the review queue. 0 ok, -1 error. */
+int   sve_memory_review(sve_ctx *ctx, int64_t id, const char *state);
+/* The person's own words for a memory, applied directly: review becomes "corrected", out of the queue.
+ * Medicine memories are changed by saving the medicine instead (-1). 0 ok, -1 error. */
+int   sve_memory_edit(sve_ctx *ctx, int64_t id, const char *text);
+/* Deletes a memory (not a medicine's: delete the medicine). 0 ok, -1 error. */
+int   sve_memory_remove(sve_ctx *ctx, int64_t id);
+int   sve_memory_set_done(sve_ctx *ctx, int64_t id, int done);
+/* Memories waiting for the person (queue 1, review "new"), newest recording first, each with "suggestion":
+ * the linked pending suggestion object, or null. */
+char *sve_review_queue_json(sve_ctx *ctx);
 
 /* Deletes everything the assistant stored, in one transaction: the profile, medicines, memory (vocabulary,
  * preferences, facts), reminders, tasks, topics and their note links, suggestions, decisions, insights,

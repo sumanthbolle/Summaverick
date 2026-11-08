@@ -23,35 +23,6 @@ using sve::jobj;
 
 namespace {
 
-char *dup(const std::string &s) {
-    char *p = (char *)malloc(s.size() + 1);
-    if (!p) return nullptr;
-    memcpy(p, s.data(), s.size());
-    p[s.size()] = 0;
-    return p;
-}
-
-char *dump(const json &j) { return dup(j.dump()); }
-
-// Runs f; any exception is logged and turned into the error value.
-template <class R, class F>
-R guard(const char *name, R err, F f) {
-    try {
-        return f();
-    } catch (const std::exception &e) {
-        sve_logf(2, "%s failed: %s", name, e.what());
-    } catch (...) {
-        sve_logf(2, "%s failed", name);
-    }
-    return err;
-}
-
-json parse(const char *s) {
-    if (!s) return json();
-    json j = json::parse(s, nullptr, false);
-    return j.is_discarded() ? json() : j;
-}
-
 std::string today_iso() {
     time_t t = time(nullptr);
     struct tm lt;
@@ -84,10 +55,12 @@ json int_or_null(const json &o, const char *k) {
     return v == INT64_MIN ? json(nullptr) : json(v);
 }
 
+}  // namespace
+
 // Medicine names the person has (profile) or the model proposed from recordings, whatever the
 // person answered on the card: a name stays a medicine after a No or a re-run, so the verbatim
 // and medicine filters keep catching it. Names only; nothing else of those cards is used.
-std::vector<std::string> known_med_names(sve::Store &st) {
+std::vector<std::string> sve::known_med_names(sve::Store &st) {
     std::vector<std::string> names;
     auto add = [&](const std::string &n) {
         if (!n.empty() && std::find(names.begin(), names.end(), n) == names.end()) names.push_back(n);
@@ -97,6 +70,10 @@ std::vector<std::string> known_med_names(sve::Store &st) {
         for (const auto &s : st.suggestions(status)) add(jstr(jobj(payload_of(s), "medicine"), "name"));
     return names;
 }
+
+namespace {
+
+using sve::known_med_names;
 
 int64_t find_medicine(sve::Store &st, const std::string &name) {
     std::string n = sve::normalize_for_match(name);
@@ -503,6 +480,8 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         int added = 0;
         for (const auto &s : sve::build_suggestions(merged, pieces, note_id, jobj(profile_of(st), "routine"), today_iso(),
                                                           lang_of(st), known_med_names(st), st.medicines())) {
+            // Recording facts are memories now (sve_memories_from_section), checked against their quote.
+            if (jstr(s, "kind") == "fact" && jstr(payload_of(s), "memory_kind") == "fact") continue;
             if (jstr(s, "kind") == "vocab") {
                 std::string t = lower(jstr(payload_of(s), "text"));
                 if (std::find(known_vocab.begin(), known_vocab.end(), t) != known_vocab.end()) continue;

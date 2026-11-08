@@ -196,6 +196,14 @@ int user_version(const std::string &p) {
     return v;
 }
 
+// Memory rows other than saved medicines' own (those are made at open for the v0 medicine, K11).
+json non_medicine_items(Store &s) {
+    json out = json::array();
+    for (const auto &m : s.memory_items(json::object()))
+        if (m["origin"] != "medicine") out.push_back(m);
+    return out;
+}
+
 int64_t item(Store &s, const std::string &text, const char *type = "fact") {
     return s.add_memory_item({{"type", type}, {"text", text}});
 }
@@ -210,7 +218,7 @@ TEST(migrate_old_db_adds_conf_and_moves_facts) {
         json ps = s.pieces(1);
         CHECK_EQ(ps.size(), (size_t)2);
         for (const auto &x : ps) CHECK(x.contains("conf") && x["conf"].is_null());
-        json items = s.memory_items(json::object());
+        json items = non_medicine_items(s);
         CHECK_EQ(items.size(), (size_t)1);
         if (items.size() == 1) {
             const json &m = items[0];
@@ -245,7 +253,7 @@ TEST(migrate_old_db_adds_conf_and_moves_facts) {
     {
         Store again(p);
         CHECK(again.ok());
-        CHECK_EQ(again.memory_items(json::object()).size(), (size_t)1);
+        CHECK_EQ(non_medicine_items(again).size(), (size_t)1);
         CHECK_EQ(again.memory("").size(), (size_t)2);
     }
     CHECK_EQ(user_version(p), 2);
@@ -256,9 +264,9 @@ TEST(migrated_fact_goes_with_its_note) {
     std::string p = make_v0();
     {
         Store s(p);
-        CHECK_EQ(s.memory_items(json::object()).size(), (size_t)1);
+        CHECK_EQ(non_medicine_items(s).size(), (size_t)1);
         CHECK(s.remove(1));
-        CHECK(s.memory_items(json::object()).empty());
+        CHECK(non_medicine_items(s).empty());
         CHECK(s.search_memory_items("salt", 5).empty());
     }
     drop_db(p);
@@ -323,7 +331,7 @@ TEST(chat_memory_without_source_survives_and_medicine_cascades) {
     int64_t chat = s.add_memory_item({{"type", "fact"}, {"text", "Locker code is in the diary"}, {"origin", "chat"}});
     CHECK(chat > 0);
     int64_t med = s.add_medicine(json::parse(R"({"name":"Telma","dose":"40 mg"})"));
-    int64_t mm = s.add_memory_item({{"type", "fact"}, {"text", "Telma 40 mg"}, {"origin", "medicine"}, {"medicine_id", med}, {"health", 1}});
+    int64_t mm = s.upsert_medicine_memory(med);  // made by add_medicine; the upsert finds it
     CHECK(mm > 0);
     CHECK_EQ(s.memory_items(json::object()).size(), (size_t)2);
     CHECK(s.delete_medicine(med));
@@ -477,7 +485,7 @@ TEST(pieces_store_optional_conf) {
 
 TEST(sweep_moves_facts_written_at_version_1_once) {
     std::string p = make_v0();
-    { Store s(p); CHECK_EQ(s.memory_items(json::object()).size(), (size_t)1); }
+    { Store s(p); CHECK_EQ(non_medicine_items(s).size(), (size_t)1); }
     // A build at version 1 accepted a fact card into the old table.
     raw_exec(p, "INSERT INTO memory(kind,text,note_id,created_at) VALUES ('fact','Gas cylinder due on 20th',1,1762500000);"
                 "INSERT INTO memory(kind,text,note_id,created_at) VALUES ('fact','Wifi password on the fridge',NULL,1762500001);"
@@ -487,7 +495,7 @@ TEST(sweep_moves_facts_written_at_version_1_once) {
         CHECK(s.ok());
         CHECK(s.memory("fact").empty());
         CHECK_EQ(s.memory("").size(), (size_t)2);  // preference and vocab untouched
-        json items = s.memory_items(json::object());
+        json items = non_medicine_items(s);
         CHECK_EQ(items.size(), (size_t)3);
         for (const auto &m : items) CHECK(m["origin"] == "migrated" && m["review"] == "kept");
         CHECK_EQ(s.search_memory_items("cylinder", 5).size(), (size_t)1);
@@ -499,7 +507,7 @@ TEST(sweep_moves_facts_written_at_version_1_once) {
     raw_exec(p, "INSERT INTO memory(kind,text,note_id,created_at) VALUES ('fact','Not swept',NULL,1762500002);");
     {
         Store s(p);
-        CHECK_EQ(s.memory_items(json::object()).size(), (size_t)3);
+        CHECK_EQ(non_medicine_items(s).size(), (size_t)3);
         CHECK_EQ(s.memory("fact").size(), (size_t)1);
     }
     drop_db(p);
@@ -593,4 +601,50 @@ TEST(queued_memories_never_reach_a_prompt) {
     CHECK(b.find("Sugar level was high") == std::string::npos);
     CHECK(s.update_memory_item(q, {{"queue", 0}, {"review", "kept"}}));  // reviewed: now it may be used
     CHECK_EQ(s.search_memory_items("Sugar", 10).size(), (size_t)2);
+}
+
+TEST(medicine_memory_follows_the_saved_medicine) {
+    Store s(":memory:");
+    int64_t med = s.add_medicine(json::parse(R"({"name":"Telma","dose":"40 mg","when_text":"after breakfast"})"));
+    CHECK(med > 0);
+    json items = s.memory_items(json::object());
+    CHECK_EQ(items.size(), (size_t)1);
+    if (items.size() == 1) {
+        const json &m = items[0];
+        CHECK_EQ(m["text"].get<std::string>(), std::string("Telma 40 mg, after breakfast"));
+        CHECK(m["origin"] == "medicine" && m["type"] == "fact" && m["review"] == "kept");
+        CHECK_EQ(m["medicine_id"].get<int64_t>(), med);
+        CHECK_EQ(m["health"].get<int64_t>(), (int64_t)1);
+        CHECK_EQ(m["queue"].get<int64_t>(), (int64_t)0);
+        CHECK(m["sources"].empty());
+        CHECK(m["importance"].get<double>() > 0);
+    }
+    const int64_t id = items.empty() ? 0 : items[0]["id"].get<int64_t>();
+    CHECK(s.update_medicine(med, json::parse(R"({"dose":"80 mg"})")));
+    CHECK_EQ(s.memory_item(id)["text"].get<std::string>(), std::string("Telma 80 mg, after breakfast"));
+    CHECK_EQ(s.upsert_medicine_memory(med), id);  // one memory per medicine
+    CHECK_EQ(s.memory_items(json::object()).size(), (size_t)1);
+    int64_t bare = s.add_medicine(json::parse(R"({"name":"Dolo"})"));
+    CHECK_EQ(s.memory_item(s.upsert_medicine_memory(bare))["text"].get<std::string>(), std::string("Dolo"));
+    CHECK(s.learned_memory("fact").empty());  // medicine memories are not Learned facts
+    CHECK(s.delete_medicine(med));
+    CHECK(s.memory_item(id).is_null());
+    CHECK(s.upsert_medicine_memory(med) < 0);
+}
+
+TEST(medicines_saved_before_memories_get_one_at_open) {
+    std::string p = make_v0();  // Amlodipine saved before the memory layer
+    for (int open = 0; open < 2; ++open) {
+        Store s(p);
+        CHECK(s.ok());
+        json meds = json::array();
+        for (const auto &m : s.memory_items(json::object()))
+            if (m["origin"] == "medicine") meds.push_back(m);
+        CHECK_EQ(meds.size(), (size_t)1);  // once, however often the store opens
+        if (meds.size() == 1) {
+            CHECK_EQ(meds[0]["text"].get<std::string>(), std::string("Amlodipine 5 mg, after dinner"));
+            CHECK(meds[0]["review"] == "kept");
+        }
+    }
+    drop_db(p);
 }

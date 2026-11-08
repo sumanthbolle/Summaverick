@@ -386,7 +386,7 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
     return true;
 }
 
-int g_sve_section_max_out = 512;
+int g_sve_section_max_out = 1024;
 bool g_sve_force_greedy = false;
 FILE *g_sve_token_log = nullptr;
 
@@ -415,7 +415,7 @@ char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *l
         const int kMaxOut = g_sve_section_max_out;
         const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
         const std::string prompt = llm.apply_template(
-            sys, sve::section_prompt(pieces, lang, sve::transcription_vocab_line(*ctx->store, 400)));
+            sys, sve::section_prompt(pieces, lang, sve::transcription_vocab_line(*ctx->store, 400), true));
         auto dump = [](const sve::json &j) { return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace)); };
         // A section that cannot fit the context with room to answer goes straight to the fallback.
         if (llm.count_tokens(prompt) + kMaxOut + 16 > llm.n_ctx) return dump(sve::fallback_section_summary(pieces));
@@ -434,7 +434,13 @@ char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *l
                 continue;
             }
             sve::json j;
-            if (sve::parse_section_summary(strip_thinking(out), starts, j)) return dump(j);
+            const std::string reply = strip_thinking(out);
+            if (sve::parse_section_summary(reply, starts, j)) return dump(j);
+            // Cut off inside "memories": the summary is kept and the memories are redone on their own later.
+            if (sve::salvage_summary(reply, starts, j)) {
+                sve_logf(1, "section summary attempt %d: memories cut off, summary kept", attempt + 1);
+                return dump(j);
+            }
             sve_logf(1, "section summary attempt %d did not parse", attempt + 1);
         }
         return dump(sve::fallback_section_summary(pieces));

@@ -29,15 +29,39 @@ std::vector<std::pair<size_t, size_t>> plan_sections(const std::vector<PieceRef>
 // e.g. "[[0,11],[11,22]]"; "[]" for no pieces or input that is not an array.
 std::string plan_sections_json(const std::string &pieces_json, int64_t end_sec_of_last, bool is_final);
 
-// Section summary JSON: {"title","topic","points":[{"text","start_sec"}],"terms":[],"hints":[]}.
+// Section summary JSON: {"title","topic","points":[{"text","start_sec"[,"type"]}],"terms":[],"hints":[]}, plus
+// "memories":[candidates] or "memories_missing":true. Notes and chapters read only title, topic and point text.
 using SectionPieces = std::vector<std::pair<int64_t, std::string>>;  // (start_sec, text)
 
+// The memories part of the combined shape line, inserted before its closing '}':
+// ,"memories":[{"type":…,"text":…,"who","to_whom","due_text","quote","start_sec","names":[{"as_said","as_written"}],
+// "numbers","dates","times"}].
+extern const char *kMemoryShape;
+// The memory rule lines ("- …\n" each) the combined prompt appends after "- Use only what was said. …".
+std::string memory_rules(const std::string &lang);
+
 // Instruction asking for that shape in `lang` ("te" -> Telugu, else English); each piece is marked [t=SEC].
-std::string section_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line);
+// with_memories = false is the summary-only prompt, byte for byte as before memories existed; true adds
+// kMemoryShape and memory_rules(lang) and nothing else.
+std::string section_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line,
+                           bool with_memories);
+// Memories only, same shape and rules, reply {"memories":[…]}: for sections summarised before memories
+// existed and when the combined call's memories are missing.
+std::string memory_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line);
 // Strips fences/thinking, parses the first JSON object, clamps each start_sec to the nearest piece start,
-// caps points at 6. False when there is no title or no point.
+// caps points at 6, keeps a point "type" that is one of the six memory types. "memories" holds
+// parse_memory_candidates of a "memories" array; anything else sets "memories_missing": true.
+// False when there is no title or no point.
 bool parse_section_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, nlohmann::json &out);
-// No-model summary: title = first 8 words, points = first sentence of up to 3 pieces, "fallback":true.
+// For output whose whole object does not parse (cut off inside "memories"): cuts at the top-level
+// ,"memories" key, closes the object and parses the summary alone, with "memories_missing": true.
+bool salvage_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, nlohmann::json &out);
+// The raw items of the first "memories" array that are whole objects, in order, even when the reply is cut off
+// inside the array (the cut item is left out). [] when there is no such array. Items still need
+// parse_memory_candidates and grounding.
+nlohmann::json complete_memory_items(const std::string &model_out);
+// No-model summary: title = first 8 words, points = first sentence of up to 3 pieces, "fallback":true,
+// "memories_missing":true.
 nlohmann::json fallback_section_summary(const SectionPieces &pieces);
 
 // Stored sections ([{"start_sec","summary":{...}}], as sve_note_sections returns) to chapters

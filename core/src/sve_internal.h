@@ -17,10 +17,53 @@
 #endif
 
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <memory>
+#include <string>
+#include <vector>
 
 // Logging: routes to the host callback (sve_set_log) or stderr.
 void sve_logf(int level, const char *fmt, ...);
+
+// C API helpers (sve_assistant.cpp, sve_brain.cpp). Strings returned to the host are malloc'd (sve_free_string).
+inline char *dup(const std::string &s) {
+    char *p = (char *)malloc(s.size() + 1);
+    if (!p) return nullptr;
+    memcpy(p, s.data(), s.size());
+    p[s.size()] = 0;
+    return p;
+}
+
+inline char *dump(const sve::json &j) { return dup(j.dump()); }
+
+// Runs f; any exception is logged and turned into the error value.
+template <class R, class F>
+inline R guard(const char *name, R err, F f) {
+    try {
+        return f();
+    } catch (const std::exception &e) {
+        sve_logf(2, "%s failed: %s", name, e.what());
+    } catch (...) {
+        sve_logf(2, "%s failed", name);
+    }
+    return err;
+}
+
+inline sve::json parse(const char *s) {
+    if (!s) return sve::json();
+    sve::json j = sve::json::parse(s, nullptr, false);
+    return j.is_discarded() ? sve::json() : j;
+}
+
+namespace sve {
+// Medicine names the person has or the model proposed from recordings (sve_assistant.cpp).
+std::vector<std::string> known_med_names(Store &st);
+}  // namespace sve
+
+// Test hook (smoke mode "memories"): called for every memory candidate sve_memories_from_section drops,
+// with the reason (sve::Grounded::reason, or "double_check_no") and the candidate JSON. NULL in the app.
+extern void (*g_sve_memory_drop)(int64_t note_id, int section_idx, const char *reason, const char *cand_json);
 
 // Test hook: output token cap of sve_section_summarize (smoke sets a tiny value to force the fallback).
 extern int g_sve_section_max_out;
