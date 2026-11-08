@@ -265,7 +265,9 @@ std::vector<std::string> name_words(const std::string &raw, const std::set<std::
         if (!canonical_facts(w).empty()) return;
         std::string lower = ascii_lower(w), bare;
         for (char c : lower) if (c != '\'') bare += c;
-        if (!written.count(bare) && (kCommon.count(lower) || (first && common_english_word(lower)))) return;
+        // Mid-sentence, a capitalised word is a name unless it is one of these; ordinary words only at a sentence start.
+        static const std::set<std::string> kAnywhere = {"i", "dr", "mr", "mrs", "ms", "sir", "madam", "rs", "inr", "ok", "okay"};
+        if (!written.count(bare) && (kAnywhere.count(lower) || (first && (kCommon.count(lower) || common_english_word(lower))))) return;
         out.push_back(w.substr(0, w.find('\'')));
     };
     for (char c : text) {
@@ -318,8 +320,11 @@ std::string keep_person(const std::string &who, const std::string &quote, const 
         size_t after = k + word_starts(form).size();
         std::string between = after < starts.size() ? before.substr(starts[after]) : "";
         const std::string wl = ascii_lower(w);
+        // Whole words only: "Ram" between is someone else even when the person is "Ramesh".
+        std::set<std::string> own;
+        for (size_t st : word_starts(wl)) { size_t e = wl.find(' ', st); own.insert(wl.substr(st, e == std::string::npos ? std::string::npos : e - st)); }
         for (const auto &nw : name_words(between, {}))
-            if (wl.find(ascii_lower(nw)) == std::string::npos) return "";
+            if (!own.count(ascii_lower(nw))) return "";
         for (const auto &o : others) {
             bool self = std::find(forms.begin(), forms.end(), o) != forms.end() || ascii_lower(o) == wl;
             if (!o.empty() && !self && name_said(o, between)) return "";
@@ -434,8 +439,16 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
     // Every name the text shows (a capitalised word that is not a common word) is said in the quote,
     // or is how a listed name is written and plausibly spells the quote's words for it.
     for (const auto &w : name_words(text, written_words(names))) {
-        if (name_said(w, quote)) continue;
         const std::string wl = ascii_lower(w);
+        // An ordinary word used as a name ("Will") must be said as a name: capitalised, whole word.
+        if (common_english_word(wl) || wl == "will" || wl == "may") {
+            bool cap = false;
+            for (size_t at = quote.find(w); at != std::string::npos && !cap; at = quote.find(w, at + 1)) {
+                auto edge = [](char c) { return !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')); };
+                cap = (at == 0 || edge(quote[at - 1])) && (at + w.size() >= quote.size() || edge(quote[at + w.size()]));
+            }
+            if (cap) continue;
+        } else if (name_said(w, quote)) continue;
         bool listed = std::any_of(names.begin(), names.end(), [&](const Name &n) {
             const Tokens ws = med_tokens(n.written, false);
             return std::find(ws.begin(), ws.end(), wl) != ws.end() && transliterates(n.written, n.said);

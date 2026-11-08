@@ -279,6 +279,25 @@ TEST(ground_who_before_quote_needs_no_other_name_between) {
     CHECK_EQ(g.row["to_whom"], "సురేష్");
 }
 
+TEST(ground_who_other_name_is_a_whole_word) {
+    // "Ram" between is someone else, even though "Ramesh" contains it.
+    SectionPieces p = {{0, "Ramesh said fine. Ram will pay 500 on Friday"}};
+    json c = cand("promise", "Pay 500 on Friday", "will pay 500 on Friday");
+    c["who"] = "Ramesh";
+    CHECK_EQ(ground(c, p).row["who"], "");
+    SectionPieces q = {{0, "ask Ravindra. Ravi will bring the chairs on Friday"}};
+    json d = cand("promise", "Bring the chairs on Friday", "will bring the chairs on Friday");
+    d["to_whom"] = "Ravindra";
+    CHECK_EQ(ground(d, q).row["to_whom"], "");
+}
+
+TEST(ground_common_word_name_mid_sentence_checked) {
+    SectionPieces p = {{0, "Suresh will bring the chairs for Kiran"}};
+    Grounded g = ground(cand("promise", "Suresh will bring the chairs for Will", "Suresh will bring the chairs for Kiran"), p);
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "text_name_not_in_quote");
+}
+
 TEST(ground_due_date_from_said_date) {
     SectionPieces p = {{0, "బిల్లు వచ్చే శుక్రవారం కడతాను"}};
     json c = cand("promise", "Pay the bill next Friday", "బిల్లు వచ్చే శుక్రవారం కడతాను");
