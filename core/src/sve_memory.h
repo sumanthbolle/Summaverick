@@ -26,9 +26,13 @@ json parse_memory_candidates(const json &arr);
 
 struct Grounded {
     bool ok = false;
-    std::string reason;  // why it was dropped: medicine, quote_not_found, field_not_in_quote:<kind>, text_not_in_quote
-    json row;            // type,text,who,to_whom,due_text,due_date,said_date,checked,confidence,health,
-                         // sources:[{start_sec,quote,conf}]
+    // Why it was dropped: medicine, quote_too_short, quote_not_found, field_not_in_quote:<kind>,
+    // text_not_in_quote, text_name_not_in_quote.
+    std::string reason;
+    // type,text,who,to_whom,due_text,due_date,said_date,checked,confidence,health,sources:[{start_sec,quote,conf}].
+    // sources[0].quote is the transcript's own words that matched, not the model's copy.
+    json row;
+    // Names, numbers, dates, promises, and every memory that could skip the review queue.
     bool needs_double_check = false;
 };
 
@@ -37,14 +41,19 @@ struct Grounded {
 Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std::vector<std::optional<double>> &piece_conf,
                        const std::string &said_ymd, const std::vector<std::string> &med_names, double low_conf_threshold);
 
-// Asks the model whether the quote says the memory, answered yes or no.
-std::string double_check_prompt(const std::string &memory_text, const std::string &quote);
+// Asks the model whether the quote says the memory (its text, who, to whom and deadline), answered yes or no.
+std::string double_check_prompt(const json &row);
+
+// The double_check value for a memory whose yes/no check was not run.
+constexpr int kNotDoubleChecked = -2;
 
 // 1 for yes/అవును, 0 for no/కాదు/లేదు, -1 otherwise. Takes text with thinking already stripped.
+// The caller drops a memory on 0.
 int parse_yes_no(const std::string &model_out);
 
-// True when the memory waits for the person: health, low confidence, an unclear double-check (-1),
-// a conflict, or direct-to-map not allowed.
+// True when the memory waits for the person: health, low confidence, a double-check that is not a
+// clear yes (-1, or kNotDoubleChecked), a conflict, or direct-to-map not allowed. Only a "yes" shows
+// a memory without review.
 bool goes_to_queue(const json &row, int double_check, bool direct_allowed);
 
 // Orders the map, recaps and practice; never hides or deletes. people_met_max: most notes any linked

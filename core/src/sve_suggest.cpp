@@ -781,10 +781,16 @@ json sanitize_topic_summary(const json &j) {
 }
 
 bool mentions_medicine(const std::string &text, const std::vector<std::string> &names) {
-    static const std::set<std::string> kWords = {"mg", "ml", "mcg", "iu", "tablet", "tablets", "capsule", "capsules",
+    static const std::set<std::string> kWords = {"mg", "mcg", "tablet", "tablets", "capsule", "capsules",
         "medicine", "medicines", "medication", "medications", "pill", "pills", "dose", "doses", "dosage", "syrup",
-        "injection", "injections", "tab", "tabs"};
-    for (const auto &t : norm_tokens(text)) if (kWords.count(t)) return true;
+        "injection", "injections"};
+    // Units that are also ordinary words ("the ML model", "a new tab") count only right after a number.
+    static const std::set<std::string> kAfterNumber = {"ml", "iu", "tab", "tabs"};
+    const std::vector<std::string> t = norm_tokens(text);
+    for (size_t i = 0; i < t.size(); ++i) {
+        if (kWords.count(t[i])) return true;
+        if (kAfterNumber.count(t[i]) && i > 0 && !t[i - 1].empty() && t[i - 1][0] >= '0' && t[i - 1][0] <= '9') return true;
+    }
     for (const char *w : {"మందు", "మాత్ర", "డోస్"}) if (text.find(w) != std::string::npos) return true;
     return !names_in_question(text, names).empty();
 }

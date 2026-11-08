@@ -2,6 +2,7 @@
 #include "check.h"
 #include "sve_health.h"
 #include "sve_memory.h"
+#include "sve_suggest.h"
 
 using namespace sve;
 using V = std::vector<std::string>;
@@ -84,7 +85,7 @@ TEST(ground_quote_not_found_drops) {
     CHECK_EQ(g.reason, "quote_not_found");
     g = ground(cand("fact", "x", ""), kTwo);
     CHECK(!g.ok);
-    CHECK_EQ(g.reason, "quote_not_found");
+    CHECK_EQ(g.reason, "quote_too_short");
 }
 
 TEST(ground_quote_across_two_pieces) {
@@ -96,7 +97,10 @@ TEST(ground_quote_across_two_pieces) {
     g = ground(cand("fact", "They had lunch", "then we had lunch"), kTwo);
     CHECK(g.ok);
     CHECK_EQ(g.row["sources"][0]["start_sec"], 58);
-    CHECK(!g.needs_double_check);
+    CHECK(g.needs_double_check);  // could be shown without review, so it needs a "yes"
+    // the stored quote is the transcript's words, not the model's spelling
+    g = ground(cand("fact", "They had lunch", "THEN we had lunch"), kTwo);
+    CHECK_EQ(g.row["sources"][0]["quote"], "then we had lunch");
 }
 
 TEST(ground_number_must_be_in_quote) {
@@ -121,8 +125,8 @@ TEST(ground_number_must_be_in_quote) {
 }
 
 TEST(ground_name_with_case_ending) {
-    SectionPieces p = {{12, "సాయంత్రం రవికి రిపోర్ట్ పంపుతాను"}};
-    json c = cand("promise", "Send the report to Ravi", "రవికి రిపోర్ట్ పంపుతాను");
+    SectionPieces p = {{12, "సరే సాయంత్రం రవికి రిపోర్ట్ పంపుతాను"}};
+    json c = cand("promise", "రవికి రిపోర్ట్ పంపాలి", "సాయంత్రం రవికి రిపోర్ట్ పంపుతాను");
     c["names"] = V{"రవి"};
     Grounded g = ground(c, p);
     CHECK(g.ok);
@@ -132,6 +136,40 @@ TEST(ground_name_with_case_ending) {
     g = ground(c, p);
     CHECK(!g.ok);
     CHECK_EQ(g.reason, "field_not_in_quote:name");
+    // A transliterated name in the text alone is dropped too.
+    c["names"] = V{"రవి"};
+    c["text"] = "Send the report to Ravi";
+    g = ground(c, p);
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "text_name_not_in_quote");
+}
+
+TEST(ground_multiword_name_is_one_run) {
+    SectionPieces p = {{0, "Ravi said Kumar comes on Monday"}};
+    json c = cand("fact", "Kumar comes on Monday", "Ravi said Kumar comes on Monday");
+    c["names"] = V{"Ravi Kumar"};
+    Grounded g = ground(c, p);
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "field_not_in_quote:name");
+    c["names"] = V{"Kumar"};
+    CHECK(ground(c, p).ok);
+}
+
+TEST(ground_text_names_must_be_said) {
+    SectionPieces p = {{0, "Suresh will pay tomorrow evening"}};
+    Grounded g = ground(cand("promise", "Kiran will pay tomorrow", "Suresh will pay tomorrow evening"), p);
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "text_name_not_in_quote");
+    CHECK(ground(cand("promise", "Suresh will pay tomorrow", "Suresh will pay tomorrow evening"), p).ok);
+}
+
+TEST(ground_short_quote_drops) {
+    Grounded g = ground(cand("fact", "Ravi is moving to Delhi", "okay"), {{0, "okay"}});
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "quote_too_short");
+    g = ground(cand("fact", "They had lunch", "we had lunch"), kTwo);  // three words
+    CHECK(!g.ok);
+    CHECK_EQ(g.reason, "quote_too_short");
 }
 
 TEST(ground_who_never_guessed) {
@@ -145,12 +183,34 @@ TEST(ground_who_never_guessed) {
     c["who"] = "I";                       // a pronoun must be in the quote itself
     g = ground(c, kTwo);
     CHECK_EQ(g.row["who"], "");
-    c["quote"] = "we had lunch";
+    c["quote"] = "then we had lunch";
     c["text"] = "They had lunch";
     c["who"] = "we";
     g = ground(c, kTwo);
     CHECK(g.ok);
     CHECK_EQ(g.row["who"], "we");
+}
+
+TEST(ground_who_before_quote_needs_no_other_name_between) {
+    SectionPieces p = {{0, "Ravi said fine. Suresh will pay 500 on Friday"}};
+    json c = cand("promise", "Pay 500 on Friday", "will pay 500 on Friday");
+    c["who"] = "Ravi";
+    Grounded g = ground(c, p);
+    CHECK(g.ok);
+    CHECK_EQ(g.row["who"], "");
+    c["who"] = "Suresh";
+    g = ground(c, p);
+    CHECK_EQ(g.row["who"], "Suresh");
+    // A listed name between counts too, also in Telugu.
+    SectionPieces t = {{0, "రవి చెప్పాడు సురేష్ ఐదు వందలు శుక్రవారం ఇస్తాడు"}};
+    json d = cand("promise", "శుక్రవారం ఐదు వందలు ఇవ్వాలి", "ఐదు వందలు శుక్రవారం ఇస్తాడు");
+    d["who"] = "రవి";
+    d["names"] = V{};
+    d["to_whom"] = "సురేష్";
+    g = ground(d, t);
+    CHECK(g.ok);
+    CHECK_EQ(g.row["who"], "");
+    CHECK_EQ(g.row["to_whom"], "సురేష్");
 }
 
 TEST(ground_due_date_from_said_date) {
@@ -193,12 +253,21 @@ TEST(ground_low_confidence_marks_low) {
     CHECK_EQ(g.row["confidence"], "high");
 }
 
+TEST(mentions_medicine_units_need_a_number) {
+    CHECK(!mentions_medicine("The ML model has 2 to 5 layers", {}));
+    CHECK(!mentions_medicine("Open a new tab", {}));
+    CHECK(mentions_medicine("5 ml twice daily", {}));
+    CHECK(mentions_medicine("two tabs after food", {}));
+    CHECK(health_keywords("The ML model has 2 to 5 layers", {}) == HealthFlag::none);
+}
+
 TEST(ground_health_flag) {
     SectionPieces p = {{0, "doctor said come back on Monday"}};
     Grounded g = ground(cand("fact", "Come back to the doctor on Monday", "doctor said come back on Monday"), p);
     CHECK(g.ok);
     CHECK_EQ(g.row["health"], 1);
     CHECK(goes_to_queue(g.row, 1, true));
+    CHECK(!g.needs_double_check);  // always reviewed by the person, no names, numbers or promise
 }
 
 TEST(queue_rule) {
@@ -206,6 +275,7 @@ TEST(queue_rule) {
     CHECK(!goes_to_queue(clean, 1, true));
     CHECK(goes_to_queue(clean, 1, false));
     CHECK(goes_to_queue(clean, -1, true));
+    CHECK(goes_to_queue(clean, kNotDoubleChecked, true));  // never shown directly without a "yes"
     json h = clean; h["health"] = 1;
     CHECK(goes_to_queue(h, 1, true));
     json low = clean; low["confidence"] = "low";
@@ -235,10 +305,16 @@ TEST(importance_orders_promise_over_idea_and_decays) {
 }
 
 TEST(double_check_prompt_has_both) {
-    std::string s = double_check_prompt("Ravi sends the report", "Ravi will send the report");
+    json row = {{"text", "Pay Suresh 500"}, {"who", "Ravi"}, {"to_whom", "Suresh"}, {"due_text", "వచ్చే శుక్రవారం"},
+                {"due_date", "2026-11-13"}, {"said_date", "2026-11-06"},
+                {"sources", json::array({{{"quote", "Ravi will pay Suresh 500 వచ్చే శుక్రవారం"}}})}};
+    std::string s = double_check_prompt(row);
     CHECK(s.find("Does the quote say this? Answer yes or no.") != std::string::npos);
-    CHECK(s.find("Ravi sends the report") != std::string::npos);
-    CHECK(s.find("Ravi will send the report") != std::string::npos);
+    CHECK(s.find("Pay Suresh 500") != std::string::npos);
+    CHECK(s.find("Ravi will pay Suresh 500") != std::string::npos);
+    CHECK(s.find("Who: Ravi") != std::string::npos);
+    CHECK(s.find("To whom: Suresh") != std::string::npos);
+    CHECK(s.find("2026-11-13") != std::string::npos);
 }
 
 TEST(parse_yes_no_variants) {

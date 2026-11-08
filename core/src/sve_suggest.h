@@ -121,7 +121,7 @@ bool filter_topic_summary(json &summary, const std::vector<std::string> &names);
 // {"summary":str,"key_terms":[{"term","meaning"}],"quiz":[{"q","a"}]} with only valid entries.
 json sanitize_topic_summary(const json &j);
 
-// True when text mentions a dose unit (mg, ml, ...), a medicine word (tablet, medicine, pill, dose,
+// True when text mentions a dose unit (mg, mcg; ml, iu, tab only right after a number), a medicine word (tablet, medicine, pill, dose,
 // మందు, మాత్ర, డోస్, ...) or one of the given medicine names.
 bool mentions_medicine(const std::string &text, const std::vector<std::string> &names);
 

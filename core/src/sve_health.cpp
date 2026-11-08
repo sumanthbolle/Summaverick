@@ -27,8 +27,8 @@ const Words &kLatinHealth() {
         "diclofenac", "aceclofenac", "ecosprin", "clopidogrel", "warfarin", "antibiotic", "antibiotics",
         "painkiller", "painkillers",
         // dose and timing
-        "tablet", "tablets", "tab", "tabs", "pill", "pills", "capsule", "capsules", "medicine", "medicines",
-        "medication", "medications", "dose", "doses", "dosage", "overdose", "mg", "ml", "mcg", "syrup", "injection",
+        "tablet", "tablets", "pill", "pills", "capsule", "capsules", "medicine", "medicines",
+        "medication", "medications", "dose", "doses", "dosage", "overdose", "mg", "mcg", "syrup", "injection",
         "injections", "prescription", "prescribed", "how many times", "how often", "before food", "after food",
         "before meals", "after meals", "empty stomach",
         // side effects

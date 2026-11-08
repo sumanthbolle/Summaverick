@@ -38,14 +38,18 @@ bool in_run(const Tokens &hay, const std::string &words) {
     return !t.empty() && contains_run(hay, t);
 }
 
-// Byte offset in `scope` of the word where the first occurrence of `q` (match tokens) starts.
-size_t run_start(const std::string &scope, const Tokens &q) {
-    std::vector<size_t> starts;  // word starts
-    for (size_t i = 0; i < scope.size(); ++i) {
-        bool space = scope[i] == ' ' || scope[i] == '\t' || scope[i] == '\n' || scope[i] == '\r';
-        bool prev_space = i == 0 || scope[i - 1] == ' ' || scope[i - 1] == '\t' || scope[i - 1] == '\n' || scope[i - 1] == '\r';
-        if (!space && prev_space) starts.push_back(i);
-    }
+bool is_space(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+
+std::vector<size_t> word_starts(const std::string &s) {
+    std::vector<size_t> out;
+    for (size_t i = 0; i < s.size(); ++i)
+        if (!is_space(s[i]) && (i == 0 || is_space(s[i - 1]))) out.push_back(i);
+    return out;
+}
+
+// Bytes [start, end) of `scope` holding the first occurrence of `q` (match tokens), cut at word starts.
+std::pair<size_t, size_t> run_span(const std::string &scope, const Tokens &q) {
+    const std::vector<size_t> starts = word_starts(scope);
     size_t end = scope.size();
     for (size_t p : starts)
         if (p > 0 && contains_run(match_tokens(scope.substr(0, p)), q)) { end = p; break; }
@@ -54,7 +58,8 @@ size_t run_start(const std::string &scope, const Tokens &q) {
         if (p >= end) break;
         if (contains_run(match_tokens(scope.substr(p, end - p)), q)) start = p;
     }
-    return start;
+    while (end > start && is_space(scope[end - 1])) --end;
+    return {start, end};
 }
 
 // Up to `n` bytes of `s` before `pos`, starting on a UTF-8 character boundary.
@@ -62,6 +67,59 @@ std::string bytes_before(const std::string &s, size_t pos, size_t n) {
     size_t from = pos > n ? pos - n : 0;
     while (from < pos && (static_cast<unsigned char>(s[from]) & 0xC0) == 0x80) ++from;
     return s.substr(from, pos - from);
+}
+
+// A name said in `text` as written: its words as one adjacent run, or its last word with a Telugu case
+// ending and its other words directly before. Stricter than name_in (no word window).
+bool name_said(const std::string &name, const std::string &text) {
+    Tokens n = med_tokens(nfc_clean(name), false), q = med_tokens(nfc_clean(text), false);
+    if (n.empty()) return false;
+    if (contains_run(q, n)) return true;
+    const std::string last = n.back();
+    n.pop_back();
+    for (size_t i = n.size(); i < q.size(); ++i) {
+        const std::string &w = q[i];
+        if (w.size() <= last.size() || w.compare(0, last.size(), last) != 0) continue;
+        if (std::find(kTeluguCaseEndings.begin(), kTeluguCaseEndings.end(), w.substr(last.size())) ==
+            kTeluguCaseEndings.end())
+            continue;
+        if (std::equal(n.begin(), n.end(), q.begin() + (i - n.size()))) return true;
+    }
+    return false;
+}
+
+// Capitalised Latin words that are not common words: the names, places and labels a text names.
+// Weekdays and months are left to the canonical-facts check.
+std::vector<std::string> name_words(const std::string &text) {
+    static const std::set<std::string> kCommon = {
+        "i", "a", "an", "the", "we", "he", "she", "they", "it", "you", "me", "us", "him", "her", "them", "my", "our",
+        "your", "his", "their", "its", "this", "that", "these", "those", "there", "here", "today", "tomorrow",
+        "yesterday", "tonight", "and", "but", "or", "so", "if", "then", "also", "not", "no", "yes", "ok", "okay",
+        "may", "will", "would", "should", "shall", "can", "could", "must", "need", "needs", "do", "does", "did",
+        "is", "are", "was", "were", "be", "been", "has", "have", "had", "who", "what", "when", "where", "why", "how",
+        "which", "whether", "next", "last", "every", "each", "all", "some", "any", "one", "after", "before", "by",
+        "on", "in", "at", "for", "to", "from", "with", "about", "dr", "mr", "mrs", "ms", "sir", "madam", "rs", "inr",
+        "pay", "paid", "send", "sent", "call", "bring", "buy", "meet", "ask", "asked", "check", "book", "finish",
+        "submit", "return", "visit", "take", "give", "get", "make", "go", "come", "tell", "told", "remember",
+        "discuss", "plan", "prepare", "review", "fix", "order", "collect", "share", "email", "write", "read",
+        "start", "stop", "keep", "move", "find", "try", "learn", "talk", "see", "look", "use", "decide", "decided",
+        "promise", "promised", "said", "say", "agreed", "agree", "follow", "renew", "clean", "repair", "transfer",
+    };
+    std::vector<std::string> out;
+    std::string cur;
+    auto flush = [&] {
+        bool digit = std::any_of(cur.begin(), cur.end(), [](char c) { return c >= '0' && c <= '9'; });
+        if (!cur.empty() && cur[0] >= 'A' && cur[0] <= 'Z' && !digit && !kCommon.count(ascii_lower(cur)) &&
+            canonical_facts(cur).empty())
+            out.push_back(cur);
+        cur.clear();
+    };
+    for (char c : text) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) cur += c;
+        else flush();
+    }
+    flush();
+    return out;
 }
 
 bool is_pronoun(const std::string &who) {
@@ -72,13 +130,27 @@ bool is_pronoun(const std::string &who) {
     return kPronouns.count(ascii_lower(nfc_clean(trim_copy(who)))) > 0;
 }
 
-// A spoken person is kept only when the recording says it: a name in the quote or just before it,
-// a pronoun in the quote itself.
-std::string keep_person(const std::string &who, const std::string &quote, const std::string &before) {
+// A spoken person is kept only when the recording says it: in the quote, or (a name, not a pronoun)
+// just before it with no other name in between. `others`: the candidate's other names.
+std::string keep_person(const std::string &who, const std::string &quote, const std::string &before,
+                        const std::vector<std::string> &others) {
     std::string w = trim_copy(who);
     if (w.empty()) return "";
-    if (name_in(w, quote)) return w;
-    if (!is_pronoun(w) && !before.empty() && name_in(w, before)) return w;
+    if (name_said(w, quote)) return w;
+    if (is_pronoun(w)) return "";
+    const std::vector<size_t> starts = word_starts(before);
+    for (size_t k = starts.size(); k-- > 0;) {
+        if (!name_said(w, before.substr(starts[k]))) continue;
+        // The last place it is said: everything after its words must name nobody else.
+        size_t words = word_starts(w).size(), after = k + words;
+        std::string between = after < starts.size() ? before.substr(starts[after]) : "";
+        const std::string wl = ascii_lower(w);
+        for (const auto &nw : name_words(between))
+            if (wl.find(ascii_lower(nw)) == std::string::npos) return "";
+        for (const auto &o : others)
+            if (!o.empty() && ascii_lower(o) != wl && name_said(o, between)) return "";
+        return w;
+    }
     return "";
 }
 
@@ -126,13 +198,16 @@ json parse_memory_candidates(const json &arr) {
 Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std::vector<std::optional<double>> &piece_conf,
                        const std::string &said_ymd, const std::vector<std::string> &med_names, double low_conf_threshold) {
     Grounded g;
-    const std::string type = jstr(cand, "type"), text = jstr(cand, "text"), quote = jstr(cand, "quote");
+    const std::string type = jstr(cand, "type"), text = jstr(cand, "text"), given_quote = jstr(cand, "quote");
 
     // 1. Medicines have their own table and rules.
-    if (mentions_medicine(text + " " + quote, med_names)) { g.reason = "medicine"; return g; }
+    if (mentions_medicine(text + " " + given_quote, med_names)) { g.reason = "medicine"; return g; }
+
+    // A quote of a word or two ("okay") cannot support a memory.
+    if (med_tokens(nfc_clean(given_quote)).size() < 4) { g.reason = "quote_too_short"; return g; }
 
     // 2. The quote is said in the section: inside one piece, or across one piece boundary.
-    const Tokens qtok = match_tokens(quote);
+    const Tokens qtok = match_tokens(given_quote);
     std::string joined;
     std::vector<size_t> offset;
     for (const auto &p : pieces) {
@@ -148,6 +223,12 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
             if (contains_run(match_tokens(pieces[i].second + " " + pieces[i + 1].second), qtok)) { first = i; count = 2; }
     }
     if (!count) { g.reason = "quote_not_found"; return g; }
+    // From here on the quote is the transcript's own span of words, not the model's copy of it.
+    std::string scope = pieces[first].second;
+    if (count == 2) scope += " " + pieces[first + 1].second;
+    const auto span = run_span(scope, qtok);
+    std::string quote = trim_copy(scope.substr(span.first, span.second - span.first));
+    if (quote.empty()) quote = given_quote;
 
     // 3. Every name, number, date and time the memory relies on is in the quote.
     json checked = json::array();
@@ -157,7 +238,7 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
         for (const auto &v : jarr(cand, f.key)) {
             std::string s = v.is_string() ? trim_copy(v.get<std::string>()) : "";
             if (s.empty()) continue;
-            bool ok = std::string(f.kind) == "name" ? name_in(s, quote) : in_run(qtok, s);
+            bool ok = std::string(f.kind) == "name" ? name_said(s, quote) : in_run(qtok, s);
             if (!ok) { g.reason = std::string("field_not_in_quote:") + f.kind; return g; }
             checked.push_back({{"kind", f.kind}, {"text", s}});
         }
@@ -167,13 +248,19 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
     for (const auto &t : canonical_facts(quote)) ++have[t];
     for (const auto &t : canonical_facts(text))
         if (--have[t] < 0) { g.reason = "text_not_in_quote"; return g; }
+    // Every name the text shows (a capitalised word that is not a common word) is said in the quote.
+    for (const auto &w : name_words(text))
+        if (!name_said(w, quote)) { g.reason = "text_name_not_in_quote"; return g; }
 
     // 5. who / to_whom only when said.
-    std::string scope = pieces[first].second;
-    if (count == 2) scope += " " + pieces[first + 1].second;
-    const std::string before = bytes_before(joined, offset[first] + run_start(scope, qtok), 80);
-    const std::string who = keep_person(jstr(cand, "who"), quote, before);
-    const std::string to_whom = keep_person(jstr(cand, "to_whom"), quote, before);
+    const std::string before = bytes_before(joined, offset[first] + span.first, 80);
+    std::vector<std::string> names;
+    for (const auto &v : jarr(cand, "names")) if (v.is_string()) names.push_back(trim_copy(v.get<std::string>()));
+    std::vector<std::string> others_w = names, others_t = names;
+    others_w.push_back(jstr(cand, "to_whom"));
+    others_t.push_back(jstr(cand, "who"));
+    const std::string who = keep_person(jstr(cand, "who"), quote, before, others_w);
+    const std::string to_whom = keep_person(jstr(cand, "to_whom"), quote, before, others_t);
 
     // 6. A deadline only in the quote's words, resolved against the day it was said.
     std::string due_text = trim_copy(jstr(cand, "due_text"));
@@ -197,14 +284,25 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
              {"checked", checked}, {"confidence", low ? "low" : "high"}, {"health", health ? 1 : 0},
              {"sources", json::array({{{"start_sec", pieces[first].first}, {"quote", quote},
                                        {"conf", min_conf ? json(*min_conf) : json(nullptr)}}})}};
-    // 9. Names, numbers, dates and promises get the yes/no check.
-    g.needs_double_check = !checked.empty() || type == "promise";
+    // 9. Names, numbers, dates and promises get the yes/no check, and so does every memory that could
+    // be shown without the person's review (only a "yes" lets it skip the queue).
+    g.needs_double_check = !checked.empty() || type == "promise" || !goes_to_queue(g.row, 1, true);
     return g;
 }
 
-std::string double_check_prompt(const std::string &memory_text, const std::string &quote) {
-    return "Quote: \"" + quote + "\"\nMemory: \"" + memory_text +
-           "\"\nDoes the quote say this? Answer yes or no.";
+std::string double_check_prompt(const json &row) {
+    std::string quote;
+    const json src = jarr(row, "sources");
+    if (!src.empty() && src[0].is_object()) quote = jstr(src[0], "quote");
+    std::string claim = "Memory: \"" + jstr(row, "text") + "\"";
+    if (!jstr(row, "who").empty()) claim += "\nWho: " + jstr(row, "who");
+    if (!jstr(row, "to_whom").empty()) claim += "\nTo whom: " + jstr(row, "to_whom");
+    if (!jstr(row, "due_text").empty()) {
+        claim += "\nBy: " + jstr(row, "due_text");
+        if (!jstr(row, "due_date").empty())
+            claim += " (" + jstr(row, "due_date") + ", said on " + jstr(row, "said_date") + ")";
+    }
+    return "Quote: \"" + quote + "\"\n" + claim + "\nDoes the quote say this? Answer yes or no.";
 }
 
 int parse_yes_no(const std::string &model_out) {
@@ -223,7 +321,7 @@ int parse_yes_no(const std::string &model_out) {
 
 bool goes_to_queue(const json &row, int double_check, bool direct_allowed) {
     auto conflict = row.find("conflict_with");
-    return truthy(row, "health") || jstr(row, "confidence") == "low" || double_check == -1 ||
+    return truthy(row, "health") || jstr(row, "confidence") == "low" || double_check != 1 ||
            (conflict != row.end() && !conflict->is_null()) || !direct_allowed;
 }
 
