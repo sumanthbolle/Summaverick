@@ -324,6 +324,8 @@ int sve_memory_review(sve_ctx *ctx, int64_t id, const char *state) {
         const std::string s = state;
         if (s != "kept" && s != "wrong") return -1;
         sve::Store &st = *ctx->store;
+        json row = st.memory_item(id);
+        if (!row.is_object() || jstr(row, "origin") == "medicine") return -1;  // follows the saved medicine
         if (!st.update_memory_item(id, {{"review", s}, {"queue", 0}})) return -1;
         return refresh_importance(st, id) ? 0 : -1;
     });

@@ -771,7 +771,8 @@ static void run_api_memories(sve_ctx *ctx) {
     const int64_t mmid = mm.value("id", (int64_t)0);
     expect(sve_medicine_save(ctx, (R"({"id":)" + std::to_string(med) + R"(,"dose":"80 mg"})").c_str()) == med &&
            take(sve_memory_get(ctx, mmid))["text"] == "Telma 80 mg, after breakfast", "medicine memory follows a dose change");
-    expect(sve_memory_edit(ctx, mmid, "Telma 20 mg") == -1 && sve_memory_remove(ctx, mmid) == -1, "medicine memory is changed by the medicine only");
+    expect(sve_memory_edit(ctx, mmid, "Telma 20 mg") == -1 && sve_memory_remove(ctx, mmid) == -1 &&
+               sve_memory_review(ctx, mmid, "wrong") == -1, "medicine memory is changed by the medicine only");
     expect(sve_medicine_delete(ctx, med) == 0 && take(sve_memory_get(ctx, mmid)).is_null(), "medicine delete removes its memory");
 
     // A recording deleted mid-way: its memories go, the next call for it is -1.

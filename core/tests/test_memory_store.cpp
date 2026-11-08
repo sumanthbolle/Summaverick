@@ -627,6 +627,7 @@ TEST(medicine_memory_follows_the_saved_medicine) {
     int64_t bare = s.add_medicine(json::parse(R"({"name":"Dolo"})"));
     CHECK_EQ(s.memory_item(s.upsert_medicine_memory(bare))["text"].get<std::string>(), std::string("Dolo"));
     CHECK(s.learned_memory("fact").empty());  // medicine memories are not Learned facts
+    CHECK(s.search_memory_items("Telma", 10).empty());  // nor reach prompts through memory search
     CHECK(s.delete_medicine(med));
     CHECK(s.memory_item(id).is_null());
     CHECK(s.upsert_medicine_memory(med) < 0);

@@ -804,7 +804,7 @@ json Store::search_memory_items(const std::string &q, int limit) {
     if (fq.empty()) return json::array();
     json rows = query_rows((std::string("SELECT ") + kMemoryCols +
                             " FROM memories_fts f JOIN memories m ON m.id=f.rowid WHERE memories_fts MATCH ? "
-                            "AND m.review<>'wrong' AND m.superseded_by IS NULL AND m.queue=0 ORDER BY bm25(memories_fts) LIMIT ?")
+                            "AND m.review<>'wrong' AND m.origin<>'medicine' AND m.superseded_by IS NULL AND m.queue=0 ORDER BY bm25(memories_fts) LIMIT ?")
                                .c_str(),
                            {fq, limit});
     json out = json::array();
@@ -919,7 +919,8 @@ int64_t Store::add_medicine(const json &m) {
                   {jget(m, "name", ""), jget(m, "dose"), when, jtext(jget(m, "times", json::array())),
                    jget(m, "repeat", "daily"), jget(m, "until_date"), now_j()}, &id);
     if (!ok) return -1;
-    return upsert_medicine_memory(id) >= 0 ? id : -1;
+    upsert_medicine_memory(id);  // the medicine is saved either way; a failed memory is repaired at the next open
+    return id;
 }
 
 json Store::medicines() {
@@ -942,8 +943,9 @@ bool Store::update_medicine(int64_t id, const json &m) {
     if (m.contains("times")) add("times", jtext(m["times"], false));
     if (sets.empty()) return false;
     binds.push_back(id);
-    return run(("UPDATE medicines SET " + sets + " WHERE id=?").c_str(), binds) && sqlite3_changes(db_) > 0 &&
-           upsert_medicine_memory(id) >= 0;
+    if (!run(("UPDATE medicines SET " + sets + " WHERE id=?").c_str(), binds) || sqlite3_changes(db_) == 0) return false;
+    upsert_medicine_memory(id);  // the update is saved either way; a failed memory is repaired at the next open
+    return true;
 }
 
 bool Store::delete_medicine(int64_t id) {
