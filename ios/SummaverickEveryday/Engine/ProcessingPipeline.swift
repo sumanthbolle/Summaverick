@@ -118,6 +118,11 @@ final class ProcessingPipeline {
     private(set) var memoryWork = false
     /// Set by the person's action (any thread reads it): the memory section in flight is cancelled, the run stops.
     @ObservationIgnored private let memoryStop = AtomicFlag()
+    /// Notes whose memory model call failed (-3) in this launch: backfills (in front and overnight) skip them, so one
+    /// such note never holds up the others. Tried again at the next launch.
+    @ObservationIgnored private var memoryFailed: Set<Int64> = []
+    /// A person's action on this note could not start (other work still ran): the note shows the busy line.
+    private(set) var busyNotice: Int64?
     /// Set when the app stops being active (read on any thread): cancels a memory run on the GPU before iOS refuses
     /// GPU work in the background, where a failed reply would mark the section done with no memories.
     @ObservationIgnored private let leftFront = AtomicFlag()
@@ -296,8 +301,7 @@ final class ProcessingPipeline {
 
     /// Re-runs the AI stage for an existing note (resume after interruption, or after a model change).
     func regenerate(noteID: Int64) async {
-        await yieldMemories()
-        guard !isWorking else { return }
+        guard await personMayStart(noteID) else { return }
         starting = true
         defer { starting = false }
         guard let note = await CoreEngine.shared.note(noteID) else { unmarkOvernight(noteID); return }   // deleted
@@ -369,8 +373,7 @@ final class ProcessingPipeline {
     /// on success.
     @discardableResult
     func regenerateOutput(noteID id: Int64, kind: OutputKind?) async -> Previous? {
-        await yieldMemories()
-        guard !isWorking else { return nil }
+        guard await personMayStart(id) else { return nil }
         starting = true
         defer { starting = false }
         let request = Regeneration(noteID: id, kind: kind)
@@ -465,8 +468,7 @@ final class ProcessingPipeline {
 
     /// "Try again" on a note's failed or paused banner: the usual resume path, now.
     func tryAgain(noteID id: Int64) async {
-        await yieldMemories()
-        guard !isWorking else { return }
+        guard await personMayStart(id) else { return }
         interrupted.remove(id)
         heatPaused.remove(id)
         await regenerate(noteID: id)
@@ -786,13 +788,14 @@ final class ProcessingPipeline {
     /// overnight for this note; a recording starting, critical heat or the cut-off cancels the section in flight
     /// (nothing of it is stored; it stays due). It never sets a failure, pauses or queues the note.
     /// quiet: a backfill, not the end of the note's own run (the stage goes back to idle when it ends).
-    /// Returns true when every section has its memories, false when the note is gone (deleted meanwhile: the run
-    /// ends quietly), nil when it stopped (the sections left are done later, idle in front or overnight).
+    /// Returns .finished when every section has its memories; .gone when the note is gone (deleted meanwhile: the
+    /// run ends quietly); .failed when a section's model call failed (-3: the note is skipped for the rest of this
+    /// launch, other notes go on); .stopped for a real stop, or no model (the sections left are done later).
     @discardableResult
-    private func writeMemories(noteID id: Int64, quiet: Bool) async -> Bool? {
+    private func writeMemories(noteID id: Int64, quiet: Bool) async -> MemoryPass.Outcome {
         let engine = CoreEngine.shared
         let due = await engine.memorySectionsDue(id)
-        guard !due.isEmpty else { return true }
+        guard !due.isEmpty else { return .finished }
         let wasMemoryWork = memoryWork
         memoryWork = true
         defer {
@@ -820,19 +823,23 @@ final class ProcessingPipeline {
             })
         switch outcome {
         case .finished:
-            return true
+            return .finished
         case .stopped:
             NSLog("[sve] note %lld: memories stopped after %ld of %ld sections; the rest wait", id, finished, due.count)
             memoriesMayBeDue = true
-            return nil
+            return .stopped
+        case .failed:
+            NSLog("[sve] note %lld: the memory call failed; skipped until the next launch", id)
+            memoryFailed.insert(id)
+            return .failed
         case .gone:
             if await engine.note(id) == nil {
                 NSLog("[sve] note %lld is gone; not writing its memories", id)
-                return false
+                return .gone
             }
             NSLog("[sve] note %lld: memories could not be written now", id)
             memoriesMayBeDue = true
-            return nil
+            return .stopped
         }
     }
 
@@ -896,7 +903,8 @@ final class ProcessingPipeline {
         memoryStop.set(false)
         defer { starting = false; memoryWork = false }
         let limit = PersonFirst.backfillNotes(inFront: overnightRun == nil)
-        let ids = await CoreEngine.shared.notesNeedingMemories(limit: limit)
+        let needing = await CoreEngine.shared.notesNeedingMemories(limit: limit + memoryFailed.count)
+        let ids = MemoryPass.backfillNotes(needing, skipping: memoryFailed, limit: limit)
         guard !ids.isEmpty else { memoriesMayBeDue = false; return }
         guard !LiveTranscriber.shared.isRecording, !Task.isCancelled, !memoryStop.isSet else { return }
         beginBackground()
@@ -905,7 +913,8 @@ final class ProcessingPipeline {
         var allDone = ids.count < limit
         for id in ids {
             activeNoteID = id
-            if await writeMemories(noteID: id, quiet: true) == nil { allDone = false; break }
+            // A failed note is skipped (memoryFailed) and the next goes on; a real stop ends the backfill.
+            guard MemoryPass.backfillGoesOn(after: await writeMemories(noteID: id, quiet: true)) else { allDone = false; break }
         }
         if allDone { memoriesMayBeDue = false }
         stage = .idle
@@ -913,22 +922,39 @@ final class ProcessingPipeline {
 
     /// The person asked for something (Ask, Regenerate, Try again, Generate notes, a topic summary): memory work
     /// stops at once (the section in flight is cancelled, stores nothing and stays due) and the run it belongs to
-    /// is waited for, at most 30 s, so the action then goes ahead. Nothing happens for any other work.
-    func yieldMemories() async {
-        guard PersonFirst.action(working: isWorking, memoriesOnly: memoryWork) == .stopMemoriesThenStart else { return }
+    /// is waited for, at most 30 s, so the action then goes ahead. Nothing happens for any other work. False only
+    /// when it waited and the work had not ended after 30 s (e.g. a model reload that cannot be cancelled): callers
+    /// then show their busy notice. Callers still check `isWorking` themselves before their model call.
+    @discardableResult
+    func yieldMemories() async -> Bool {
+        guard PersonFirst.action(working: isWorking, memoriesOnly: memoryWork) == .stopMemoriesThenStart else { return true }
         NSLog("[sve] the person asked for something: memories stop")
         memoryStop.set(true)
         let end = Date().addingTimeInterval(30)
         while isWorking, Date() < end {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
+        return !isWorking
+    }
+
+    /// Before a person's action on a note: memory work yields. False when other work still runs; the note then shows
+    /// the busy line for a few seconds instead of the tap doing nothing.
+    private func personMayStart(_ id: Int64) async -> Bool {
+        if busyNotice == id { busyNotice = nil }
+        await yieldMemories()
+        guard isWorking else { return true }
+        busyNotice = id
+        Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            if self.busyNotice == id { self.busyNotice = nil }
+        }
+        return false
     }
 
     /// "Find reminders and tasks" on a note that was never extracted (an older recording): extraction
     /// only, with the same busy guard as a recording.
     func findReminders(noteID: Int64) async {
-        await yieldMemories()
-        guard !isWorking else { return }
+        guard await personMayStart(noteID) else { return }
         starting = true
         defer { starting = false }
         guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
@@ -1162,18 +1188,20 @@ final class ProcessingPipeline {
     // MARK: overnight
 
     /// After Stop, before the run goes on: when the work left (the audio not yet transcribed, the sections not
-    /// yet written, the three outputs, the memories of every section) is long, the note offers to finish overnight.
+    /// yet written, the three outputs; never the memories) is long, the note offers to finish overnight.
     private func offerOvernightIfLong(_ id: Int64, audio: URL, duration: Int64) {
         let s = TranscriptSidecar.load(audioPath: audio.path)
         let written = NoteSection.validPrefix(s.sections, pieceCount: s.pieces.count)
         let dur = Int(clamping: max(0, duration))
-        let minutes = WorkEstimate.minutesLeft(
-            audioSecondsLeft: dur - Int(s.transcribedSeconds),
-            sectionsLeft: WorkEstimate.sectionsLeft(durationSeconds: dur, coveredSeconds: written.last?.endSec ?? 0),
-            outputsLeft: OutputKind.allCases.count,
-            memorySectionsLeft: WorkEstimate.sectionsLeft(durationSeconds: dur, coveredSeconds: 0))   // every section's memories
-        NSLog("[sve] note %lld: about %ld min of work left", id, minutes)
-        if WorkEstimate.offersOvernight(minutesLeft: minutes) { overnightOffer = id }
+        let audioLeft = dur - Int(s.transcribedSeconds)
+        let sectionsLeft = WorkEstimate.sectionsLeft(durationSeconds: dur, coveredSeconds: written.last?.endSec ?? 0)
+        let outputs = OutputKind.allCases.count
+        let minutes = WorkEstimate.minutesLeft(audioSecondsLeft: audioLeft, sectionsLeft: sectionsLeft, outputsLeft: outputs)
+        NSLog("[sve] note %lld: about %ld min of work left before memories", id, minutes)
+        // Memory sections never count toward the offer (K43): they run later, idle in front or overnight.
+        if WorkEstimate.offersOvernight(audioSecondsLeft: audioLeft, sectionsLeft: sectionsLeft, outputsLeft: outputs) {
+            overnightOffer = id
+        }
     }
 
     /// "Yes" to "Finish overnight while charging?": the note is marked, the run stops before its next piece or
@@ -1306,7 +1334,10 @@ final class ProcessingPipeline {
         }
         await pruneOvernight()
         var memoriesLeft = memoriesMayBeDue
-        if !expired.isSet { memoriesLeft = !(await CoreEngine.shared.notesNeedingMemories(limit: 1)).isEmpty }
+        if !expired.isSet {   // notes whose memory call failed in this launch do not count: they wait for the next one
+            let needing = await CoreEngine.shared.notesNeedingMemories(limit: 1 + memoryFailed.count)
+            memoriesLeft = !MemoryPass.backfillNotes(needing, skipping: memoryFailed, limit: 1).isEmpty
+        }
         return !overnight.isEmpty || !interrupted.isEmpty || memoriesLeft
     }
 

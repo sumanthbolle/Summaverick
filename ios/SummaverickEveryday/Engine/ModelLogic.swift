@@ -256,6 +256,13 @@ enum WorkEstimate {
     }
 
     static func offersOvernight(minutesLeft: Int) -> Bool { minutesLeft > offerAboveMinutes }
+
+    /// The offer after Stop (K43): the transcription, the sections and the three outputs. Memory sections never
+    /// count toward it (they run later, idle in front or overnight); memory time is only part of the overnight
+    /// work left.
+    static func offersOvernight(audioSecondsLeft: Int, sectionsLeft: Int, outputsLeft: Int, memorySectionsLeft: Int = 0) -> Bool {
+        offersOvernight(minutesLeft: minutesLeft(audioSecondsLeft: audioSecondsLeft, sectionsLeft: sectionsLeft, outputsLeft: outputsLeft))
+    }
 }
 
 /// Notes the person chose to finish overnight, while the phone charges (UserDefaults "pipeline.overnight").
@@ -356,8 +363,20 @@ enum MemoryPass {
         case finished
         /// A section call said -1: the run ends quietly, nothing more for this note now.
         case gone
-        /// `beforeEach` said no, or a call was cancelled or failed: the sections left stay due for later.
+        /// A section's model call failed (-3): this note's sections left stay due, other notes go on.
+        case failed
+        /// `beforeEach` said no, or a call was cancelled (recording, the person, heat, cut off): the sections left
+        /// stay due for later, and the backfill stops.
         case stopped
+    }
+
+    /// After one note of a backfill: a real stop ends it; a finished, gone or failed note lets the next one go.
+    static func backfillGoesOn(after outcome: Outcome) -> Bool { outcome != .stopped }
+
+    /// The notes a backfill takes, in the core's order (newest first): those whose memory call did not fail
+    /// during this launch, at most `limit`.
+    nonisolated static func backfillNotes(_ needing: [Int64], skipping failed: Set<Int64>, limit: Int) -> [Int64] {
+        Array(needing.lazy.filter { !failed.contains($0) }.prefix(max(0, limit)))
     }
 
     /// For each section index in `due`, in order: `beforeEach` (false stops), `write`, then `afterEach` with the
@@ -372,7 +391,8 @@ enum MemoryPass {
                 finished += 1
                 await afterEach(finished, n)
             case .gone: return (.gone, finished)
-            case .cancelled, .failed: return (.stopped, finished)
+            case .cancelled: return (.stopped, finished)
+            case .failed: return (.failed, finished)
             }
         }
         return (.finished, finished)

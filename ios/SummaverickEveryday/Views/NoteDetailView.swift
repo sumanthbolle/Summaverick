@@ -146,6 +146,8 @@ struct NoteDetailView: View {
                         StatusBanner(stage: .paused(models.status == .unsupported ? AIStatus.unsupportedMessage
                                                                                   : ProcessingPipeline.waitingMessage))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else if pipeline.busyNotice == noteID {
+                        Text("Busy with a recording — try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
                     } else if let failure = pipeline.lastFailure[noteID] {
                         StatusBanner(stage: pipeline.interrupted.contains(noteID) ? .paused(failure) : .failed(failure),
                                      onTryAgain: RegenerateRules.showsTryAgain(needsWork: needsGeneration, aiReady: models.isReady,
@@ -545,9 +547,12 @@ struct NoteDetailView: View {
             guard !Heat.isTooHot(ProcessInfo.processInfo.thermalState) else {
                 answer = String(localized: "The phone is too warm. Try again when it has cooled down."); return
             }
-            await pipeline.yieldMemories()   // the person first: memory work stops for the answer
+            // The person first: memory work stops for the answer. Other work still running: the busy line.
+            let busy = String(localized: "Busy with a recording — try again in a moment.")
+            guard await pipeline.yieldMemories(), !pipeline.isWorking else { answer = busy; return }
             do {
-                try await models.loadIntoCore()
+                try await models.loadIntoCore()   // the backend for right now (GPU in front)
+                guard !pipeline.isWorking else { answer = busy; return }
                 let context = [n.detailed_notes, t].compactMap { $0 }.joined(separator: "\n\n")
                 answer = try await CoreEngine.shared.ask(context: context, question: q, lang: n.lang)
             } catch {

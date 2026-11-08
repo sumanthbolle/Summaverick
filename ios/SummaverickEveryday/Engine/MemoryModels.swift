@@ -6,15 +6,19 @@ import Foundation
 
 /// A name, number, date or time a memory relies on, as the exact words of its quote.
 struct CheckedField: Codable, Equatable, Hashable {
+    /// "name" | "number" | "date" | "time"
     var kind: String
+    /// The words as said in the quote.
     var text: String
+    /// Names only: how the model wrote the name (e.g. "Ravi" for "రవి"); nil otherwise.
+    var asWritten: String?
 
-    init(kind: String, text: String) { self.kind = kind; self.text = text }
+    init(kind: String, text: String, asWritten: String? = nil) { self.kind = kind; self.text = text; self.asWritten = asWritten }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        kind = c.lenient(.kind) ?? ""; text = c.lenient(.text) ?? ""
+        kind = c.lenient(.kind) ?? ""; text = c.lenient(.text) ?? ""; asWritten = c.lenient(.asWritten)
     }
-    enum CodingKeys: String, CodingKey { case kind, text }
+    enum CodingKeys: String, CodingKey { case kind, text, asWritten = "as_written" }
 }
 
 /// Where a memory was said: the recording, the second and the words.

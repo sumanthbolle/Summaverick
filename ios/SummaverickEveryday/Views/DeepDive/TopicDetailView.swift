@@ -252,13 +252,15 @@ struct TopicDetailView: View {
         guard canSummarise, !loadingSummary else { return }
         summaryBusy = false
         if pipeline.isBusy { summaryBusy = true; return }
+        guard await pipeline.yieldMemories(), !pipeline.isWorking else { summaryBusy = true; return }
         loadingSummary = true
-        await pipeline.yieldMemories()
         defer { loadingSummary = false }
         summaryError = nil
         // Writing the summary is a model run: not while the phone is too hot.
         guard !Heat.isTooHot(ProcessInfo.processInfo.thermalState) else { summaryError = tooWarmMessage; return }
         do {
+            try await ModelManager.shared.loadIntoCore()   // the backend for right now (GPU in front), never left on the CPU
+            guard !pipeline.isWorking else { summaryBusy = true; return }
             let s = try await CoreEngine.shared.topicSummary(route.id, lang: settings.notesLanguage)
             if Task.isCancelled { return }
             if s != summary { revealed = [] }

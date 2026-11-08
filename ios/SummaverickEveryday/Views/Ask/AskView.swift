@@ -454,9 +454,11 @@ struct AskView: View {
         generating = true
         Task {
             defer { generating = false }
-            await pipeline.yieldMemories()   // the person first: memory work stops for the answer
+            // The person first: memory work stops for the answer. Other work still running: the busy notice.
+            guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; update(id, .failed); return }
             do {
-                try await loadSelectedModel()
+                try await loadSelectedModel()   // the backend for right now (GPU in front)
+                guard !pipeline.isWorking else { notice = .busy; update(id, .failed); return }
                 let a = try await CoreEngine.shared.ask(q)
                 update(id, .answered(a, named: await namedMedicines(a)))
             } catch {
@@ -522,9 +524,10 @@ struct AskView: View {
                 transcribing = false
             }
             if pipeline.isBusy { notice = .busy; return }
-            await pipeline.yieldMemories()
+            guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; return }
             do {
                 try await loadSelectedModel()
+                guard !pipeline.isWorking else { notice = .busy; return }
                 let pieces = try await CoreEngine.shared.transcribeAudioPieces(path: url.path)
                 let heard = pieces.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }.joined(separator: " ")

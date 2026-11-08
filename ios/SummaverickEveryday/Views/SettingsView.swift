@@ -54,7 +54,7 @@ struct SettingsView: View {
 
                 Section {
                     Button(role: .destructive) {
-                        if pipeline.isWorking { wipeBusy = true } else { confirmWipe = true }
+                        if pipeline.isBusy { wipeBusy = true } else { confirmWipe = true }
                     } label: {
                         HStack {
                             Text("Delete everything")
@@ -82,7 +82,13 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) {}
             }
             .confirmationDialog("Remove Summaverick's AI?", isPresented: $confirmRemoveAI, titleVisibility: .visible) {
-                Button("Remove", role: .destructive) { Task { await models.remove() } }
+                Button("Remove", role: .destructive) {
+                    Task {
+                        // Memory work stops for it (K42); a note still being written: busy, as before.
+                        guard await pipeline.yieldMemories(), !pipeline.isWorking else { wipeBusy = true; return }
+                        await models.remove()
+                    }
+                }
             } message: {
                 Text("Your notes stay. New recordings wait until it is downloaded again.")
             }
@@ -99,7 +105,7 @@ struct SettingsView: View {
                 Text(AIStatus.unsupportedMessage).font(.footnote).foregroundStyle(.secondary)
                 if models.hasFiles {   // left from an older version; never used on this phone
                     Button("Remove to free space", role: .destructive) {
-                        if pipeline.isWorking { wipeBusy = true } else { confirmRemoveAI = true }
+                        if pipeline.isBusy { wipeBusy = true } else { confirmRemoveAI = true }
                     }
                     .frame(minHeight: 44)
                 }
@@ -115,7 +121,7 @@ struct SettingsView: View {
                 AICellularToggle()
                 if status.isReady {
                     Button("Remove to free space", role: .destructive) {
-                        if pipeline.isWorking { wipeBusy = true } else { confirmRemoveAI = true }
+                        if pipeline.isBusy { wipeBusy = true } else { confirmRemoveAI = true }
                     }
                     .frame(minHeight: 44)
                 }
@@ -128,9 +134,11 @@ struct SettingsView: View {
     /// Any failure (a note left, or the core refusing) shows "Could not delete everything" with Retry.
     private func wipe() {
         guard !wiping else { return }
-        guard !pipeline.isWorking else { wipeBusy = true; return }
+        guard !pipeline.isBusy else { wipeBusy = true; return }
         wiping = true
         Task {
+            // Memory work stops for it (K42); a note still being written: busy, as before.
+            guard await pipeline.yieldMemories(), !pipeline.isWorking else { wiping = false; wipeBusy = true; return }
             let engine = CoreEngine.shared
             for n in await engine.notes(limit: 10_000) {
                 pipeline.forget(noteID: n.id)
