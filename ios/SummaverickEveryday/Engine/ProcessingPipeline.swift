@@ -3,7 +3,9 @@
 // the saved cursor (TranscriptSidecar). Notes use the GPU while the app is in front, else the CPU.
 // On iOS 26+ a continued-processing task keeps the work going with the phone locked. If iOS suspends the
 // app mid-way, or the phone gets too hot, the note keeps whatever was finished and is resumed
-// automatically later; the user can also tap "Generate notes". Recordings made before the AI has
+// automatically later; the user can also tap "Generate notes". Cut off with the app not in front, the note goes on
+// the overnight list by itself and finishes in the overnight task (on battery too), with a notification when its
+// notes are ready (NotesNotifier); opening the app resumes it at once. Recordings made before the AI has
 // downloaded wait and are processed, one at a time, once it is ready. A long recording can instead be
 // finished overnight while the phone charges (OvernightWork). After the notes, memories are written one section
 // at a time; they never come before the notes, never hold them up and never fail them. Older notes get theirs
@@ -72,9 +74,11 @@ final class ProcessingPipeline {
                 // iOS stops the AI model (it runs on the GPU) once the app is in the background, so a
                 // failure after the phone locked is an interruption, not a real error. Resume it later.
                 interrupted.insert(id)
-                lastFailure[id] = String(localized: "Paused when the phone locked. It will continue when you open Summaverick.")
+                lastFailure[id] = Self.cutOffMessage
+                cutOff(id)
             } else {
                 lastFailure[id] = msg
+                notifyFailed(id, line: msg)
             }
         }
     }
@@ -106,6 +110,8 @@ final class ProcessingPipeline {
     /// Set when the continued-processing task expires: cancels the model run in flight.
     @ObservationIgnored private let abort = AtomicFlag()
 
+    /// A note's work cut off with the phone locked: it finishes by itself later (the overnight task) or when opened.
+    static var cutOffMessage: String { String(localized: "Paused when the phone locked. It will finish by itself later, or when you open Summaverick.") }
     static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
     nonisolated static var overnightMessage: String { String(localized: "Waiting for the charger — finishes overnight") }
@@ -138,6 +144,19 @@ final class ProcessingPipeline {
     /// Notes the person chose to finish overnight while charging. They start only while plugged in or inside
     /// the overnight task (OvernightWork), unless "Do it now". Kept across launches.
     private(set) var overnight: [Int64] = (UserDefaults.standard.array(forKey: ProcessingPipeline.overnightKey) as? [Int64]) ?? []
+    nonisolated private static let automaticKey = "pipeline.overnight.auto"
+    /// Notes on the overnight list by themselves after a cut-off (not by the person): the task may then run on
+    /// battery, and opening the app takes them off the list and resumes them at once. Kept across launches.
+    @ObservationIgnored private var automatic: Set<Int64> = Set((UserDefaults.standard.array(forKey: ProcessingPipeline.automaticKey) as? [Int64]) ?? [])
+    /// Any thread (OvernightWork's request): a note cut off after Stop is waiting to finish by itself.
+    nonisolated static var automaticFinishPending: Bool {
+        !((UserDefaults.standard.array(forKey: automaticKey) as? [Int64]) ?? []).isEmpty
+    }
+    /// The run in flight writes a note's notes (process, or resuming them; not a regenerate or a backfill): only
+    /// such a run is enrolled after a cut-off and notifies ready, paused and failed.
+    @ObservationIgnored private var notesRun = false
+    /// Notes whose "paused" notification was posted for the cut-off of their current run (posted once).
+    @ObservationIgnored private var pausedPosted: Set<Int64> = []
     /// After Stop: the note whose work left is long enough to offer finishing it overnight.
     private(set) var overnightOffer: Int64?
     /// "Yes" tapped while the note is being written: it stops before its next piece or stage.
@@ -270,6 +289,8 @@ final class ProcessingPipeline {
             ownsBackground = true
             activeNoteID = id
         }
+        startNotesRun(id)
+        defer { notesRun = false }
         defer { if !interrupted.contains(id) { markAutoTried(id) } }
         defer { settleOvernight(id) }
         offerOvernightIfLong(id, audio: audio, duration: duration)
@@ -323,6 +344,8 @@ final class ProcessingPipeline {
         defer { endBackground() }
         activeNoteID = noteID
         lastFailure[noteID] = nil
+        startNotesRun(noteID)
+        defer { notesRun = false }
         if !(await heatGate(noteID)) { return }
 
         // No transcript yet (earlier transcription failed): redo it from the audio if we still have it.
@@ -496,7 +519,7 @@ final class ProcessingPipeline {
         report(TranscriptSidecar.load(audioPath: audio.path))   // from where live transcription got to
         let abort = self.abort
         let (done, stop) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true,
-                                                       shouldStop: { Self.critical || abort.isSet },
+                                                       shouldStop: { ContinuedWork.beat(); return Self.critical || abort.isSet },
                                                        beforePiece: { await self.heatGate(noteID) },
                                                        onPiece: { report($0) })
         if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
@@ -538,15 +561,60 @@ final class ProcessingPipeline {
         }
     }
 
-    /// The system ended the continued-processing task: stop the run; the note resumes from where it was.
+    /// The system ended the continued-processing task: stop the run; the note resumes from where it was, by itself
+    /// in the overnight task (cutOff) or when the app is opened.
     private func continuedWorkExpired() {
         abort.set(true)
         // Memories run after the notes are done: stopping them leaves nothing to resume or show.
         if isWorking, !memoryWork, let id = activeNoteID {
             interrupted.insert(id)
-            lastFailure[id] = String(localized: "Paused when the phone locked. It will continue when you open Summaverick.")
+            lastFailure[id] = Self.cutOffMessage
+            cutOff(id)
         }
     }
+
+    /// A notes run starts for this note: it may be cut off (and notify) again.
+    private func startNotesRun(_ id: Int64) {
+        notesRun = true
+        pausedPosted.remove(id)
+    }
+
+    /// A notes run cut off with the app not in front (the continued-processing task expired, the app left the
+    /// front, or the overnight task ended): the note goes on the overnight list by itself (a mark of the person's
+    /// stays theirs), the overnight task is asked for (on battery too) and, once per run, "paused" is posted.
+    /// The run in flight was cancelled; every piece, section and output already finished is kept.
+    private func cutOff(_ id: Int64) {
+        guard OvernightList.enrolsAfterCutOff(notesRun: notesRun, memoriesOnly: memoryWork, appActive: appIsActive) else { return }
+        let percent = ContinuedWork.shared.percent
+        if OvernightList.marksAutomatic(alreadyMarked: overnight.contains(id)) {
+            markOvernight(id)
+            automatic.insert(id)
+            saveAutomatic()
+        }
+        NSLog("[sve] bg: note %lld cut off at %ld%%; it finishes by itself in the overnight task", id, percent)
+        OvernightWork.shared.schedule()
+        guard NotifyRule.postsPaused(cutOffByOvernightTask: overnightOwnsRun.isSet), pausedPosted.insert(id).inserted else { return }
+        Task {
+            let title = await CoreEngine.shared.note(id)?.title ?? ""
+            NotesNotifier.paused(noteID: id, title: title, percent: percent)
+        }
+    }
+
+    /// A notes run failed for real (not a cut-off) with the app not in front: the note's failure line, as a
+    /// notification.
+    private func notifyFailed(_ id: Int64, line: String) {
+        guard notesRun, !appIsActive else { return }
+        NSLog("[sve] bg: note %lld: notes failed in the background: %@", id, line)
+        Task {
+            let title = await CoreEngine.shared.note(id)?.title ?? ""
+            NotesNotifier.failed(noteID: id, title: title, line: line)
+        }
+    }
+
+    /// Steps after transcription, for the lock-screen progress: reminders, sections, title, the three outputs.
+    private static let notesSteps = 3 + OutputKind.allCases.count
+    private static let sectionsStep = 1
+    private static let firstOutputStep = 3
 
     private func generateOutputs(noteID id: Int64, transcript: String, lang: String, setTitle: Bool) async {
         let engine = CoreEngine.shared
@@ -566,7 +634,7 @@ final class ProcessingPipeline {
         // Reminders, tasks and profile changes first, so they are ready even if note writing is interrupted.
         // A failure here never fails the notes.
         let abort = self.abort
-        let steps = 3 + OutputKind.allCases.count   // reminders, sections, title, three outputs
+        let steps = Self.notesSteps   // reminders, sections, title, three outputs
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 0, outputsTotal: steps))
         do {
             if await engine.pieces(id).isEmpty {   // note from before pieces existed
@@ -575,7 +643,9 @@ final class ProcessingPipeline {
             }
             stage = .extracting
             do {
-                let n = try await onBackend { try await engine.extract(noteID: id, shouldStop: { abort.isSet }) }
+                let n = try await onBackend {
+                    try await engine.extract(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
+                }
                 NSLog("[sve] extract added %d suggestions", n)
             } catch {
                 NSLog("[sve] extract failed: %@", String(describing: error))
@@ -603,16 +673,21 @@ final class ProcessingPipeline {
             if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
             if !(await heatGate(id)) { return }
             do {
-                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections)
+                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections,
+                                                 step: Self.firstOutputStep + i)
                 await engine.setOutput(id, kind, text)
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
-                ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 4 + i, outputsTotal: steps))
+                ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.firstOutputStep + 1 + i, outputsTotal: steps))
             } catch {
                 stage = .failed(error.localizedDescription)
                 return
             }
         }
-        // The notes are stored. Memories now, never before them; a stop or failure here never fails the notes
+        // The notes are stored: "ready" now (when the app is not in front), not after the memories.
+        let readyTitle = await engine.note(id)?.title ?? ""
+        NSLog("[sve] bg: note %lld: notes ready (app %@)", id, appIsActive ? "in front" : "not in front")
+        NotesNotifier.notesReady(noteID: id, title: readyTitle)
+        // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
         memoryStop.set(false)
         _ = await writeMemories(noteID: id, quiet: false)
@@ -644,22 +719,30 @@ final class ProcessingPipeline {
     }
 
     /// One output (not stored): from the sections when `fromSections`, else (or when the sections cannot be used)
-    /// from the transcript. Throws when it fails or is cancelled (the abort flag).
+    /// from the transcript. Throws when it fails or is cancelled (the abort flag). step: its place in the notes
+    /// steps, for the lock-screen progress (nil for a regenerate).
     private func writeOutput(_ kind: OutputKind, noteID id: Int64, transcript: String, lang: String,
-                             fromSections: Bool) async throws -> String {
+                             fromSections: Bool, step: Int? = nil) async throws -> String {
         let engine = CoreEngine.shared
         let abort = self.abort
         stage = .generating(kind, "final", 0, 1)
+        // Every few tokens (core thread): the stage line, the chunk progress, and the heartbeat.
+        let progress: (String, Int, Int) -> Void = { phase, done, total in
+            if step != nil { ContinuedWork.beat() }
+            Task { @MainActor in
+                self.stage = .generating(kind, phase, done, total)
+                if let step {
+                    let part = total > 0 ? Double(done) / Double(total) : 0
+                    ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: step, part: part, outputsTotal: Self.notesSteps))
+                }
+            }
+        }
         return try await onBackend { () async throws -> String in
             if fromSections, let t = await engine.generateFromSections(noteID: id, kind: kind, lang: lang, shouldStop: { abort.isSet },
-                                                                       onProgress: { phase, done, total in
-                Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
-            }) { return t }
+                                                                       onProgress: progress) { return t }
             // nil: cancelled (our flag) or the sections could not be used, then the transcript as before.
             if abort.isSet { throw CoreError.generationFailed }
-            return try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }) { phase, done, total in
-                Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
-            }
+            return try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }, onProgress: progress)
         }
     }
 
@@ -680,6 +763,11 @@ final class ProcessingPipeline {
         let total = SectionWriter.plan(pieces: Array(pieces[from...]), endSec: duration, isFinal: true).count
         let abort = self.abort, recording = LiveTranscriber.shared.recordingNow
         var written = 0, gone = false, stopped = false
+        /// The lock-screen progress inside the sections step: one share per section.
+        func reportSections() {
+            let part = Double(written) / Double(max(total, 1))
+            ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.sectionsStep, part: part, outputsTotal: Self.notesSteps))
+        }
         func stop() -> Bool { abort.isSet || (quiet && LiveTranscriber.shared.isRecording) || Task.isCancelled }
         do {
             let done = try await SectionWriter.writeDue(
@@ -692,18 +780,21 @@ final class ProcessingPipeline {
                         stopped = true; return false
                     }
                     stage = .sections(written, total)
+                    if !quiet { reportSections() }
                     return true
                 },
                 summarize: { ps, lang in
                     try await onBackend {
                         try await engine.sectionSummarize(pieces: ps, lang: lang, shouldStop: {
-                            abort.isSet || Self.critical || (quiet && recording.isSet)
+                            if !quiet { ContinuedWork.beat() }
+                            return abort.isSet || Self.critical || (quiet && recording.isSet)
                         })
                     }
                 },
                 onSection: { secs in
                     guard await engine.setSections(id, secs) else { gone = true; return false }
                     written += 1
+                    if !quiet { reportSections() }
                     NotificationCenter.default.post(name: .notesChanged, object: nil)   // chapters appear as they come
                     return true
                 })
@@ -1056,6 +1147,10 @@ final class ProcessingPipeline {
             heatPaused.remove(id)
             let owned = OvernightList.ownsRun(inOvernightTask: overnightRun != nil, appActive: appIsActive,
                                               continuedTaskHeld: ContinuedWork.shared.isHeld)
+            if !appIsActive {
+                NSLog("[sve] bg: resuming note %lld (%@)", id,
+                      ContinuedWork.shared.isHeld ? "continued processing" : (overnightRun != nil ? "overnight task" : "background time"))
+            }
             overnightOwnsRun.set(owned)
             await rerun(noteID: id)
             overnightOwnsRun.set(false)
@@ -1078,6 +1173,7 @@ final class ProcessingPipeline {
     /// Once the AI is ready: every note with audio and no transcript (recorded while it downloaded)
     /// is queued and processed one at a time. When nothing else is left, notes that still need memories get them.
     func processWaitingNotes() async {
+        releaseAutomaticInFront()
         await queueWaitingNotes()
         await resumeInterrupted()
         await backfillMemories()   // then, idle in front, memories for older notes
@@ -1102,6 +1198,21 @@ final class ProcessingPipeline {
             .filter { !overnight.contains($0) }
         if !ids.isEmpty { NSLog("[sve] %ld notes waiting for the AI", ids.count) }
         interrupted.formUnion(ids)
+    }
+
+    /// The app is in front: notes put on the overnight list by themselves after a cut-off come off it and resume
+    /// now (opening the app never waits for the charger). The person's own overnight marks stay.
+    private func releaseAutomaticInFront() {
+        guard appIsActive, !automatic.isEmpty else { return }
+        let released = OvernightList.releasedInFront(overnight: overnight, automatic: automatic)
+        if released.overnight != overnight {
+            overnight = released.overnight
+            UserDefaults.standard.set(overnight, forKey: Self.overnightKey)
+        }
+        for id in released.resume where !(isWorking && activeNoteID == id) { interrupted.insert(id) }
+        automatic = []
+        saveAutomatic()
+        NSLog("[sve] bg: app in front: %ld cut-off notes resume now", released.resume.count)
     }
 
     private func isHandingOver(_ path: String) -> Bool {
@@ -1299,9 +1410,16 @@ final class ProcessingPipeline {
     }
 
     private func unmarkOvernight(_ id: Int64) {
+        if automatic.remove(id) != nil { saveAutomatic() }
         guard overnight.contains(id) else { return }
         overnight.removeAll { $0 == id }
         UserDefaults.standard.set(overnight, forKey: Self.overnightKey)
+    }
+
+    /// Only notes still on the overnight list are automatic.
+    private func saveAutomatic() {
+        automatic.formIntersection(overnight)
+        UserDefaults.standard.set(automatic.sorted(), forKey: Self.automaticKey)
     }
 
     /// Drops notes from the overnight list that were deleted or have nothing left to do.
@@ -1321,6 +1439,7 @@ final class ProcessingPipeline {
         if pruned != overnight {
             overnight = pruned
             UserDefaults.standard.set(overnight, forKey: Self.overnightKey)
+            saveAutomatic()
         }
     }
 

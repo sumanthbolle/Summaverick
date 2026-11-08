@@ -219,9 +219,45 @@ enum NotesProgress {
     }
 
     static func fraction(outputsDone: Int, outputsTotal: Int) -> Double {
-        guard outputsTotal > 0 else { return 1 }
-        return transcriptionShare + (1 - transcriptionShare) * min(1, max(0, Double(outputsDone) / Double(outputsTotal)))
+        fraction(outputsDone: outputsDone, part: 0, outputsTotal: outputsTotal)
     }
+
+    /// Inside a step: `part` (0…1) of step `outputsDone` is done (a section of the sections, a chunk of an
+    /// output). Part 1 is where the next step starts.
+    static func fraction(outputsDone: Int, part: Double, outputsTotal: Int) -> Double {
+        guard outputsTotal > 0 else { return 1 }
+        let done = Double(outputsDone) + min(1, max(0, part))
+        return transcriptionShare + (1 - transcriptionShare) * min(1, max(0, done / Double(outputsTotal)))
+    }
+
+    /// iOS may end a continued-processing task whose progress stands still, so the lock-screen progress
+    /// moves at least this often while the model works.
+    static let heartbeatSeconds: TimeInterval = 30
+
+    /// The progress has not moved for `heartbeatSeconds`: the next progress callback from the model moves it.
+    static func heartbeatDue(lastReport: Date, now: Date) -> Bool {
+        now.timeIntervalSince(lastReport) >= heartbeatSeconds
+    }
+
+    /// One heartbeat: the progress moves by one unit of the system's 1000, and never reaches done (0.99 at most).
+    static func heartbeatFraction(_ fraction: Double) -> Double {
+        let f = max(0, fraction)
+        guard f < 0.99 else { return f }
+        return min(0.99, f + 0.0011)
+    }
+}
+
+/// Notes notifications (NotesNotifier): ready, paused, failed. One per state change, never per percent.
+enum NotifyRule {
+    /// In front the app already shows the note: nothing is posted.
+    static func shouldNotify(appActive: Bool) -> Bool { !appActive }
+
+    /// One identifier per note, so a later state replaces the earlier one.
+    static func identifier(noteID: Int64) -> String { "notes.\(noteID)" }
+
+    /// "Paused" when work after Stop is cut off; not each time the overnight task is ended during the night (the
+    /// note was already paused and finishes in a later run).
+    static func postsPaused(cutOffByOvernightTask: Bool) -> Bool { !cutOffByOvernightTask }
 }
 
 /// How long the work left on a note will take on the phone's CPU (measured on the device), to decide whether
@@ -289,6 +325,26 @@ enum OvernightList {
     /// clears the mark. Unmarked notes always may run.
     static func mayStart(marked: Bool, pluggedIn: Bool, inOvernightTask: Bool) -> Bool {
         !marked || pluggedIn || inOvernightTask
+    }
+
+    /// A notes run (a recording's notes, or resuming them) cut off with the app not in front (the continued-processing
+    /// task expired, or the app left the front): the note goes on this list by itself, without the "Finish
+    /// overnight?" offer, so the overnight task finishes it. Memories are not notes; in front the resume loop takes it.
+    static func enrolsAfterCutOff(notesRun: Bool, memoriesOnly: Bool, appActive: Bool) -> Bool {
+        notesRun && !memoriesOnly && !appActive
+    }
+
+    /// The enrolment is automatic only for a note the person did not mark: theirs keeps its meaning.
+    static func marksAutomatic(alreadyMarked: Bool) -> Bool { !alreadyMarked }
+
+    /// While an automatic note waits, the task may run on battery (iOS still picks an idle moment); otherwise only
+    /// on the charger, as the person was told.
+    static func requiresExternalPower(automaticPending: Bool) -> Bool { !automaticPending }
+
+    /// The app came to the front: automatic marks leave the list and those notes resume at once (opening the app
+    /// never waits for the charger); the person's own marks stay.
+    static func releasedInFront(overnight: [Int64], automatic: Set<Int64>) -> (overnight: [Int64], resume: [Int64]) {
+        (overnight.filter { !automatic.contains($0) }, overnight.filter { automatic.contains($0) })
     }
 }
 

@@ -39,6 +39,31 @@ final class ContinuedWork {
     /// The app may keep working in the background now.
     var isHeld: Bool { held != nil }
 
+    /// The progress shown now, in whole percent (for the "paused at" notification).
+    var percent: Int { Int((fraction * 100).rounded(.down)) }
+
+    /// When the progress last moved (any thread reads it: the model's progress callbacks).
+    private final class Clock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var last = Date()
+        func stamp(_ now: Date = Date()) { lock.lock(); last = now; lock.unlock() }
+        /// True once per heartbeat: the progress has not moved for `NotesProgress.heartbeatSeconds`.
+        func beatDue(_ now: Date = Date()) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard NotesProgress.heartbeatDue(lastReport: last, now: now) else { return false }
+            last = now
+            return true
+        }
+    }
+    nonisolated private static let clock = Clock()
+
+    /// From the model's progress callbacks (any thread, every few tokens): when the progress has stood still for
+    /// 30 s, it moves one unit, so iOS sees the work going on during a long section or output.
+    nonisolated static func beat() {
+        guard clock.beatDue() else { return }
+        Task { @MainActor in ContinuedWork.shared.pulse() }
+    }
+
     static var title: String { String(localized: "Writing your notes") }
 
     /// Identifiers already given a handler. Registering the same one twice ends the app.
@@ -57,7 +82,7 @@ final class ContinuedWork {
             MainActor.assumeIsolated { ContinuedWork.shared.started(task) }
         }
         registered.insert(id)
-        if !ok { NSLog("[sve] continued processing handler not registered for %@", id) }
+        if !ok { NSLog("[sve] bg: continued processing handler not registered for %@", id) }
     }
 
     /// Processing starts after Stop: call synchronously in the tap, while the app is in front. Submits
@@ -74,14 +99,19 @@ final class ContinuedWork {
         do {
             try BGTaskScheduler.shared.submit(request)
             wanted = true
+            NSLog("[sve] bg: continued processing asked for (%@)", id)
         } catch {
-            NSLog("[sve] continued processing not available: %@", String(describing: error))
+            NSLog("[sve] bg: continued processing not available: %@", String(describing: error))
         }
     }
 
     /// Progress 0…1 and the stage line, shown by the system.
     func update(fraction: Double? = nil, subtitle: String? = nil) {
-        if let fraction { self.fraction = max(self.fraction, min(1, max(0, fraction))) }
+        if let fraction {
+            let before = units
+            self.fraction = max(self.fraction, min(1, max(0, fraction)))
+            if units != before { Self.clock.stamp() }
+        }
         if let subtitle, !subtitle.isEmpty { self.subtitle = subtitle }
         apply()
     }
@@ -89,11 +119,22 @@ final class ContinuedWork {
     /// A new note starts in the same task: progress starts again from 0.
     func startNote() {
         fraction = 0
+        Self.clock.stamp()
+        apply()
+    }
+
+    private var units: Int64 { Int64(fraction * 1000) }
+
+    private func pulse() {
+        guard held != nil else { return }
+        fraction = NotesProgress.heartbeatFraction(fraction)
+        NSLog("[sve] bg: heartbeat, progress %.3f", fraction)
         apply()
     }
 
     /// All work is done (or paused until the app is opened). Completes the task exactly once.
     func finish(success: Bool) {
+        if wanted || held != nil { NSLog("[sve] bg: continued processing finished (%@)", success ? "all done" : "work left") }
         wanted = false
         complete(success: success)
     }
@@ -105,6 +146,7 @@ final class ContinuedWork {
         }
         // Finished before the system started the task: nothing left to do.
         guard wanted, held == nil else { t.setTaskCompleted(success: true); return }
+        NSLog("[sve] bg: continued processing started")
         let h = Held(t)
         held = h
         t.progress.totalUnitCount = 1000
@@ -118,7 +160,7 @@ final class ContinuedWork {
 
     private func expired(_ h: Held) {
         guard held === h else { return }
-        NSLog("[sve] continued processing expired")
+        NSLog("[sve] bg: continued processing expired at %ld%%", percent)
         held = nil
         wanted = false
         onExpire?()
@@ -126,7 +168,7 @@ final class ContinuedWork {
 
     private func apply() {
         guard #available(iOS 26, *), let t = held?.task as? BGContinuedProcessingTask else { return }
-        t.progress.completedUnitCount = Int64(fraction * 1000)
+        t.progress.completedUnitCount = units
         t.updateTitle(Self.title, subtitle: subtitle)
     }
 

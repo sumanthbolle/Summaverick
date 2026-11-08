@@ -197,6 +197,10 @@
 			isa = PBXBuildFile;
 			fileRef = 8E2A14BEAEE07F5369F65BB8;
 		};
+		DC63BBC908E702BC81A8A6F1 = {
+			isa = PBXBuildFile;
+			fileRef = 85C17E3BCA69B1CF4F17F91A;
+		};
 		DC70A4770243CC1CA714EEB5 = {
 			isa = PBXBuildFile;
 			fileRef = FDA9E084D501D8D1690658ED;
@@ -516,6 +520,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = SuggestionCard.swift;
 			path = SummaverickEveryday/Views/Today/SuggestionCard.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		85C17E3BCA69B1CF4F17F91A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = NotesNotifier.swift;
+			path = SummaverickEveryday/Engine/NotesNotifier.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		892E4DF51BC5A1D8EB706A7A = {
@@ -895,6 +906,7 @@
 				DAD9D4F5BE940D31ED604618,
 				C593582C209D99DB076F4AB2,
 				B05E051B8E13E602C77A96F0,
+				85C17E3BCA69B1CF4F17F91A,
 				B9675BF203CCF71683907580,
 				2E361774B975154A11567968,
 				FC685B2FB5E51229E33B1F2C,
@@ -1099,6 +1111,7 @@
 				832433C1965C36667340EE3B,
 				A062B0CDA53604F5D8A7D47D,
 				5997944FB95EF3E94D57974F,
+				DC63BBC908E702BC81A8A6F1,
 				1794160D386E91967AC6CD24,
 				5809D5B858D8CE07F8518B8C,
 				74F26ED096628426F957DD0E,

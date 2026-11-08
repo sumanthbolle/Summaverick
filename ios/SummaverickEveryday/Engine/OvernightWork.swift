@@ -3,7 +3,8 @@
 // (the app is in the background), one note at a time, through the pipeline, with the heat rule: first the marked,
 // cut-off and waiting notes, then the memories of notes that still need them, newest first (up to 20 notes a
 // run). Every piece, section, output and section's memories is kept as it finishes, so an expired task loses at
-// most the step in flight.
+// most the step in flight. A note cut off after Stop goes on the list by itself (no offer); while such a note
+// waits the task may also run on battery, and the note's "ready" notification comes when it is done.
 // Not the same as ContinuedWork (iOS 26 continued processing right after Stop, while the person waits):
 // that one has its own identifiers; the pipeline's busy claim keeps the two from ever running model work at
 // the same time.
@@ -42,23 +43,26 @@ final class OvernightWork {
         let ok = BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: .main) { task in
             MainActor.assumeIsolated { OvernightWork.shared.started(task) }
         }
-        if !ok { NSLog("[sve] overnight task handler not registered") }
+        if !ok { NSLog("[sve] bg: overnight task handler not registered") }
     }
 
-    /// Asks iOS to run the task once the phone is on the charger (no network needed). Asking again replaces
-    /// the request that is waiting.
+    /// Asks iOS to run the task once the phone is on the charger, or, while a note cut off after Stop waits,
+    /// at an idle moment on battery too (no network needed). Asking again replaces the request that is waiting.
     func schedule() { Self.submit() }
 
     /// Any thread (also from the expiration handler).
     nonisolated private static func submit() {
         let request = BGProcessingTaskRequest(identifier: identifier)
-        request.requiresExternalPower = true
+        // A note cut off after Stop (put on the list by itself) may finish on battery; the person's own
+        // "Finish overnight" waits for the charger, as they were told.
+        let onBattery = !OvernightList.requiresExternalPower(automaticPending: ProcessingPipeline.automaticFinishPending)
+        request.requiresExternalPower = !onBattery
         request.requiresNetworkConnectivity = false
         do {
             try BGTaskScheduler.shared.submit(request)
-            NSLog("[sve] overnight task scheduled")
+            NSLog("[sve] bg: overnight task scheduled (%@)", onBattery ? "may run on battery" : "on the charger")
         } catch {
-            NSLog("[sve] overnight task not scheduled: %@", String(describing: error))
+            NSLog("[sve] bg: overnight task not scheduled: %@", String(describing: error))
         }
     }
 
@@ -70,7 +74,7 @@ final class OvernightWork {
             task.setTaskCompleted(success: true)
             return
         }
-        NSLog("[sve] overnight task started")
+        NSLog("[sve] bg: overnight task started")
         let r = Run(task)
         run = r
         let pipeline = ProcessingPipeline.shared
@@ -78,7 +82,7 @@ final class OvernightWork {
             // Right here, on whatever thread this runs: the app may be suspended before a hop to main.
             // Cancel the run in flight (its finished work is kept), ask again, complete.
             guard r.expired.setOnce() else { return }
-            NSLog("[sve] overnight task expired")
+            NSLog("[sve] bg: overnight task expired")
             pipeline.cancelForExpiry()
             OvernightWork.submit()
             r.complete(success: false)
@@ -87,7 +91,7 @@ final class OvernightWork {
             let workLeft = await pipeline.runOvernight(expired: r.expired)
             if !r.expired.isSet {
                 if workLeft { Self.submit() }   // heat, memories left, or more than one night's work: again on the charger
-                NSLog("[sve] overnight task done (work left: %@)", workLeft ? "yes" : "no")
+                NSLog("[sve] bg: overnight task done (work left: %@)", workLeft ? "yes" : "no")
                 r.complete(success: !workLeft)
             }
             if self.run === r { self.run = nil }

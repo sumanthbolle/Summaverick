@@ -226,12 +226,16 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
     // MARK: UNUserNotificationCenterDelegate
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        // A note's notes notification arriving in front is not shown: the app already shows the note.
+        if notification.request.identifier.hasPrefix(NotesNotifier.prefix) { return [] }
+        return [.banner, .list, .sound]
     }
 
+    /// Reminders, and a note's notes notifications (NotesNotifier: their userInfo has the note id), open their note.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let identifier = response.notification.request.identifier
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              response.notification.request.identifier.hasPrefix(Self.prefix) else { return }
+              identifier.hasPrefix(Self.prefix) || identifier.hasPrefix(NotesNotifier.prefix) else { return }
         let route = Self.route(from: response.notification.request.content.userInfo)
         await MainActor.run { ReminderScheduler.shared.pendingRoute = route }
     }
