@@ -2,6 +2,7 @@
 // Hosts: iOS (today), Android (next), the Summaverick Everyday device (Linux/ARM).
 #include "sve_core.h"
 #include "sve_internal.h"
+#include <mutex>
 #include "sve_prompts.h"
 #include "sve_context.h"
 #include "sve_audio.h"
@@ -57,16 +58,15 @@ static char *dup_str(const std::string &s) {
     return p;
 }
 
-static bool g_backend_init = false;
+static std::once_flag g_backend_once;  // sve_init may run on two threads at once (two contexts)
 
 const char *sve_version(void) { return SVE_VERSION; }
 
 sve_ctx *sve_init(const char *db_path) {
-    if (!g_backend_init) {
+    std::call_once(g_backend_once, [] {
         llama_log_set(llama_log_bridge, nullptr);
         llama_backend_init();
-        g_backend_init = true;
-    }
+    });
     auto *c = new sve_ctx();
     c->store = std::make_unique<sve::Store>(db_path ? db_path : ":memory:");
     if (!c->store->ok()) {

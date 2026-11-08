@@ -1133,9 +1133,7 @@ final class ProcessingPipeline {
     /// (yieldMemories). Never keeps the screen on.
     func backfillMemories() async {
         guard !isWorking, !resuming, !memoriesHeld, ModelManager.shared.isReady, !LiveTranscriber.shared.isRecording,
-              // Older notes' memories only in the overnight task: while the app is open, a memory call holds the
-              // engine for a minute or more and every screen's read waits behind it (the Timeline looks empty).
-              overnightRun != nil, !(overnightRun?.isSet ?? false),
+              appIsActive || overnightRun != nil, !(overnightRun?.isSet ?? false),
               Heat.beforeRun(Self.thermal) != .pause, nextToResume(tried: []) == nil else { return }
         starting = true
         memoryWork = true

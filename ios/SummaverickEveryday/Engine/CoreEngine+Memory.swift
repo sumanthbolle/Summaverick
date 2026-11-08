@@ -1,5 +1,6 @@
 // Memory API of the core (sve_core.h, "memories (the second brain)" section), as typed Swift.
-// Everything runs inside the CoreEngine actor, so the one sve_ctx is never used from two threads.
+// Making memories runs the model inside the CoreEngine actor; everything else here is a store-only call on
+// CoreStore's context (CoreEngine.store), so the review queue and the memory screens never wait behind it.
 import Foundation
 
 extension CoreEngine {
@@ -12,7 +13,7 @@ extension CoreEngine {
         case modelFailed
     }
 
-    private func memoryJSON<T: Decodable>(_ type: T.Type, _ json: UnsafeMutablePointer<CChar>?) -> T? {
+    private nonisolated func memoryJSON<T: Decodable>(_ type: T.Type, _ json: UnsafeMutablePointer<CChar>?) -> T? {
         decode(type, take(json))
     }
 
@@ -38,41 +39,47 @@ extension CoreEngine {
     }
 
     /// Indexes of the note's sections whose memories are not made yet, in order; [] when none (or no note).
-    func memorySectionsDue(_ noteID: Int64) -> [Int] { memoryJSON([Int].self, sve_memory_sections_due(ctx, noteID)) ?? [] }
-
-    /// Notes with a section whose memories are not made yet, newest first.
-    func notesNeedingMemories(limit: Int) -> [Int64] {
-        memoryJSON([Int64].self, sve_notes_needing_memories(ctx, Int32(clamping: limit))) ?? []
+    nonisolated func memorySectionsDue(_ noteID: Int64) async -> [Int] {
+        await store { self.memoryJSON([Int].self, sve_memory_sections_due($0, noteID)) ?? [] }
     }
 
-    // MARK: reading
+    /// Notes with a section whose memories are not made yet, newest first.
+    nonisolated func notesNeedingMemories(limit: Int) async -> [Int64] {
+        await store { self.memoryJSON([Int64].self, sve_notes_needing_memories($0, Int32(clamping: limit))) ?? [] }
+    }
 
-    func memories(_ filter: MemoryFilter = .all) -> [BrainMemory] {
+    // MARK: reading (store context)
+
+    nonisolated func memories(_ filter: MemoryFilter = .all) async -> [BrainMemory] {
         guard let d = try? JSONEncoder().encode(filter), let json = String(data: d, encoding: .utf8) else { return [] }
-        return memoryJSON([BrainMemory].self, sve_memories_json(ctx, json)) ?? []
+        return await store { self.memoryJSON([BrainMemory].self, sve_memories_json($0, json)) ?? [] }
     }
 
     /// One memory with its history (the versions it replaced); nil when it is gone.
-    func memory(_ id: Int64) -> BrainMemory? { memoryJSON(BrainMemory.self, sve_memory_get(ctx, id)) }
+    nonisolated func memory(_ id: Int64) async -> BrainMemory? { await store { self.memoryJSON(BrainMemory.self, sve_memory_get($0, id)) } }
 
     /// One memory with its history, telling "gone" apart from "could not read".
-    func lookupMemory(_ id: Int64) -> MemoryLookup { MemoryLookup(json: take(sve_memory_get(ctx, id))) }
+    nonisolated func lookupMemory(_ id: Int64) async -> MemoryLookup { await store { MemoryLookup(json: self.take(sve_memory_get($0, id))) } }
 
     /// Memories waiting for the person, newest recording first, each with its pending card (if any);
     /// nil when the queue could not be read.
-    func reviewQueue() -> [ReviewItem]? { ReviewItem.queue(fromJSON: take(sve_review_queue_json(ctx))) }
+    nonisolated func reviewQueue() async -> [ReviewItem]? { await store { ReviewItem.queue(fromJSON: self.take(sve_review_queue_json($0))) } }
 
-    // MARK: the person's changes (medicine memories follow their medicine: these refuse them)
+    // MARK: the person's changes (store context; medicine memories follow their medicine: these refuse them)
 
     /// "Keep" (kept: true) or "Wrong". Both take the memory out of the review queue.
-    @discardableResult func reviewMemory(_ id: Int64, _ kept: Bool) -> Bool {
-        sve_memory_review(ctx, id, kept ? "kept" : "wrong") == 0
+    @discardableResult nonisolated func reviewMemory(_ id: Int64, _ kept: Bool) async -> Bool {
+        await store { sve_memory_review($0, id, kept ? "kept" : "wrong") == 0 }
     }
 
     /// The person's own words for a memory, applied directly.
-    @discardableResult func editMemory(_ id: Int64, _ text: String) -> Bool { sve_memory_edit(ctx, id, text) == 0 }
+    @discardableResult nonisolated func editMemory(_ id: Int64, _ text: String) async -> Bool {
+        await store { sve_memory_edit($0, id, text) == 0 }
+    }
 
-    @discardableResult func removeMemory(_ id: Int64) -> Bool { sve_memory_remove(ctx, id) == 0 }
+    @discardableResult nonisolated func removeMemory(_ id: Int64) async -> Bool { await store { sve_memory_remove($0, id) == 0 } }
 
-    @discardableResult func setMemoryDone(_ id: Int64, _ done: Bool) -> Bool { sve_memory_set_done(ctx, id, done ? 1 : 0) == 0 }
+    @discardableResult nonisolated func setMemoryDone(_ id: Int64, _ done: Bool) async -> Bool {
+        await store { sve_memory_set_done($0, id, done ? 1 : 0) == 0 }
+    }
 }

@@ -67,7 +67,11 @@ enum CoreError: LocalizedError {
     }
 }
 
-/// Serialises all access to one sve_ctx. Call from anywhere; work happens off the main thread.
+/// Serialises all access to the model's sve_ctx. Call from anywhere; work happens off the main thread.
+/// Store-only calls (notes, settings, assistant rows, memories: no model) are `nonisolated` and run on
+/// CoreStore's own sve_ctx instead, so a screen's read or write never waits behind a model call that holds
+/// this actor for minutes. Both contexts open the same SQLite file (WAL, busy timeout in the core); neither
+/// caches rows, so each sees the other's committed writes.
 actor CoreEngine {
     static let shared = CoreEngine()
 
@@ -81,21 +85,31 @@ actor CoreEngine {
         return dir.appendingPathComponent("notes.sqlite")
     }
 
-    private init() {
+    /// The core's log goes to NSLog; set once, by whichever context opens first.
+    static let logInstalled: Void = {
         sve_set_log({ level, msg, _ in
             if let msg { NSLog("[sve %d] %@", level, String(cString: msg)) }
         }, nil)
+    }()
+
+    private init() {
+        _ = CoreEngine.logInstalled
         ctx = sve_init(CoreEngine.databaseURL.path)
         if ctx == nil { NSLog("sve_init failed") }
     }
 
-    func take(_ p: UnsafeMutablePointer<CChar>?) -> String? {
+    /// Runs a store-only call on CoreStore's context (never behind a model call on this actor).
+    nonisolated func store<T>(_ body: @Sendable (OpaquePointer?) throws -> T) async rethrows -> T {
+        try await CoreStore.shared.run(body)
+    }
+
+    nonisolated func take(_ p: UnsafeMutablePointer<CChar>?) -> String? {
         guard let p else { return nil }
         defer { sve_free_string(p) }
         return String(cString: p)
     }
 
-    func decode<T: Decodable>(_ type: T.Type, _ json: String?) -> T? {
+    nonisolated func decode<T: Decodable>(_ type: T.Type, _ json: String?) -> T? {
         guard let json, let data = json.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
@@ -208,32 +222,51 @@ actor CoreEngine {
         return (t?.isEmpty ?? true) ? nil : t
     }
 
-    // MARK: notes
+    // MARK: notes (store context)
 
-    func createNote(title: String, lang: String, audioPath: String?, transcript: String?, durationSeconds: Int64) -> Int64 {
-        sve_note_create(ctx, title, lang, audioPath, transcript, durationSeconds)
+    nonisolated func createNote(title: String, lang: String, audioPath: String?, transcript: String?, durationSeconds: Int64) async -> Int64 {
+        await store { sve_note_create($0, title, lang, audioPath, transcript, durationSeconds) }
     }
 
-    func setTranscript(_ id: Int64, _ transcript: String) { _ = sve_note_set_transcript(ctx, id, transcript) }
-    func setOutput(_ id: Int64, _ kind: OutputKind, _ text: String) { _ = sve_note_set_output(ctx, id, kind.cKind, text) }
-    func setTitle(_ id: Int64, _ title: String) { _ = sve_note_set_title(ctx, id, title) }
-    func deleteNote(_ id: Int64) { _ = sve_note_delete(ctx, id) }
-    func clearAudio(_ id: Int64) { _ = sve_note_clear_audio(ctx, id) }
-    func setAudioPath(_ id: Int64, _ path: String) -> Bool { sve_note_set_audio_path(ctx, id, path) == 0 }
-    func clearTranscript(_ id: Int64) { _ = sve_note_clear_transcript(ctx, id) }
+    nonisolated func setTranscript(_ id: Int64, _ transcript: String) async { await store { _ = sve_note_set_transcript($0, id, transcript) } }
+    nonisolated func setOutput(_ id: Int64, _ kind: OutputKind, _ text: String) async {
+        await store { _ = sve_note_set_output($0, id, kind.cKind, text) }
+    }
+    nonisolated func setTitle(_ id: Int64, _ title: String) async { await store { _ = sve_note_set_title($0, id, title) } }
+    nonisolated func deleteNote(_ id: Int64) async { await store { _ = sve_note_delete($0, id) } }
+    nonisolated func clearAudio(_ id: Int64) async { await store { _ = sve_note_clear_audio($0, id) } }
+    nonisolated func setAudioPath(_ id: Int64, _ path: String) async -> Bool { await store { sve_note_set_audio_path($0, id, path) == 0 } }
+    nonisolated func clearTranscript(_ id: Int64) async { await store { _ = sve_note_clear_transcript($0, id) } }
 
-    func note(_ id: Int64) -> Note? { decode(Note.self, take(sve_note_get_json(ctx, id))) }
+    nonisolated func note(_ id: Int64) async -> Note? { await store { self.decode(Note.self, self.take(sve_note_get_json($0, id))) } }
 
-    func notes(query: String = "", limit: Int32 = 200) -> [NoteSummary] {
-        decode([NoteSummary].self, take(sve_notes_list_json(ctx, query, limit))) ?? []
+    nonisolated func notes(query: String = "", limit: Int32 = 200) async -> [NoteSummary] {
+        await store { self.decode([NoteSummary].self, self.take(sve_notes_list_json($0, query, limit))) ?? [] }
     }
 
-    func audioOlderThan(days: Int32) -> [AudioRetentionRow] {
-        decode([AudioRetentionRow].self, take(sve_notes_audio_older_than_json(ctx, days))) ?? []
+    nonisolated func audioOlderThan(days: Int32) async -> [AudioRetentionRow] {
+        await store { self.decode([AudioRetentionRow].self, self.take(sve_notes_audio_older_than_json($0, days))) ?? [] }
     }
 
-    // MARK: settings
+    // MARK: settings (store context)
 
-    func setting(_ key: String) -> String? { take(sve_setting_get(ctx, key)) }
-    func setSetting(_ key: String, _ value: String) { _ = sve_setting_set(ctx, key, value) }
+    nonisolated func setting(_ key: String) async -> String? { await store { self.take(sve_setting_get($0, key)) } }
+    nonisolated func setSetting(_ key: String, _ value: String) async { await store { _ = sve_setting_set($0, key, value) } }
+}
+
+/// The second sve_ctx on the notes database, with no model: every store-only call of CoreEngine runs here, one
+/// at a time (the core's rule: one thread per context). Model calls stay on CoreEngine's own context. Writes from
+/// both contexts are serialised by SQLite (a writer waits for the other's write to commit).
+actor CoreStore {
+    static let shared = CoreStore()
+
+    private let ctx: OpaquePointer?
+
+    private init() {
+        _ = CoreEngine.logInstalled
+        ctx = sve_init(CoreEngine.databaseURL.path)
+        if ctx == nil { NSLog("sve_init (store context) failed") }
+    }
+
+    func run<T>(_ body: (OpaquePointer?) throws -> T) rethrows -> T { try body(ctx) }
 }

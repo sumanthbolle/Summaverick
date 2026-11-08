@@ -17,7 +17,8 @@
  *
  * All strings are UTF‑8. Every char* returned by the library must be released with sve_free_string().
  * Functions return 0 on success and a negative value on failure unless stated otherwise.
- * One sve_ctx must only be used from one thread at a time.
+ * One sve_ctx must only be used from one thread at a time. Several contexts may open the same database file
+ * and be used from different threads at once (SQLite WAL; a writer waits up to 5 s for another's write).
  */
 #ifndef SVE_CORE_H
 #define SVE_CORE_H
@@ -51,7 +52,11 @@ void sve_set_log(sve_log_cb cb, void *user);
 
 const char *sve_version(void);
 
-/* Opens (or creates) the notes database. db_path may be ":memory:" for tests. */
+/* Opens (or creates) the notes database. db_path may be ":memory:" for tests. Loads no model, so a context
+ * that never calls sve_load_llm is a store-only context: a host can keep one for quick reads and writes while
+ * another context on the same file runs long model calls. Each call reads SQLite afresh (no per-context
+ * cache), so either context sees the other's committed rows. Opening a file that is already up to date
+ * writes nothing. */
 sve_ctx *sve_init(const char *db_path);
 void sve_free(sve_ctx *ctx);
 

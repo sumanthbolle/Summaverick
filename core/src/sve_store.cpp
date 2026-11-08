@@ -6,9 +6,12 @@
 
 namespace sve {
 
+// Outside any transaction (neither can change inside one). journal_mode is stored in the file, foreign_keys
+// is per connection.
+static const char *kWal = "PRAGMA journal_mode=WAL";
+static const char *kForeignKeys = "PRAGMA foreign_keys=ON";
+
 static const char *kSchema = R"SQL(
-PRAGMA journal_mode=WAL;
-PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -188,10 +191,55 @@ Store::Store(const std::string &path) {
         if (db_) { sqlite3_close(db_); db_ = nullptr; }
         return;
     }
-    if (!exec(kSchema) || !migrate()) { sqlite3_close(db_); db_ = nullptr; return; }
-    // Medicines saved before medicine memories existed get theirs now (idempotent; a failure leaves the
-    // medicine without one until it is saved again, and does not stop the store from opening).
-    for (const auto &m : query_rows("SELECT id FROM medicines ORDER BY id", {})) upsert_medicine_memory(m["id"].get<int64_t>());
+    // Several connections may share the file (the app's model context and its store context): a writer
+    // waits for another's write to finish instead of failing with SQLITE_BUSY. Set before anything runs.
+    sqlite3_busy_timeout(db_, kBusyTimeoutMs);
+    if (!set_wal() || !exec(kForeignKeys) || !create_schema() || !migrate()) { sqlite3_close(db_); db_ = nullptr; return; }
+    sync_medicine_memories();
+}
+
+// A file already in WAL mode just reads it. Switching a new file to WAL needs every other connection off it, and
+// SQLite answers SQLITE_BUSY at once there (no busy wait) when another connection is opening the same new file:
+// tried again for up to the busy timeout.
+bool Store::set_wal() {
+    for (int waited = 0;; waited += 10) {
+        if (exec(kWal)) return true;
+        if ((sqlite3_errcode(db_) & 0xff) != SQLITE_BUSY || waited >= kBusyTimeoutMs) return false;
+        sqlite3_sleep(10);
+    }
+}
+
+// CREATE ... IF NOT EXISTS: on a file that is up to date nothing is written and no write lock is taken. Two
+// connections creating a new file at once can deadlock on the lock upgrade, which SQLite answers with an
+// immediate SQLITE_BUSY (no busy wait); then the schema is run again holding the write lock from the start.
+bool Store::create_schema() {
+    if (exec(kSchema)) return true;
+    if ((sqlite3_errcode(db_) & 0xff) != SQLITE_BUSY || !begin()) return false;
+    if (!exec(kSchema)) { std::string e = err_; rollback(); err_ = e; return false; }
+    return commit();
+}
+
+static std::string medicine_memory_text(const json &m);
+
+// Medicines saved before medicine memories existed get theirs now (idempotent; a failure leaves the
+// medicine without one until it is saved again, and does not stop the store from opening). Reads first and
+// writes only when a medicine's memory is missing or out of step, so a second open of an up-to-date file
+// writes nothing; the writes run in one IMMEDIATE transaction, re-checked inside it, so two connections
+// opening at once never both add the same memory.
+void Store::sync_medicine_memories() {
+    auto out_of_step = [this](const json &m) {
+        const std::string text = medicine_memory_text(m);
+        if (text.empty()) return false;
+        json have = query_rows("SELECT text FROM memories WHERE origin='medicine' AND medicine_id=? ORDER BY id LIMIT 1",
+                               {m["id"]});
+        return have.empty() || have[0]["text"] != text;
+    };
+    const char *kMeds = "SELECT id,name,dose,when_text FROM medicines ORDER BY id";
+    bool due = false;
+    for (const auto &m : query_rows(kMeds, {})) if (out_of_step(m)) { due = true; break; }
+    if (!due || !begin()) return;
+    for (const auto &m : query_rows(kMeds, {})) if (out_of_step(m)) upsert_medicine_memory(m["id"].get<int64_t>());
+    if (!commit()) rollback();
 }
 
 // Moves every old-table fact into memories, kept as it was (preferences and vocabulary stay in
@@ -218,7 +266,11 @@ bool Store::migrate() {
     json v = query_rows("PRAGMA user_version", {});
     int64_t version = v.empty() ? 0 : v[0].value("user_version", (int64_t)0);
     if (version >= 2) return true;
-    if (!exec("BEGIN")) return false;
+    if (!begin()) return false;
+    // Another connection may have migrated while this one waited for the write lock.
+    v = query_rows("PRAGMA user_version", {});
+    version = v.empty() ? 0 : v[0].value("user_version", (int64_t)0);
+    if (version >= 2) return exec("COMMIT");
     bool ok = true;
     // 0 -> 1: a database from before the memory layer; its pieces table has no conf column.
     if (version < 1 && query_rows("SELECT 1 FROM pragma_table_info('transcript_pieces') WHERE name='conf'", {}).empty())
@@ -478,7 +530,7 @@ static std::string to_fts(const std::string &q) { return fts_query(q, true); }
 
 bool Store::set_pieces(int64_t note_id, const json &pieces) {
     if (!pieces.is_array()) { err_ = "pieces must be an array"; return false; }
-    if (!exec("BEGIN")) return false;
+    if (!begin()) return false;
     bool ok = run("DELETE FROM transcript_pieces WHERE note_id=?", {note_id});
     int idx = 0;
     for (const auto &p : pieces) {
@@ -626,7 +678,7 @@ bool Store::merge_topics(int64_t from, int64_t into) {
     if (from == into) return false;
     if (query_rows("SELECT id FROM topics WHERE id=?", {from}).empty() ||
         query_rows("SELECT id FROM topics WHERE id=?", {into}).empty()) return false;
-    if (!exec("BEGIN")) return false;
+    if (!begin()) return false;
     bool ok = run("INSERT OR IGNORE INTO note_topics(note_id,topic_id) SELECT note_id,? FROM note_topics WHERE topic_id=?", {into, from}) &&
               // Memory links move too: deleting `from` would otherwise cascade them away.
               run("INSERT OR IGNORE INTO memory_entities(memory_id,topic_id,role) SELECT memory_id,?,role FROM memory_entities "
@@ -982,7 +1034,7 @@ bool Store::dismiss_insight(int64_t id) {
 
 bool Store::set_sections(int64_t note_id, const json &sections) {
     if (!sections.is_array()) { err_ = "sections must be an array"; return false; }
-    if (!exec("BEGIN")) return false;
+    if (!begin()) return false;
     bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id});
     for (const auto &s : sections) {
         if (!ok) break;
@@ -1013,7 +1065,7 @@ json Store::sections(int64_t note_id) {
 }
 
 bool Store::clear_transcript(int64_t note_id) {
-    if (!exec("BEGIN")) return false;
+    if (!begin()) return false;
     bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id}) &&
               run("DELETE FROM memory_progress WHERE note_id=?", {note_id}) &&
               run("DELETE FROM memory_sources WHERE note_id=?", {note_id});  // single-source memories go too
@@ -1040,7 +1092,7 @@ bool Store::wipe_assistant() {
     static const char *kTables[] = {"memory_entities", "memory_sources", "memory_progress", "memories",
                                     "suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
                                     "medicines", "decisions", "insights", "sections", "transcript_pieces"};
-    if (!exec("BEGIN")) return false;
+    if (!begin()) return false;
     bool ok = true;
     for (const char *t : kTables) ok = ok && run((std::string("DELETE FROM ") + t).c_str(), {});
     for (const char *k : kAssistantSettings) ok = ok && run("DELETE FROM settings WHERE key=?", {k});

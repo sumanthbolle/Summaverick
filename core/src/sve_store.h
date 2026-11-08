@@ -29,6 +29,8 @@ struct NoteListRow {
 
 class Store {
 public:
+    // How long a connection waits for another connection's write before a statement fails with SQLITE_BUSY.
+    static constexpr int kBusyTimeoutMs = 5000;
     explicit Store(const std::string &path);
     ~Store();
     bool ok() const { return db_ != nullptr; }
@@ -43,7 +45,9 @@ public:
     std::vector<std::pair<int64_t, std::string>> audio_older_than(int days);
 
     // Explicit transaction for multi-row changes (not nested; set_pieces/merge_topics use their own).
-    bool begin() { return exec("BEGIN"); }
+    // IMMEDIATE: the write lock is taken at BEGIN, where the busy timeout applies. A deferred transaction that
+    // reads and then writes gets SQLITE_BUSY at once (no wait) when another connection wrote in between.
+    bool begin() { return exec("BEGIN IMMEDIATE"); }
     bool commit() { return exec("COMMIT"); }
     bool rollback() { return exec("ROLLBACK"); }
 
@@ -153,8 +157,11 @@ public:
 private:
     // PRAGMA user_version upgrades, run once per version at open (0 -> 1: pieces conf, facts to memories;
     // 1 -> 2: facts written to the old table at version 1 move too).
+    bool set_wal();
+    bool create_schema();
     bool migrate();
     bool move_old_facts();
+    void sync_medicine_memories();
     json memory_full(json row);  // adds sources and people to a memories row
     bool exec(const char *sql);
     json query_rows(const char *sql, const std::vector<json> &binds);
