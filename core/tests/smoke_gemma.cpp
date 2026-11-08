@@ -9,12 +9,13 @@
 //               against the first phase sve_generate runs (final = one prompt, chunk = summarised first)
 //   notes       SVE_TEST_WAV: pieces, then the three note kinds from the transcript (SVE_LANG, default te),
 //               then one chat question over the note (SVE_QUESTION)
-// SVE_GREEDY=1 makes every generation greedy; SVE_TOKEN_LOG=<file> appends prompt/generated token ids
+// SVE_GREEDY=1 (any value but empty or 0) makes every generation greedy; SVE_TOKEN_LOG=<file> appends prompt/generated token ids
 // (both for tools/model/compare_outputs.sh).
 #include "sve_core.h"
 #include "sve_internal.h"
 #include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
 #include "third_party/nlohmann/json.hpp"
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
@@ -939,8 +940,9 @@ int main(int argc, char **argv) {
         return fails ? 1 : 0;
     }
     if (!gguf) { fprintf(stderr, "set SVE_GEMMA\n"); return 2; }
-    if (getenv("SVE_GREEDY")) g_sve_force_greedy = true;
-    if (const char *p = getenv("SVE_TOKEN_LOG")) g_sve_token_log = fopen(p, "a");
+    if (const char *g = getenv("SVE_GREEDY")) g_sve_force_greedy = *g && strcmp(g, "0") != 0;
+    if (const char *p = getenv("SVE_TOKEN_LOG"))
+        if (!(g_sve_token_log = fopen(p, "a"))) { fprintf(stderr, "cannot open SVE_TOKEN_LOG %s: %s\n", p, strerror(errno)); return 1; }
     const bool live = !strcmp(mode, "live") || !strcmp(mode, "sections") || !strcmp(mode, "longnotes");
     // live and sections run as on the phone: CPU only (the projector follows), 4 threads.
     if (sve_load_llm(ctx, gguf, 8192, live ? 4 : 0, live ? 0 : 99) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
