@@ -272,7 +272,7 @@ extension CoreEngine {
     /// Result of one step of incremental transcription (sve_transcribe_next_piece).
     enum NextPiece: Equatable {
         /// Transcribed [start, endSample); text may be empty (silence).
-        case piece(startSec: Int, endSample: Int64, text: String)
+        case piece(startSec: Int, endSample: Int64, text: String, conf: Double?)
         /// Still recording and under 31 s after the cursor: ask again later.
         case wait
         /// Nothing left to transcribe (final only).
@@ -286,6 +286,7 @@ extension CoreEngine {
         let start_sec: Int?
         let end_sample: Int64?
         let text: String?
+        let conf: Double?
     }
 
     /// Plans and transcribes the next ~28 s piece of a WAV that may still be being recorded, from
@@ -312,7 +313,7 @@ extension CoreEngine {
         case "end": return .end
         case "piece":
             guard let end = r.end_sample, end > startSample else { throw CoreError.transcriptionFailed }
-            return .piece(startSec: r.start_sec ?? Int(startSample / 16_000), endSample: end, text: r.text ?? "")
+            return .piece(startSec: r.start_sec ?? Int(startSample / 16_000), endSample: end, text: r.text ?? "", conf: r.conf)
         default: throw CoreError.transcriptionFailed
         }
     }

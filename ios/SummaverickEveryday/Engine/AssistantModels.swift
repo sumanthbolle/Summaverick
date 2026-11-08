@@ -312,17 +312,22 @@ struct TranscriptPiece: Codable, Equatable, Hashable {
     var text: String
     /// Present only when read back from the store.
     var idx: Int?
+    /// Mean token probability of the transcription of this piece, 0...1; nil for recordings from before.
+    var conf: Double?
 
-    init(startSec: Int, text: String, idx: Int? = nil) { self.startSec = startSec; self.text = text; self.idx = idx }
+    init(startSec: Int, text: String, idx: Int? = nil, conf: Double? = nil) {
+        self.startSec = startSec; self.text = text; self.idx = idx; self.conf = conf
+    }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        startSec = c.lenient(.startSec) ?? 0; text = c.lenient(.text) ?? ""; idx = c.lenient(.idx)
+        startSec = c.lenient(.startSec) ?? 0; text = c.lenient(.text) ?? ""; idx = c.lenient(.idx); conf = c.lenient(.conf)
     }
     func encode(to encoder: Encoder) throws {   // idx is never sent back to the core
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(startSec, forKey: .startSec); try c.encode(text, forKey: .text)
+        if let conf, conf.isFinite { try c.encode(conf, forKey: .conf) }
     }
-    enum CodingKeys: String, CodingKey { case idx, text, startSec = "start_sec" }
+    enum CodingKeys: String, CodingKey { case idx, text, conf, startSec = "start_sec" }
 }
 
 // MARK: - suggestions

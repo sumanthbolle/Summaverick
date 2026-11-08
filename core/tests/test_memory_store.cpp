@@ -483,6 +483,21 @@ TEST(pieces_store_optional_conf) {
     CHECK(ps[1].contains("conf") && ps[1]["conf"].is_null());
 }
 
+TEST(pieces_conf_roundtrip) {
+    Store s(":memory:");
+    int64_t n = s.create("One", "en", nullptr, "tx", 10);
+    CHECK(s.set_pieces(n, json::parse(R"([{"start_sec":0,"text":"a","conf":0.0},{"start_sec":4,"text":"b","conf":1.0},{"start_sec":8,"text":"c","conf":null}])")));
+    json ps = s.pieces(n);
+    CHECK_EQ(ps.size(), (size_t)3);
+    CHECK(ps[0]["conf"].is_number() && ps[0]["conf"].get<double>() == 0.0);
+    CHECK(ps[1]["conf"].is_number() && ps[1]["conf"].get<double>() == 1.0);
+    CHECK(ps[2]["conf"].is_null());
+    // rewriting the pieces replaces them, conf included
+    CHECK(s.set_pieces(n, json::parse(R"([{"start_sec":0,"text":"z","conf":0.42}])")));
+    CHECK_EQ(s.pieces(n).size(), (size_t)1);
+    CHECK(s.pieces(n)[0]["conf"].get<double>() == 0.42);
+}
+
 TEST(sweep_moves_facts_written_at_version_1_once) {
     std::string p = make_v0();
     { Store s(p); CHECK_EQ(non_medicine_items(s).size(), (size_t)1); }

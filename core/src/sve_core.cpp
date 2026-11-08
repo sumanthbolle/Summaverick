@@ -9,6 +9,7 @@
 #include "sve_budget.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdarg>
 #include <fstream>
 #include <cstdio>
@@ -317,7 +318,7 @@ int sve_audio_loaded(const sve_ctx *ctx) { return ctx && ctx->mtmd ? 1 : 0; }
 // Transcribes one piece of 16 kHz mono audio with the loaded projector. False on failure/cancel.
 static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const std::string &prev,
                              const std::string &vocab, sve_progress_cb cb, void *user, int done, int total,
-                             std::string &out) {
+                             std::string &out, double *conf = nullptr) {
     sve::Llm &llm = *ctx->llm;
     const std::string prompt = llm.apply_template(sve::kTranscriberSystem,
                                                   sve::transcription_instruction(mtmd_get_marker(ctx->mtmd), vocab, prev));
@@ -344,7 +345,7 @@ static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const
     if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", done + 1, total, rc); return false; }
     out.clear();
     int room = std::min(768, llm.n_ctx - (int)n_past - 4);
-    if (!llm.generate(room, true, out, cb, user, "chunk", done, total)) return false;
+    if (!llm.generate(room, true, out, cb, user, "chunk", done, total, conf)) return false;
     out = strip_thinking(out);
     return true;
 }
@@ -356,9 +357,11 @@ static bool audio_ready(sve_ctx *ctx) {
     return true;
 }
 
+struct TimedPiece { int64_t start_sec; std::string text; double conf; };
+
 // Transcribes in ~28 s pieces; each result is (piece start in whole seconds, text). False on failure/cancel.
 static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user,
-                              std::vector<std::pair<int64_t, std::string>> &result) {
+                              std::vector<TimedPiece> &result) {
     if (!wav_path || !audio_ready(ctx)) return false;
     std::vector<float> pcm;
     if (!read_wav16k(wav_path, pcm)) { sve_logf(2, "could not read %s", wav_path); return false; }
@@ -378,9 +381,11 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
     for (int i = 0; i < total; ++i) {
         if (cb && cb("chunk", i, total, user)) return false;
         std::string piece;
+        double conf = std::nan("");
         if (!transcribe_piece(ctx, pcm.data() + pieces[i].first, pieces[i].second - pieces[i].first, prev, vocab,
-                              cb, user, i, total, piece)) return false;
-        if (!piece.empty()) { result.push_back({(int64_t)(pieces[i].first / sve::kAudioRate), piece}); prev = piece; }
+                              cb, user, i, total, piece, &conf)) return false;
+        sve_logf(0, "piece %d/%d conf %.4f", i + 1, total, conf);
+        if (!piece.empty()) { result.push_back({(int64_t)(pieces[i].first / sve::kAudioRate), piece, conf}); prev = piece; }
     }
     if (cb) cb("final", total, total, user);
     return true;
@@ -477,10 +482,11 @@ char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t star
         if (cb && cb("chunk", 0, 1, user)) return nullptr;
         const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
         std::string text;
+        double conf = std::nan("");
         if (!transcribe_piece(ctx, pcm.data() + (plan.start - start), plan.stop - plan.start, prev_text ? prev_text : "",
-                              vocab, cb, user, 0, 1, text)) return nullptr;
+                              vocab, cb, user, 0, 1, text, &conf)) return nullptr;
         sve::json j = {{"status", "piece"}, {"start_sec", (int64_t)(plan.start / sve::kAudioRate)},
-                       {"end_sample", (int64_t)plan.stop}, {"text", text}};
+                       {"end_sample", (int64_t)plan.stop}, {"text", text}, {"conf", conf}};
         return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
     } catch (const std::exception &e) {
         sve_logf(2, "transcribe failed: %s", e.what());
@@ -493,10 +499,10 @@ char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t star
 
 char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user) {
     try {
-        std::vector<std::pair<int64_t, std::string>> pieces;
+        std::vector<TimedPiece> pieces;
         if (!transcribe_pieces(ctx, wav_path, cb, user, pieces)) return nullptr;
         std::string out;
-        for (const auto &p : pieces) { out += p.second; out += "\n"; }
+        for (const auto &p : pieces) { out += p.text; out += "\n"; }
         return dup_str(strip_thinking(out));
     } catch (const std::exception &e) {
         sve_logf(2, "transcribe failed: %s", e.what());
@@ -509,10 +515,10 @@ char *sve_transcribe_audio(sve_ctx *ctx, const char *wav_path, sve_progress_cb c
 
 char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_cb cb, void *user) {
     try {
-        std::vector<std::pair<int64_t, std::string>> pieces;
+        std::vector<TimedPiece> pieces;
         if (!transcribe_pieces(ctx, wav_path, cb, user, pieces)) return nullptr;
         sve::json arr = sve::json::array();
-        for (const auto &p : pieces) arr.push_back({{"start_sec", p.first}, {"text", p.second}});
+        for (const auto &p : pieces) arr.push_back({{"start_sec", p.start_sec}, {"text", p.text}, {"conf", p.conf}});
         return dup_str(arr.dump());
     } catch (const std::exception &e) {
         sve_logf(2, "transcribe failed: %s", e.what());

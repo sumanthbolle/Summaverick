@@ -34,8 +34,11 @@ struct Llm {
     bool complete(const std::string &prompt, int max_new_tokens, std::string &out,
                   sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy = false);
     // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
+    // mean_prob (optional): mean softmax probability of the chosen non-EOG tokens under the raw logits
+    // (before penalties); NaN when no token was generated. Read after sampling, never changes the choice.
     bool generate(int max_new_tokens, bool greedy, std::string &out,
-                  sve_progress_cb cb, void *user, const char *phase, int done, int total);
+                  sve_progress_cb cb, void *user, const char *phase, int done, int total,
+                  double *mean_prob = nullptr);
 };
 
 // Remove thinking blocks and surrounding whitespace.

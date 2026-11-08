@@ -95,6 +95,8 @@ struct TranscriptSidecar: Codable, Equatable {
     struct Piece: Codable, Equatable {
         var start_sec: Int
         var text: String
+        /// Mean token probability of the piece (0...1); absent in sidecars from before and when unknown.
+        var conf: Double?
     }
 
     /// Next sample (16 kHz) to transcribe from.
@@ -111,11 +113,11 @@ struct TranscriptSidecar: Codable, Equatable {
 
     /// Adds a finished piece and moves the cursor. Empty text (silence) only moves the cursor.
     /// A piece that does not move the cursor forward is ignored.
-    mutating func append(startSec: Int, endSample: Int64, text: String) {
+    mutating func append(startSec: Int, endSample: Int64, text: String, conf: Double? = nil) {
         guard endSample > cursor_sample else { return }
         cursor_sample = endSample
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !t.isEmpty { pieces.append(Piece(start_sec: startSec, text: t)) }
+        if !t.isEmpty { pieces.append(Piece(start_sec: startSec, text: t, conf: conf)) }
     }
 
     static func path(forAudio audioPath: String) -> String { audioPath + ".live.json" }

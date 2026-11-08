@@ -992,7 +992,11 @@ static int run_longnotes(sve_ctx *ctx, const char *wav, const char *lang) {
 static int run_notes(sve_ctx *ctx, const char *wav, const char *lang, const char *question) {
     json pieces = take(sve_transcribe_audio_pieces(ctx, wav, nullptr, nullptr));
     if (!pieces.is_array() || pieces.empty()) { fprintf(stderr, "no pieces\n"); return 1; }
-    printf("--- pieces\n%s\n", pieces.dump(2).c_str());
+    {   // conf goes to stderr so stdout stays comparable across versions
+        json shown = pieces;
+        for (auto &p : shown) { fprintf(stderr, "conf %s\n", p.value("conf", json()).dump().c_str()); p.erase("conf"); }
+        printf("--- pieces\n%s\n", shown.dump(2).c_str());
+    }
     std::string transcript;
     for (const auto &p : pieces) transcript += p["text"].get<std::string>() + "\n";
     const char *names[] = {"short summary", "detailed notes", "revision questions"};

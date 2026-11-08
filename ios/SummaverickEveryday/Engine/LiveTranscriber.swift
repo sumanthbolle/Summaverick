@@ -56,8 +56,8 @@ enum TranscriptRun {
             case .end: return (progress, .end)
             case .wait: return (progress, .wait)
             case .skipped: return (progress, .yielded)
-            case .piece(let startSec, let endSample, let text):
-                progress.append(startSec: startSec, endSample: endSample, text: text)
+            case .piece(let startSec, let endSample, let text, let conf):
+                progress.append(startSec: startSec, endSample: endSample, text: text, conf: conf)
                 progress.save(audioPath: audioPath)   // skipped when the audio was deleted meanwhile
                 onPiece(progress)
                 if let sections = try await afterPiece(progress) {
@@ -70,7 +70,7 @@ enum TranscriptRun {
 
     /// The pieces as the note stores them.
     static func pieces(_ s: TranscriptSidecar) -> [TranscriptPiece] {
-        s.pieces.map { TranscriptPiece(startSec: $0.start_sec, text: $0.text) }
+        s.pieces.map { TranscriptPiece(startSec: $0.start_sec, text: $0.text, conf: $0.conf) }
     }
 }
 

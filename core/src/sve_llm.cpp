@@ -4,6 +4,7 @@
 #include "sve_budget.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <thread>
 
@@ -109,10 +110,12 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
 
 // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
 bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
-              sve_progress_cb cb, void *user, const char *phase, int done, int total) {
+              sve_progress_cb cb, void *user, const char *phase, int done, int total, double *mean_prob) {
     llama_sampler_chain_params sp = llama_sampler_chain_default_params();
     sp.no_perf = true;
     llama_sampler *smpl = llama_sampler_chain_init(sp);
+    double prob_sum = 0;
+    int prob_n = 0;
     if (greedy || g_sve_force_greedy) {
         // light penalty only: real speech repeats words, but a stuck model repeats whole phrases
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.05f, 0.0f, 0.0f));
@@ -131,6 +134,18 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
         llama_token id = llama_sampler_sample(smpl, ctx, -1);
         sve_log_tokens('o', &id, 1);
         if (llama_vocab_is_eog(vocab, id)) break;
+        if (mean_prob) {
+            const float *lg = llama_get_logits_ith(ctx, -1);
+            const int nv = llama_vocab_n_tokens(vocab);
+            if (lg && id >= 0 && id < nv) {
+                float mx = lg[0];
+                for (int k = 1; k < nv; ++k) mx = std::max(mx, lg[k]);
+                double z = 0;
+                for (int k = 0; k < nv; ++k) z += std::exp((double)lg[k] - mx);
+                prob_sum += std::exp((double)lg[id] - mx) / z;
+                ++prob_n;
+            }
+        }
         llama_sampler_accept(smpl, id);
         int n = llama_token_to_piece(vocab, id, piece, sizeof piece, 0, false);
         if (n > 0) out.append(piece, n);
@@ -139,6 +154,7 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
         if ((i & 15) == 0 && cb && cb(phase, done, total, user)) { ok = false; break; }
     }
     llama_sampler_free(smpl);
+    if (mean_prob) *mean_prob = prob_n ? prob_sum / prob_n : std::nan("");
     return ok;
 }
 

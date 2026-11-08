@@ -400,7 +400,11 @@ int sve_note_set_pieces(sve_ctx *ctx, int64_t note_id, const char *pieces_json) 
         if (!in.is_array()) return -1;
         json clean = json::array();
         for (const auto &p : in)
-            if (p.is_object()) clean.push_back({{"start_sec", jint(p, "start_sec", 0)}, {"text", jstr(p, "text")}});
+            if (p.is_object()) {
+                json c = {{"start_sec", jint(p, "start_sec", 0)}, {"text", jstr(p, "text")}};
+                if (p.contains("conf") && p["conf"].is_number()) c["conf"] = p["conf"];
+                clean.push_back(c);
+            }
         return ctx->store->set_pieces(note_id, clean) ? 0 : -1;
     });
 }
