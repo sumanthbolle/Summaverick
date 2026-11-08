@@ -405,6 +405,13 @@
 			path = SummaverickEveryday/Views/RecordView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		68019339B3FB26EF022BB32A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_budget.h;
+			path = ../core/src/sve_budget.h;
+			sourceTree = SOURCE_ROOT;
+		};
 		69021175FE455DA46F1832CA = {
 			isa = PBXFileReference;
 			lastKnownFileType = text.json.xcstrings;
@@ -826,6 +833,7 @@
 				0A726C07BA65E563FB374790,
 				A134B997A05BEC16D4B96325,
 				BB44682AB82F093499931FDE,
+				68019339B3FB26EF022BB32A,
 				9E2ACA831A68C5FC7568EFA9,
 				E6FD595D542BBAD86BA1B59B,
 				3C94D64FE92A566816D76B43,

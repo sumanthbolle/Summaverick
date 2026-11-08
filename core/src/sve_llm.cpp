@@ -1,6 +1,7 @@
 #include "sve_llm.h"
 #include "sve_internal.h"
 #include "sve_prompts.h"
+#include "sve_budget.h"
 
 #include <algorithm>
 #include <cstring>
@@ -188,9 +189,10 @@ bool reduce_to_fit(Llm &llm, const std::string &sys, std::string material, int f
     from_bullets = false;
     // Per-chunk extraction needs room for the chunk, the system prompt, ~80 tokens of scaffolding
     // and its own output.
-    const int chunk_out = std::max(120, std::min(400, llm.n_ctx / 5));
-    const int chunk_budget = std::max(128, llm.n_ctx - chunk_out - llm.count_tokens(sys) - 80 - 32);
-    final_budget = std::max(128, std::min(final_budget, chunk_budget));
+    const int sys_tokens = llm.count_tokens(sys);
+    const int chunk_out = sve::chunk_max_out(llm.n_ctx);
+    const int chunk_budget = sve::chunk_budget(llm.n_ctx, sys_tokens);
+    final_budget = sve::fit_budget(llm.n_ctx, sys_tokens, final_budget);
 
     for (int round = 0; round < 4; ++round) {
         int ntok = llm.count_tokens(material);

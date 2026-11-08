@@ -5,6 +5,8 @@
 //               recorded (copied in 10 s steps into a WAV whose header says data size 0), then final
 //   extract     doctor-visit fixture: extract, list pending suggestions, two Ask questions
 //   api         assistant C API without a model (accept/reject, medicines, medicine Ask route)
+//   fits        model only: sve_transcript_fits on the doctor-visit fixture and on longer text, checked
+//               against the first phase sve_generate runs (final = one prompt, chunk = summarised first)
 //   notes       SVE_TEST_WAV: pieces, then the three note kinds from the transcript (SVE_LANG, default te),
 //               then one chat question over the note (SVE_QUESTION)
 // SVE_GREEDY=1 makes every generation greedy; SVE_TOKEN_LOG=<file> appends prompt/generated token ids
@@ -868,6 +870,63 @@ static int run_notes(sve_ctx *ctx, const char *wav, const char *lang, const char
     return 0;
 }
 
+// sve_transcript_fits against what sve_generate does: the first model phase is "final" (whole transcript in one
+// prompt) when it says 1 and "chunk" (summarised first) when it says 0. The callback cancels at once, so each
+// generate call costs one prefill step.
+static int first_phase_cancel(const char *phase, int, int, void *user) {
+    auto *seen = static_cast<std::string *>(user);
+    if (seen->empty()) *seen = phase;
+    return 1;
+}
+
+static std::string first_phase(sve_ctx *ctx, const std::string &text, const char *lang) {
+    std::string seen;
+    char *o = sve_generate(ctx, text.c_str(), SVE_OUT_SHORT_SUMMARY, lang, first_phase_cancel, &seen);
+    sve_free_string(o);
+    return seen;
+}
+
+static std::string slurp(const char *path) {
+    std::ifstream f(path);
+    return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+}
+
+static int run_fits(sve_ctx *ctx, const char *lang) {
+    const std::string fx = slurp(SVE_FIXTURE_DIR "/doctor_visit.txt");
+    expect(!fx.empty(), "fixture read");
+    expect(sve_transcript_fits(ctx, fx.c_str(), lang) == 1, "short fixture fits one prompt");
+    expect(first_phase(ctx, fx, lang) == "final", "short fixture: sve_generate goes straight to the final prompt");
+    expect(sve_transcript_fits(ctx, "", lang) == 1, "empty transcript fits (sve_generate returns \"\")");
+    expect(sve_transcript_fits(ctx, nullptr, lang) == -1, "NULL transcript is -1");
+    // Grow the fixture until it no longer fits; the last fitting and first non-fitting must match sve_generate.
+    std::string text, last_fit, first_over;
+    for (int i = 0; i < 400 && first_over.empty(); ++i) {
+        std::string next = text + fx;
+        if (sve_transcript_fits(ctx, next.c_str(), lang) == 1) text = next;
+        else {
+            // refine to the line: add the fixture's lines one at a time
+            size_t pos = 0;
+            while (pos < fx.size()) {
+                size_t nl = fx.find('\n', pos);
+                size_t end = nl == std::string::npos ? fx.size() : nl + 1;
+                std::string cand = text + fx.substr(pos, end - pos);
+                if (sve_transcript_fits(ctx, cand.c_str(), lang) == 1) text = cand;
+                else { first_over = cand; break; }
+                pos = end;
+            }
+        }
+    }
+    last_fit = text;
+    printf("fits: last fitting %zu bytes, first over %zu bytes\n", last_fit.size(), first_over.size());
+    expect(!first_over.empty(), "a long transcript does not fit");
+    expect(first_phase(ctx, last_fit, lang) == "final", "largest fitting transcript: no chunking");
+    expect(first_phase(ctx, first_over, lang) == "chunk", "one line more: sve_generate chunks it");
+    std::string two_h;
+    for (int i = 0; i < 50; ++i) two_h += fx;   // well past the budget
+    expect(sve_transcript_fits(ctx, two_h.c_str(), lang) == 0, "50x the fixture does not fit");
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "transcribe";
     const char *gguf = getenv("SVE_GEMMA"), *mmproj = getenv("SVE_MMPROJ"), *wav = getenv("SVE_TEST_WAV");
@@ -914,6 +973,11 @@ int main(int argc, char **argv) {
         if (sve_load_audio(ctx, mmproj) != 0) { fprintf(stderr, "sve_load_audio failed\n"); return 1; }
         const char *lang = getenv("SVE_LANG"), *q = getenv("SVE_QUESTION");
         if (int rc = run_notes(ctx, wav, lang ? lang : "te", q ? q : "What are the main points of this recording?")) return rc;
+    } else if (!strcmp(mode, "fits")) {
+        const char *lang = getenv("SVE_LANG");
+        run_fits(ctx, lang ? lang : "te");
+        printf("%s (%d missed)\n", fails ? "FITS FAIL" : "FITS OK", fails);
+        if (fails) { sve_free(ctx); return 1; }
     } else { fprintf(stderr, "unknown mode %s\n", mode); return 2; }
     if (g_sve_token_log) fclose(g_sve_token_log);
     sve_free(ctx);

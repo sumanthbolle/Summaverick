@@ -6,6 +6,7 @@
 #include "sve_context.h"
 #include "sve_audio.h"
 #include "sve_sections.h"
+#include "sve_budget.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -98,6 +99,25 @@ int sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, 
 void sve_unload_llm(sve_ctx *ctx) { if (ctx) { sve_unload_audio(ctx); ctx->llm.reset(); } }
 int sve_llm_loaded(const sve_ctx *ctx) { return ctx && ctx->llm ? 1 : 0; }
 
+// System prompt of the notes outputs: the always block (profile, vocabulary) in front, without the medicines:
+// notes are free text and must not pick up the profile's doses (spec §4).
+static std::string notes_system(sve_ctx *ctx, const std::string &lang) {
+    return sve::context_system(*ctx->store, sve::system_prompt(lang), false);
+}
+
+int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang_c) {
+    try {
+        if (!ctx || !ctx->llm || !transcript) return -1;
+        sve::Llm &llm = *ctx->llm;
+        const std::string text(transcript);
+        if (strip_thinking(text).empty()) return 1;   // sve_generate returns "" without the model
+        const int sys_tokens = llm.count_tokens(notes_system(ctx, lang_c ? lang_c : "en"));
+        // The check reduce_to_fit makes first, with the budget sve_generate gives it.
+        return sve::notes_material_fits(llm.count_tokens(text), llm.n_ctx, sys_tokens) ? 1 : 0;
+    } catch (...) {
+        return -1;
+    }
+}
 
 char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang_c,
                    sve_progress_cb cb, void *user) {
@@ -109,10 +129,10 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
 
     // The always block (profile, vocabulary) goes in front of every system prompt (spec §7.3), here
     // without the medicines: notes are free text and must not pick up the profile's doses (spec §4).
-    const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
-    const int max_out = std::max(160, std::min(700, llm.n_ctx / 4));
+    const std::string sys = notes_system(ctx, lang);
+    const int max_out = sve::notes_max_out(llm.n_ctx);
     // prompt scaffolding ≈ 250 tokens plus the system prompt (reduce_to_fit floors this)
-    const int budget = llm.n_ctx - max_out - 250 - llm.count_tokens(sys);
+    const int budget = sve::notes_budget(llm.n_ctx, llm.count_tokens(sys));
 
     std::string material;
     bool from_bullets = false;
@@ -143,9 +163,10 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
         sve::Llm &llm = *ctx->llm;
         const std::string lang = lang_c ? lang_c : "en";
         // Same budget as sve_generate.
-        const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
-        const int max_out = std::max(160, std::min(700, llm.n_ctx / 4));
-        const int budget = llm.n_ctx - max_out - 250 - llm.count_tokens(sys);
+        const std::string sys = notes_system(ctx, lang);
+        const int sys_tokens = llm.count_tokens(sys);
+        const int max_out = sve::notes_max_out(llm.n_ctx);
+        const int budget = sve::notes_budget(llm.n_ctx, sys_tokens);
         auto count = [&llm](const std::string &t) { return llm.count_tokens(t); };
 
         std::vector<std::string> groups = sve::section_groups(secs, budget, count);
@@ -154,8 +175,8 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
         bool from_bullets = false;
         if (groups.size() > 1) {
             // Hierarchical: summarise each group (room as in reduce_to_fit's chunk step), then write from those.
-            const int chunk_out = std::max(120, std::min(400, llm.n_ctx / 5));
-            const int chunk_budget = std::max(128, llm.n_ctx - chunk_out - llm.count_tokens(sys) - 80 - 32);
+            const int chunk_out = sve::chunk_max_out(llm.n_ctx);
+            const int chunk_budget = sve::chunk_budget(llm.n_ctx, sys_tokens);
             groups = sve::section_groups(secs, std::max(budget, chunk_budget), count);
             std::string bullets;
             const int total = (int)groups.size();

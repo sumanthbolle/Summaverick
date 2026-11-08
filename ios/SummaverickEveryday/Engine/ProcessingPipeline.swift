@@ -416,10 +416,15 @@ final class ProcessingPipeline {
         if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
 
-        // Section summaries the note does not have yet (all of them for a note from before sections). Notes and
-        // title come from them only when they cover the whole recording; otherwise from the transcript.
-        guard let fromSections = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
+        // Section summaries the note does not have yet (all of them for a note from before sections; the chapters
+        // come from them). Notes and title come from the transcript, exactly as before sections, whenever it fits
+        // one prompt; from the sections only when it does not and they cover the whole recording.
+        guard let covered = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
+        var fromSections = false
+        if covered, let fits = try? await onBackend({ await engine.transcriptFits(transcript, lang: lang) }) {
+            fromSections = fits == false
+        }
         if setTitle, !(await heatGate(id)) { return }
 
         if setTitle, let t = try? await onBackend({ () async throws -> String in

@@ -69,6 +69,11 @@ int  sve_llm_loaded(const sve_ctx *ctx);
 char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang,
                    sve_progress_cb cb, void *user);
 
+/* 1 when sve_generate takes the whole transcript in one prompt (no chunking), 0 when it would have to
+ * summarise it first, -1 with no model or bad input. Same budget as sve_generate (needs the model's tokenizer).
+ * Notes and title come from the transcript when it fits, from the section summaries only when it does not. */
+int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang);
+
 /* Free‑form question over a transcript or set of notes ("what was the homework?").
  * context_text should be the transcript (or concatenated note outputs). */
 char *sve_ask(sve_ctx *ctx, const char *context_text, const char *question, const char *lang,

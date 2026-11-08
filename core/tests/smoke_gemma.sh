@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds core/tests/smoke_gemma.cpp against Homebrew llama.cpp + mtmd and runs it.
-# Usage: smoke_gemma.sh [transcribe|live|sections|longnotes|notes|extract|api]   Env: SVE_GEMMA SVE_MMPROJ SVE_TEST_WAV [SVE_FIXTURE SVE_LANG SVE_QUESTION SVE_GREEDY SVE_TOKEN_LOG]
-#   api needs no model; live feeds SVE_TEST_WAV as a growing recording (CPU); sections = live's pieces, ~5 min sections, one summary each (SVE_LANG, default te); longnotes = sections, then a synthetic ~2 h input (repeated summaries) -> notes x3 + title + chapters; extract uses core/tests/fixtures/doctor_visit.txt by default.
+# Usage: smoke_gemma.sh [transcribe|live|sections|longnotes|notes|fits|extract|api]   Env: SVE_GEMMA SVE_MMPROJ SVE_TEST_WAV [SVE_FIXTURE SVE_LANG SVE_QUESTION SVE_GREEDY SVE_TOKEN_LOG]
+#   api needs no model; fits needs only SVE_GEMMA; live feeds SVE_TEST_WAV as a growing recording (CPU); sections = live's pieces, ~5 min sections, one summary each (SVE_LANG, default te); longnotes = sections, then a synthetic ~2 h input (repeated summaries) -> notes x3 + title + chapters; extract uses core/tests/fixtures/doctor_visit.txt by default.
 set -eu
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="$(mktemp -d)"; trap 'rm -rf "$OUT"' EXIT

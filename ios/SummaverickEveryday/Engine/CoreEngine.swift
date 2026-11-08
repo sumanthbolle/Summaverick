@@ -195,6 +195,13 @@ actor CoreEngine {
         return out
     }
 
+    /// Whether `generate` takes the whole transcript in one prompt (no chunking). nil with no model.
+    func transcriptFits(_ transcript: String, lang: String) -> Bool? {
+        guard let ctx else { return nil }
+        let r = sve_transcript_fits(ctx, transcript, lang)
+        return r < 0 ? nil : r == 1
+    }
+
     func suggestTitle(transcript: String, lang: String) -> String? {
         guard let ctx else { return nil }
         let t = take(sve_suggest_title(ctx, transcript, lang))?.trimmingCharacters(in: .whitespacesAndNewlines)
