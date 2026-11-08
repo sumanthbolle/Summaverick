@@ -579,7 +579,10 @@ json Store::suggestions(const std::string &status) {
 }
 
 bool Store::set_suggestion_status(int64_t id, const std::string &status) {
-    return run("UPDATE suggestions SET status=? WHERE id=?", {status, id}) && sqlite3_changes(db_) > 0;
+    // "superseded" only replaces a card still waiting: a card the person accepted or declined on the screens'
+    // connection a moment earlier keeps its decision.
+    return run("UPDATE suggestions SET status=? WHERE id=? AND (?<>'superseded' OR status='pending')", {status, id, status}) &&
+           sqlite3_changes(db_) > 0;
 }
 
 bool Store::set_suggestion_check(int64_t id, const std::string &check_status, const json &check_fields) {
