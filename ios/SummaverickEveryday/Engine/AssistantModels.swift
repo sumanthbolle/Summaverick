@@ -1,50 +1,8 @@
 // Typed models for the assistant half of the core API (sve_core.h, "personal assistant" section).
 // The core's JSON uses snake_case keys, so every type has explicit CodingKeys. Decoding is lenient:
-// a missing key, a null or an unexpected type becomes nil/default instead of failing the whole list.
+// a missing key, a null or an unexpected type becomes nil/default instead of failing the whole list
+// (the lenient/flag helpers and JSONValue live in TranscriptSidecar.swift).
 import Foundation
-
-extension KeyedDecodingContainer {
-    /// nil when the key is missing, null, or of an unexpected type.
-    fileprivate func lenient<T: Decodable>(_ key: Key) -> T? { try? decode(T.self, forKey: key) }
-    /// The core stores booleans as 0/1 integers in some places and true/false in others.
-    fileprivate func flag(_ key: Key) -> Bool? {
-        if let b: Bool = lenient(key) { return b }
-        if let i: Int = lenient(key) { return i != 0 }
-        return nil
-    }
-}
-
-// MARK: - raw JSON
-
-/// Any JSON value. Used to keep a suggestion payload's raw shape so edits round-trip untouched.
-enum JSONValue: Codable, Equatable {
-    case null, bool(Bool), number(Double), string(String), array([JSONValue]), object([String: JSONValue])
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.singleValueContainer()
-        if c.decodeNil() { self = .null }
-        else if let b = try? c.decode(Bool.self) { self = .bool(b) }
-        else if let n = try? c.decode(Double.self) { self = .number(n) }
-        else if let s = try? c.decode(String.self) { self = .string(s) }
-        else if let a = try? c.decode([JSONValue].self) { self = .array(a) }
-        else if let o = try? c.decode([String: JSONValue].self) { self = .object(o) }
-        else { self = .null }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.singleValueContainer()
-        switch self {
-        case .null: try c.encodeNil()
-        case .bool(let b): try c.encode(b)
-        case .number(let n): try c.encode(n)
-        case .string(let s): try c.encode(s)
-        case .array(let a): try c.encode(a)
-        case .object(let o): try c.encode(o)
-        }
-    }
-
-    var stringValue: String? { if case .string(let s) = self { return s }; return nil }
-}
 
 // MARK: - profile, routine, medicines
 

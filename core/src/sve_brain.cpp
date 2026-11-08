@@ -184,14 +184,14 @@ int64_t store_memory(sve::Store &st, int64_t note_id, const json &g, int double_
     return refresh_importance(st, id) ? id : -1;
 }
 
-// The section's pieces that have text, with their transcript confidence. Section piece ranges are
-// half-open piece indexes [first_piece, last_piece).
+// The section's pieces that have text, with their transcript confidence. Section piece ranges include both ends,
+// [first_piece, last_piece], as the app stores them (NoteSection, SectionWriter).
 void section_material(sve::Store &st, int64_t note_id, const json &section, sve::SectionPieces &pieces,
                       std::vector<std::optional<double>> &conf) {
     const int64_t first = jint(section, "first_piece", 0), last = jint(section, "last_piece", 0);
     for (const auto &p : st.pieces(note_id)) {
         const int64_t idx = jint(p, "idx", -1);
-        if (idx < first || idx >= last) continue;
+        if (idx < first || idx > last) continue;
         const std::string t = jstr(p, "text");
         if (t.find_first_not_of(" \t\r\n") == std::string::npos) continue;
         pieces.push_back({jint(p, "start_sec", 0), t});

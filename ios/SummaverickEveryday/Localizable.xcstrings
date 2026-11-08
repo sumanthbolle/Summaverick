@@ -4754,6 +4754,23 @@
           }
         }
       }
+    },
+    "Finding things to remember… part %lld of %lld": {
+      "comment": "Part number, total parts of a recording whose memories are being written",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finding things to remember… part %1$lld of %2$lld"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "గుర్తుంచుకోవాల్సినవి వెతుకుతోంది… %2$lld భాగాల్లో %1$lldవ భాగం"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

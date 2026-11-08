@@ -1,4 +1,4 @@
-// Small pure rules behind the AI download, the device check, heat and the waiting-notes queue.
+// Small pure rules behind the AI download, the device check, heat, the waiting-notes queue and the memory pass.
 // Foundation only and free of app state, so they can be checked with a standalone swiftc script.
 import Foundation
 
@@ -231,6 +231,9 @@ enum WorkEstimate {
     static let secondsPerAudioSecond = 1.2
     /// One section summary (~5 minutes of audio).
     static let secondsPerSection = 60
+    /// One section's memories: their own model call after the notes, about 1.4 times a section summary
+    /// (Mac CPU: 82.6 s against 60.2 s, 69.3 s against 46.1 s).
+    static let secondsPerMemorySection = 84
     /// One of the three outputs (summary, notes, questions).
     static let secondsPerOutput = 90
     /// Audio per section, for sections not planned yet (the planner's target length).
@@ -239,9 +242,10 @@ enum WorkEstimate {
     static let offerAboveMinutes = 20
 
     /// Whole minutes of work left, rounded up. Negative inputs count as none.
-    static func minutesLeft(audioSecondsLeft: Int, sectionsLeft: Int, outputsLeft: Int) -> Int {
+    static func minutesLeft(audioSecondsLeft: Int, sectionsLeft: Int, outputsLeft: Int, memorySectionsLeft: Int = 0) -> Int {
         let seconds = Double(max(0, audioSecondsLeft)) * secondsPerAudioSecond
-            + Double(max(0, sectionsLeft) * secondsPerSection + max(0, outputsLeft) * secondsPerOutput)
+            + Double(max(0, sectionsLeft) * secondsPerSection + max(0, outputsLeft) * secondsPerOutput
+                     + max(0, memorySectionsLeft) * secondsPerMemorySection)
         return Int((seconds / 60).rounded(.up))
     }
 
@@ -319,5 +323,55 @@ enum RegenerateRules {
     /// Stop wins: a run cancelled by Stop is never shown as a failure, nor saved.
     static func outcome(written: Bool, stopped: Bool) -> Outcome {
         stopped ? .stopped : (written ? .replaced : .failed)
+    }
+}
+
+/// The memories of one note, written after its notes: one section at a time (sve_memories_from_section), each
+/// after the caller's checks (heat, a recording, notes waiting), every finished section kept before the next.
+@MainActor
+enum MemoryPass {
+    /// What one section's memory call came to.
+    enum Step: Equatable {
+        /// Stored this many (0 also for a section already done, or a model reply that could not be used).
+        case stored(Int)
+        /// -1: the note or the section is gone (deleted meanwhile), bad input, or no model.
+        case gone
+        /// -2: cancelled; nothing was stored and the section stays due.
+        case cancelled
+
+        nonisolated init(result: Int32) {
+            switch result {
+            case 0...: self = .stored(Int(result))
+            case -2: self = .cancelled
+            default: self = .gone
+            }
+        }
+    }
+
+    enum Outcome: Equatable {
+        /// Every section given has its memories.
+        case finished
+        /// A section call said -1: the run ends quietly, nothing more for this note now.
+        case gone
+        /// `beforeEach` said no, or a call was cancelled: the sections left stay due for later.
+        case stopped
+    }
+
+    /// For each section index in `due`, in order: `beforeEach` (false stops), `write`, then `afterEach` with the
+    /// sections finished so far. Returns how it ended and how many sections were finished.
+    static func run(due: [Int], beforeEach: (Int) async -> Bool, write: (Int) async -> Step,
+                    afterEach: (_ finished: Int, _ stored: Int) async -> Void = { _, _ in }) async -> (outcome: Outcome, finished: Int) {
+        var finished = 0
+        for idx in due {
+            guard await beforeEach(idx) else { return (.stopped, finished) }
+            switch await write(idx) {
+            case .stored(let n):
+                finished += 1
+                await afterEach(finished, n)
+            case .gone: return (.gone, finished)
+            case .cancelled: return (.stopped, finished)
+            }
+        }
+        return (.finished, finished)
     }
 }

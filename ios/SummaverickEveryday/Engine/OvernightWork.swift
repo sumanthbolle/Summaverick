@@ -1,7 +1,9 @@
 // Overnight mode: a BGProcessingTask that finishes long recordings while the phone charges. iOS runs it
 // when the phone is plugged in and idle (usually at night); it can end it at any time. Work runs on the CPU
-// (the app is in the background), one note at a time, through the pipeline, with the heat rule. Every piece,
-// section and output is kept as it finishes, so an expired task loses at most the step in flight.
+// (the app is in the background), one note at a time, through the pipeline, with the heat rule: first the marked,
+// cut-off and waiting notes, then the memories of notes that still need them, newest first (up to 20 notes a
+// run). Every piece, section, output and section's memories is kept as it finishes, so an expired task loses at
+// most the step in flight.
 // Not the same as ContinuedWork (iOS 26 continued processing right after Stop, while the person waits):
 // that one has its own identifiers; the pipeline's busy claim keeps the two from ever running model work at
 // the same time.
@@ -84,7 +86,7 @@ final class OvernightWork {
         Task { @MainActor in
             let workLeft = await pipeline.runOvernight(expired: r.expired)
             if !r.expired.isSet {
-                if workLeft { Self.submit() }   // heat, or more than one night's work: again on the charger
+                if workLeft { Self.submit() }   // heat, memories left, or more than one night's work: again on the charger
                 NSLog("[sve] overnight task done (work left: %@)", workLeft ? "yes" : "no")
                 r.complete(success: !workLeft)
             }

@@ -701,7 +701,7 @@ static void run_api_memories(sve_ctx *ctx) {
         return json{{"idx", idx}, {"first_piece", a}, {"last_piece", b}, {"start_sec", s0}, {"end_sec", s1},
                     {"summary", {{"title", "T"}, {"points", json::array({{{"text", "p"}, {"start_sec", s0}}})}}}};
     };
-    json secs = json::array({sec(0, 0, 3, 0, 90), sec(1, 3, 4, 90, 120), sec(2, 4, 4, 120, 120)});
+    json secs = json::array({sec(0, 0, 2, 0, 90), sec(1, 3, 3, 90, 120), sec(2, 4, 4, 120, 120)});   // both ends included
     expect(sve_note_set_sections(ctx, note, secs.dump().c_str()) == 0, "memories: sections stored");
     expect(take(sve_memory_sections_due(ctx, note)) == json::parse("[0,1,2]"), "memories: every section due");
     json needing = take(sve_notes_needing_memories(ctx, 10));
@@ -779,6 +779,37 @@ static void run_api_memories(sve_ctx *ctx) {
     sve_note_delete(ctx, note);
     expect(take(sve_memory_get(ctx, pid)).is_null(), "memories go with their only recording");
     expect(sve_memories_from_section(ctx, note, 0, nullptr, nullptr) == -1, "memories: deleted note -> -1");
+
+    // Review Focus 4, as the app's memory pass runs it (ProcessingPipeline.writeMemories): the due sections are read
+    // once, then written one at a time; the recording is deleted between section 0 and section 1.
+    int64_t mid_note = make_note(ctx, pieces, "Deleted mid-way");
+    expect(sve_note_set_sections(ctx, mid_note, json::array({sec(0, 0, 1, 0, 60), sec(1, 2, 3, 60, 120)}).dump().c_str()) == 0,
+           "mid-way: two sections stored");
+    json due = take(sve_memory_sections_due(ctx, mid_note));
+    expect(due == json::parse("[0,1]"), "mid-way: both sections due");
+    std::vector<int> results;
+    int64_t first_id = 0;
+    for (const auto &idx : due) {
+        g_api_drops.clear();
+        int r = sve_memories_from_section(ctx, mid_note, idx.get<int>(), nullptr, nullptr);
+        results.push_back(r);
+        printf("--- mid-way: section %d -> %d, drops:", idx.get<int>(), r);
+        for (const auto &d : g_api_drops) printf(" %s", d.c_str());
+        printf("\n");
+        if (r < 0) break;  // the pass ends quietly on -1
+        if (idx == 0) {
+            json mine = take(sve_memories_json(ctx, (R"({"note_id":)" + std::to_string(mid_note) + "}").c_str()));
+            first_id = mine.empty() ? 0 : mine[0].value("id", (int64_t)0);
+            sve_note_delete(ctx, mid_note);  // the person deletes the recording while its memories are being written
+        }
+    }
+    expect(results.size() == 2 && results[0] >= 1 && results[1] == -1, "mid-way: section 0 stored, section 1 after the delete -> -1");
+    expect(first_id > 0 && take(sve_memory_get(ctx, first_id)).is_null(), "mid-way: section 0's memories went with the recording");
+    expect(take(sve_memories_json(ctx, (R"({"note_id":)" + std::to_string(mid_note) + "}").c_str())).empty() &&
+               take(sve_memory_sections_due(ctx, mid_note)).empty(), "mid-way: nothing of it is left or due");
+    json still = take(sve_notes_needing_memories(ctx, 100));
+    expect(still.is_array() && std::find(still.begin(), still.end(), json(mid_note)) == still.end(),
+           "mid-way: the deleted note never comes back for memories");
     g_sve_model_reply = nullptr;
     g_sve_memory_drop = nullptr;
 }
@@ -939,7 +970,7 @@ static int run_sections(sve_ctx *ctx, const char *wav, const char *lang, json *s
         printf("--- section %zu (pieces %zu..%zu, %.1f s)\n%s\n", k, secs[k].first, secs[k].second, sec, s.dump(2).c_str());
         expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 6,
                "section summary has a title and 1..6 points");
-        if (stored) stored->push_back({{"idx", (int)k}, {"first_piece", (int)secs[k].first}, {"last_piece", (int)secs[k].second},
+        if (stored) stored->push_back({{"idx", (int)k}, {"first_piece", (int)secs[k].first}, {"last_piece", (int)secs[k].second - 1},
                                        {"start_sec", refs[secs[k].first].start_sec}, {"end_sec", refs[secs[k].second - 1].end_sec}, {"summary", s}});
         if (s.value("fallback", false)) printf("(fallback used)\n");
         if (force_fb) expect(s.value("fallback", false), "forced truncation returns the fallback summary");
@@ -1165,7 +1196,7 @@ static int run_memories(sve_ctx *ctx, const char *db_path) {
                 expect(sm.is_object() && sm.contains("title"), "section summary written");
                 if (sm.value("fallback", false)) printf("(fallback used)\n");
                 int64_t s0 = pieces[a]["start_sec"], s1 = b < pieces.size() ? pieces[b]["start_sec"].get<int64_t>() : end;
-                secs.push_back({{"idx", (int)k}, {"first_piece", (int)a}, {"last_piece", (int)b}, {"start_sec", s0}, {"end_sec", s1},
+                secs.push_back({{"idx", (int)k}, {"first_piece", (int)a}, {"last_piece", (int)b - 1}, {"start_sec", s0}, {"end_sec", s1},
                                 {"summary", sm}});
             }
             expect(sve_note_set_sections(ctx, id, secs.dump().c_str()) == 0, "sections stored");
