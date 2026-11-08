@@ -4003,22 +4003,6 @@
         }
       }
     },
-    "Keep Summaverick open until your notes are written.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep Summaverick open until your notes are written."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "నోట్స్ తయారయ్యే వరకు Summaverick ని తెరిచే ఉంచండి."
-          }
-        }
-      }
-    },
     "Allow the microphone for Summaverick in Settings.": {
       "localizations": {
         "en": {
@@ -5421,6 +5405,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "రికార్డింగ్‌ను ఆపుతుంది; దాని నోట్స్ ఈ ఫోన్‌లోనే తయారవుతాయి."
+          }
+        }
+      }
+    },
+    "You can close Summaverick and get on with your day. You'll get a notification when your notes are ready.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can close Summaverick and get on with your day. You'll get a notification when your notes are ready."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు Summaverick ని మూసేసి మీ పనులు చూసుకోవచ్చు. నోట్స్ సిద్ధమైనప్పుడు మీకు నోటిఫికేషన్ వస్తుంది."
           }
         }
       }

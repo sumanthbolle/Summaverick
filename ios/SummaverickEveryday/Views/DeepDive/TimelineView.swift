@@ -94,7 +94,7 @@ struct StatusBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(stage.label).font(.footnote).lineLimit(2)
                 if stage.isWorking {
-                    Text("Keep Summaverick open until your notes are written.")
+                    Text("You can close Summaverick and get on with your day. You'll get a notification when your notes are ready.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
