@@ -78,6 +78,11 @@ struct StatusBanner: View {
     let stage: ProcessingPipeline.Stage
     /// Waiting for the charger: "Do it now" runs the note at once.
     var onDoItNow: (() -> Void)? = nil
+    /// A regenerate running: Stop cancels it (the old text stays).
+    var onStop: (() -> Void)? = nil
+    /// Failed or paused: Try again runs the note now. Disabled while another note is running.
+    var onTryAgain: (() -> Void)? = nil
+    var tryAgainDisabled = false
     var body: some View {
         HStack(spacing: 10) {
             switch stage {
@@ -99,6 +104,19 @@ struct StatusBanner: View {
                     .buttonStyle(.bordered)
                     .font(.footnote.weight(.semibold))
                     .frame(minHeight: 44)
+            }
+            if let onStop {
+                Button("Stop", action: onStop)
+                    .buttonStyle(.bordered)
+                    .font(.footnote.weight(.semibold))
+                    .frame(minHeight: 44)
+            }
+            if let onTryAgain {
+                Button("Try again", action: onTryAgain)
+                    .buttonStyle(.bordered)
+                    .font(.footnote.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .disabled(tryAgainDisabled)
             }
         }
         .padding(.horizontal).padding(.vertical, 8)

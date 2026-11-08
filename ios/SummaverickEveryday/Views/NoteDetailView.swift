@@ -37,6 +37,8 @@ struct NoteDetailView: View {
     @State private var gateKey = "note.\(UUID().uuidString)"
     /// Extraction has run on this note (true until loaded, so the button never flashes).
     @State private var extracted = true
+    /// What the last successful regenerate replaced, for Undo; kept until the note is left.
+    @State private var undo: ProcessingPipeline.Previous?
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -50,6 +52,15 @@ struct NoteDetailView: View {
             case .transcript: return "Transcript"
             }
         }
+        /// The output this tab shows; nil for the transcript.
+        var kind: OutputKind? {
+            switch self {
+            case .summary: return .shortSummary
+            case .notes: return .detailedNotes
+            case .questions: return .revisionQuestions
+            case .transcript: return nil
+            }
+        }
     }
 
     init(noteID: Int64, startAt: Int? = nil) {
@@ -60,6 +71,8 @@ struct NoteDetailView: View {
     }
 
     private var isThisNoteBusy: Bool { pipeline.isBusy && pipeline.activeNoteID == noteID }
+    /// A regenerate of this note is running: its progress and Stop show under the text.
+    private var isRegeneratingHere: Bool { isThisNoteBusy && pipeline.regenerating?.noteID == noteID }
     private var presenting: Bool { confirmDelete || fixing != nil || shareItem != nil || errorMessage != nil }
 
     var body: some View {
@@ -120,8 +133,10 @@ struct NoteDetailView: View {
                     ChaptersView(chapters: chapters, onPlay: audioPath.map { p in { sec in playChapter(p, sec) } })
 
                     if isThisNoteBusy {
-                        StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
-                        if pipeline.overnightOffer == noteID { overnightOffer }
+                        if !isRegeneratingHere {
+                            StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
+                            if pipeline.overnightOffer == noteID { overnightOffer }
+                        }
                     } else if pipeline.isOvernight(noteID) {
                         StatusBanner(stage: .overnight, onDoItNow: models.isReady ? {
                             Task { await pipeline.doItNow(noteID: noteID) }
@@ -132,7 +147,12 @@ struct NoteDetailView: View {
                                                                                   : ProcessingPipeline.waitingMessage))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else if let failure = pipeline.lastFailure[noteID] {
-                        StatusBanner(stage: pipeline.interrupted.contains(noteID) ? .paused(failure) : .failed(failure))
+                        StatusBanner(stage: pipeline.interrupted.contains(noteID) ? .paused(failure) : .failed(failure),
+                                     onTryAgain: RegenerateRules.showsTryAgain(needsWork: needsGeneration, aiReady: models.isReady,
+                                                                               overnight: pipeline.isOvernight(noteID)) ? {
+                                         Task { await pipeline.tryAgain(noteID: noteID) }
+                                     } : nil,
+                                     tryAgainDisabled: pipeline.isBusy)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
 
@@ -142,6 +162,8 @@ struct NoteDetailView: View {
                     .pickerStyle(.segmented)
 
                     content
+
+                    regenerateControls
 
                     if needsGeneration && !isThisNoteBusy && models.isReady && !pipeline.isOvernight(noteID) {
                         Button {
@@ -199,6 +221,10 @@ struct NoteDetailView: View {
                             if let url = exportFileURL() { shareItem = ShareItem(items: [url]) }
                         } label: { Label("Export as Markdown file", systemImage: "doc") }
                     }
+                    if showsRegenerateAll {
+                        Button { regenerate(nil) } label: { Label("Regenerate all", systemImage: "arrow.clockwise") }
+                            .disabled(pipeline.isBusy)
+                    }
                     Button(role: .destructive) { confirmDelete = true } label: { Label("Delete note", systemImage: "trash") }
                 } label: { Image(systemName: "ellipsis.circle") }
                 .accessibilityLabel(Text("More options"))
@@ -244,6 +270,75 @@ struct NoteDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 24)
             }
+        }
+    }
+
+    /// Under a tab's text: the progress and Stop while a regenerate runs, "Try again" after one failed, else
+    /// Regenerate (and Undo after a regenerate).
+    @ViewBuilder private var regenerateControls: some View {
+        if isRegeneratingHere {
+            StatusBanner(stage: pipeline.stage, onStop: { pipeline.stopRegenerating(noteID: noteID) })
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else if !isThisNoteBusy, let failed = pipeline.regenerateFailed[noteID] {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text("Could not write this again. Try again.").font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                Button("Try again") { regenerate(failed.kind) }
+                    .buttonStyle(.bordered)
+                    .font(.footnote.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .disabled(pipeline.isBusy || !models.isReady)
+            }
+            .padding(.horizontal).padding(.vertical, 8)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+        } else if let kind = tab.kind {
+            let hasText = !(note?.output(kind) ?? "").isEmpty
+            let showRegenerate = RegenerateRules.showsRegenerate(hasText: hasText, noteBusy: isThisNoteBusy, aiReady: models.isReady,
+                                                                  overnight: pipeline.isOvernight(noteID))
+            let showUndo = RegenerateRules.showsUndo(replacedThisTab: undo?.outputs[kind] != nil, noteBusy: isThisNoteBusy)
+            if showRegenerate || showUndo {
+                HStack(spacing: 12) {
+                    if showRegenerate {
+                        Button { regenerate(kind) } label: {
+                            Label("Regenerate", systemImage: "arrow.clockwise").frame(minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(pipeline.isBusy)
+                    }
+                    if showUndo {
+                        Button { undoRegenerate() } label: {
+                            Label("Undo", systemImage: "arrow.uturn.backward").frame(minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+
+    private var showsRegenerateAll: Bool {
+        guard let n = note else { return false }
+        return RegenerateRules.showsRegenerateAll(hasTranscript: hasTranscript, outputs: OutputKind.allCases.map { n.output($0) != nil },
+                                                  noteBusy: isThisNoteBusy, aiReady: models.isReady, overnight: pipeline.isOvernight(noteID))
+    }
+
+    /// One output (kind) or, nil, the title and all three. The old text stays until the new is complete.
+    private func regenerate(_ kind: OutputKind?) {
+        Task {
+            if let previous = await pipeline.regenerateOutput(noteID: noteID, kind: kind) { undo = previous }
+            await load()
+        }
+    }
+
+    /// The text before the last regenerate back, saved.
+    private func undoRegenerate() {
+        guard let previous = undo else { return }
+        undo = nil
+        Task {
+            await pipeline.restore(previous, noteID: noteID)
+            await load()
         }
     }
 

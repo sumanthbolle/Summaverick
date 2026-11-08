@@ -315,6 +315,135 @@ final class ProcessingPipeline {
         await generateOutputs(noteID: noteID, transcript: t, lang: AppSettings.shared.notesLanguage, setTitle: note.title.hasPrefix("Recording "))
     }
 
+    // MARK: regenerate one output, or all
+
+    /// A "Regenerate" asked for: one output, or (kind nil) the title and all three outputs.
+    struct Regeneration: Equatable {
+        let noteID: Int64
+        let kind: OutputKind?
+        var kinds: [OutputKind] { kind.map { [$0] } ?? OutputKind.allCases }
+    }
+
+    /// What a regenerate replaced, kept by the note screen for Undo.
+    struct Previous: Equatable {
+        var title: String?
+        var outputs: [OutputKind: String]
+    }
+
+    /// The regenerate running now (its note shows the progress and Stop under the text).
+    private(set) var regenerating: Regeneration?
+    /// The last regenerate of a note that failed (error, heat, cut off by iOS): the note shows "Try again".
+    private(set) var regenerateFailed: [Int64: Regeneration] = [:]
+    @ObservationIgnored private var regenerateStopped = false
+
+    /// "Regenerate" (one output) or "Regenerate all" (kind nil: title and the three outputs; not reminders and
+    /// tasks, and the sections are reused, not rewritten). Same source rule, heat rule and backend as the first
+    /// time, with sampling, so it gives a new version. The old text stays until everything asked for is written,
+    /// then it is replaced at once; after a failure or Stop nothing changes. Returns the replaced text (for Undo)
+    /// on success.
+    @discardableResult
+    func regenerateOutput(noteID id: Int64, kind: OutputKind?) async -> Previous? {
+        guard !isBusy else { return nil }
+        starting = true
+        defer { starting = false }
+        let request = Regeneration(noteID: id, kind: kind)
+        regenerateFailed[id] = nil
+        let engine = CoreEngine.shared
+        guard let note = await engine.note(id) else { return nil }   // deleted
+        let transcript = note.transcript ?? ""
+        guard ModelManager.shared.isReady, !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            regenerateFailed[id] = request; return nil
+        }
+        beginBackground()
+        defer { endBackground() }
+        activeNoteID = id
+        regenerating = request
+        regenerateStopped = false
+        // A regenerate never queues the note for resuming nor changes its resume banner: put those back after.
+        let wasQueued = interrupted.contains(id), wasHeatPaused = heatPaused.contains(id), failure = lastFailure[id]
+        // In the language the note was written in (as section backfill does).
+        let written = await writeAgain(request, transcript: transcript, lang: note.lang)
+        if !wasQueued { interrupted.remove(id) }
+        if !wasHeatPaused { heatPaused.remove(id) }
+        lastFailure[id] = failure
+        regenerating = nil
+
+        let outcome = RegenerateRules.outcome(written: written != nil, stopped: regenerateStopped)
+        if outcome == .replaced, let written, let now = await engine.note(id) {   // deleted meanwhile: nothing is written
+            var previous = Previous(title: nil, outputs: [:])
+            if let t = written.title { previous.title = now.title; await engine.setTitle(id, t) }
+            for k in request.kinds {
+                guard let text = written.outputs[k] else { continue }
+                if let old = now.output(k) { previous.outputs[k] = old }
+                await engine.setOutput(id, k, text)
+            }
+            NotificationCenter.default.post(name: .notesChanged, object: nil)
+            stage = .done
+            return previous
+        }
+        if outcome == .failed { regenerateFailed[id] = request }
+        stage = .idle
+        return nil
+    }
+
+    /// The new text for a regenerate, nothing stored. nil: failed, too hot (critical), stopped or cut off.
+    private func writeAgain(_ request: Regeneration, transcript: String, lang: String) async -> Previous? {
+        let id = request.noteID, engine = CoreEngine.shared
+        if !(await heatGate(id)) { return nil }
+        do {
+            try await loadSelectedModel()
+        } catch {
+            NSLog("[sve] regenerate: model not loaded: %@", String(describing: error))
+            return nil
+        }
+        let pieces = await engine.pieces(id)
+        let covered = SectionWriter.coversAll(await engine.sections(id), pieceCount: pieces.count)
+        let fromSections = await notesFromSections(covered: covered, transcript: transcript, lang: lang)
+        var result = Previous(title: nil, outputs: [:])
+        if request.kind == nil {
+            if abort.isSet { return nil }
+            if !(await heatGate(id)) { return nil }
+            result.title = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections)
+        }
+        for kind in request.kinds {
+            if abort.isSet { return nil }
+            if !(await heatGate(id)) { return nil }
+            do {
+                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections)
+                guard RegenerateRules.accepts(text) else { NSLog("[sve] regenerate: empty %@", kind.title); return nil }
+                result.outputs[kind] = text
+            } catch {
+                NSLog("[sve] regenerate failed: %@", String(describing: error))
+                return nil
+            }
+        }
+        return abort.isSet ? nil : result
+    }
+
+    /// Stop on a regenerate: the run is cancelled and the old text kept.
+    func stopRegenerating(noteID id: Int64) {
+        guard regenerating?.noteID == id else { return }
+        regenerateStopped = true
+        abort.set(true)
+    }
+
+    /// Undo after a regenerate: the previous text (and title) back, saved.
+    func restore(_ previous: Previous, noteID id: Int64) async {
+        let engine = CoreEngine.shared
+        guard !(isBusy && activeNoteID == id), await engine.note(id) != nil else { return }
+        if let t = previous.title { await engine.setTitle(id, t) }
+        for (k, text) in previous.outputs { await engine.setOutput(id, k, text) }
+        NotificationCenter.default.post(name: .notesChanged, object: nil)
+    }
+
+    /// "Try again" on a note's failed or paused banner: the usual resume path, now.
+    func tryAgain(noteID id: Int64) async {
+        guard !isBusy else { return }
+        interrupted.remove(id)
+        heatPaused.remove(id)
+        await regenerate(noteID: id)
+    }
+
     /// Audio → text, on the CPU, from where live transcription (or an interrupted run) stopped. The model
     /// hears the recording itself, so any language mix works. Stops (the progress callback cancels) as
     /// soon as the phone gets too hot or the background time runs out; the caller treats that as a pause,
@@ -421,17 +550,10 @@ final class ProcessingPipeline {
         // one prompt; from the sections only when it does not and they cover the whole recording.
         guard let covered = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
-        var fromSections = false
-        if covered, let fits = try? await onBackend({ await engine.transcriptFits(transcript, lang: lang) }) {
-            fromSections = fits == false
-        }
+        let fromSections = await notesFromSections(covered: covered, transcript: transcript, lang: lang)
         if setTitle, !(await heatGate(id)) { return }
 
-        if setTitle, let t = try? await onBackend({ () async throws -> String in
-            if fromSections, let t = await engine.titleFromSections(noteID: id, lang: lang) { return t }
-            guard let t = await engine.suggestTitle(transcript: transcript, lang: lang) else { throw CoreError.generationFailed }
-            return t
-        }) {
+        if setTitle, let t = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections) {
             await engine.setTitle(id, t)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
@@ -440,19 +562,8 @@ final class ProcessingPipeline {
         for (i, kind) in OutputKind.allCases.enumerated() {
             if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
             if !(await heatGate(id)) { return }
-            stage = .generating(kind, "final", 0, 1)
             do {
-                let text = try await onBackend { () async throws -> String in
-                    if fromSections, let t = await engine.generateFromSections(noteID: id, kind: kind, lang: lang, shouldStop: { abort.isSet },
-                                                                               onProgress: { phase, done, total in
-                        Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
-                    }) { return t }
-                    // nil: cancelled (our flag) or the sections could not be used, then the transcript as before.
-                    if abort.isSet { throw CoreError.generationFailed }
-                    return try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }) { phase, done, total in
-                        Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
-                    }
-                }
+                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections)
                 await engine.setOutput(id, kind, text)
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
                 ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 4 + i, outputsTotal: steps))
@@ -467,6 +578,45 @@ final class ProcessingPipeline {
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
         Task { await self.compressAudio(noteID: id) }   // the notes are done; the WAV can shrink
+    }
+
+    /// The notes' source rule: from the sections only when they cover the whole recording and the transcript does
+    /// not fit one prompt; otherwise from the transcript, exactly as before sections.
+    private func notesFromSections(covered: Bool, transcript: String, lang: String) async -> Bool {
+        guard covered, let fits = try? await onBackend({ await CoreEngine.shared.transcriptFits(transcript, lang: lang) }) else {
+            return false
+        }
+        return fits == false
+    }
+
+    /// A title for the note from the same source as its notes; nil when none could be written.
+    private func writeTitle(noteID id: Int64, transcript: String, lang: String, fromSections: Bool) async -> String? {
+        let engine = CoreEngine.shared
+        return try? await onBackend { () async throws -> String in
+            if fromSections, let t = await engine.titleFromSections(noteID: id, lang: lang) { return t }
+            guard let t = await engine.suggestTitle(transcript: transcript, lang: lang) else { throw CoreError.generationFailed }
+            return t
+        }
+    }
+
+    /// One output (not stored): from the sections when `fromSections`, else (or when the sections cannot be used)
+    /// from the transcript. Throws when it fails or is cancelled (the abort flag).
+    private func writeOutput(_ kind: OutputKind, noteID id: Int64, transcript: String, lang: String,
+                             fromSections: Bool) async throws -> String {
+        let engine = CoreEngine.shared
+        let abort = self.abort
+        stage = .generating(kind, "final", 0, 1)
+        return try await onBackend { () async throws -> String in
+            if fromSections, let t = await engine.generateFromSections(noteID: id, kind: kind, lang: lang, shouldStop: { abort.isSet },
+                                                                       onProgress: { phase, done, total in
+                Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
+            }) { return t }
+            // nil: cancelled (our flag) or the sections could not be used, then the transcript as before.
+            if abort.isSet { throw CoreError.generationFailed }
+            return try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }) { phase, done, total in
+                Task { @MainActor in self.stage = .generating(kind, phase, done, total) }
+            }
+        }
     }
 
     /// Writes the note's missing section summaries from its stored pieces, one at a time, each stored before the
@@ -881,6 +1031,7 @@ final class ProcessingPipeline {
         interrupted.remove(id)
         heatPaused.remove(id)
         lastFailure[id] = nil
+        regenerateFailed[id] = nil
         if overnightOffer == id { overnightOffer = nil }
     }
 

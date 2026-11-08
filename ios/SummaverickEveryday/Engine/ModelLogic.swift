@@ -280,3 +280,44 @@ enum OvernightList {
         !marked || pluggedIn || inOvernightTask
     }
 }
+
+/// Regenerate, Undo and Try again on a note's screen.
+enum RegenerateRules {
+    /// "Regenerate" under a tab: the tab has text, nothing runs for this note, the AI is ready and the note is not
+    /// waiting for the charger. (Disabled, not hidden, while another note runs: one model run at a time.)
+    static func showsRegenerate(hasText: Bool, noteBusy: Bool, aiReady: Bool, overnight: Bool) -> Bool {
+        hasText && !noteBusy && aiReady && !overnight
+    }
+
+    /// "Regenerate all" in the note's menu: there is a transcript and at least one output to write again.
+    static func showsRegenerateAll(hasTranscript: Bool, outputs: [Bool], noteBusy: Bool, aiReady: Bool, overnight: Bool) -> Bool {
+        hasTranscript && outputs.contains(true) && !noteBusy && aiReady && !overnight
+    }
+
+    /// Undo under a tab: the last regenerate (since the note was opened) replaced this tab's text and nothing
+    /// runs for this note now.
+    static func showsUndo(replacedThisTab: Bool, noteBusy: Bool) -> Bool { replacedThisTab && !noteBusy }
+
+    /// "Try again" on the note's failed or paused banner: the note still needs work (the resume path does
+    /// nothing otherwise), the AI is ready and the note is not waiting for the charger.
+    static func showsTryAgain(needsWork: Bool, aiReady: Bool, overnight: Bool) -> Bool {
+        needsWork && aiReady && !overnight
+    }
+
+    /// New text replaces the old only when it has something in it.
+    static func accepts(_ text: String) -> Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    enum Outcome: Equatable {
+        /// Everything asked for was written: the new text replaces the old.
+        case replaced
+        /// The person tapped Stop: old text kept, no failure shown.
+        case stopped
+        /// Error, heat or cut off by iOS: old text kept, "Try again" shown.
+        case failed
+    }
+
+    /// Stop wins: a run cancelled by Stop is never shown as a failure, nor saved.
+    static func outcome(written: Bool, stopped: Bool) -> Outcome {
+        stopped ? .stopped : (written ? .replaced : .failed)
+    }
+}

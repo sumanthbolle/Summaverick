@@ -4690,6 +4690,70 @@
           }
         }
       }
+    },
+    "Regenerate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regenerate"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మళ్ళీ రాయి"
+          }
+        }
+      }
+    },
+    "Regenerate all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regenerate all"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అన్నీ మళ్ళీ రాయి"
+          }
+        }
+      }
+    },
+    "Undo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వెనక్కి తీసుకో"
+          }
+        }
+      }
+    },
+    "Could not write this again. Try again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not write this again. Try again."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీన్ని మళ్ళీ రాయలేకపోయాం. మళ్లీ ప్రయత్నించండి."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
