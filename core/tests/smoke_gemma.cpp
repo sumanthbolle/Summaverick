@@ -841,8 +841,10 @@ static void run_api_memories(sve_ctx *ctx) {
 static std::string g_chat_prompt;
 static const char *g_chat_reply = nullptr;
 static const char *g_classify_reply = nullptr;
+static int g_model_calls = 0, g_classify_calls = 0;
 static const char *chat_model(const char *phase, const char *prompt) {
-    if (!strcmp(phase, "classify")) return g_classify_reply;
+    if (!strcmp(phase, "classify")) { ++g_classify_calls; return g_classify_reply; }
+    ++g_model_calls;
     g_chat_prompt = prompt;
     return g_chat_reply;
 }
@@ -1045,6 +1047,95 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
         j = go(ask("What is the deadline for the exam?"), "An ordinary answer.", "G", f2);
         expect(j["kind"] != "due", "deadline with a subject is not due");
         sve_free(c3);
+    }
+    g_classify_reply = "G";
+    // Fix round 3: a health question never calls the model; quotes the passage or refuses.
+    {
+        const std::string line = sve::health_only_text("en");
+        const json U1 = {{"role", "user"}, {"text", "What should I take for a headache?"}};
+        const json RF = {{"role", "assistant"}, {"text", line}};
+        const json RFH = {{"role", "assistant"}, {"text", line}, {"kind", "health"}};
+        auto u = [](const char *t) { return json{{"role", "user"}, {"text", t}}; };
+        struct Fix { const char *piece; json msgs; const char *reply; const char *what; };
+        std::vector<Fix> fixes = {
+            {"The doctor came at nine and we talked about the school.", ask("What did the doctor say?"), "The doctor said rest and drink warm water with honey [S1].", "doctor"},
+            {"The child is five and sang a song.", json::array({U1, RF, u("And for a child of five?")}), "For a child of five, give half the amount with water [S1].", "child after a refusal"},
+            {"My blood sugar level was high this morning.", ask("What is my blood sugar level?"), "It was high [S1]. Avoid rice and walk every morning [S1].", "blood sugar"},
+            {"We will treat the cold room on Friday.", ask("How do I treat a cold?"), "Rest and gargle with warm salt water [S1].", "treat a cold"},
+            {"Take the trip bags with you.", ask("What should I take on the trip?"), "Rest and drink warm water [S1].", "take on the trip"},
+            {"రక్త పరీక్ష రిపోర్ట్ ఈ రోజు వచ్చింది.", ask("రక్త పరీక్ష రిపోర్ట్ ఏమిటి?"), "రిపోర్ట్ వచ్చింది, విశ్రాంతి తీసుకోండి [S1].", "te report"},
+        };
+        for (const auto &f : fixes) {
+            sve_ctx *cf = sve_init(":memory:");
+            int64_t nf = sve_note_create(cf, "Family", "en", nullptr, "x", 60);
+            sve_note_set_pieces(cf, nf, json::array({{{"start_sec", 0}, {"text", f.piece}, {"conf", 0.9}}}).dump().c_str());
+            g_chat_reply = f.reply;
+            g_classify_reply = "G";
+            g_model_calls = g_classify_calls = 0;
+            ChatSink sk;
+            json j = take(sve_assistant_chat(cf, f.msgs.dump().c_str(), nullptr, chat_text, &sk, nullptr, nullptr));
+            std::string what = std::string("health: no model, the passage word for word: ") + f.what;
+            expect(g_model_calls == 0 && g_classify_calls == 0 && sk.pieces == 0 && j.is_object() && j["medicine"] == true && j["kind"] == "medicine" &&
+                   contains(j["answer"], f.piece) && j["sources"].size() == 1, what.c_str());
+            sve_free(cf);
+        }
+
+        // Health turns are out of the prompt.
+        sve_ctx *ch = sve_init(":memory:");
+        int64_t nh = sve_note_create(ch, "Plumbing call", "en", nullptr, "x", 60);
+        sve_note_set_pieces(ch, nh, R"([{"start_sec":0,"text":"We used the old pipe and will bring it down tomorrow.","conf":0.9}])");
+        sve_note_set_output(ch, nh, SVE_OUT_SHORT_SUMMARY, "The team set the walnut budget.");
+        auto clean_prompt = [&](const json &msgs, const char *reply, const char *cls) {
+            g_chat_reply = reply;
+            g_classify_reply = cls;
+            g_chat_prompt.clear();
+            g_model_calls = 0;
+            ChatSink sk;
+            json j = take(sve_assistant_chat(ch, msgs.dump().c_str(), nullptr, chat_text, &sk, nullptr, nullptr));
+            for (const char *w : {"headache", "grandmother", "tablets", "Is it safe", "pharmacist", "fever"})
+                if (g_chat_prompt.find(w) != std::string::npos) return false;
+            return j.is_object();
+        };
+        expect(clean_prompt(json::array({U1, RF, u("And for a child of five?"), RF, u("What about an adult?")}), "Rest.", "G") && g_model_calls == 1 && g_chat_prompt.find("child of five") == std::string::npos,
+               "a chain of refusals: the next question reaches the model with no health context");
+        expect(clean_prompt(json::array({u("Is my grandmother's walking ok for her age?"), RF, u("And for a child of five?")}), "Rest.", "G"),
+               "after a refusal with no flag: no health context");
+        expect(clean_prompt(json::array({u("Which tablets do I take?"), {{"role", "assistant"}, {"text", "(quote)"}, {"medicine", true}}, u("Is it safe?"), RF, u("And for children?")}), "Rest.", "G"),
+               "medicine, refusal, follow-up: no health context");
+        expect(clean_prompt(json::array({U1, RF, u("And this week?")}), "- [Plumbing call] The walnut budget was set.", "G") && g_model_calls == 1,
+               "a period follow-up: the summary, with no health context");
+        // The flag on a classify-H refusal: the next turn is sticky, with no model.
+        g_chat_reply = "x";
+        g_classify_reply = "H";
+        ChatSink sh1;
+        json h1 = take(sve_assistant_chat(ch, ask("Is my grandmother's walking ok for her age?").dump().c_str(), nullptr, chat_text, &sh1, nullptr, nullptr));
+        expect(h1.is_object() && h1["kind"] == "health" && h1["answer"] == line, "a classify-H refusal is flagged kind health");
+        g_classify_reply = "G";
+        g_model_calls = g_classify_calls = 0;
+        ChatSink sh2;
+        json h2 = take(sve_assistant_chat(ch, json::array({u("Is my grandmother's walking ok for her age?"), RFH, u("And for a child of five?")}).dump().c_str(),
+                                          nullptr, chat_text, &sh2, nullptr, nullptr));
+        expect(h2.is_object() && h2["answer"] == line && h2["kind"] != "health" && g_model_calls == 0 && g_classify_calls == 0,
+               "after a classify-H refusal: one sticky turn, no model; not itself flagged, so the chain ends");
+        ChatSink sh3;
+        json h3 = take(sve_assistant_chat(ch, ask("What should I take for a headache?").dump().c_str(), nullptr, chat_text, &sh3, nullptr, nullptr));
+        expect(h3.is_object() && h3["kind"] == "health", "a gate refusal is flagged kind health");
+        // Before the summary route.
+        g_model_calls = 0;
+        ChatSink sh4;
+        json h4 = take(sve_assistant_chat(ch, ask("What can I take today?").dump().c_str(), nullptr, chat_text, &sh4, nullptr, nullptr));
+        expect(h4.is_object() && h4["kind"] != "summary" && g_model_calls == 0, "What can I take today? is not a summary");
+        sve_free(ch);
+        // A flagged title in a kept line.
+        sve_ctx *ct = sve_init(":memory:");
+        int64_t ntt = sve_note_create(ct, "Doctor visit", "en", nullptr, "x", 60);
+        sve_note_set_pieces(ct, ntt, R"([{"start_sec":0,"text":"Ravi fixed the kitchen tap.","conf":0.9}])");
+        g_chat_reply = "He fixed it [S1].";
+        ChatSink stt;
+        json tj = take(sve_assistant_chat(ct, ask("What did Ravi say about the kitchen tap?").dump().c_str(), nullptr, chat_text, &stt, nullptr, nullptr));
+        expect(tj.is_object() && g_chat_prompt.find("Doctor") == std::string::npos && g_chat_prompt.find("Recording") != std::string::npos,
+               "a flagged note title is a neutral label in the material");
+        sve_free(ct);
     }
     g_classify_reply = "G";
     // sve_route_kind

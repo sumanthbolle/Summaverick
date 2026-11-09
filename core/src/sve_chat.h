@@ -23,6 +23,7 @@ struct ChatTurn {
     std::string role;  // "user" | "assistant"
     std::string text;
     bool medicine = false;  // an assistant turn that was a medicine answer (text is then a placeholder)
+    bool health = false;    // an assistant turn with kind "health": a refusal of a question that was itself about health
 };
 
 // messages_json ([{"role":"user"|"assistant","text":…}], newest last) as turns: other roles and empty texts are
@@ -57,14 +58,14 @@ bool has_subject(const std::string &text);
 // The kind of question, by a code rule first (in this order):
 // - a medicine name or medicine word (is_medicine_question): "medicine", the code-built path; never anything else;
 // - quiz: "quiz me", "test me", "next question", or a question starting with the word "quiz" alone or "quiz on/about/for";
-//   క్విజ్, తర్వాతి ప్రశ్న, మరో ప్రశ్న, or పరీక్ష with పెట్టండి/పెట్టు, or with నన్ను and చేయండి/చేయి (never bare పరీక్ష, an exam or a blood test);
+//   క్విజ్, తర్వాతి ప్రశ్న, మరో ప్రశ్న, or పరీక్ష with the whole word పెట్టండి/పెట్టు, or with నన్ను and చేయండి/చేయి (never bare పరీక్ష, an exam or a blood test);
 // - due: "to-do"; with no subject also "due" not followed by "to", "deadline", గడువు, "what do I have", "remind…",
 //   చేయాల్సి, గుర్తు చేయ;
 // - period words (today, yesterday, this week, last week, this month; ఈ రోజు/ఈరోజు/నేడు, నిన్న, ఈ వారం,
 //   గత వారం/పోయిన వారం, ఈ నెల) or summary words (key discussions, highlights, important points, summarise, recap;
 //   సారాంశం, ముఖ్యాంశాలు, ముఖ్యమైన). With no subject: "summary" over the period (local time, the week starting on
-//   Monday), or the last 7 days, today included, when none is named. A period alone in "how are you", "what is" or
-//   "what should I" is not a summary.
+//   Monday), or the last 7 days, today included, when none is named. A period alone in "how are you", "what is today" or
+//   "what should/can I" (unless remember, know, review or revise) is not a summary.
 // Anything else: kind "recordings" with by_rule false (retrieval, then the model's recordings/general call); a named
 // period sets [from, to), restricting the retrieval to the notes of that period.
 struct Route {
@@ -76,10 +77,13 @@ Route route_question(const std::string &text, int64_t now, const std::vector<std
 
 // Sentences and titles held out of model text and from model material: health_keywords.
 bool health_text(const std::string &text, const std::vector<std::string> &medicine_names);
-// A question that never goes to general knowledge or to the classification: health_gate, on the question or on the last
-// earlier question, or a follow-up whose previous answer was a medicine answer.
+// A question that never calls the model (R-N10-d): health_gate on the question or on the last earlier question, or a
+// follow-up whose previous answer was a medicine answer or a refusal flagged kind "health".
 bool chat_health_question(const std::string &question, const std::vector<ChatTurn> &earlier,
                           const std::vector<std::string> &medicine_names);
+// The earlier turns without health: medicine answers, refusals, the questions that produced them, and any turn with a
+// health word, so a later question reaches the model with no health context.
+std::vector<ChatTurn> history_without_health(const std::vector<ChatTurn> &earlier, const std::vector<std::string> &medicine_names);
 // The line for a health question with nothing found, or a general answer that drifted into health. lang "te" -> Telugu.
 std::string health_only_text(const std::string &lang);
 // The sentences of text that health_text does not flag.
@@ -93,6 +97,8 @@ bool health_passage_scores(const std::string &keywords, const std::string &text,
 void drop_source(Relevant &rel, const std::string &label);
 // Takes the remembered facts health_text flags out of the block.
 void drop_flagged_facts(Relevant &rel, const std::vector<std::string> &medicine_names);
+// A note title health_gate flags becomes "Recording" in the block's lines; the sources keep the real title for the links.
+void neutral_titles(Relevant &rel, const std::vector<std::string> &medicine_names);
 
 // The model's one-letter reply (thinking stripped): 'R', 'G' or 'H'. Anything else is 'R', never 'G'.
 char classify_route(const std::string &reply);
@@ -153,7 +159,8 @@ struct Passage {
     std::string title, text;
 };
 // Adds the scoring passages that health_text does not flag (best first, at most max_n, within max_bytes of block) to rel
-// as further [S<n>] labels under "Summaries of recordings:". Returns how many were added.
+// under "Summaries of recordings:", labelled on from the highest label in use (labels of dropped sources are not
+// reused while a higher one exists). A flagged title is "Recording" in the block. Returns how many were added.
 int add_passages(Relevant &rel, std::vector<Passage> candidates, const std::string &keywords,
                  const std::vector<std::string> &medicine_names, size_t max_bytes, size_t max_n = 4);
 

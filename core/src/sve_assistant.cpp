@@ -1051,6 +1051,10 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         };
         const std::vector<std::string> names = known_med_names(st);
         const sve::Route route = sve::route_question(q, (int64_t)time(nullptr), names);
+        // A health question, or the one turn after one: never calls the model (R-N10-d).
+        const bool health_q = sve::chat_health_question(q, earlier, names);
+        // What the model may read of the conversation: nothing about health.
+        const std::vector<sve::ChatTurn> history = sve::history_without_health(earlier, names);
 
         // No model for these three. Medicine: from stored facts only, in code, never streamed (spec §7.8a).
         if (route.kind == "medicine") return result(medicine_route(st, q, names, lang), "medicine");
@@ -1073,7 +1077,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         auto run = [&](const char *kind, const std::string &sys, int max_out, sve::AnswerStream &stream, std::string &raw,
                        const std::function<std::string(const std::string &)> &build) -> bool {
             if (cb) cb((std::string("kind:") + kind).c_str(), 0, 1, cbuser);   // before the first piece
-            std::vector<sve::ChatTurn> window = sve::history_window(earlier, sve::kChatHistoryTokens, count);
+            std::vector<sve::ChatTurn> window = sve::history_window(history, sve::kChatHistoryTokens, count);
             std::string userp = build(sve::history_block(window));
             while (llm && !window.empty() && llm->count_tokens(llm->apply_template(sys, userp)) + max_out + 16 > llm->n_ctx) {
                 window.erase(window.begin());
@@ -1110,7 +1114,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
             return result(ask_result(answer, json::array(), false, false), "general");
         };
 
-        if (route.kind == "summary") {
+        if (route.kind == "summary" && !sve::health_gate(q, names)) {
             const json rows = st.note_summaries(route.from, route.to, 200, true);
             if (rows.empty())
                 return result(ask_result(lang == "te" ? "ఆ కాలంలో రికార్డింగ్‌లు లేవు." : "No recordings in that period.",
@@ -1134,8 +1138,8 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
             const std::string sys = sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety, false);
             if (llm) {
                 // Stored summaries that fit go straight to the final call; only a long period needs the model to map them.
-                const int history = llm->count_tokens(sve::history_block(sve::history_window(earlier, sve::kChatHistoryTokens, count)));
-                const int budget = llm->n_ctx - kSummaryMaxOut - 400 - llm->count_tokens(sys) - history;
+                const int history_tokens = llm->count_tokens(sve::history_block(sve::history_window(history, sve::kChatHistoryTokens, count)));
+                const int budget = llm->n_ctx - kSummaryMaxOut - 400 - llm->count_tokens(sys) - history_tokens;
                 std::string fitted;
                 bool from_bullets = false;
                 if (!sve::reduce_to_fit(*llm, sys, material, budget, fitted, from_bullets, cb, cbuser)) return nullptr;
@@ -1160,16 +1164,16 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         }
 
         // A question about the recordings, or general knowledge.
-        const std::string words = sve::chat_search_query(q, earlier);
+        const std::string words = sve::chat_search_query(q, history);
         sve::Relevant rel = sve::relevant(st, words, 6000, route.from, route.to);
-        // A health question, or a follow-up of a medicine answer: never general and never classified.
-        const bool health_q = sve::chat_health_question(q, earlier, names);
         const auto flagged = [&](const std::string &t) { return sve::health_text(t, names); };
+        // Whether a passage answers this question. A health question needs its health word in the passage ("bring it
+        // down" does not answer "bring down a fever").
+        const auto answers_it = [&](const std::string &t) {
+            return health_q ? sve::health_passage_scores(words, t, names) : sve::passage_scores(sve::keyword_hits(words, t), words);
+        };
         // Quoted word for word: what the health check flags in a passage that answers this question (a stray
         // word match in an unrelated one does not make it a medicine answer).
-        const auto answers_it = [&](const std::string &t) {
-            return sve::passage_scores(sve::keyword_hits(words, t), words) || (health_q && sve::health_passage_scores(words, t, names));
-        };
         const auto quote_it = [&](const std::string &t) { return flagged(t) && answers_it(t); };
         json med = medicine_material_answer(st, rel, quote_it, lang);
         if (!med.is_null()) return result(med, "medicine");
@@ -1183,7 +1187,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         for (const auto &src : rel.sources) {
             std::string t = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
             int h = sve::keyword_hits(words, t);
-            if (sve::passage_scores(h, words) && (!health_q || sve::health_passage_scores(words, t, names)) && h > best_hits && !flagged(t)) {
+            if (answers_it(t) && h > best_hits && !flagged(t)) {
                 best_hits = h;
                 best_text = t;
                 best_source = source_of(src);
@@ -1196,8 +1200,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         std::vector<sve::Passage> passages = summary_passages(st, route.from, route.to);
         for (const auto &p : passages) {
             int h = sve::keyword_hits(words, p.title + "\n" + p.text);
-            if (sve::passage_scores(h, words) && (!health_q || sve::health_passage_scores(words, p.title + "\n" + p.text, names)) && h > best_hits &&
-                !flagged(p.title + "\n" + p.text)) {
+            if (answers_it(p.title + "\n" + p.text) && h > best_hits && !flagged(p.title + "\n" + p.text)) {
                 best_hits = h;
                 best_text = p.text;
                 best_source = {{"note_id", p.note_id}, {"start_sec", p.start_sec}, {"title", p.title}};
@@ -1206,11 +1209,21 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         sve::add_passages(rel, std::move(passages), words, names, 7000);
         const bool scores = best_hits > 0;
         const auto nothing = [&]() {
-            return result(ask_result(health_q ? sve::health_only_text(lang) : sve::not_found_text(lang), json::array(), true, false), "recordings");
+            // kind "health" when the question itself was about health: the next turn is sticky. Not on a sticky refusal,
+            // or one health question would refuse the whole chat after it.
+            return result(ask_result(health_q ? sve::health_only_text(lang) : sve::not_found_text(lang), json::array(), true, false),
+                          health_q && sve::health_gate(q, names) ? "health" : "recordings");
         };
-        // A health question reaches the model only on a passage that answers it and is not flagged.
-        if (health_q && !scores) return nothing();
-
+        if (health_q) {
+            // R-N10-d: never the model. The best passage word for word with its source, or the line.
+            if (!scores) return nothing();
+            json hit = best_source;
+            hit["text"] = best_text;
+            const json hits = json::array({hit});
+            const std::string quoted = sve::medicine_answer(json::array(), hits, lang);
+            if (quoted.empty()) return nothing();
+            return result(ask_result(quoted, sources_of(hits), false, true), "medicine");
+        }
         if (!scores && !health_q && has_model) {
             // Nothing scores: a tiny call says whether the recordings could answer it. Model not ready: recordings.
             const std::string prompt = sve::classify_prompt(q);
@@ -1226,11 +1239,12 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
             const char route_to = ok ? sve::classify_route(reply) : 'R';
             sve_logf(0, "ask route: %c", route_to);   // the phone test reads this
             if (route_to == 'G') return general();
-            if (route_to == 'H') return result(ask_result(sve::health_only_text(lang), json::array(), true, false), "recordings");
+            if (route_to == 'H') return result(ask_result(sve::health_only_text(lang), json::array(), true, false), "health");
         }
         if (rel.sources.empty()) return nothing();
         if (!has_model) return nullptr;
 
+        sve::neutral_titles(rel, names);
         sve::AnswerStream stream(names, sink);
         std::string raw;
         if (!run("recordings", ask_system(st), kChatMaxOut, stream, raw,

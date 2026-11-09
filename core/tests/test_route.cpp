@@ -563,3 +563,87 @@ TEST(drop_material_from_the_block) {
     drop_source(one, "S1");
     CHECK(one.block.empty() && one.sources.empty());
 }
+
+// ---- Fix round 3
+
+TEST(route_round3_shapes) {
+    for (const char *q : {"Anything due?", "Is anything due today?", "Do I have anything due tomorrow?"}) CHECK_EQ(kind_of(q), std::string("due"));
+    for (const char *q : {"What's happening this week?", "What is happening today?", "What should I remember from yesterday?", "What's on today?"})
+        CHECK_EQ(kind_of(q), std::string("summary"));
+    for (const char *q : {"What is today?", "How are you today?", "What should I take today?", "What can I take today?"}) CHECK(kind_of(q) != "summary");
+    CHECK(chat_health_question("What can I take today?", {}, {}));
+    CHECK(chat_health_question("What should I take today?", {}, {}));
+    CHECK(kind_of("రక్త పరీక్ష పెట్టుకున్నారు") != "quiz");
+    CHECK_EQ(kind_of("పరీక్ష పెట్టండి"), std::string("quiz"));
+    CHECK_EQ(kind_of("నాకు పరీక్ష పెట్టు"), std::string("quiz"));
+}
+
+TEST(passage_labels_never_collide) {
+    Relevant r;
+    r.block = "From recordings:\n[S1] A 00:00: a\n[S2] A 00:30: pain\n[S3] A 01:00: b\n";
+    r.sources = json::parse(R"([{"label":"S1","note_id":1,"start_sec":0,"title":"A"},{"label":"S2","note_id":1,"start_sec":30,"title":"A"},{"label":"S3","note_id":1,"start_sec":60,"title":"A"}])");
+    drop_source(r, "S2");
+    add_passages(r, {{2, 0, "B", "kitchen summary"}}, "kitchen", {}, 7000);
+    CHECK(r.block.find("[S4] B") != std::string::npos);
+    CHECK_EQ(r.block.find("[S3]"), r.block.rfind("[S3]"));
+    Cited c = apply_citations("From the summary [S4].", r.sources);
+    CHECK_EQ(c.sources.size(), (size_t)1);
+    if (!c.sources.empty()) CHECK(c.sources[0]["note_id"] == 2);
+    Cited d = apply_citations("From the piece [S3].", r.sources);
+    if (!d.sources.empty()) CHECK(d.sources[0]["note_id"] == 1);
+}
+
+TEST(drop_source_takes_the_whole_piece) {
+    Relevant r;
+    r.block = "From recordings:\n[S1] A 00:00: Ravi asked.\n[S2] A 00:30: The tap was noisy.\n\nTake paracetamol for it.\n[S3] A 01:00: Fine.\n\nRemembered facts:\n- Ravi likes tea\n";
+    r.sources = json::parse(R"([{"label":"S1"},{"label":"S2"},{"label":"S3"}])");
+    drop_source(r, "S2");
+    CHECK(r.block.find("paracetamol") == std::string::npos);
+    CHECK(r.block.find("[S1] A 00:00: Ravi asked.\n[S3] A 01:00: Fine.") != std::string::npos);
+    drop_source(r, "S3");
+    CHECK(r.block.find("Fine") == std::string::npos && r.block.find("Remembered facts:\n- Ravi likes tea") != std::string::npos);
+}
+
+TEST(telugu_only_words_more_forms_and_scoring) {
+    for (const char *t : {"రవి మాత్రమైనా వచ్చాడు.", "అంత మాత్రాన ఏమీ కాదు.", "రవి మాత్రం రాలేదు."}) CHECK(!health_text(t, {}));
+    CHECK_EQ(chat_search_query("రవి మాత్రం ఏమి చెప్పాడు?", {}), std::string("రవి చెప్పాడు"));
+    CHECK_EQ(chat_search_query("పైపు మాత్రమే ఎందుకు?", {}), std::string("పైపు ఎందుకు"));
+}
+
+TEST(flagged_title_is_neutral_in_a_passage) {
+    Relevant r;
+    r.sources = json::array();
+    CHECK_EQ(add_passages(r, {{1, 0, "Doctor visit", "The budget is set"}}, "budget", {}, 7000), 1);
+    CHECK(r.block.find("Doctor") == std::string::npos && r.block.find("[S1] Recording") != std::string::npos);
+    CHECK(r.sources[0]["title"] == "Doctor visit");   // the link keeps the real title
+}
+
+TEST(history_without_health_turns) {
+    const std::string line = health_only_text("en");
+    std::vector<ChatTurn> t = chat_turns(json::parse(std::string(R"([
+        {"role":"user","text":"What did Ravi say about the pipe?"},{"role":"assistant","text":"It leaks."},
+        {"role":"user","text":"What should I take for a headache?"},{"role":"assistant","text":")") + line + R"("},
+        {"role":"user","text":"And for a child of five?"},{"role":"assistant","text":")" + line + R"("},
+        {"role":"user","text":"Is my grandmother ok?"},{"role":"assistant","text":")" + line + R"(","kind":"health"},
+        {"role":"user","text":"Which one?"},{"role":"assistant","text":"Take Dolo.","medicine":true},
+        {"role":"user","text":"Who won?"},{"role":"assistant","text":"India."}])"));
+    std::vector<ChatTurn> h = history_without_health(t, {});
+    CHECK_EQ(h.size(), (size_t)4);
+    if (h.size() == 4) { CHECK_EQ(h[0].text, std::string("What did Ravi say about the pipe?")); CHECK_EQ(h[3].text, std::string("India.")); }
+    // te line too
+    CHECK(history_without_health({{"user", "x"}, {"assistant", health_only_text("te")}}, {}).empty());
+    // the flag makes the next turn sticky; a refusal without it does not
+    std::vector<ChatTurn> flagged = chat_turns(json::parse(R"([{"role":"user","text":"Is she ok?"},{"role":"assistant","text":"no","kind":"health"}])"));
+    CHECK(chat_health_question("And for a child?", flagged, {}));
+    std::vector<ChatTurn> plain = chat_turns(json::parse(R"([{"role":"user","text":"Is she ok?"},{"role":"assistant","text":"no"}])"));
+    CHECK(!chat_health_question("And for a child?", plain, {}));
+}
+
+TEST(neutral_titles_in_the_block) {
+    Relevant r;
+    r.block = "From recordings:\n[S1] Doctor visit 00:00: Ravi fixed it\n[S2] Sales report 00:30: Up\n";
+    r.sources = json::parse(R"([{"label":"S1","title":"Doctor visit"},{"label":"S2","title":"Sales report"}])");
+    neutral_titles(r, {});
+    CHECK(r.block.find("[S1] Recording 00:00") != std::string::npos && r.block.find("[S2] Sales report") != std::string::npos);
+    CHECK(r.sources[0]["title"] == "Doctor visit");
+}

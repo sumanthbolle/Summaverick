@@ -597,7 +597,7 @@ std::vector<std::string> names_in_question(const std::string &question, const st
 
 std::string without_only_words(const std::string &text) {
     std::string s = text;
-    for (const char *w : {"మాత్రమే", "మాత్రం"})
+    for (const char *w : {"మాత్రమైనా", "మాత్రమే", "మాత్రాన", "మాత్రం"})
         for (size_t at = s.find(w); at != std::string::npos; at = s.find(w, at)) s.replace(at, strlen(w), " ");
     return s;
 }

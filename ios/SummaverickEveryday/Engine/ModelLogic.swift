@@ -1113,6 +1113,8 @@ struct ChatMessage: Codable, Equatable {
     var sources: [SourceRef]? = nil
     /// On the question only: the quiz ids already asked in this chat.
     var quiz_asked: [String]? = nil
+    /// "health" on a refusal of a question that was itself about health: the next question stays out of the model.
+    var kind: String? = nil
 }
 
 /// Which earlier turns of a chat go with a new question. The core trims them again to its token budget
@@ -1125,6 +1127,7 @@ enum ChatWindow {
         let answer: String?
         var medicine = false
         var sources: [ChatMessage.SourceRef] = []
+        var kind: String? = nil
     }
 
     static let maxTurns = 12
@@ -1146,7 +1149,7 @@ enum ChatWindow {
             chars += q.count + a.count
             picked.append([ChatMessage(role: "user", text: q),
                            ChatMessage(role: "assistant", text: a, medicine: t.medicine ? true : nil,
-                                       sources: t.sources.isEmpty ? nil : t.sources)])
+                                       sources: t.sources.isEmpty ? nil : t.sources, kind: t.kind)])
         }
         return picked.reversed().flatMap { $0 }
             + [ChatMessage(role: "user", text: question, quiz_asked: quizAsked.isEmpty ? nil : quizAsked)]

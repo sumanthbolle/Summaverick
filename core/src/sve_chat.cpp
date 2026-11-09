@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <set>
@@ -112,10 +113,11 @@ std::vector<ChatTurn> chat_turns(const json &messages) {
         if (!m.is_object()) continue;
         std::string role = jstr(m, "role"), text = trim_copy(jstr(m, "text"));
         if ((role != "user" && role != "assistant") || text.empty()) continue;
+        const bool health = role == "assistant" && jstr(m, "kind") == "health";
         if (role == "assistant") {
             auto med = m.find("medicine");
             if (med != m.end() && med->is_boolean() && med->get<bool>()) {
-                out.push_back({role, "(A medicine answer, quoted from the saved facts and recordings.)", true});
+                out.push_back({role, "(A medicine answer, quoted from the saved facts and recordings.)", true, false});
                 continue;
             }
             auto src = m.find("sources");
@@ -130,7 +132,7 @@ std::vector<ChatTurn> chat_turns(const json &messages) {
                 if (!list.empty()) text += "\n(Sources: " + list + ")";
             }
         }
-        out.push_back({role, text, false});
+        out.push_back({role, text, false, health});
     }
     return out;
 }
@@ -166,7 +168,8 @@ std::string history_block(const std::vector<ChatTurn> &window) {
 std::string chat_search_query(const std::string &question, const std::vector<ChatTurn> &earlier) {
     // Period words pick the notes (Route), they are not what the passage must say.
     static const std::set<std::string> kPeriod = {"today", "tonight", "yesterday", "tomorrow", "week", "weeks", "month", "months",
-                                                  "last", "ఈ", "రోజు", "ఈరోజు", "నేడు", "నిన్న", "వారం", "గత", "పోయిన", "నెల"};
+                                                  "last", "ఈ", "రోజు", "ఈరోజు", "నేడు", "నిన్న", "వారం", "గత", "పోయిన", "నెల",
+                                                  "మాత్రం", "మాత్రమే", "మాత్రమైనా", "మాత్రాన"};
     std::string kq;
     {
         std::string cur;
@@ -397,6 +400,14 @@ bool has_phrase(const std::vector<std::string> &w, std::initializer_list<const c
     }
     return false;
 }
+// The Telugu word on its own: not a stem of a longer word (Telugu letters count as word bytes).
+bool telugu_word(const std::string &text, const char *word) {
+    const size_t n = strlen(word);
+    for (size_t at = text.find(word); at != std::string::npos; at = text.find(word, at + 1))
+        if ((at == 0 || (unsigned char)text[at - 1] < 0x80) && (at + n == text.size() || (unsigned char)text[at + n] < 0x80)) return true;
+    return false;
+}
+
 bool has_any(const std::string &text, std::initializer_list<const char *> subs) {
     for (const char *x : subs) if (text.find(x) != std::string::npos) return true;
     return false;
@@ -503,7 +514,7 @@ bool has_subject(const std::string &text) {
         "key", "discussion", "discussions", "discuss", "discussed", "highlight", "highlights", "important", "point", "points",
         "summarise", "summarize", "summary", "summaries", "summarised", "summarized", "recap", "happen", "happened", "happening",
         "talk", "talked", "talking", "meeting", "meetings", "recording", "recordings", "note", "notes", "remember", "coming", "up",
-        "pending", "list", "soon", "give", "show", "get", "need", "due", "remind", "reminds", "reminder", "reminders", "todo", "todos",
+        "pending", "list", "soon", "give", "show", "get", "need", "anything", "due", "remind", "reminds", "reminder", "reminders", "todo", "todos",
         "deadline", "deadlines", "గడువు",
         "ఈ", "రోజు", "ఈరోజు", "నేడు", "నిన్న", "వారం", "గత", "పోయిన", "నెల", "ఏం", "జరిగింది", "మాట్లాడాం", "చర్చలు", "చెప్పారు", "చెప్పండి",
         "రికార్డింగ్‌ల", "రికార్డింగ్ల", "రికార్డింగ్‌లు", "రికార్డింగ్లు", "త్వరలో", "ఏమేమి", "ఉంది", "ముఖ్యమైన", "ముఖ్యాంశాలు", "సారాంశం", "చేయాల్సి", "గుర్తు", "చేయండి",
@@ -528,7 +539,8 @@ Route route_question(const std::string &text, int64_t now, const std::vector<std
                              (w.size() == 1 || w[1] == "on" || w[1] == "about" || w[1] == "for");
     if (has_phrase(w, {"quiz", "me"}) || has_phrase(w, {"test", "me"}) || has_phrase(w, {"next", "question"}) || starts_quiz ||
         has_any(text, {"క్విజ్", "తర్వాతి ప్రశ్న", "మరో ప్రశ్న"}) ||
-        (has_any(text, {"పరీక్ష"}) && (has_any(text, {"పెట్టండి", "పెట్టు"}) || (has_any(text, {"నన్ను"}) && has_any(text, {"చేయండి", "చేయి"}))))) {
+        (has_any(text, {"పరీక్ష"}) && (telugu_word(text, "పెట్టండి") || telugu_word(text, "పెట్టు") ||
+                                       (has_any(text, {"నన్ను"}) && (telugu_word(text, "చేయండి") || telugu_word(text, "చేయి")))))) {
         r.kind = "quiz"; r.by_rule = true; return r;
     }
     bool due_word = false;
@@ -554,8 +566,13 @@ Route route_question(const std::string &text, int64_t now, const std::vector<std
         has_prefix(w, "highlight") || has_phrase(w, {"important", "points"}) || has_prefix(w, "summar") ||
         has_prefix(w, "recap") || has_any(text, {"సారాంశ", "ముఖ్యాంశ", "ముఖ్యమైన"});
     // A period alone in small talk or a question of another shape is not asking for a summary.
-    const bool other_shape = !summary_word && (has_phrase(w, {"how", "are", "you"}) || has_phrase(w, {"what", "is"}) || has_phrase(w, {"what", "s"}) ||
-                                               has_phrase(w, {"should", "i"}) || has_phrase(w, {"how", "do", "i"}));
+    bool asks_the_date = false;   // "What is today?", not "What is happening today?"
+    for (size_t i = 0; i + 2 < w.size(); ++i)
+        asks_the_date = asks_the_date || (w[i] == "what" && (w[i + 1] == "is" || w[i + 1] == "s") &&
+                                          (w[i + 2] == "today" || w[i + 2] == "tomorrow" || w[i + 2] == "yesterday" || w[i + 2] == "this" || w[i + 2] == "last"));
+    const bool advice = (has_phrase(w, {"should", "i"}) || has_phrase(w, {"can", "i"}) || has_phrase(w, {"how", "do", "i"})) &&
+                        !has_word(w, "remember") && !has_word(w, "know") && !has_word(w, "review") && !has_word(w, "revise");
+    const bool other_shape = !summary_word && (has_phrase(w, {"how", "are", "you"}) || asks_the_date || advice);
     if ((named || summary_word) && !subject && !other_shape) {
         r.kind = "summary";
         r.by_rule = true;
@@ -572,10 +589,31 @@ bool health_text(const std::string &text, const std::vector<std::string> &medici
 
 bool chat_health_question(const std::string &question, const std::vector<ChatTurn> &earlier,
                           const std::vector<std::string> &medicine_names) {
-    if (health_gate(question, medicine_names) || (!earlier.empty() && earlier.back().medicine)) return true;
+    if (health_gate(question, medicine_names) || (!earlier.empty() && (earlier.back().medicine || earlier.back().health))) return true;
     for (size_t k = earlier.size(); k-- > 0;)
         if (earlier[k].role == "user") return health_gate(earlier[k].text, medicine_names);
     return false;
+}
+
+std::vector<ChatTurn> history_without_health(const std::vector<ChatTurn> &earlier, const std::vector<std::string> &medicine_names) {
+    const auto bad_answer = [&](const ChatTurn &a) {
+        return a.medicine || a.health || a.text == health_only_text("en") || a.text == health_only_text("te") ||
+               health_text(a.text, medicine_names) || health_gate(a.text, medicine_names);
+    };
+    std::vector<ChatTurn> out;
+    for (size_t i = 0; i < earlier.size(); ++i) {
+        const ChatTurn &t = earlier[i];
+        if (t.role == "user" && i + 1 < earlier.size() && earlier[i + 1].role == "assistant") {
+            if (!health_gate(t.text, medicine_names) && !bad_answer(earlier[i + 1])) {
+                out.push_back(t);
+                out.push_back(earlier[i + 1]);
+            }
+            ++i;
+        } else if (t.role == "user" ? !health_gate(t.text, medicine_names) : !bad_answer(t)) {
+            out.push_back(t);
+        }
+    }
+    return out;
 }
 
 std::string health_only_text(const std::string &lang) {
@@ -626,7 +664,7 @@ void drop_source(Relevant &rel, const std::string &label) {
         if (a != 0 || rel.block[0] == '\n') ++a;
         // The line ends where the next labelled line or the next heading starts.
         size_t e = std::string::npos;
-        for (const char *next : {"\n[S", "\nRemembered facts:", "\nSummaries of recordings:", "\n\n"}) e = std::min(e, rel.block.find(next, a));
+        for (const char *next : {"\n[S", "\nRemembered facts:\n", "\nSummaries of recordings:\n"}) e = std::min(e, rel.block.find(next, a));
         e = e == std::string::npos ? rel.block.size() : e + 1;
         rel.block.erase(a, e - a);
     }
@@ -634,6 +672,17 @@ void drop_source(Relevant &rel, const std::string &label) {
         json kept = json::array();
         for (const auto &s : rel.sources) if (jstr(s, "label") != label) kept.push_back(s);
         rel.sources = kept;
+    }
+}
+
+void neutral_titles(Relevant &rel, const std::vector<std::string> &medicine_names) {
+    if (!rel.sources.is_array()) return;
+    for (const auto &s : rel.sources) {
+        const std::string title = jstr(s, "title");
+        if (title.empty() || !health_gate(title, medicine_names)) continue;
+        const std::string head = "[" + jstr(s, "label") + "] " + title + " ";
+        size_t at = rel.block.find(head);
+        if (at != std::string::npos) rel.block.replace(at, head.size(), "[" + jstr(s, "label") + "] Recording ");
     }
 }
 
@@ -911,8 +960,14 @@ int add_passages(Relevant &rel, std::vector<Passage> candidates, const std::stri
     for (const auto &sp : scored) {
         if ((size_t)added >= max_n) break;
         const Passage &p = sp.second;
-        std::string label = "S" + std::to_string(rel.sources.size() + 1);
-        std::string line = "[" + label + "] " + p.title + " " + mmss_label(p.start_sec) + ": " + p.text + "\n";
+        int high = 0;
+        for (const auto &s : rel.sources) {
+            const std::string l = jstr(s, "label");
+            if (l.size() > 1) high = std::max(high, atoi(l.c_str() + 1));
+        }
+        std::string label = "S" + std::to_string(high + 1);
+        const std::string shown_title = health_gate(p.title, medicine_names) ? "Recording" : p.title;
+        std::string line = "[" + label + "] " + shown_title + " " + mmss_label(p.start_sec) + ": " + p.text + "\n";
         std::string add = (added == 0 ? std::string(rel.block.empty() ? "" : "\n") + "Summaries of recordings:\n" : "") + line;
         if (rel.block.size() + add.size() > max_bytes) break;
         rel.block += add;

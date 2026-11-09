@@ -29,7 +29,8 @@ struct ChatTurn: Codable, Identifiable, Equatable {
             // A quiz turn: what was put to the person is the question; the expected answer stays out of the history.
             let said = a.kind == "quiz" ? (a.question ?? shown) : shown
             return ChatWindow.Turn(question: question, answer: said.isEmpty ? nil : said, medicine: a.medicine,
-                                   sources: a.sources.map { ChatMessage.SourceRef(title: $0.title, start_sec: $0.startSec) })
+                                   sources: a.sources.map { ChatMessage.SourceRef(title: $0.title, start_sec: $0.startSec) },
+                                   kind: a.kind == "health" ? "health" : nil)
         case .stopped(let partial):
             return ChatWindow.Turn(question: question, answer: partial)
         case .waiting, .streaming, .failed:

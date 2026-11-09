@@ -355,8 +355,10 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
  * "quiz" ("question", "answer" = the expected answer, "source", "quiz_id"; none left: not_found and "quiz_done");
  * "summary" (stored summaries of the notes of the period, each note a source; empty period: not_found);
  * "recordings" (retrieval over pieces and stored summaries); "general" (the model's own knowledge, no sources).
- * A question the health check flags, or a follow-up of a medicine answer, never goes to "general": nothing found gives
- * a fixed line saying to ask a doctor or pharmacist. Before the first piece of a model answer cb gets the phase
+ * A question the health check flags, or the turn after one, never calls the model: the best passage word for word
+ * ("medicine":true), or a fixed line saying to ask a doctor or pharmacist (kind "health" when the question itself was
+ * about health; pass "kind":"health" back on that assistant turn). Health turns are never in the model's prompt.
+ * Before the first piece of a model answer cb gets the phase
  * "kind:<kind>", so a stopped answer keeps its kind.
  * on_text (may be NULL) gets the visible answer as it is written, a sentence at a time, thinking and [S1] labels
  * removed; its pieces join to "answer" when the answer is the model's. No sentence that mentions a medicine is ever
