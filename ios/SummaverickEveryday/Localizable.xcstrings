@@ -75,6 +75,17 @@
         }
       }
     },
+    "\"What did sir say about the exam date?\" I'll answer and take you to that moment in the recording.": {
+      "comment": "Setup tour tip on Ask",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"పరీక్ష తేదీ గురించి సార్ ఏం చెప్పారు?\" నేను చెప్పి, రికార్డింగ్‌లో ఆ క్షణానికి తీసుకెళ్తాను."
+          }
+        }
+      }
+    },
     "%@, the short version is here ☕": {
       "localizations": {
         "te": {
@@ -88,6 +99,23 @@
     "%lld": {
       "comment": "Badge count",
       "shouldTranslate": false
+    },
+    "%lld of %lld": {
+      "comment": "Setup tour: tip 1 of 4",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld లో %1$lld"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld of %2$lld"
+          }
+        }
+      }
     },
     "%lld open to-dos": {
       "localizations": {
@@ -395,6 +423,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ లోని రికార్డింగ్‌లన్నీ %2$@ లోకి వెళ్తాయి. దీన్ని వెనక్కి తీసుకోలేరు."
+          }
+        }
+      }
+    },
+    "All set. I don't need the internet again.": {
+      "comment": "Setup download step, when the language pack is already there",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అంతా రెడీ. ఇక ఇంటర్నెట్ అక్కర్లేదు."
+          }
+        }
+      }
+    },
+    "Allow both": {
+      "comment": "Setup: asks for the microphone and notifications, and agrees to the recording line",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రెండూ అనుమతించు"
           }
         }
       }
@@ -732,6 +782,28 @@
       },
       "comment": "%@ is a routine time name, e.g. Dinner"
     },
+    "Coming soon": {
+      "comment": "Setup: a language or option that cannot be picked yet",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "త్వరలో"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "comment": "Setup: next screen",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొనసాగించు"
+          }
+        }
+      }
+    },
     "Continue now": {
       "localizations": {
         "en": {
@@ -744,6 +816,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఇప్పుడే కొనసాగించండి"
+          }
+        }
+      }
+    },
+    "Continue while it downloads": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "డౌన్‌లోడ్ అవుతూ ఉండగా కొనసాగించు"
           }
         }
       }
@@ -1217,6 +1299,17 @@
         }
       }
     },
+    "Every class, kept together.": {
+      "comment": "Setup tour tip on Deep dive",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రతి క్లాస్, ఒకే చోట."
+          }
+        }
+      }
+    },
     "Every day": {
       "localizations": {
         "te": {
@@ -1343,6 +1436,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఇది తొలగించండి"
+          }
+        }
+      }
+    },
+    "Forgot something? Just ask me.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఏదైనా మర్చిపోయారా? నన్ను అడగండి."
           }
         }
       }
@@ -1577,6 +1680,17 @@
       },
       "comment": "%@ is the person's name"
     },
+    "Got it": {
+      "comment": "Setup tour: closes the last tip",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అర్థమైంది"
+          }
+        }
+      }
+    },
     "Got the gist!": {
       "localizations": {
         "te": {
@@ -1629,6 +1743,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "అంతా విన్నాను"
+          }
+        }
+      }
+    },
+    "Hi, I'm Summaverick.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నమస్తే, నేను Summaverick."
           }
         }
       }
@@ -2128,6 +2252,16 @@
         }
       }
     },
+    "I'll try it later": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తర్వాత ప్రయత్నిస్తాను"
+          }
+        }
+      }
+    },
     "I'll write your notes after you stop": {
       "localizations": {
         "en": {
@@ -2323,6 +2457,16 @@
         }
       }
     },
+    "Keep it on this phone": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లోనే ఉంచండి"
+          }
+        }
+      }
+    },
     "Keep recording": {
       "localizations": {
         "te": {
@@ -2370,6 +2514,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఇటీవలిది: %@"
+          }
+        }
+      }
+    },
+    "Let's try one, %@.": {
+      "comment": "Setup last screen; the person's first name",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఒకటి ప్రయత్నిద్దాం, %@."
+          }
+        }
+      }
+    },
+    "Let's try one.": {
+      "comment": "Setup last screen, no name given",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఒకటి ప్రయత్నిద్దాం."
           }
         }
       }
@@ -2624,6 +2790,16 @@
         }
       }
     },
+    "My language pack is still downloading. I'll write the notes once it finishes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నా లాంగ్వేజ్ ప్యాక్ ఇంకా డౌన్‌లోడ్ అవుతోంది. అది పూర్తయ్యాక నోట్స్ రాస్తాను."
+          }
+        }
+      }
+    },
     "Name": {
       "localizations": {
         "te": {
@@ -2730,6 +2906,16 @@
         }
       }
     },
+    "Nice to meet you": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మిమ్మల్ని కలవడం సంతోషం"
+          }
+        }
+      }
+    },
     "No": {
       "localizations": {
         "te": {
@@ -2740,12 +2926,32 @@
         }
       }
     },
+    "No big download. What was said goes to that company, under their rules.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పెద్ద డౌన్‌లోడ్ అక్కర్లేదు. మాట్లాడింది ఆ కంపెనీకి వెళ్తుంది, వాళ్ళ నియమాల ప్రకారం."
+          }
+        }
+      }
+    },
     "No medicines yet.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "ఇంకా మందులు లేవు."
+          }
+        }
+      }
+    },
+    "No need to wait here. Close the app if you like, and I'll tell you when I'm ready.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇక్కడే వేచి ఉండక్కర్లేదు. యాప్ మూసేసినా పర్లేదు, నేను రెడీ అయ్యాక చెప్తాను."
           }
         }
       }
@@ -2999,6 +3205,16 @@
         }
       }
     },
+    "Notifications": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోటిఫికేషన్లు"
+          }
+        }
+      }
+    },
     "Notifications are off": {
       "localizations": {
         "te": {
@@ -3040,6 +3256,26 @@
       },
       "comment": "How often a reminder repeats"
     },
+    "One 5.5 GB download first": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముందు ఒక్కసారి 5.5 GB డౌన్‌లోడ్"
+          }
+        }
+      }
+    },
+    "One big download, then no internet needed.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఒక్క పెద్ద డౌన్‌లోడ్, తర్వాత ఇంటర్నెట్ అక్కర్లేదు."
+          }
+        }
+      }
+    },
     "One moment, I'm writing another note": {
       "localizations": {
         "en": {
@@ -3052,6 +3288,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఒక్క నిమిషం, ఇంకో నోట్ రాస్తున్నాను"
+          }
+        }
+      }
+    },
+    "Only record people who know they are being recorded and are fine with it.": {
+      "comment": "Setup: the recording consent line",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డ్ చేస్తున్నారని తెలిసి, ఒప్పుకున్న వాళ్ళనే రికార్డ్ చేయండి."
           }
         }
       }
@@ -3326,6 +3573,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "గోప్యత"
+          }
+        }
+      }
+    },
+    "Private, and my advice": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రైవేట్, నా సలహా ఇదే"
           }
         }
       }
@@ -3631,6 +3888,17 @@
         }
       }
     },
+    "Reminders waiting for your Yes, things to check and what's coming up. Nothing rings until you say Yes.": {
+      "comment": "Setup tour tip on Today",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ \"సరే\" కోసం ఎదురుచూసే రిమైండర్లు, చూడాల్సినవి, రాబోయేవి. మీరు సరే అనే వరకు ఏదీ మోగదు."
+          }
+        }
+      }
+    },
     "Remove": {
       "localizations": {
         "te": {
@@ -3735,6 +4003,16 @@
         }
       },
       "comment": "Heading in the shared notes file"
+    },
+    "Right here on this phone": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇక్కడే, ఈ ఫోన్‌లోనే"
+          }
+        }
+      }
     },
     "Running about %lld min behind": {
       "localizations": {
@@ -3993,6 +4271,17 @@
         }
       }
     },
+    "Show me around again": {
+      "comment": "Settings: replays the setup tour tips",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మళ్ళీ చూపించండి"
+          }
+        }
+      }
+    },
     "Show recording reminder": {
       "localizations": {
         "te": {
@@ -4013,12 +4302,43 @@
         }
       }
     },
+    "Skip": {
+      "comment": "Setup tour: ends the tips",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వదిలేయండి"
+          }
+        }
+      }
+    },
     "Skip this step": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "ఈ దశ వదిలేయండి"
+          }
+        }
+      }
+    },
+    "So I can hear the lecture. Only when you tap record.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "క్లాస్ వినడానికి. మీరు రికార్డ్ నొక్కినప్పుడు మాత్రమే."
+          }
+        }
+      }
+    },
+    "So I can tell you when your notes are ready, and ring your reminders.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ రెడీ అయినప్పుడు చెప్పడానికి, మీ రిమైండర్లు మోగించడానికి."
           }
         }
       }
@@ -4419,6 +4739,16 @@
         }
       }
     },
+    "Tap it, then put your phone in your pocket. I keep listening and writing, even when it's locked.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నొక్కి, ఫోన్ జేబులో పెట్టేయండి. లాక్ అయినా నేను వింటూ, రాస్తూనే ఉంటాను."
+          }
+        }
+      }
+    },
     "Tap the word that is wrong": {
       "localizations": {
         "en": {
@@ -4431,6 +4761,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "తప్పుగా ఉన్న పదాన్ని తాకండి"
+          }
+        }
+      }
+    },
+    "Tell me what you did today. Ten seconds is plenty, and I'll show you what I can do with it.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈరోజు ఏం చేశారో చెప్పండి. పది సెకన్లు చాలు, దాంతో నేనేం చేయగలనో చూపిస్తాను."
           }
         }
       }
@@ -4693,6 +5033,16 @@
         }
       }
     },
+    "This red button is all you need.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఎర్ర బటన్ ఒక్కటి చాలు."
+          }
+        }
+      }
+    },
     "Time": {
       "localizations": {
         "te": {
@@ -4799,6 +5149,17 @@
       },
       "comment": "Tab name, and the day heading in the reminders list"
     },
+    "Today keeps your day in one place.": {
+      "comment": "Setup tour tip on Today",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈరోజు: మీ రోజంతా ఒకే చోట."
+          }
+        }
+      }
+    },
     "Tomorrow": {
       "localizations": {
         "te": {
@@ -4894,6 +5255,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "రోజుకు రెండుసార్లు అంటే రెండు సమయాలు కావాలి."
+          }
+        }
+      }
+    },
+    "Two small things I need from you": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నుండి రెండు చిన్న అనుమతులు"
           }
         }
       }
@@ -5250,6 +5621,16 @@
         }
       }
     },
+    "Where should I write your notes?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ ఎక్కడ రాయమంటారు?"
+          }
+        }
+      }
+    },
     "Which language do you prefer?": {
       "localizations": {
         "te": {
@@ -5277,6 +5658,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఎవరు"
+          }
+        }
+      }
+    },
+    "With your own ChatGPT, Claude or Copilot": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ ChatGPT, Claude లేదా Copilot తో"
           }
         }
       }
@@ -5546,6 +5937,16 @@
         }
       }
     },
+    "You can change this later.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తర్వాత మార్చుకోవచ్చు."
+          }
+        }
+      }
+    },
     "You can close the app and get on with your day. I'll let you know when your notes are ready.": {
       "localizations": {
         "en": {
@@ -5572,12 +5973,32 @@
         }
       }
     },
+    "You listen. I'll take the notes, in your language, right here on your phone.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు వినండి. నోట్స్ నేను రాస్తాను, మీ భాషలో, మీ ఫోన్‌లోనే."
+          }
+        }
+      }
+    },
     "Your day": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
             "value": "మీ దినచర్య"
+          }
+        }
+      }
+    },
+    "Your microphone": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ మైక్రోఫోన్"
           }
         }
       }
@@ -5635,6 +6056,16 @@
         }
       }
     },
+    "Your notes by topic and by person, so revising before the exam takes one tap.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నోట్స్, విషయం వారీగా, మనిషి వారీగా. పరీక్ష ముందు రివిజన్ ఒక్క టచ్‌తో."
+          }
+        }
+      }
+    },
     "Your notes stay. New recordings wait until it is downloaded again.": {
       "localizations": {
         "en": {
@@ -5657,6 +6088,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "మీ సొంత నోట్స్ సహాయకుడు. అంతా ఈ ఫోన్‌లోనే ఉంటుంది."
+          }
+        }
+      }
+    },
+    "Your practice note stays with your other notes. Delete it whenever you like.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ప్రాక్టీస్ నోట్ మీ మిగతా నోట్స్‌తో ఉంటుంది. ఎప్పుడైనా డిలీట్ చేయవచ్చు."
+          }
+        }
+      }
+    },
+    "Your recordings and notes never leave your phone. Works with no internet.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌లు, నోట్స్ ఫోన్ దాటి వెళ్ళవు. ఇంటర్నెట్ లేకపోయినా పనిచేస్తుంది."
           }
         }
       }

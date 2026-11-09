@@ -35,6 +35,10 @@
 			isa = PBXBuildFile;
 			fileRef = 9E2ACA831A68C5FC7568EFA9;
 		};
+		1D93FAC83E0C239CDE7EBB43 = {
+			isa = PBXBuildFile;
+			fileRef = 6FBD9F3DE594670E26D165EC;
+		};
 		1E01B2EFF4A31A1034B15098 = {
 			isa = PBXBuildFile;
 			fileRef = 13A63ABDA892EF2D8A1A560A;
@@ -216,6 +220,10 @@
 		B939673027A07B580BF6B7A1 = {
 			isa = PBXBuildFile;
 			fileRef = 892E4DF51BC5A1D8EB706A7A;
+		};
+		BA9D2ACC5550BEBF951BB462 = {
+			isa = PBXBuildFile;
+			fileRef = 4AF174E3AE529342FF2A9846;
 		};
 		C23AA49A9EE82365B4F4B783 = {
 			isa = PBXBuildFile;
@@ -544,6 +552,13 @@
 			path = SummaverickEveryday/Views/Profile/LearnedView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		4AF174E3AE529342FF2A9846 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = GuidedSetupView.swift;
+			path = SummaverickEveryday/Views/Setup/GuidedSetupView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		4E9F0134C12B9B82D2B2A856 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -675,6 +690,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = sve_textmatch.cpp;
 			path = ../core/src/sve_textmatch.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		6FBD9F3DE594670E26D165EC = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SetupTour.swift;
+			path = SummaverickEveryday/Views/Setup/SetupTour.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		7098A4559C0419D83AAB1B2A = {
@@ -1167,6 +1189,7 @@
 				14170FB9E149C3DD932A78DD,
 				3EC16C5E440AEDC2F8EC5F6A,
 				DA0A32E81D9A4713BC65BFBC,
+				BEBE7E84826B6F21349BCBB4,
 				F86C9C201E773F26CECBA845,
 				29A1CD6197C4EBF318C20726,
 				8C247BC7003BBE5F71E1479C,
@@ -1199,6 +1222,15 @@
 				647DAFDDC9793F2E68970D6F,
 			);
 			name = Shared;
+			sourceTree = "<group>";
+		};
+		BEBE7E84826B6F21349BCBB4 = {
+			isa = PBXGroup;
+			children = (
+				4AF174E3AE529342FF2A9846,
+				6FBD9F3DE594670E26D165EC,
+			);
+			name = Views/Setup;
 			sourceTree = "<group>";
 		};
 		BECA9321D0D66DAD007659AB = {
@@ -1452,6 +1484,8 @@
 				E374920B948422FA0FDEBA74,
 				A98A4FF70B48BB38E9507E50,
 				8D4A6C6E4B479FCA91F91BA9,
+				BA9D2ACC5550BEBF951BB462,
+				1D93FAC83E0C239CDE7EBB43,
 				908F929CC6113FA25B46EE92,
 				DD6F72C30ED5F9B5F7BCA8E3,
 				E3B6ED99E22E4B0C0EC884D9,

@@ -1308,3 +1308,78 @@ enum ChatKeep {
 enum AskRoute {
     static func needsNoModel(_ kind: String) -> Bool { kind == "due" || kind == "quiz" || kind == "medicine" }
 }
+
+/// The first-time setup (Task L2): whether it shows, what comes after each step, which languages can be picked.
+/// Setup screens (welcome → name and language → where notes are written → download → permissions), then the tour
+/// over the real tabs, then "try it". Shown once, on a new install only.
+enum SetupFlow {
+    /// UserDefaults key holding `Progress.rawValue` once it is decided.
+    static let progressKey = "setup.progress"
+
+    enum Progress: String { case setup, tour, tryIt, done }
+    enum Step: String, CaseIterable { case welcome, nameLanguage, whereNotes, download, permissions }
+    /// Where notes are written. Only this phone for now: connectors to the person's own account are not built.
+    enum NotesPlace: String { case phone, ownAccount }
+
+    /// A new install has no notes, never acknowledged the recording reminder and has no profile name. Anything else is
+    /// an existing install, which never sees setup.
+    static func isNewInstall(hasNotes: Bool, consentAcknowledged: Bool, profileName: String?) -> Bool {
+        let named = !(profileName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return !hasNotes && !consentAcknowledged && !named
+    }
+
+    /// At launch: the stored progress when there is one (setup, the tour or "try it" resume where they were left);
+    /// otherwise setup for a new install and done for an existing one.
+    static func start(stored: String?, hasNotes: Bool, consentAcknowledged: Bool, profileName: String?) -> Progress {
+        if let stored, let p = Progress(rawValue: stored) { return p }
+        return isNewInstall(hasNotes: hasNotes, consentAcknowledged: consentAcknowledged, profileName: profileName) ? .setup : .done
+    }
+
+    static func shows(_ p: Progress) -> Bool { p != .done }
+
+    /// The step after `step`. Where notes are written: only this phone goes on, to the download unless it is not
+    /// needed (already there, or a phone that cannot write notes). nil after permissions: the setup screens end.
+    static func next(after step: Step, place: NotesPlace = .phone, downloadNeeded: Bool = true) -> Step? {
+        switch step {
+        case .welcome: return .nameLanguage
+        case .nameLanguage: return .whereNotes
+        case .whereNotes:
+            guard placeSelectable(place) else { return .whereNotes }
+            return downloadNeeded ? .download : .permissions
+        case .download: return .permissions
+        case .permissions: return nil
+        }
+    }
+
+    static let afterSetup = Progress.tour
+    /// "Show me around again" in Settings replays only the tips.
+    static func afterTour(replay: Bool) -> Progress { replay ? .done : .tryIt }
+    static let afterTryIt = Progress.done
+
+    static func placeSelectable(_ place: NotesPlace) -> Bool { place == .phone }
+
+    /// The progress dots: seven in all (the five setup screens, the tour, try it); how many are lit on a step.
+    static let dotCount = 7
+    static func dots(_ step: Step) -> Int { (Step.allCases.firstIndex(of: step) ?? 0) + 1 }
+
+    /// The language list, in its own script. Only English and Telugu can be picked: the others' accuracy and
+    /// medicine checks are not done.
+    static let languages: [(code: String, native: String)] = [
+        ("en", "English"), ("hi", "हिन्दी"), ("te", "తెలుగు"), ("ta", "தமிழ்"), ("ml", "മലയാളം"),
+    ]
+    static let selectableLanguages: Set<String> = ["en", "te"]
+    static func languageSelectable(_ code: String) -> Bool { selectableLanguages.contains(code) }
+
+    /// The language first shown: the phone's first preferred language that can be picked, else the current
+    /// setting when it can be picked, else English.
+    static func initialLanguage(current: String, preferred: [String]) -> String {
+        for p in preferred {
+            let code = String(p.split(separator: "-").first ?? "").lowercased()
+            if code != "en", languageSelectable(code) { return code }
+        }
+        return languageSelectable(current) ? current : "en"
+    }
+
+    /// A tap on a language: one that cannot be picked yet leaves the choice as it was.
+    static func choose(_ code: String, current: String) -> String { languageSelectable(code) ? code : current }
+}

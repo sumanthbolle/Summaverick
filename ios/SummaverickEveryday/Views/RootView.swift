@@ -60,6 +60,10 @@ struct RootView: View {
     @State private var showConsent = false
     /// The tab bar hides while a keyboard is up, so screens below it keep normal keyboard avoidance.
     @State private var keyboardUp = false
+    /// The first-time setup, its tour over the tabs, and "try it".
+    @State private var setup = SetupState.shared
+    @State private var tourTip: TourTip = .record
+    @State private var recordAfterTryIt = false
 
     var body: some View {
         // The bar takes its own space under the tabs. (As a .safeAreaInset it was drawn over the tabs without
@@ -70,10 +74,32 @@ struct RootView: View {
                 tabContent(.today) { TodayView() }
                 tabContent(.deepDive) { DeepDiveView() }
                 tabContent(.ask) { AskView() }
+                if touring {
+                    TourOverlay(tip: $tourTip) { setup.finishTour() }
+                        .transition(.opacity)
+                }
             }
             .frame(maxHeight: .infinity)
-            if !keyboardUp { RootTabBar(selection: $router.tab) { startRecordingFlow() } }
+            .fullScreenCover(isPresented: shows(.setup)) {
+                GuidedSetupView { setup.set(SetupFlow.afterSetup) }.environment(settings)
+            }
+            // A view of its own, so this cover and the setup's are never on the same view as the recorder's.
+            .background {
+                Color.clear.fullScreenCover(isPresented: shows(.tryIt), onDismiss: {
+                    if recordAfterTryIt { recordAfterTryIt = false; startRecordingFlow() }
+                }) {
+                    TryItView(onRecord: { recordAfterTryIt = true; setup.set(SetupFlow.afterTryIt) },
+                              onLater: { setup.set(SetupFlow.afterTryIt) })
+                        .environment(settings)
+                }
+            }
+            if !keyboardUp { RootTabBar(selection: $router.tab, spotlight: touring ? tourTip : nil) { startRecordingFlow() } }
         }
+        .task { await setup.decide(settings: settings) }
+        .onChange(of: setup.progress) { _, p in
+            if p == .tour { tourTip = .record; router.tab = .today }
+        }
+        .onChange(of: tourTip) { _, t in router.tab = t.tab }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
         .environment(router)
@@ -118,6 +144,12 @@ struct RootView: View {
             .opacity(visible ? 1 : 0)
             .allowsHitTesting(visible)
             .accessibilityHidden(!visible)
+    }
+
+    private var touring: Bool { setup.progress == .tour }
+
+    private func shows(_ p: SetupFlow.Progress) -> Binding<Bool> {
+        Binding(get: { setup.progress == p }, set: { _ in })
     }
 
     private var noteLink: Binding<NoteMoment?> {
@@ -169,6 +201,8 @@ struct RootView: View {
 /// The bottom bar, in the owner-approved order: Today, the red Record button, Deep dive, Ask.
 private struct RootTabBar: View {
     @Binding var selection: Router.Tab
+    /// During the setup tour: the tip's own item stays lit, the others dim, and nothing takes taps.
+    var spotlight: TourTip? = nil
     let onRecord: () -> Void
 
     var body: some View {
@@ -187,7 +221,10 @@ private struct RootTabBar: View {
             Rectangle().fill(Theme.tabBar).ignoresSafeArea(edges: .bottom)
                 .overlay(alignment: .top) { Divider() }
         }
+        .allowsHitTesting(spotlight == nil)
     }
+
+    private func lit(_ tip: TourTip) -> Double { spotlight == nil || spotlight == tip ? 1 : 0.3 }
 
     private func item(_ tab: Router.Tab, _ title: LocalizedStringKey, _ icon: String) -> some View {
         let selected = selection == tab
@@ -201,6 +238,7 @@ private struct RootTabBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(selected ? Theme.accent : Theme.secondary)
+        .opacity(lit(tab == .today ? .today : tab == .deepDive ? .deepDive : .ask))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -229,6 +267,7 @@ private struct RootTabBar: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .opacity(lit(.record))
                 .accessibilityLabel(Text("Record"))
             }
     }

@@ -23,6 +23,16 @@ struct SettingsView: View {
                     NavigationLink { LearnedView() } label: {
                         Label("Things I remember", systemImage: "brain.head.profile").frame(minHeight: 44)
                     }
+                    Button {
+                        dismiss()
+                        Task {   // once the sheet has gone, so the tips sit over the real tabs
+                            try? await Task.sleep(for: .milliseconds(500))
+                            SetupState.shared.replayTour()
+                        }
+                    } label: {
+                        Label("Show me around again", systemImage: "questionmark.circle").frame(minHeight: 44)
+                    }
+                    .foregroundStyle(Theme.text)
                 }
                 .listRowBackground(Theme.formRow)
 

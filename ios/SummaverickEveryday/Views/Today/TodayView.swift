@@ -121,6 +121,7 @@ struct TodayView: View {
             .onChange(of: notificationsOff || errorMessage != nil) { _, open in PresentationGate.shared.set("today", open) }
             .sheet(isPresented: $showSetup, onDismiss: { Task { await reload() } }) { ProfileSetupView() }
             .onChange(of: lock.isLocked) { _, _ in offerSetupIfNeeded() }
+            .onChange(of: SetupState.shared.progress) { _, _ in offerSetupIfNeeded() }
             .alert("Notifications are off", isPresented: $notificationsOff) {
                 Button("Open Settings") {
                     if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
@@ -456,6 +457,8 @@ struct TodayView: View {
     /// Opens the setup sheet once per launch while there is no profile, never over the lock screen or
     /// another sheet. The card stays on Today as the way back in.
     private func offerSetupIfNeeded() {
+        // Never during, or before the decision on, the first-time setup.
+        guard SetupState.shared.progress == .done else { return }
         guard loaded, profile == nil, !ProfileSetupView.shownThisLaunch, !lock.isLocked, !router.showSettings,
               router.openNote == nil, PresentationGate.shared.open.isEmpty else { return }
         ProfileSetupView.shownThisLaunch = true
