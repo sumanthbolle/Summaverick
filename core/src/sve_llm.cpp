@@ -30,13 +30,17 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
 
     unsigned hw = std::thread::hardware_concurrency();
     n_threads = n_threads_req > 0 ? n_threads_req : (int)std::max(1u, std::min(hw, 4u));
+    // Prefill (and the audio encoder) are compute-bound bursts: up to 8 cores, never fewer than decoding.
+    // Mac CPU: prefill 11.8 s -> 7.2 s per 28 s piece, transcripts identical. A 6-core iPhone gets 6
+    // (not yet measured there). Decoding is memory-bound and stays on n_threads.
+    n_threads_batch = std::max(n_threads, (int)std::min(hw, 8u));
 
     llama_context_params cp = llama_context_default_params();
     cp.n_ctx = n_ctx;
     cp.n_batch = 512;
     cp.n_ubatch = 512;
     cp.n_threads = n_threads;
-    cp.n_threads_batch = n_threads;
+    cp.n_threads_batch = n_threads_batch;
     cp.no_perf = true;
     ctx = llama_init_from_model(model, cp);
     if (!ctx) { sve_logf(2, "failed to create context"); return false; }
@@ -45,7 +49,8 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     if (t) tmpl = t;
     char desc[128];
     llama_model_desc(model, desc, sizeof desc);
-    sve_logf(0, "loaded %s (n_ctx=%d, threads=%d, gpu_layers=%d)", desc, n_ctx, n_threads, n_gpu_layers);
+    sve_logf(0, "loaded %s (n_ctx=%d, threads=%d, batch threads=%d, gpu_layers=%d)", desc, n_ctx, n_threads,
+             n_threads_batch, n_gpu_layers);
     return true;
 }
 

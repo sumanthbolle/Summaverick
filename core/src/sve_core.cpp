@@ -298,11 +298,10 @@ int sve_load_audio(sve_ctx *ctx, const char *mmproj_path) {
     // so transcription keeps running while the phone is locked (iOS refuses background GPU work).
     mp.use_gpu = ctx->llm->n_gpu_layers > 0;
     mp.print_timings = false;
-    // The audio encoder is a short compute-bound burst per piece: it may use more cores than decoding
-    // (up to 8, never fewer than the model's). Measured on the Mac CPU: encode 1.04 s -> 0.59 s per
-    // 28 s piece, transcripts identical (docs/superpowers/2026-11-09-piece-speed.md).
-    const unsigned hw = std::thread::hardware_concurrency();
-    mp.n_threads = std::max(ctx->llm->n_threads, (int)std::min(hw, 8u));
+    // The audio encoder is a short compute-bound burst per piece: it gets the prefill's threads (more
+    // than decoding). Mac CPU: encode 1.04 s -> 0.59 s per 28 s piece, transcripts identical
+    // (docs/superpowers/2026-11-09-piece-speed.md).
+    mp.n_threads = ctx->llm->n_threads_batch;
     mp.warmup = false;
     ctx->mtmd = mtmd_init_from_file(mmproj_path, ctx->llm->model, mp);
     if (!ctx->mtmd) { sve_logf(2, "failed to load audio projector %s", mmproj_path); return -2; }

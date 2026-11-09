@@ -20,6 +20,7 @@ struct Llm {
     const llama_vocab *vocab = nullptr;
     int n_ctx = 4096;
     int n_threads = 4;
+    int n_threads_batch = 4;   // prefill and the audio encoder (load sets it)
     int n_gpu_layers = 0;   // 0 = CPU only; the audio projector follows (sve_load_audio)
     std::string tmpl; // chat template (jinja source) from the GGUF, or empty
 
