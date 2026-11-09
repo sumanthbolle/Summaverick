@@ -201,7 +201,9 @@ final class LiveTranscriber {
 
     private func ended(_ s: LiveSession) {
         if running[s.audioPath] === s { running[s.audioPath] = nil }
-        if running.isEmpty && current == nil { UIDevice.current.isBatteryMonitoringEnabled = false }
+        if running.isEmpty && current == nil && !HeatGovernor.shared.holdsBatteryMonitoring {
+            UIDevice.current.isBatteryMonitoringEnabled = false   // the heat ladder may still be reading it
+        }
     }
 
     /// Heat (the shared ladder at paused, which lasts a minute of calm past critical) or battery below 20%.
@@ -220,8 +222,8 @@ final class LiveTranscriber {
         if level == .paused { return false }
         guard HeatLadder.showsCooling(level) else { return true }
         show(s, .cooling)
-        let start = Date()
-        while !s.finishing.isSet, !HeatLadder.restOver(level: heat.level, started: start, now: Date()) {
+        let start = HeatGovernor.now
+        while !s.finishing.isSet, !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now) {
             do { try await Task.sleep(nanoseconds: 250_000_000) } catch { break }
         }
         if heat.level == .paused { return false }

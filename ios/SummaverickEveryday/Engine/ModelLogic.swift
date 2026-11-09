@@ -108,10 +108,11 @@ enum HeatLadder {
     }
 
     /// Worse is immediate; better is one level, once `demanded < current` has held for calmSeconds (calmSince,
-    /// kept by the caller: see State).
-    static func next(current: Level, demanded: Level, calmSince: Date?, now: Date) -> Level {
+    /// kept by the caller: see State). Times are seconds on a monotonic clock that counts device sleep
+    /// (HeatGovernor.now), never wall-clock time.
+    static func next(current: Level, demanded: Level, calmSince: TimeInterval?, now: TimeInterval) -> Level {
         if demanded >= current { return max(current, demanded) }
-        guard let calmSince, now.timeIntervalSince(calmSince) >= calmSeconds else { return current }
+        guard let calmSince, now - calmSince >= calmSeconds else { return current }
         return Level(rawValue: current.rawValue - 1) ?? current
     }
 
@@ -120,11 +121,23 @@ enum HeatLadder {
         private(set) var level: Level = .full
         /// Since when demand has been below the level; nil when it is not. Reset whenever demand rises, and
         /// after each step down (the next step needs its own minute).
-        private(set) var calmSince: Date?
+        private(set) var calmSince: TimeInterval?
         private var lastDemanded: Level?
+        /// When the last reading was fed.
+        private(set) var lastReading: TimeInterval?
 
-        /// Feeds one reading; true when the level changed.
-        mutating func update(demanded d: Level, now: Date) -> Bool {
+        /// Feeds one reading; true when the level changed. A gap of more than calmSeconds since the last reading
+        /// (the app was suspended, nothing read) counts as calm: the level starts again from this demand, so a
+        /// stale paused never holds up the work that wakes the app (worse is still immediate: demand is fresh).
+        mutating func update(demanded d: Level, now: TimeInterval) -> Bool {
+            defer { lastReading = now }
+            if let last = lastReading, now - last > HeatLadder.calmSeconds {
+                let changed = d != level
+                level = d
+                calmSince = nil
+                lastDemanded = d
+                return changed
+            }
             if d < level {
                 if calmSince == nil || (lastDemanded.map { d > $0 } ?? false) { calmSince = now }
             } else {
@@ -151,8 +164,8 @@ enum HeatLadder {
 
     /// A rest that began at `started` is over: its seconds at the current level have passed, the phone is back
     /// at full, or it is paused (the gate pauses the work instead).
-    static func restOver(level: Level, started: Date, now: Date) -> Bool {
-        level == .paused || now.timeIntervalSince(started) >= restSeconds(level)
+    static func restOver(level: Level, started: TimeInterval, now: TimeInterval) -> Bool {
+        level == .paused || now - started >= restSeconds(level)
     }
 
     /// Decode threads for CPU runs (GPU runs keep the GPU and only rest).

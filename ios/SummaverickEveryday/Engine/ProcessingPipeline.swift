@@ -357,8 +357,8 @@ final class ProcessingPipeline {
         let before = stage
         stage = .cooling
         NSLog("[sve] note %lld: heat %@, resting %.0f s", id, level.name, HeatLadder.restSeconds(level))
-        let start = Date()
-        while !HeatLadder.restOver(level: heat.level, started: start, now: Date()), !abort.isSet,
+        let start = HeatGovernor.now
+        while !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now), !abort.isSet,
               !LiveTranscriber.shared.liveRunning {
             do { try await Task.sleep(nanoseconds: 500_000_000) } catch { break }
         }
@@ -1147,8 +1147,8 @@ final class ProcessingPipeline {
         notesStored = true   // an expiry only stops it
         let abort = self.abort
         func yields() -> Bool { LiveFirst.yields(recording: LiveTranscriber.shared.liveRunning, runIsLive: false) }
-        let heat = HeatGovernor.shared, start = Date()
-        while !HeatLadder.restOver(level: heat.level, started: start, now: Date()), !abort.isSet, !yields() {
+        let heat = HeatGovernor.shared, start = HeatGovernor.now
+        while !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now), !abort.isSet, !yields() {
             do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return }
         }
         guard !abort.isSet, !yields(), heat.level != .paused else { return }   // stays due
@@ -1295,8 +1295,8 @@ final class ProcessingPipeline {
         if level == .paused { return false }
         guard HeatLadder.showsCooling(level) else { return true }
         stage = .cooling
-        let start = Date()
-        while !HeatLadder.restOver(level: heat.level, started: start, now: Date()), !stop() {
+        let start = HeatGovernor.now
+        while !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now), !stop() {
             do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return false }
         }
         return !stop() && heat.level != .paused

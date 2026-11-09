@@ -143,6 +143,8 @@ actor CoreEngine {
             throw CoreError.modelLoadFailed(mmprojPath)
         }
         applyHeatThreads()   // after the projector: the audio encoder keeps its load-time threads
+        // The heat ladder's memory input is log-only until measured on the phone (R-N6-b).
+        NSLog("[sve] heat: memory after load %d MB", Int32(clamping: HeatGovernor.availableMemoryMB))
     }
 
     /// CPU threads set on the loaded CPU model since its load; nil: the load-time ones (the heat ladder's full).
