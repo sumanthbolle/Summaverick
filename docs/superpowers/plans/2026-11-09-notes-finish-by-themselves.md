@@ -219,7 +219,47 @@ Owner request (2026-11-09): control heating like Edge Veda (github.com/ramanujam
 - [ ] **Step 4:** Device build and `STRINGS OK`.
 - [ ] **Step 5: Commit** `feat(ios,core): heat ladder: ease off gradually (rests, fewer threads) instead of stop-start; memory and battery count`.
 
-### Task N7: Device check with the owner
+### Task N7: Notes accuracy (owner audit of "District Collectors and Aspirants' Dreams in Service")
+
+The owner flagged quality problems in note 19. The audit (scratchpad `q1/audit.md`, with a Mac re-run in `q1/rerun/out.json`) found:
+- The phone run was not the cause.
+- ASR garbles fast code-mixed speech.
+- The notes step inverts or changes statements and invents action items.
+- Another note's saved vocabulary (S&P 500, IPO, AI bubble) leaks into every section and notes prompt.
+- Sections are capped at 3–6 points and skip content.
+
+**Files:**
+- Modify: `core/src/sve_sections.cpp` (section prompt, point cap), `core/src/sve_core.cpp` (vocabulary line use; notes system prompt; low-confidence re-run), `core/src/sve_prompts.h` (notes prompt rules), `core/tests/*` (prompt tests).
+- Create: `docs/superpowers/2026-11-09-notes-accuracy.md`.
+
+**Interfaces:**
+- **A. Vocabulary is spelling help only.**
+  - The vocabulary line in the section, memory and notes prompts says the terms are spellings to use *only if they are said*, never topics to add.
+  - In the transcription prompt it stays as hearing help.
+  - Test: the section and notes prompts contain that instruction next to the vocabulary.
+  - Test: a section summary of pieces that never mention a vocabulary term must not list it. This one is a smoke check on the 3 section windows of note 19 in `smoke_gemma.sh sections` style, or the audit harness.
+- **B. Notes prompt rules**, added to the notes and question instructions in en; the output language rules stay:
+  - Skip passages that are unclear or garbled instead of guessing.
+  - Write an action item only when a speaker asks for or commits to it.
+  - Keep who said what (host versus guest).
+  - Never reverse a statement or a negation.
+  - Keep numbers, names and terms exactly as in the transcript.
+- **C. Low-confidence re-run.** A transcription piece whose `conf` is below 0.80 is transcribed once more, greedy, with the same context. The text with the higher `conf` is kept. At most one retry per piece.
+  - Core decides this in `sve_transcribe_next_piece`, with a pure helper `bool sve_should_retry_piece(double conf)` and a test.
+  - Log: `[sve] piece %d conf %.2f: transcribed again (%.2f)`.
+- **D. Section point cap.** Sections keep up to 10 points (today 3–6), and every piece must be represented. The section prompt says "cover every part".
+
+- [ ] **Step 1:** Write the core tests for A, C (`sve_should_retry_piece` at 0.79, 0.80 and NaN, where NaN means no retry) and D (the prompt text). Run them and see them fail, implement, then run `core/tests/run.sh` (all passed) and `smoke_gemma.sh api`.
+- [ ] **Step 2: Measure on the Mac CPU (the audit harness).**
+  - Regenerate note 19's sections and notes from its stored transcript before and after the change: summary, notes and questions.
+  - Do the same for notes 16 and 17, which are long.
+  - A reviewer, not the implementer, then reads the transcript against both versions for unsupported claims, inversions, invented action items, vocabulary leaks and missing major points.
+  - The change is kept only if the after-version is no worse on every count and better on the audit's examples.
+  - Write the counts table to `docs/superpowers/2026-11-09-notes-accuracy.md`.
+- [ ] **Step 3:** Also measure the cost of C: the share of pieces re-run in notes 16, 17 and 19, and the added time.
+- [ ] **Step 4: Commit** `fix(core): notes stay with what was said: vocabulary is spelling only, stricter notes rules, low-confidence pieces heard twice, fuller sections`.
+
+### Task N8: Device check with the owner
 
 - [ ] Install the build. Run each spec "Done when" case, plus heat: the same long recording or Regenerate once before N6 and once after (or with the ladder at full and at normal), comparing total time and the thermal states logged, with `xcrun devicectl device process launch --console` logs:
   1. A long recording (or the 81-minute note's Regenerate): locked, cable in, and left alone.
@@ -227,4 +267,4 @@ Owner request (2026-11-09): control heating like Edge Veda (github.com/ramanujam
   3. A recording made while another note is being written.
 
   Record the order of notifications and any cut-off.
-- [ ] Write the results to `docs/superpowers/2026-11-09-notes-finish-device-check.md` and commit.
+- [ ] Write the results to `docs/superpowers/2026-11-09-notes-finish-device-check.md (and note 19's Regenerate after N7)` and commit.
