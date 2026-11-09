@@ -120,9 +120,15 @@ enum SizeCheck {
 }
 
 enum WaitingNotes {
-    /// A resumed notes run writes only the outputs not stored yet (in OutputKind order): a summary the person was told
-    /// was ready is never rewritten, nor announced again.
-    static func outputsToWrite(stored: [Bool]) -> [Bool] { stored.map { !$0 } }
+    /// A resumed notes run writes only the outputs not stored yet (in OutputKind order; stored: each output's text, nil
+    /// when none): a summary the person was told was ready is never rewritten, nor announced again. An empty or
+    /// whitespace-only output has no text (RegenerateRules.accepts) and is written.
+    static func outputsToWrite(stored: [String?]) -> [Bool] { stored.map { !($0.map(RegenerateRules.accepts) ?? false) } }
+
+    /// Reminders, tasks and profile changes are extracted only when the note was not extracted yet (the core marks it
+    /// only after a successful run, so one cut off mid-extraction runs again). Extracting twice would give an accepted
+    /// card a second pending copy and bring a rejected one back.
+    static func extracts(alreadyExtracted: Bool) -> Bool { !alreadyExtracted }
 
     struct Candidate: Equatable {
         let id: Int64

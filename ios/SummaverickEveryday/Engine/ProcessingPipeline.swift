@@ -1027,16 +1027,21 @@ final class ProcessingPipeline {
                 let dur = await engine.note(id)?.duration_seconds ?? 0
                 await engine.setPieces(id, PiecesBackfill.pieces(transcript: transcript, durationSeconds: dur))
             }
-            stage = .extracting
-            do {
-                let n = try await onBackend {
-                    try await engine.extract(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
+            if WaitingNotes.extracts(alreadyExtracted: await engine.noteExtracted(id)) {
+                stage = .extracting
+                do {
+                    let n = try await onBackend {
+                        try await engine.extract(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
+                    }
+                    NSLog("[sve] extract added %d suggestions", n)
+                } catch {
+                    NSLog("[sve] extract failed: %@", String(describing: error))
                 }
-                NSLog("[sve] extract added %d suggestions", n)
-            } catch {
-                NSLog("[sve] extract failed: %@", String(describing: error))
+                NotificationCenter.default.post(name: .assistantChanged, object: nil)
+            } else {
+                // A resumed run: extracted already (its cards may be accepted or rejected); the step counts as done.
+                NSLog("[sve] note %lld: reminders and tasks already extracted; not extracted again", id)
             }
-            NotificationCenter.default.post(name: .assistantChanged, object: nil)
         }
         if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }   // cut off (aborted)
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
@@ -1057,8 +1062,8 @@ final class ProcessingPipeline {
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3, outputsTotal: steps))
 
         // A resumed run writes only what is not stored yet: a summary already announced is not rewritten or announced again.
-        let stored = await engine.note(id).map { n in OutputKind.allCases.map { n.output($0) != nil } }
-            ?? OutputKind.allCases.map { _ in false }
+        let stored = await engine.note(id).map { n in OutputKind.allCases.map { n.output($0) } }
+            ?? OutputKind.allCases.map { _ in nil }
         let toWrite = WaitingNotes.outputsToWrite(stored: stored)
         for (i, kind) in OutputKind.allCases.enumerated() {
             guard toWrite[i] else {
