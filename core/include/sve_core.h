@@ -355,12 +355,18 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
  * "quiz" ("question", "answer" = the expected answer, "source", "quiz_id"; none left: not_found and "quiz_done");
  * "summary" (stored summaries of the notes of the period, each note a source; empty period: not_found);
  * "recordings" (retrieval over pieces and stored summaries); "general" (the model's own knowledge, no sources).
+ * A question the health check flags, or a follow-up of a medicine answer, never goes to "general": nothing found gives
+ * a fixed line saying to ask a doctor or pharmacist. Before the first piece of a model answer cb gets the phase
+ * "kind:<kind>", so a stopped answer keeps its kind.
  * on_text (may be NULL) gets the visible answer as it is written, a sentence at a time, thinking and [S1] labels
  * removed; its pieces join to "answer" when the answer is the model's. No sentence that mentions a medicine is ever
  * streamed. "answer" is the final text to show. on_text or cb returning non-zero cancels (NULL). NULL also on error,
  * or with no model when the question needs one. */
 char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *lang_hint,
                          sve_text_cb on_text, void *user, sve_progress_cb cb, void *cbuser);
+/* The kind sve_assistant_chat's code rule gives a question ("medicine", "quiz", "due", "summary", "recordings"), for the
+ * host: "due" and "quiz" need no model, so sve_assistant_chat can run them on a store-only context at once. */
+char *sve_route_kind(sve_ctx *ctx, const char *question);
 
 /* At most one insight per calendar day, from recent notes and open tasks: {"id":0,"text":""} or "null".
  * cb (may be NULL) is called during generation; returning non-zero cancels it (returns NULL, nothing stored). */

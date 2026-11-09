@@ -93,10 +93,10 @@ struct Selection {
 };
 
 // Single source of truth for what relevant_block labels and relevant_sources returns.
-Selection select_relevant(Store &store, const std::string &query) {
+Selection select_relevant(Store &store, const std::string &query, int64_t from = 0, int64_t to = 0) {
     Selection sel;
-    sel.facts = texts(store.search_memory_items(query, 5));  // current memories: not wrong, not superseded
-    json p = store.search_pieces(query, 6);
+    if (to == 0) sel.facts = texts(store.search_memory_items(query, 5));  // current memories: not wrong, not superseded
+    json p = to == 0 ? store.search_pieces(query, 6) : store.search_pieces_between(query, from, to, 6);
     if (p.is_array()) sel.pieces = p;
     return sel;
 }
@@ -170,8 +170,8 @@ std::string spelling_vocab_line(Store &store, size_t max_bytes, const std::strin
     return "Spell these words this way (" + std::string(kVocabOnlyIfSaid) + "): " + line.substr(head.size());
 }
 
-Relevant relevant(Store &store, const std::string &query, size_t max_bytes) {
-    Selection sel = select_relevant(store, query);
+Relevant relevant(Store &store, const std::string &query, size_t max_bytes, int64_t from, int64_t to) {
+    Selection sel = select_relevant(store, query, from, to);
     Relevant r;
     r.sources = json::array();
     std::string pieces, facts;

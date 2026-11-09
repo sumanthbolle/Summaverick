@@ -6,6 +6,7 @@
 #include "sve_chat.h"
 #include "sve_context.h"
 #include "sve_extract.h"
+#include "sve_health.h"
 #include "sve_learn.h"
 #include "sve_medcheck.h"
 #include "sve_prompts.h"
@@ -871,20 +872,21 @@ namespace {
 
 // Retrieved material that mentions a medicine (even an unknown name), in a piece or a remembered fact, is quoted
 // word for word, never generated. Medicine pieces come first; at most 3. Null when the material mentions none.
-json medicine_material_answer(sve::Store &st, const sve::Relevant &rel, const std::vector<std::string> &names,
+// is_med: mentions_medicine for sve_assistant_ask; for a chat the health check, on passages that score.
+json medicine_material_answer(sve::Store &st, const sve::Relevant &rel, const std::function<bool(const std::string &)> &is_med,
                               const std::string &lang) {
     json med_hits = json::array(), other = json::array(), med_facts = json::array();
     for (const auto &src : rel.sources) {
         json h = source_of(src);
         h["text"] = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
-        (sve::mentions_medicine(jstr(h, "text"), names) ? med_hits : other).push_back(h);
+        (is_med(jstr(h, "text")) ? med_hits : other).push_back(h);
     }
     size_t fh = rel.block.find("Remembered facts:\n");
     if (fh != std::string::npos) {
         std::string rest = rel.block.substr(fh), line;
         for (size_t i = 0; i <= rest.size(); ++i) {
             if (i < rest.size() && rest[i] != '\n') { line += rest[i]; continue; }
-            if (line.rfind("- ", 0) == 0 && sve::mentions_medicine(line.substr(2), names)) med_facts.push_back(line.substr(2));
+            if (line.rfind("- ", 0) == 0 && is_med(line.substr(2))) med_facts.push_back(line.substr(2));
             line.clear();
         }
     }
@@ -904,10 +906,10 @@ json medicine_material_answer(sve::Store &st, const sve::Relevant &rel, const st
 // The model's answer (thinking stripped) with its [S<n>] labels turned into sources. NOT_FOUND or no valid label:
 // the not-found sentence. An answer that drifted into medicines: the cited words verbatim instead.
 json cited_answer(sve::Store &st, const std::string &model_out, const sve::Relevant &rel,
-                  const std::vector<std::string> &names, const std::string &lang) {
+                  const std::function<bool(const std::string &)> &is_med, const std::string &lang) {
     sve::Cited c = sve::apply_citations(model_out, rel.sources);
     if (c.not_found) return ask_result(sve::not_found_text(lang), json::array(), true, false);
-    if (sve::mentions_medicine(c.answer, names)) {
+    if (is_med(c.answer)) {
         json hits = json::array();
         for (const auto &s : c.sources) {
             json h = s;
@@ -940,7 +942,8 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
 
         std::string kq = sve::keyword_query(q);
         sve::Relevant rel = sve::relevant(st, kq.empty() ? q : kq, 6000);
-        json med = medicine_material_answer(st, rel, names, lang);
+        const auto is_med = [&](const std::string &t) { return sve::mentions_medicine(t, names); };
+        json med = medicine_material_answer(st, rel, is_med, lang);
         if (!med.is_null()) return dump(med);
         if (rel.sources.empty()) return dump(ask_result(sve::not_found_text(lang), json::array(), true, false));
         if (!ctx->llm) return nullptr;
@@ -956,7 +959,7 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
             "reply with exactly NOT_FOUND and nothing else.";
         std::string out;
         if (!llm.complete(llm.apply_template(sys, userp), 300, out, cb, user, "final", 0, 1, true)) return nullptr;
-        return dump(cited_answer(st, sve::strip_thinking(out), rel, names, lang));
+        return dump(cited_answer(st, sve::strip_thinking(out), rel, is_med, lang));
     });
 }
 
@@ -970,12 +973,7 @@ constexpr int kClassifyMaxOut = 3;
 // the expected answer, shown when the person asks for it. All used: says so, with "quiz_done" (the host offers to
 // start over). Questions that mention a medicine are never asked.
 json quiz_result(sve::Store &st, const std::vector<std::string> &asked, const std::vector<std::string> &names, const std::string &lang) {
-    json notes = json::array();
-    for (const auto &n : st.list("", 20)) {
-        auto row = st.get(n.id);
-        if (row && row->revision_questions)
-            notes.push_back({{"id", n.id}, {"title", n.title}, {"revision_questions", *row->revision_questions}});
-    }
+    const json notes = st.note_summaries(0, 0, 20);
     if (auto it = sve::pick_quiz(notes, asked, names)) {
         json src = {{"note_id", it->note_id}, {"start_sec", 0}, {"title", it->title}};
         json r = ask_result(it->answer, json::array({src}), false, false);
@@ -1010,20 +1008,23 @@ json due_result(sve::Store &st, const std::vector<std::string> &names, const std
 }
 
 // The stored summaries of recent notes, as candidates for a recordings answer.
-std::vector<sve::Passage> summary_passages(sve::Store &st) {
+std::vector<sve::Passage> summary_passages(sve::Store &st, int64_t from, int64_t to) {
     std::vector<sve::Passage> out;
-    for (const auto &n : st.list("", 100)) {
-        auto row = st.get(n.id);
-        if (row && row->short_summary) {
-            std::string t = sve::strip_unclear(*row->short_summary);
-            if (!t.empty()) out.push_back({n.id, 0, n.title, t});
-        }
-        for (const auto &sec : st.sections(n.id)) {
-            json one = json::array({{{"title", ""}, {"created_at", 0}, {"sections", json::array({sec})}}});
-            std::string m = sve::summary_material(one);   // "### …\n- title points\n\n"
-            size_t at = m.find("\n- ");
-            std::string t = at == std::string::npos ? "" : sve::trim_copy(m.substr(at + 3));
-            if (!t.empty()) out.push_back({n.id, jint(sec, "start_sec", 0), n.title, t});
+    for (const auto &n : st.note_summaries(from, to, 100)) {
+        const int64_t id = jint(n, "id", 0);
+        const std::string title = jstr(n, "title");
+        std::string t = sve::strip_unclear(jstr(n, "short_summary"));
+        if (!t.empty()) out.push_back({id, 0, title, t});
+        for (const auto &sec : st.sections(id)) {
+            json sum = sec.is_object() && sec.contains("summary") ? sec["summary"] : json();
+            if (!sum.is_object()) continue;
+            std::string line = sve::strip_unclear(jstr(sum, "title"));
+            if (sum.contains("points") && sum["points"].is_array())
+                for (const auto &p : sum["points"]) {
+                    std::string pt = sve::strip_unclear(p.is_object() ? jstr(p, "text") : p.is_string() ? p.get<std::string>() : "");
+                    if (!pt.empty()) line += (line.empty() ? "" : " ") + pt;
+                }
+            if (!line.empty()) out.push_back({id, jint(sec, "start_sec", 0), title, line});
         }
     }
     return out;
@@ -1069,8 +1070,9 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
 
         // One streamed model call: the earlier turns within the budget and the context (the oldest go first), the
         // pieces through `stream`; stops as soon as the stream wants nothing more. False on cancel or error.
-        auto run = [&](const char *phase, const std::string &sys, int max_out, sve::AnswerStream &stream, std::string &raw,
+        auto run = [&](const char *kind, const std::string &sys, int max_out, sve::AnswerStream &stream, std::string &raw,
                        const std::function<std::string(const std::string &)> &build) -> bool {
+            if (cb) cb((std::string("kind:") + kind).c_str(), 0, 1, cbuser);   // before the first piece
             std::vector<sve::ChatTurn> window = sve::history_window(earlier, sve::kChatHistoryTokens, count);
             std::string userp = build(sve::history_block(window));
             while (llm && !window.empty() && llm->count_tokens(llm->apply_template(sys, userp)) + max_out + 16 > llm->n_ctx) {
@@ -1078,7 +1080,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
                 userp = build(sve::history_block(window));
             }
             if (stand_in) {
-                const char *r = g_sve_model_reply(phase, userp.c_str());
+                const char *r = g_sve_model_reply(!strcmp(kind, "recordings") ? "chat" : kind, userp.c_str());
                 if (!r) return false;
                 const std::string reply = r;
                 for (size_t i = 0; i < reply.size() && !stream.done(); i += 3) {  // in small pieces, as tokens come
@@ -1097,36 +1099,43 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
             const std::string sys = sve::context_system(st,
                 "You are Summaverick, a helpful assistant on the person's phone, without internet. "
                 "Never give medical advice, medicine names or doses.", false);
-            sve::AnswerStream stream(names, sink, sve::AnswerStream::SkipMedicine);
+            // Held at a sentence the health check flags: the code-built line, not model text.
+            sve::AnswerStream stream(names, sink);
             std::string raw;
             if (!run("general", sys, kGeneralMaxOut, stream, raw, [&](const std::string &h) { return sve::general_prompt(h, q, lname); }))
                 return nullptr;
+            if (stream.held()) return result(ask_result(sve::health_only_text(lang), json::array(), true, false), "recordings");
             std::string answer = stream.shown();
             if (answer.empty()) answer = lang == "te" ? "దీనికి నేను ఇక్కడ సమాధానం చెప్పలేను." : "I can't answer that here.";
             return result(ask_result(answer, json::array(), false, false), "general");
         };
 
         if (route.kind == "summary") {
-            std::vector<sve::NoteListRow> rows = st.notes_between(route.from, route.to, 200);
+            const json rows = st.note_summaries(route.from, route.to, 200, true);
             if (rows.empty())
                 return result(ask_result(lang == "te" ? "ఆ కాలంలో రికార్డింగ్‌లు లేవు." : "No recordings in that period.",
                                          json::array(), true, false), "summary");
-            if (!has_model) return nullptr;
             json notes = json::array(), sources = json::array();
             std::string titles;
             for (const auto &n : rows) {
-                auto row = st.get(n.id);
-                notes.push_back({{"title", n.title}, {"created_at", n.created_at},
-                                 {"short_summary", row && row->short_summary ? *row->short_summary : ""},
-                                 {"sections", st.sections(n.id)}});
-                sources.push_back({{"note_id", n.id}, {"start_sec", 0}, {"title", n.title}});
-                titles += "\n\xE2\x80\xA2 " + n.title;
+                const int64_t id = jint(n, "id", 0);
+                const std::string title = jstr(n, "title");
+                notes.push_back({{"title", title}, {"created_at", jint(n, "created_at", 0)}, {"short_summary", jstr(n, "short_summary")},
+                                 {"sections", st.sections(id)}});
+                sources.push_back({{"note_id", id}, {"start_sec", 0}, {"title", title}});
+                if (!sve::is_health_memory(title, names)) titles += "\n\xE2\x80\xA2 " + title;
             }
-            std::string material = sve::summary_material(notes);
+            const std::string titles_answer = (lang == "te" ? "ఆ కాలంలో రికార్డింగ్‌లు:" : "Recordings in that period:") +
+                                              (titles.empty() ? " " + std::to_string(rows.size()) : titles);
+            bool any = false;
+            std::string material = sve::summary_material(notes, names, &any);
+            if (!any) return result(ask_result(titles_answer, sources, false, false), "summary");   // nothing to summarise: no model
+            if (!has_model) return nullptr;
             const std::string sys = sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety, false);
             if (llm) {
                 // Stored summaries that fit go straight to the final call; only a long period needs the model to map them.
-                const int budget = llm->n_ctx - kSummaryMaxOut - 400 - llm->count_tokens(sys) - sve::kChatHistoryTokens;
+                const int history = llm->count_tokens(sve::history_block(sve::history_window(earlier, sve::kChatHistoryTokens, count)));
+                const int budget = llm->n_ctx - kSummaryMaxOut - 400 - llm->count_tokens(sys) - history;
                 std::string fitted;
                 bool from_bullets = false;
                 if (!sve::reduce_to_fit(*llm, sys, material, budget, fitted, from_bullets, cb, cbuser)) return nullptr;
@@ -1146,30 +1155,36 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
                      [&](const std::string &h) { return sve::summary_prompt(h, material, period, q, lname); }))
                 return nullptr;
             std::string answer = stream.shown();
-            if (answer.empty()) answer = (lang == "te" ? "ఆ కాలంలో రికార్డింగ్‌లు:" : "Recordings in that period:") + titles;
+            if (answer.empty()) answer = titles_answer;
             return result(ask_result(answer, sources, false, false), "summary");
         }
 
         // A question about the recordings, or general knowledge.
         const std::string words = sve::chat_search_query(q, earlier);
-        sve::Relevant rel = sve::relevant(st, words, 6000);
-        json med = medicine_material_answer(st, rel, names, lang);
+        sve::Relevant rel = sve::relevant(st, words, 6000, route.from, route.to);
+        // A health question, or a follow-up of a medicine answer: never general and never classified.
+        const bool health_q = sve::chat_health_question(q, earlier, names);
+        const auto flagged = [&](const std::string &t) { return sve::health_text(t, names); };
+        // Quoted word for word: what the health check flags in a passage that answers this question (a stray
+        // word match in an unrelated one does not make it a medicine answer).
+        const auto quote_it = [&](const std::string &t) { return flagged(t) && sve::passage_scores(sve::keyword_hits(words, t), words); };
+        json med = medicine_material_answer(st, rel, quote_it, lang);
         if (!med.is_null()) return result(med, "medicine");
 
         // The best-scoring passage: decides recordings without the model, and stands in for a model that says
-        // NOT_FOUND although something scores. Pieces here mention no medicine (checked just above).
+        // NOT_FOUND although something scores. Never one the health check flags.
         int best_hits = 0;
         std::string best_text;
         json best_source;
         for (const auto &src : rel.sources) {
             std::string t = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
             int h = sve::keyword_hits(words, t);
-            if (sve::passage_scores(h, words) && h > best_hits) { best_hits = h; best_text = t; best_source = source_of(src); }
+            if (sve::passage_scores(h, words) && h > best_hits && !flagged(t)) { best_hits = h; best_text = t; best_source = source_of(src); }
         }
-        std::vector<sve::Passage> passages = summary_passages(st);
+        std::vector<sve::Passage> passages = summary_passages(st, route.from, route.to);
         for (const auto &p : passages) {
             int h = sve::keyword_hits(words, p.title + "\n" + p.text);
-            if (sve::passage_scores(h, words) && h > best_hits && !sve::mentions_medicine(p.title + "\n" + p.text, names)) {
+            if (sve::passage_scores(h, words) && h > best_hits && !flagged(p.title + "\n" + p.text)) {
                 best_hits = h;
                 best_text = p.text;
                 best_source = {{"note_id", p.note_id}, {"start_sec", p.start_sec}, {"title", p.title}};
@@ -1178,7 +1193,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         sve::add_passages(rel, std::move(passages), words, names, 7000);
         const bool scores = best_hits > 0;
 
-        if (!scores && has_model) {
+        if (!scores && !health_q && has_model) {
             // Nothing scores: a tiny call says whether the recordings could answer it. Model not ready: recordings.
             const std::string prompt = sve::classify_prompt(q);
             std::string reply;
@@ -1192,22 +1207,35 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
             }
             if (ok && sve::classify_general(reply)) return general();
         }
-        if (rel.sources.empty()) return result(ask_result(sve::not_found_text(lang), json::array(), true, false), "recordings");
+        const auto nothing = [&]() {
+            return result(ask_result(health_q ? sve::health_only_text(lang) : sve::not_found_text(lang), json::array(), true, false), "recordings");
+        };
+        if (rel.sources.empty()) return nothing();
         if (!has_model) return nullptr;
 
         sve::AnswerStream stream(names, sink);
         std::string raw;
-        if (!run("chat", ask_system(st), kChatMaxOut, stream, raw,
+        if (!run("recordings", ask_system(st), kChatMaxOut, stream, raw,
                  [&](const std::string &h) { return sve::chat_recordings_prompt(h, rel.block, q, lname); }))
             return nullptr;
-        json r = cited_answer(st, sve::strip_thinking(raw), rel, names, lang);
-        if (r["not_found"] == true && r["medicine"] == false && scores) {
+        json r = cited_answer(st, sve::strip_thinking(raw), rel, flagged, lang);
+        if (r["not_found"] == true) {
             // The not-found sentence is only for when nothing scores: the closest passage, word for word.
-            r = ask_result((lang == "te" ? "మీ రికార్డింగ్‌లలో దగ్గరగా ఉన్నది:\n\xE2\x80\x9C" : "The closest in your recordings:\n\xE2\x80\x9C") +
-                               best_text + "\xE2\x80\x9D",
-                           json::array({best_source}), false, false);
+            if (r["medicine"] == false && scores)
+                r = ask_result((lang == "te" ? "మీ రికార్డింగ్‌లలో దగ్గరగా ఉన్నది:\n\xE2\x80\x9C" : "The closest in your recordings:\n\xE2\x80\x9C") +
+                                   best_text + "\xE2\x80\x9D",
+                               json::array({best_source}), false, false);
+            else
+                return nothing();
         }
         return result(r, r["medicine"] == true ? "medicine" : "recordings");
+    });
+}
+
+char *sve_route_kind(sve_ctx *ctx, const char *question) {
+    return guard<char *>("sve_route_kind", nullptr, [&]() -> char * {
+        if (!ctx || !question) return nullptr;
+        return dup(sve::route_question(question, (int64_t)time(nullptr), known_med_names(*ctx->store)).kind);
     });
 }
 

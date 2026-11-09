@@ -5777,6 +5777,22 @@
           }
         }
       }
+    },
+    "and %lld more": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "and %lld more"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మరో %lld"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -80,6 +80,8 @@ struct AskView: View {
 
     /// The longest voice question.
     private static let maxVoiceSeconds: TimeInterval = 30
+    /// Links listed under an answer (a long period cites many notes).
+    private static let maxSourcesShown = 10
 
     private var isTelugu: Bool { profileLang == "te" }
     private var turns: [ChatTurn] { chats.current?.turns ?? [] }
@@ -92,13 +94,8 @@ struct AskView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if models.isReady {
-                    chat
-                } else {
-                    ScrollView { AIGettingReadyPanel().padding(16) }
-                }
-            }
+            // Always the chat: what is due and quizzes need no model. Until it is ready, its panel leads the chat.
+            chat
             .navigationTitle("Ask Summaverick")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -182,6 +179,7 @@ struct AskView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
+                        if !models.isReady { AIGettingReadyPanel() }
                         if turns.isEmpty { intro }
                         ForEach(turns) { turn in
                             turnView(turn).id(turn.id)
@@ -248,7 +246,7 @@ struct AskView: View {
             case .waiting:
                 TypingIndicator()
             case .streaming(let partial):
-                if partial.isEmpty { TypingIndicator() } else { streamingView(partial) }
+                if partial.isEmpty { TypingIndicator() } else { streamingView(partial, kind: turn.kind) }
             case .answered(let a):
                 if a.kind == "quiz" {
                     quizCard(a, turn: turn.id)
@@ -278,8 +276,9 @@ struct AskView: View {
     }
 
     /// The answer as it is written. Never a medicine answer: those come whole, built in code.
-    private func streamingView(_ partial: String) -> some View {
+    private func streamingView(_ partial: String, kind: String?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            if kind == "general" { generalLabel }
             Text(verbatim: partial)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
@@ -295,6 +294,7 @@ struct AskView: View {
     /// Stop was tapped: what was written before it, marked "(stopped)".
     private func stoppedView(_ partial: String, turn: ChatTurn) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            if turn.kind == "general" && !partial.isEmpty { generalLabel }
             if !partial.isEmpty {
                 Text(verbatim: partial)
                     .font(.body)
@@ -313,6 +313,12 @@ struct AskView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var generalLabel: some View {
+        Label("General knowledge — not from your recordings", systemImage: "globe")
+            .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func copyButton(_ words: String) -> some View {
@@ -378,11 +384,7 @@ struct AskView: View {
         let shown = a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? notFoundText(a.lang) : a.answer
         let quoted = a.medicine && shown == a.answer
         return VStack(alignment: .leading, spacing: 10) {
-            if a.kind == "general" && !a.medicine {
-                Label("General knowledge — not from your recordings", systemImage: "globe")
-                    .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            if a.kind == "general" && !a.medicine { generalLabel }
             if a.kind == "summary" && !a.notFound {
                 Label("Summary of your recordings", systemImage: "text.alignleft")
                     .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
@@ -415,12 +417,17 @@ struct AskView: View {
 
             if !a.sources.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(a.sources) { src in sourceLink(src) }
+                    ForEach(Array(a.sources.prefix(Self.maxSourcesShown))) { src in sourceLink(src) }
+                    if a.sources.count > Self.maxSourcesShown {
+                        Text("and \(a.sources.count - Self.maxSourcesShown) more")
+                            .font(.footnote).foregroundStyle(.secondary)
+                            .frame(minHeight: 44, alignment: .leading)
+                    }
                 }
             }
 
-            if !a.notFound && (a.kind == "due" || a.kind == "summary") {
-                copyButton(a.answer)   // already a list, or many points: not one reminder or to-do
+            if !a.notFound && (a.kind == "due" || a.kind == "summary" || a.kind == "general") {
+                copyButton(a.answer)   // a list, many points, or not from a recording: not one reminder or to-do
             } else if !a.notFound && !a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 10) { makeButtons(a, turn: turn, named: named); copyButton(a.answer) }
@@ -585,46 +592,76 @@ struct AskView: View {
         text = d
     }
 
+    /// Why a question that needs the model cannot run now; nil when it can.
+    private var blocked: AskNotice? {
+        // A recording is being processed: the core is busy with it, so do not queue a question behind it.
+        if pipeline.isBusy { return .busy }
+        guard models.isReady else { return .needsModel }
+        if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { return .tooWarm }
+        return nil
+    }
+
+    private func needsNoModel(_ kind: String) -> Bool { kind == "due" || kind == "quiz" }
+
     private func send(_ raw: String, fromField: Bool = true) {
         let q = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !generating, !listening, !transcribing else { return }
-        // A recording is being processed: the core is busy with it, so do not queue a question behind it.
-        if pipeline.isBusy { notice = .busy; return }
-        guard models.isReady else { notice = .needsModel; return }
-        if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
-        notice = nil
-        if fromField { text = "" }
-        let id = chats.append(q)
-        ask(id, q)
+        generating = true   // while the kind is read, nothing else starts
+        Task {
+            let instant = needsNoModel(await CoreEngine.shared.routeKind(q))
+            if !instant, let why = blocked {
+                notice = why
+                generating = false
+                return
+            }
+            notice = nil
+            if fromField { text = "" }
+            ask(chats.append(q), q, instant: instant)
+        }
     }
 
     private func retry(_ turn: ChatTurn) {
         guard !generating else { return }
-        if pipeline.isBusy { notice = .busy; return }
-        guard models.isReady else { notice = .needsModel; return }
-        if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
-        notice = nil
-        chats.update(turn.id, .waiting)
-        ask(turn.id, turn.question)
+        generating = true
+        Task {
+            let instant = needsNoModel(await CoreEngine.shared.routeKind(turn.question))
+            if !instant, let why = blocked {
+                notice = why
+                generating = false
+                return
+            }
+            notice = nil
+            chats.setKind(nil, turn: turn.id)
+            chats.update(turn.id, .waiting)
+            ask(turn.id, turn.question, instant: instant)
+        }
     }
 
-    private func ask(_ id: UUID, _ q: String) {
+    /// instant: what is due or a quiz: on the store context, with no model, heat or busy check (answers during a notes run).
+    private func ask(_ id: UUID, _ q: String, instant: Bool) {
         generating = true
         // The earlier turns of this chat go with it (the core trims them to its token budget).
         let messages = ChatWindow.messages(earlier: chats.turns(before: id).map(\.windowTurn), question: q,
                                            quizAsked: chats.quizAsked(turn: id))
         askTask = Task {
             defer { generating = false; askTask = nil }
-            // The person first: memory work stops for the answer. Other work still running: the busy notice.
-            guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
             do {
-                try await loadSelectedModel()   // the backend for right now (GPU in front)
-                guard !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
-                try Task.checkCancellation()
-                let a = try await CoreEngine.shared.chat(messages: messages, langHint: profileLang) { partial in
-                    // Only while this answer is still being written (a late redraw after the end is dropped).
-                    guard isWriting(id) else { return }
-                    chats.update(id, .streaming(partial))
+                let a: AskAnswer
+                if instant {
+                    a = try await CoreEngine.shared.chatOnStore(messages: messages, langHint: profileLang)
+                } else {
+                    // The person first: memory work stops for the answer. Other work still running: the busy notice.
+                    guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
+                    try await loadSelectedModel()   // the backend for right now (GPU in front)
+                    guard !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
+                    try Task.checkCancellation()
+                    a = try await CoreEngine.shared.chat(messages: messages, langHint: profileLang,
+                                                         onKind: { kind in chats.setKind(kind, turn: id) },
+                                                         onText: { partial in
+                        // Only while this answer is still being written (a late redraw after the end is dropped).
+                        guard isWriting(id) else { return }
+                        chats.update(id, .streaming(partial))
+                    })
                 }
                 named[id] = await namedMedicines(a)
                 if let quizID = a.quizID { chats.markQuizAsked(quizID, turn: id) }

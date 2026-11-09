@@ -42,8 +42,9 @@ public:
     bool remove(int64_t id);
     std::optional<NoteRow> get(int64_t id);
     std::vector<NoteListRow> list(const std::string &query, int limit);
-    // Notes created in [from, to) (epoch seconds), oldest first, at most limit (Ask's period summaries).
-    std::vector<NoteListRow> notes_between(int64_t from, int64_t to, int limit);
+    // Ask: {id,title,created_at,short_summary,revision_questions} of notes created in [from, to) (epoch seconds; to 0 =
+    // all notes), newest first unless oldest_first, at most limit. Never reads the transcripts.
+    json note_summaries(int64_t from, int64_t to, int limit, bool oldest_first = false);
     std::vector<std::pair<int64_t, std::string>> audio_older_than(int days);
 
     // Explicit transaction for multi-row changes (not nested; set_pieces/merge_topics use their own).
@@ -60,6 +61,8 @@ public:
     bool set_pieces(int64_t note_id, const json &pieces);
     json pieces(int64_t note_id);
     json search_pieces(const std::string &q, int limit);
+    // Only pieces of notes created in [from, to).
+    json search_pieces_between(const std::string &q, int64_t from, int64_t to, int limit);
 
     // Section summaries: [{idx,first_piece,last_piece,start_sec,end_sec,summary:{...}}]. set replaces all
     // (fails for a missing note, so a deleted note is never resurrected). clear_transcript also drops sections.

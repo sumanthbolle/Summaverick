@@ -18,6 +18,8 @@ struct ChatTurn: Codable, Identifiable, Equatable {
     var id = UUID()
     let question: String
     var state: State
+    /// The answer's kind, known before its first words (the core says it first): a stopped answer keeps its label.
+    var kind: String?
 
     /// The answer shown for it, for the history sent with a follow-up (ChatWindow).
     var windowTurn: ChatWindow.Turn {
@@ -117,6 +119,12 @@ final class ChatStore {
         guard let chat = chats.first(where: { $0.turns.contains { $0.id == turnID } }),
               let i = chat.turns.firstIndex(where: { $0.id == turnID }) else { return current?.turns ?? [] }
         return Array(chat.turns[..<i])
+    }
+
+    func setKind(_ kind: String?, turn turnID: UUID) {
+        guard let c = chats.firstIndex(where: { $0.turns.contains { $0.id == turnID } }),
+              let t = chats[c].turns.firstIndex(where: { $0.id == turnID }) else { return }
+        chats[c].turns[t].kind = kind
     }
 
     // MARK: quiz

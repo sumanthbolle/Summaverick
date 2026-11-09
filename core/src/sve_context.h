@@ -47,7 +47,8 @@ struct Relevant {
 
 // Memories (current, not wrong) and transcript pieces matching `query`, within max_bytes. Whole items only
 // (pieces first, then facts); an oversized first piece is included truncated.
-Relevant relevant(Store &store, const std::string &query, size_t max_bytes);
+// to != 0: only pieces of notes created in [from, to), and no remembered facts (they have no period).
+Relevant relevant(Store &store, const std::string &query, size_t max_bytes, int64_t from = 0, int64_t to = 0);
 
 std::string relevant_block(Store &store, const std::string &query, size_t max_bytes);
 json relevant_sources(Store &store, const std::string &query, size_t max_bytes);

@@ -1,11 +1,13 @@
 #include "sve_chat.h"
 #include "sve_context.h"  // truncate_utf8
+#include "sve_health.h"
 #include "sve_suggest.h"  // keyword_query, mentions_medicine
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <set>
 
 namespace sve {
 
@@ -113,7 +115,7 @@ std::vector<ChatTurn> chat_turns(const json &messages) {
         if (role == "assistant") {
             auto med = m.find("medicine");
             if (med != m.end() && med->is_boolean() && med->get<bool>()) {
-                out.push_back({role, "(A medicine answer, quoted from the saved facts and recordings.)"});
+                out.push_back({role, "(A medicine answer, quoted from the saved facts and recordings.)", true});
                 continue;
             }
             auto src = m.find("sources");
@@ -128,7 +130,7 @@ std::vector<ChatTurn> chat_turns(const json &messages) {
                 if (!list.empty()) text += "\n(Sources: " + list + ")";
             }
         }
-        out.push_back({role, text});
+        out.push_back({role, text, false});
     }
     return out;
 }
@@ -309,7 +311,7 @@ void AnswerStream::release(bool final) {
             }
             if (!edge) continue;
             std::string seg = chunk.substr(a, p - a);
-            if (!mentions_medicine(seg, names_)) kept += seg;
+            if (!health_text(seg, names_)) kept += seg;
             a = p;
         }
         if (shown_.empty()) {
@@ -323,7 +325,7 @@ void AnswerStream::release(bool final) {
         return;
     }
     std::string upto = shown_ + chunk;
-    if (upto.find("NOT_FOUND") != std::string::npos || mentions_medicine(upto, names_)) {
+    if (upto.find("NOT_FOUND") != std::string::npos || health_text(upto, names_)) {
         held_ = true;  // answered in code instead; nothing more is shown
         pending_.clear();
         return;
@@ -457,13 +459,22 @@ std::string strip_lead(std::string line) {
     return line.substr(i);
 }
 
-// "Q12. rest" -> rest when line starts with the letter and digits then . ) or :, else nullopt.
-std::optional<std::string> tagged(const std::string &line, char letter) {
-    if (line.empty() || (line[0] != letter && line[0] != (char)(letter + 32))) return std::nullopt;
-    size_t i = 1;
-    while (i < line.size() && line[i] >= '0' && line[i] <= '9') ++i;
-    if (i == 1 || i >= line.size() || (line[i] != '.' && line[i] != ')' && line[i] != ':')) return std::nullopt;
-    return trim_copy(strip_lead(line.substr(i + 1)));
+// "Q12. rest", "Question 2: rest", "ప్ర1. rest" (or A, Answer, జ, జవాబు) -> rest; nullopt when the line is not one.
+std::optional<std::string> tagged(const std::string &line, bool question) {
+    static const std::vector<std::string> kQ = {"question", "q", "ప్రశ్న", "ప్ర"}, kA = {"answer", "a", "జవాబు", "సమాధానం", "జ"};
+    const std::string low = lower_ascii_copy(line);
+    for (const auto &tag : question ? kQ : kA) {
+        if (low.compare(0, tag.size(), tag) != 0) continue;
+        size_t i = tag.size(), start;
+        while (i < line.size() && line[i] == ' ') ++i;
+        start = i;
+        while (i < line.size() && line[i] >= '0' && line[i] <= '9') ++i;
+        if (i == start || i >= line.size() || (line[i] != '.' && line[i] != ')' && line[i] != ':')) continue;
+        std::string rest = trim_copy(strip_lead(line.substr(i + 1)));
+        while (!rest.empty() && (rest.back() == '*' || rest.back() == ' ')) rest.pop_back();
+        return rest;
+    }
+    return std::nullopt;
 }
 
 std::string mmss_label(int64_t sec) {
@@ -475,40 +486,101 @@ std::string mmss_label(int64_t sec) {
 
 }  // namespace
 
+bool has_subject(const std::string &text) {
+    static const std::set<std::string> kGeneric = {
+        "today", "tonight", "yesterday", "tomorrow", "week", "weeks", "month", "months", "last", "next", "past", "recent",
+        "key", "discussion", "discussions", "discuss", "discussed", "highlight", "highlights", "important", "point", "points",
+        "summarise", "summarize", "summary", "summaries", "summarised", "summarized", "recap", "happen", "happened", "happening",
+        "talk", "talked", "talking", "meeting", "meetings", "recording", "recordings", "note", "notes", "remember", "coming", "up",
+        "pending", "list", "soon", "give", "show", "get", "need", "due", "remind", "reminds", "reminder", "reminders", "todo", "todos",
+        "ఈ", "రోజు", "ఈరోజు", "నేడు", "నిన్న", "వారం", "గత", "పోయిన", "నెల", "ఏం", "జరిగింది", "మాట్లాడాం", "చర్చలు", "చెప్పారు", "చెప్పండి",
+        "రికార్డింగ్‌ల", "రికార్డింగ్ల", "రికార్డింగ్‌లు", "రికార్డింగ్లు", "త్వరలో", "ఏమేమి", "ఉంది", "ముఖ్యమైన", "ముఖ్యాంశాలు", "సారాంశం", "చేయాల్సి", "గుర్తు", "చేయండి",
+    };
+    std::string cur;
+    const std::string kq = keyword_query(text) + " ";
+    for (char c : kq) {
+        if (c != ' ') { cur += c; continue; }
+        if (!cur.empty() && !kGeneric.count(cur)) return true;
+        cur.clear();
+    }
+    return false;
+}
+
 Route route_question(const std::string &text, int64_t now, const std::vector<std::string> &medicine_names) {
     Route r;
     if (is_medicine_question(text, medicine_names)) { r.kind = "medicine"; r.by_rule = true; return r; }
     const std::vector<std::string> w = ascii_words(text);
     const std::string low = lower_ascii_copy(text);
-    if (has_prefix(w, "quiz") || has_phrase(w, {"test", "me"}) || has_phrase(w, {"next", "question"}) ||
-        has_any(text, {"క్విజ్", "పరీక్ష", "తర్వాతి ప్రశ్న", "మరో ప్రశ్న"})) {
+    const bool subject = has_subject(text);
+    if (has_phrase(w, {"quiz", "me"}) || has_phrase(w, {"test", "me"}) || has_phrase(w, {"next", "question"}) ||
+        (!w.empty() && w[0].compare(0, 4, "quiz") == 0 && low.find_first_not_of(" \t\n") == low.find(w[0])) ||
+        has_any(text, {"క్విజ్", "తర్వాతి ప్రశ్న", "మరో ప్రశ్న"}) ||
+        (has_any(text, {"పరీక్ష"}) && has_any(text, {"పెట్ట", "నన్ను"}))) {
         r.kind = "quiz"; r.by_rule = true; return r;
     }
-    if (has_word(w, "due") || has_prefix(w, "remind") || has_word(w, "todo") || has_word(w, "todos") ||
-        has_any(low, {"to-do", "to do list"}) || has_phrase(w, {"what", "do", "i", "have"}) || has_prefix(w, "deadline") ||
-        has_any(text, {"చేయాల్సి", "గుర్తు చేయ", "గడువు"})) {
+    bool due_word = false;
+    for (size_t i = 0; i < w.size(); ++i) due_word = due_word || (w[i] == "due" && !(i + 1 < w.size() && w[i + 1] == "to"));
+    if (due_word || has_word(w, "todo") || has_word(w, "todos") || has_any(low, {"to-do", "to do list"}) ||
+        has_prefix(w, "deadline") || has_any(text, {"గడువు"}) ||
+        (!subject && (has_phrase(w, {"what", "do", "i", "have"}) || has_prefix(w, "remind") || has_any(text, {"చేయాల్సి", "గుర్తు చేయ"})))) {
         r.kind = "due"; r.by_rule = true; return r;
     }
     const int64_t today = day_start(now, 0);
-    auto period = [&](int64_t from, int64_t to) { r.kind = "summary"; r.from = from; r.to = to; r.by_rule = true; return r; };
-    if (has_word(w, "yesterday") || has_any(text, {"నిన్న"})) return period(day_start(now, -1), today);
-    if (has_word(w, "today") || has_word(w, "tonight") || has_any(text, {"ఈ రోజు", "ఈరోజు", "నేడు"}))
-        return period(today, day_start(now, 1));
-    if (has_phrase(w, {"last", "week"}) || has_any(text, {"గత వారం", "పోయిన వారం"})) {
+    bool named = true;
+    if (has_word(w, "yesterday") || has_any(text, {"నిన్న"})) { r.from = day_start(now, -1); r.to = today; }
+    else if (has_word(w, "today") || has_word(w, "tonight") || has_any(text, {"ఈ రోజు", "ఈరోజు", "నేడు"})) { r.from = today; r.to = day_start(now, 1); }
+    else if (has_phrase(w, {"last", "week"}) || has_any(text, {"గత వారం", "పోయిన వారం"})) {
         int64_t monday = day_start(now, -weekday_from_monday(now));
-        return period(day_start(monday, -7), monday);
-    }
-    if (has_phrase(w, {"this", "week"}) || has_any(text, {"ఈ వారం"})) {
+        r.from = day_start(monday, -7); r.to = monday;
+    } else if (has_phrase(w, {"this", "week"}) || has_any(text, {"ఈ వారం"})) {
         int64_t monday = day_start(now, -weekday_from_monday(now));
-        return period(monday, day_start(monday, 7));
-    }
-    if (has_phrase(w, {"this", "month"}) || has_any(text, {"ఈ నెల"})) return period(month_start(now, 0), month_start(now, 1));
-    if (has_phrase(w, {"key", "discussions"}) || has_phrase(w, {"key", "discussion"}) || has_phrase(w, {"key", "points"}) ||
+        r.from = monday; r.to = day_start(monday, 7);
+    } else if (has_phrase(w, {"this", "month"}) || has_any(text, {"ఈ నెల"})) { r.from = month_start(now, 0); r.to = month_start(now, 1); }
+    else named = false;
+    const bool summary_word = has_phrase(w, {"key", "discussions"}) || has_phrase(w, {"key", "discussion"}) || has_phrase(w, {"key", "points"}) ||
         has_prefix(w, "highlight") || has_phrase(w, {"important", "points"}) || has_prefix(w, "summar") ||
-        has_prefix(w, "recap") || has_any(text, {"సారాంశ", "ముఖ్యాంశ", "ముఖ్యమైన"}))
-        return period(day_start(now, -6), day_start(now, 1));
-    r.kind = "recordings";
+        has_prefix(w, "recap") || has_any(text, {"సారాంశ", "ముఖ్యాంశ", "ముఖ్యమైన"});
+    if ((named || summary_word) && !subject) {
+        r.kind = "summary";
+        r.by_rule = true;
+        if (!named) { r.from = day_start(now, -6); r.to = day_start(now, 1); }
+        return r;
+    }
+    r.kind = "recordings";   // with [from, to) when a period was named
     return r;
+}
+
+bool health_text(const std::string &text, const std::vector<std::string> &medicine_names) {
+    return health_keywords(text, medicine_names) == HealthFlag::health;
+}
+
+bool chat_health_question(const std::string &question, const std::vector<ChatTurn> &earlier,
+                          const std::vector<std::string> &medicine_names) {
+    return is_health_memory(question, medicine_names) || (!earlier.empty() && earlier.back().medicine);
+}
+
+std::string health_only_text(const std::string &lang) {
+    return lang == "te"
+        ? "ఆరోగ్యం, మందుల ప్రశ్నలకు మీరు సేవ్ చేసిన మందులు, రికార్డింగ్‌ల నుండి మాత్రమే సమాధానం ఇవ్వగలను. దయచేసి డాక్టర్‌ను లేదా ఫార్మసిస్ట్‌ను అడగండి."
+        : "I can only answer health and medicine questions from your saved medicines and recordings. Please ask a doctor or pharmacist.";
+}
+
+std::string drop_health_sentences(const std::string &text, const std::vector<std::string> &medicine_names) {
+    std::string kept;
+    size_t a = 0;
+    for (size_t p = 1; p <= text.size(); ++p) {
+        bool edge = p == text.size();
+        if (!edge && is_ws(text[p]) && !is_ws(text[p - 1])) {
+            char prev = text[p - 1];
+            edge = text[p] == '\n' || prev == '.' || prev == '!' || prev == '?' || prev == ':' ||
+                   (p >= 3 && text.compare(p - 3, 3, "\xE0\xA5\xA4") == 0);
+        }
+        if (!edge) continue;
+        std::string seg = text.substr(a, p - a);
+        if (!health_text(seg, medicine_names)) kept += seg;
+        a = p;
+    }
+    return trim_copy(kept);
 }
 
 bool classify_general(const std::string &reply) {
@@ -540,8 +612,8 @@ std::vector<std::pair<std::string, std::string>> parse_revision_questions(const 
         std::string line = trim_copy(text.substr(i, e - i));
         i = e + 1;
         std::string body = strip_lead(line);
-        if (auto t = tagged(body, 'Q')) { push(); q = *t; in_q = true; }
-        else if (auto t2 = tagged(body, 'A')) { if (in_q) { a = *t2; in_a = true; } }
+        if (auto t = tagged(body, true)) { push(); q = *t; in_q = true; }
+        else if (auto t2 = tagged(body, false)) { if (in_q) { a = *t2; in_a = true; } }
         else if (!line.empty() && in_a) a += " " + line;
         if (e == text.size()) break;
     }
@@ -558,11 +630,11 @@ void each_quiz(const json &notes, const std::vector<std::string> &names, F f) {
         int64_t id = jint(n, "id", 0);
         auto qa = parse_revision_questions(jstr(n, "revision_questions"));
         for (size_t k = 0; k < qa.size(); ++k) {
-            if (mentions_medicine(qa[k].first + "\n" + qa[k].second, names)) continue;
+            if (health_text(qa[k].first + "\n" + qa[k].second, names)) continue;
             QuizItem it;
             it.id = std::to_string(id) + ":" + std::to_string(k + 1);
-            it.question = qa[k].first;
-            it.answer = qa[k].second;
+            it.question = strip_unclear(qa[k].first);
+            it.answer = strip_unclear(qa[k].second);
             it.note_id = id;
             it.title = jstr(n, "title");
             if (f(it)) return;
@@ -661,27 +733,33 @@ std::string strip_unclear(const std::string &text) {
     return trim_copy(s);
 }
 
-std::string summary_material(const json &notes) {
+std::string summary_material(const json &notes, const std::vector<std::string> &medicine_names, bool *any_content) {
     std::string out;
-    if (!notes.is_array()) return out;
-    for (const auto &n : notes) {
-        if (!n.is_object()) continue;
-        out += "### " + jstr(n, "title") + " (" + ymd_of(jint(n, "created_at", 0)) + ")\n";
-        std::string body = strip_unclear(jstr(n, "short_summary"));
-        if (body.empty() && n.contains("sections") && n["sections"].is_array())
-            for (const auto &sec : n["sections"]) {
-                json sum = sec.is_object() && sec.contains("summary") ? sec["summary"] : json();
-                if (!sum.is_object()) continue;
-                std::string line = strip_unclear(jstr(sum, "title"));
-                if (sum.contains("points") && sum["points"].is_array())
-                    for (const auto &p : sum["points"]) {
-                        std::string t = strip_unclear(p.is_object() ? jstr(p, "text") : p.is_string() ? p.get<std::string>() : "");
-                        if (!t.empty()) line += (line.empty() ? "" : " ") + t;
-                    }
-                if (!line.empty()) body += "- " + line + "\n";
-            }
-        out += (body.empty() ? std::string("(no summary yet)") : trim_copy(body)) + "\n\n";
-    }
+    bool any = false;
+    if (notes.is_array())
+        for (const auto &n : notes) {
+            if (!n.is_object()) continue;
+            std::string title = jstr(n, "title");
+            if (is_health_memory(title, medicine_names)) title.clear();
+            out += "### " + (title.empty() ? std::string() : title + " ") + "(" + ymd_of(jint(n, "created_at", 0)) + ")\n";
+            std::string body = drop_health_sentences(strip_unclear(jstr(n, "short_summary")), medicine_names);
+            if (body.empty() && n.contains("sections") && n["sections"].is_array())
+                for (const auto &sec : n["sections"]) {
+                    json sum = sec.is_object() && sec.contains("summary") ? sec["summary"] : json();
+                    if (!sum.is_object()) continue;
+                    std::string line = strip_unclear(jstr(sum, "title"));
+                    if (health_text(line, medicine_names)) line.clear();
+                    if (sum.contains("points") && sum["points"].is_array())
+                        for (const auto &p : sum["points"]) {
+                            std::string t = strip_unclear(p.is_object() ? jstr(p, "text") : p.is_string() ? p.get<std::string>() : "");
+                            if (!t.empty() && !health_text(t, medicine_names)) line += (line.empty() ? "" : " ") + t;
+                        }
+                    if (!line.empty()) body += "- " + line + "\n";
+                }
+            if (!body.empty()) any = true;
+            out += (body.empty() ? std::string("(no summary yet)") : trim_copy(body)) + "\n\n";
+        }
+    if (any_content) *any_content = any;
     return out;
 }
 
@@ -710,13 +788,21 @@ std::string general_prompt(const std::string &history, const std::string &questi
 
 int keyword_hits(const std::string &keywords, const std::string &text) {
     const std::string low = lower_ascii_copy(text);
+    auto is_ascii_word = [](unsigned char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'); };
+    auto found = [&](const std::string &k) {
+        bool ascii = true;
+        for (unsigned char c : k) ascii = ascii && c < 0x80;
+        for (size_t at = low.find(k); at != std::string::npos; at = low.find(k, at + 1))
+            if (!ascii || at == 0 || !is_ascii_word((unsigned char)low[at - 1])) return true;
+        return false;
+    };
     std::vector<std::string> seen;
     int n = 0;
     std::string cur;
     auto flush = [&] {
         if (!cur.empty() && std::find(seen.begin(), seen.end(), cur) == seen.end()) {
             seen.push_back(cur);
-            if (low.find(cur) != std::string::npos) ++n;
+            if (found(cur)) ++n;
         }
         cur.clear();
     };
@@ -728,7 +814,7 @@ int keyword_hits(const std::string &keywords, const std::string &text) {
 bool passage_scores(int hits, const std::string &keywords) {
     size_t words = words_in(keywords);
     if (words == 0 || hits <= 0) return false;
-    return (size_t)hits * 2 >= words;
+    return (size_t)hits * 2 >= words && (words < 2 || hits >= 2);
 }
 
 int add_passages(Relevant &rel, std::vector<Passage> candidates, const std::string &keywords,
@@ -736,7 +822,7 @@ int add_passages(Relevant &rel, std::vector<Passage> candidates, const std::stri
     std::vector<std::pair<int, Passage>> scored;
     for (auto &c : candidates) {
         int h = keyword_hits(keywords, c.title + "\n" + c.text);
-        if (passage_scores(h, keywords) && !mentions_medicine(c.title + "\n" + c.text, medicine_names))
+        if (passage_scores(h, keywords) && !health_text(c.title + "\n" + c.text, medicine_names))
             scored.push_back({h, std::move(c)});
     }
     std::stable_sort(scored.begin(), scored.end(), [](const auto &a, const auto &b) { return a.first > b.first; });

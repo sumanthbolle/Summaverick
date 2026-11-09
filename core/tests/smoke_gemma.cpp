@@ -17,6 +17,7 @@
 #include "sve_core.h"
 #include "sve_internal.h"
 #include "sve_threads.h"   // threads mode checks the core's thread rule
+#include "sve_chat.h"     // the health line, api mode
 #include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
 #include <sqlite3.h>
 #include <map>
@@ -865,7 +866,7 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
     sve_note_set_output(ctx, a, SVE_OUT_SHORT_SUMMARY, "The team set the walnut budget for March.");
     sve_note_set_output(ctx, a, SVE_OUT_REVISION_QUESTIONS,
                         "Q1. Which budget was set?\nA1. The walnut budget.\n\nQ2. Which tablet?\nA2. Dolo 650.\n\nQ3. For when?\nA3. March.");
-    g_chat_reply = "- [Budget meeting] The walnut budget was set. Take 5 mg daily.\n- [Budget meeting] It is for March.\n";
+    g_chat_reply = "- [Budget meeting] The walnut budget was set. Paracetamol relieves pain and fever.\n- [Budget meeting] It is for March.\n";
     ChatSink s1;
     json sum = chat(ask("Highlight this week key discussions to remember"), s1, nullptr);
     printf("--- summary (no model)\n%s\n", sum.dump(2).c_str());
@@ -874,7 +875,7 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
         for (const auto &x : sum["sources"]) cites = cites || (x["note_id"] == a && x["title"] == "Budget meeting");
     expect(sum.is_object() && sum["kind"] == "summary" && cites && g_chat_prompt.find("The team set the walnut budget") != std::string::npos,
            "summary: from the stored summaries, cites the note");
-    expect(sum.is_object() && sum["answer"].get<std::string>() == s1.text && s1.text.find("5 mg") == std::string::npos &&
+    expect(sum.is_object() && sum["answer"].get<std::string>() == s1.text && s1.text.find("Paracetamol") == std::string::npos &&
            s1.text.find("It is for March") != std::string::npos, "summary: streamed; a medicine sentence left out, the rest goes on");
     ChatSink s2;
     json lastm = chat(ask("What happened last week?"), s2, nullptr);
@@ -922,9 +923,76 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
     ChatSink s7;
     json gen = chat(ask("Who wrote Gitanjali?"), s7, nullptr);
     printf("--- general (no model)\n%s\n", gen.dump(2).c_str());
-    expect(gen.is_object() && gen["kind"] == "general" && gen["sources"].empty() && gen["answer"].get<std::string>() == s7.text &&
-           s7.text.find("Tagore") != std::string::npos && s7.text.find("5 mg") == std::string::npos && s7.text.find("Nobel") != std::string::npos,
-           "general: streamed from the model's own knowledge, no sources");
+    expect(gen.is_object() && gen["kind"] == "recordings" && gen["not_found"] == true && contains(gen["answer"], "ask a doctor or pharmacist") &&
+           s7.text == "Rabindranath Tagore wrote it.", "general: drifts into health: the code-built line; that sentence never shown");
+    g_chat_reply = "Rabindranath Tagore wrote it. He won the Nobel Prize.";
+    ChatSink s7a;
+    json gen2 = chat(ask("Who wrote Gitanjali?"), s7a, nullptr);
+    expect(gen2.is_object() && gen2["kind"] == "general" && gen2["sources"].empty() && gen2["answer"].get<std::string>() == s7a.text &&
+           s7a.text.find("Nobel") != std::string::npos, "general: streamed from the model's own knowledge, no sources");
+
+    // Verified leaks: health questions never reach classify or general, whatever the model would say.
+    g_classify_reply = "G";
+    for (const char *h : {"What is paracetamol used for?", "What should I take for a headache?", "How do I bring down a fever?",
+                          "జ్వరం తగ్గడానికి ఏం చేయాలి?"}) {
+        g_chat_prompt.clear();
+        ChatSink sh;
+        json hj = chat(ask(h), sh, nullptr);
+        std::string what = std::string("health question never general: ") + h;
+        expect(hj.is_object() && hj["kind"] != "general" && sh.text.find("Tagore") == std::string::npos, what.c_str());
+    }
+    ChatSink shl;
+    json hl = chat(ask("What should I take for a walnut headache tomorrow morning?"), shl, nullptr);
+    expect(hl.is_object() && hl["not_found"] == true && hl["answer"] == sve::health_only_text("en"), "health question, nothing found: the code-built line");
+    ChatSink shl2;
+    json hl2 = chat(ask("జ్వరం తగ్గడానికి ఏం చేయాలి?"), shl2, nullptr);
+    expect(hl2.is_object() && hl2["answer"] == sve::health_only_text("te") && hl2["lang"] == "te", "... in the question's language");
+    // A follow-up of a medicine answer stays out of general.
+    ChatSink sf;
+    json fu = chat(json::array({{{"role", "user"}, {"text", "Which tablets?"}}, {{"role", "assistant"}, {"text", "Take Dolo 650."}, {"medicine", true}},
+                                {{"role", "user"}, {"text", "Who wrote Gitanjali?"}}}), sf, nullptr);
+    expect(fu.is_object() && fu["answer"] == sve::health_only_text("en"), "a follow-up of a medicine answer never goes to general");
+
+    // The kind comes before the first piece, so a stopped general answer keeps its label.
+    {
+        struct Seen { std::vector<std::string> order; } seen;
+        g_chat_reply = "Rabindranath Tagore wrote it. He won the Nobel Prize.";
+        auto text_cb = [](const char *p, void *u) -> int { static_cast<Seen *>(u)->order.push_back(std::string("t:") + p); return 1; };
+        auto prog_cb = [](const char *ph, int, int, void *u) -> int {
+            if (!strncmp(ph, "kind:", 5)) static_cast<Seen *>(u)->order.push_back(ph);
+            return 0;
+        };
+        char *got = sve_assistant_chat(ctx, ask("Who wrote Gitanjali?").dump().c_str(), nullptr, text_cb, &seen, prog_cb, &seen);
+        expect(got == nullptr && seen.order.size() == 2 && seen.order[0] == "kind:general" && seen.order[1].rfind("t:", 0) == 0,
+               "the kind comes before the first piece (and the stopped call still gave it)");
+    }
+    // sve_route_kind
+    auto kind_of = [&](const char *q) { char *k = sve_route_kind(ctx, q); std::string r = k ? k : ""; sve_free_string(k); return r; };
+    expect(kind_of("What's due soon?") == "due" && kind_of("Quiz me on my recent recordings") == "quiz" && kind_of("Which tablets?") == "medicine" &&
+           kind_of("Who wrote Gitanjali?") == "recordings", "sve_route_kind");
+    expect(sve_route_kind(ctx, nullptr) == nullptr && sve_route_kind(nullptr, "x") == nullptr, "sve_route_kind: bad input -> NULL");
+    // A period named with a subject: only that period's notes.
+    g_classify_reply = nullptr;
+    g_chat_reply = "The walnut budget was set [S1].";
+    ChatSink sr1, sr2;
+    json inr = chat(ask("What did we say about the walnut budget today?"), sr1, nullptr);
+    json outr = chat(ask("What did we say about the walnut budget last week?"), sr2, nullptr);
+    expect(inr.is_object() && inr["kind"] == "recordings" && inr["not_found"] == false, "a subject and a period: recordings within the period");
+    expect(outr.is_object() && outr["kind"] == "recordings" && outr["not_found"] == true, "... nothing in another period");
+    // Every note with nothing stored: the titles, no model call.
+    {
+        sve_ctx *c2 = sve_init(":memory:");
+        int64_t n1 = sve_note_create(c2, "Lecture one", "en", nullptr, "x", 60);
+        (void)n1;
+        sve_note_create(c2, "Doctor visit", "en", nullptr, "x", 60);
+        g_chat_prompt.clear();
+        ChatSink st;
+        json tl = take(sve_assistant_chat(c2, ask("What happened today?").dump().c_str(), nullptr, chat_text, &st, nullptr, nullptr));
+        expect(tl.is_object() && tl["kind"] == "summary" && contains(tl["answer"], "Lecture one") && !contains(tl["answer"], "Doctor visit") &&
+               g_chat_prompt.empty() && tl["sources"].size() == 2, "summary: nothing stored: the titles in code, no model; a health title left out");
+        sve_free(c2);
+    }
+    g_classify_reply = "G";
     ChatSink s8;
     expect(chat(ask("Which medicine helps with sleep?"), s8, nullptr)["kind"] == "medicine", "medicine is never general, even when the model would say G");
     // A question that scores never asks the model.

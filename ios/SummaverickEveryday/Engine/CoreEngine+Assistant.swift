@@ -205,6 +205,22 @@ extension CoreEngine {
         return a
     }
 
+    /// The kind the core's code rule gives a question; "recordings" when it cannot say.
+    nonisolated func routeKind(_ question: String) async -> String {
+        await store { self.take(sve_route_kind($0, question)) } ?? "recordings"
+    }
+
+    /// A question that needs no model ("due", "quiz") on the store context: never behind a model call on this actor,
+    /// so it answers at once during a notes run.
+    nonisolated func chatOnStore(messages: [ChatMessage], langHint: String? = nil) async throws -> AskAnswer {
+        guard let json = encodeJSON(messages) else { throw AssistantError.badJSON }
+        return try await store { c in
+            guard let out = self.take(sve_assistant_chat(c, json, langHint, nil, nil, nil, nil)) else { throw CoreError.generationFailed }
+            guard let a = self.decode(AskAnswer.self, out) else { throw AssistantError.badJSON }
+            return a
+        }
+    }
+
     /// Stop: what had been released when the answer was stopped.
     struct ChatStopped: Error {
         let partial: String
@@ -280,13 +296,19 @@ extension CoreEngine {
 
     /// Ask as a chat (sve_assistant_chat): `messages` end with the question (ChatWindow.messages). onText gets the
     /// visible answer so far, on the main thread, as it is written (never for medicine, due or quiz answers, which
-    /// come whole in the result). Cancelling the calling task stops it: throws ChatStopped with what was released.
+    /// come whole in the result). onKind gets the answer's kind before its first piece. Cancelling the calling task
+    /// stops it: throws ChatStopped with what was released.
     func chat(messages: [ChatMessage], langHint: String? = nil,
+              onKind: @escaping @MainActor (String) -> Void = { _ in },
               onText: @escaping @MainActor (String) -> Void = { _ in }) async throws -> AskAnswer {
         guard let ctx else { throw CoreError.initFailed }
         guard let json = encodeJSON(messages) else { throw AssistantError.badJSON }
         let text = TextBox(onText: onText, isCancelled: { Task.isCancelled })
-        let box = progressBox()
+        let box = progressBox { phase, _, _ in
+            guard phase.hasPrefix("kind:") else { return }
+            let kind = String(phase.dropFirst(5))
+            DispatchQueue.main.async { MainActor.assumeIsolated { onKind(kind) } }
+        }
         let tuser = Unmanaged.passUnretained(text).toOpaque()
         let puser = Unmanaged.passUnretained(box).toOpaque()
         let out = take(sve_assistant_chat(ctx, json, langHint, CoreEngine.textTrampoline, tuser,

@@ -418,33 +418,6 @@ std::vector<NoteListRow> Store::list(const std::string &query, int limit) {
     return rows;
 }
 
-std::vector<NoteListRow> Store::notes_between(int64_t from, int64_t to, int limit) {
-    std::vector<NoteListRow> rows;
-    sqlite3_stmt *st = nullptr;
-    const char *sql =
-        "SELECT id,title,lang,created_at,duration_seconds,audio_path IS NOT NULL,"
-        "COALESCE(short_summary, substr(COALESCE(transcript,''),1,160)) FROM notes "
-        "WHERE created_at >= ? AND created_at < ? ORDER BY created_at ASC, id ASC LIMIT ?";
-    if (sqlite3_prepare_v2(db_, sql, -1, &st, nullptr) != SQLITE_OK) { err_ = sqlite3_errmsg(db_); return rows; }
-    sqlite3_bind_int64(st, 1, from);
-    sqlite3_bind_int64(st, 2, to);
-    sqlite3_bind_int(st, 3, limit);
-    while (sqlite3_step(st) == SQLITE_ROW) {
-        NoteListRow r;
-        r.id = sqlite3_column_int64(st, 0);
-        const unsigned char *t = sqlite3_column_text(st, 1), *l = sqlite3_column_text(st, 2), *p = sqlite3_column_text(st, 6);
-        r.title = t ? reinterpret_cast<const char *>(t) : "";
-        r.lang = l ? reinterpret_cast<const char *>(l) : "";
-        r.created_at = sqlite3_column_int64(st, 3);
-        r.duration_seconds = sqlite3_column_int64(st, 4);
-        r.has_audio = sqlite3_column_int(st, 5) != 0;
-        r.preview = p ? reinterpret_cast<const char *>(p) : "";
-        rows.push_back(std::move(r));
-    }
-    sqlite3_finalize(st);
-    return rows;
-}
-
 std::vector<std::pair<int64_t, std::string>> Store::audio_older_than(int days) {
     std::vector<std::pair<int64_t, std::string>> out;
     sqlite3_stmt *st = nullptr;
@@ -581,6 +554,24 @@ json Store::search_pieces(const std::string &q, int limit) {
         "SELECT p.note_id AS note_id, n.title AS title, p.start_sec AS start_sec, p.text AS text "
         "FROM pieces_fts f JOIN transcript_pieces p ON p.rowid=f.rowid JOIN notes n ON n.id=p.note_id "
         "WHERE pieces_fts MATCH ? ORDER BY bm25(pieces_fts) LIMIT ?", {fq, limit});
+}
+
+json Store::search_pieces_between(const std::string &q, int64_t from, int64_t to, int limit) {
+    std::string fq = to_fts(q);
+    if (fq.empty()) return json::array();
+    return query_rows(
+        "SELECT p.note_id AS note_id, n.title AS title, p.start_sec AS start_sec, p.text AS text "
+        "FROM pieces_fts f JOIN transcript_pieces p ON p.rowid=f.rowid JOIN notes n ON n.id=p.note_id "
+        "WHERE pieces_fts MATCH ? AND n.created_at >= ? AND n.created_at < ? ORDER BY bm25(pieces_fts) LIMIT ?",
+        {fq, from, to, limit});
+}
+
+json Store::note_summaries(int64_t from, int64_t to, int limit, bool oldest_first) {
+    const std::string order = oldest_first ? "ASC" : "DESC";
+    const std::string cols = "SELECT id,title,created_at,short_summary,revision_questions FROM notes ";
+    if (to == 0) return query_rows((cols + "ORDER BY created_at " + order + ", id " + order + " LIMIT ?").c_str(), {limit});
+    return query_rows((cols + "WHERE created_at >= ? AND created_at < ? ORDER BY created_at " + order + ", id " + order + " LIMIT ?").c_str(),
+                      {from, to, limit});
 }
 
 // suggestions ----------------------------------------------------------------
