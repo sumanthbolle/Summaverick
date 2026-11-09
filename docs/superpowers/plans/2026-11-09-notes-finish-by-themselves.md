@@ -259,6 +259,58 @@ The owner flagged quality problems in note 19. The audit (scratchpad `q1/audit.m
 - [ ] **Step 3:** Also measure the cost of C: the share of pieces re-run in notes 16, 17 and 19, and the added time.
 - [ ] **Step 4: Commit** `fix(core): notes stay with what was said: vocabulary is spelling only, stricter notes rules, low-confidence pieces heard twice, fuller sections`.
 
+### Task N9: Ask — streaming, conversation, language (core + iOS)
+
+**Files:**
+- Modify: `core/include/sve_core.h`, `core/src/sve_assistant.cpp` (ask path), `core/src/sve_llm.cpp` (a text-piece callback alongside progress), `core/tests/*`, `ios/SummaverickEveryday/Engine/CoreEngine+Assistant.swift`, `ios/SummaverickEveryday/Views/Ask/AskView.swift`, `Localizable.xcstrings`.
+- Create: `ios/SummaverickEveryday/Engine/ChatStore.swift`, which keeps chats in a JSON file in Application Support (not the notes DB).
+
+**Interfaces:**
+- **Core:** `char *sve_assistant_chat(sve_ctx*, const char *messages_json, const char *lang_hint, sve_text_cb on_text, void *user, sve_progress_cb cb, void *cbuser)`.
+  - `messages_json` is `[{"role":"user"|"assistant","text":…}]` with the newest last.
+  - `sve_text_cb` is `int (*)(const char *piece, void *user)`: each new piece of the visible answer, with thinking blocks stripped. Returning nonzero cancels.
+  - It returns the same JSON as `sve_assistant_ask` plus `"kind"` (`"recordings"|"general"|"medicine"|"summary"|"due"|"quiz"`) and `"lang"`.
+  - `sve_assistant_ask` stays as it is, so old callers keep working.
+- **History:** earlier turns are trimmed to a budget of 1500 tokens, newest first. Each turn's sources are kept as text.
+- **Language:** `sve::question_lang(text)` gives `"te"` when Telugu script is at least 30% of the letters, else `"en"`. The answer is written in that language, never the profile's.
+- **Swift:**
+  - `CoreEngine.chat(messages:onText:) async throws -> AskAnswer`.
+  - AskView shows the streamed text in the answer bubble as it grows, and keeps Stop and Copy.
+  - `ChatStore`: a list of chats, `newChat()`, autosave. "New chat" goes in the toolbar.
+- **Strings:** "New chat", "General knowledge — not from your recordings", and "Stop", if new, in en and te.
+
+- [ ] **Step 1: Core tests.**
+  - `question_lang` cases.
+  - History trimming within budget, keeping the newest.
+  - The `on_text` pieces concatenate to the returned answer, with thinking stripped across piece edges.
+  - Cancel through `on_text`.
+  - Fail first, implement, then `core/tests/run.sh` all passed and `smoke_gemma.sh api` reports `API OK (0 missed)`.
+  - No model runs on the Mac (battery): no other smoke modes.
+- [ ] **Step 2:** Swift: streaming bubble, `ChatStore`, follow-ups send the history. A pure rule for the history window, with a swiftc check.
+- [ ] **Step 3:** Device build, `STRINGS OK`. Commit `feat: Ask streams its answer, remembers the conversation, and answers in the language asked`.
+
+### Task N10: Ask — the right source for each kind of question
+
+**Files:**
+- Modify: `core/src/sve_assistant.cpp`, `core/src/sve_store.cpp/.h` (period queries), `core/tests/*`, `ios/SummaverickEveryday/Views/Ask/AskView.swift` (quiz card), `Localizable.xcstrings`.
+
+**Interfaces:**
+- **Routing:** `sve::route_question(text, now) -> Route{kind, from, to}`, a code rule first.
+  - Period words (today, yesterday, this week, last week, this month, and their Telugu equivalents) give `summary` with the date range.
+  - "quiz"/"test me" or the Telugu equivalents give `quiz`.
+  - "due", "remind", "to-do", "what do I have" give `due`.
+  - A medicine name or medicine words give `medicine`, the existing path.
+  - Everything else goes to a model classification, `recordings` or `general`, defaulting to `recordings` when any retrieved passage scores above the threshold.
+- **summary:** a map-reduce over the stored `short_summary` and section summaries of notes created in the range. It cites each note with a link and needs no transcript retrieval. An empty range gives "No recordings in that period."
+- **quiz:** it returns `{"kind":"quiz","question":…,"answer":…,"source":…}` from stored `revision_questions` of recent notes, not yet asked in this chat. AskView shows a quiz card with "Show answer" and "Next question".
+- **due:** reminders and tasks due in 7 days, listed in code with no model.
+- **recordings:** retrieval also searches section summaries and short summaries, not only transcript words. The not-found sentence appears only when nothing scores.
+- **general:** the model answers from its own knowledge, with the label. It is never used for medicine.
+
+- [ ] **Step 1:** Core tests for `route_question`, in English and Telugu, including the owner's two failing phrasings: "Highlight this week key discussions to remember" gives `summary`, and "Quiz me on my recent recordings" gives `quiz`. Also tests for the period range math, `due` with no model, `quiz` picking an unasked question, and medicine never routed to general. Fail, implement, pass. No model runs on the Mac.
+- [ ] **Step 2:** Swift quiz card and kind labels. Device build, `STRINGS OK`.
+- [ ] **Step 3: Commit** `feat: Ask uses the right source for each question: period summaries, quizzes, what's due, recordings, general knowledge`.
+
 ### Task N8: Device check with the owner
 
 - [ ] Install the build. Run each spec "Done when" case, plus heat: the same long recording or Regenerate once before N6 and once after (or with the ladder at full and at normal), comparing total time and the thermal states logged, with `xcrun devicectl device process launch --console` logs:
@@ -267,4 +319,4 @@ The owner flagged quality problems in note 19. The audit (scratchpad `q1/audit.m
   3. A recording made while another note is being written.
 
   Record the order of notifications and any cut-off.
-- [ ] Write the results to `docs/superpowers/2026-11-09-notes-finish-device-check.md (and note 19's Regenerate after N7)` and commit.
+- [ ] Write the results to `docs/superpowers/2026-11-09-notes-finish-device-check.md (and note 19's Regenerate after N7; Ask: streaming, follow-ups, the two failing questions, Quiz me, What's due, a general question, Telugu question)` and commit.

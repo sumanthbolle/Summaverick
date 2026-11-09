@@ -78,3 +78,25 @@ during the recording and from making each piece cheaper, never from a less accur
 
 Exact copy beyond the strings above (en + te), the persistence format for queued and cut-off regenerates, and how
 the profile is taken (core timing logs are fine).
+
+
+## Addendum (2026-11-09): Ask Summaverick as a full local chat ("full fledged local chatGPT")
+
+The owner found Ask unresponsive and ineffective on the phone:
+- the question box was hidden behind the tab bar (fixed in b971567);
+- "Highlight this week key discussions" answered "I didn't hear that…", in Telugu to an English question;
+- "Quiz me" pasted raw transcript;
+- nothing showed until the whole answer was done.
+
+The calls below are the controller's, stated to the owner.
+- **Conversation.** Multi-turn: follow-ups see the earlier turns, within a token budget, newest first. Chats are kept on the phone across launches, with "New chat". Still no network.
+- **Streaming.** The answer text appears as it is written. The first words show within a few seconds of the model starting.
+- **Routing by kind of question.** It is decided in code first, with a small model fallback:
+  - (a) A period summary ("this week", "today", "key discussions") comes from the stored short summaries and section summaries of the notes in that period, and cites each note.
+  - (b) Quiz: one stored revision question at a time from recent notes. The person answers, then sees the expected answer and the link.
+  - (c) What's due: read from reminders and tasks, with no model.
+  - (d) A question about the recordings: retrieval over the transcripts and sections as today, with better matching (sections and summaries too, not only transcript words), and links to the moment.
+  - (e) General: answered from the model's own knowledge, labelled "General knowledge — not from your recordings".
+- **Medicine stays in code.** Medicine questions are answered only from saved medicine facts, as today. They are never routed to general knowledge, and never reworded.
+- **Language.** The answer is written in the language of the question (Telugu or English; mixed means the dominant script), not the profile language.
+- **Not now:** web search, cloud models (the connectors are a later feature), and images.
