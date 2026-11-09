@@ -456,15 +456,69 @@ enum TaskLifecycle {
         !working && personRunsPending <= 0 && queued <= 0
     }
 
-    /// A note's progress 0...1 on the task: it uses the room the task has left, so the task never goes back.
-    static func rescaled(taskFraction: Double, noteFraction: Double) -> Double {
-        let t = min(1, max(0, taskFraction)), n = min(1, max(0, noteFraction))
-        return t + (1 - t) * n
+}
+
+/// The progress of one continued-processing task. Each note run in the task has its own 1000 units: the first
+/// note's are the task's first 1000, and each note that joins later adds 1000 to the total. The completed units
+/// never go back. Inside a note, its notes fill units 0...900 and its memories and insight 900...990; a heartbeat
+/// moves the note's units up to 990, so it can always move while that note's work is alive, however many notes
+/// the task runs. Done (the total) is shown only when the task finishes.
+struct TaskProgress: Equatable {
+    static let noteUnits: Int64 = 1000
+    /// Where the note's notes end and its memories and insight start (of its own 0...1).
+    static let notesShare = 0.9
+
+    private(set) var totalUnits: Int64 = noteUnits
+    private(set) var completedUnits: Int64 = 0
+    /// The note's own progress, of its 1000 units (heartbeats included), 0...0.99.
+    private(set) var noteFraction: Double = 0
+    /// The note's notes 0...1, as the pipeline reports them (for the note's percent in notices and the Live Activity).
+    private(set) var notesFraction: Double = 0
+    /// The note in flight has all its notes written.
+    private(set) var notesDone = false
+    private var noteBase: Int64 = 0
+    private var noteStarted = false
+
+    /// A note run starts in the task: the first one uses the task's first 1000 units, a later one adds its own 1000.
+    mutating func startNote() {
+        if noteStarted {
+            totalUnits += Self.noteUnits
+            noteBase = totalUnits - Self.noteUnits
+        }
+        noteStarted = true
+        noteFraction = 0
+        notesFraction = 0
+        notesDone = false
+        completedUnits = max(completedUnits, noteBase)
     }
 
-    /// The share of the room left that one note fills: a note that joins the task later still has room to move.
-    /// Done (1) is shown only when the task finishes.
-    static let noteShare = 0.9
+    /// The note's notes 0...1: units 0...900 of the note.
+    mutating func notes(_ fraction: Double) {
+        let f = min(1, max(0, fraction))
+        notesFraction = max(notesFraction, f)
+        if f >= 1 { notesDone = true }
+        move(to: f * Self.notesShare)
+    }
+
+    /// After the notes: memories and the insight, 0...1 of what is left, units 900...990 of the note.
+    mutating func afterNotes(_ part: Double) {
+        notesFraction = 1
+        notesDone = true
+        move(to: Self.notesShare + (0.99 - Self.notesShare) * min(1, max(0, part)))
+    }
+
+    /// One heartbeat on the note's own units (NotesProgress.heartbeatFraction: never past 990). False when it cannot move.
+    mutating func heartbeat() -> Bool {
+        let next = NotesProgress.heartbeatFraction(noteFraction)
+        guard next > noteFraction else { return false }
+        move(to: next)
+        return true
+    }
+
+    private mutating func move(to f: Double) {
+        noteFraction = max(noteFraction, min(0.99, max(0, f)))
+        completedUnits = max(completedUnits, noteBase + Int64(noteFraction * Double(Self.noteUnits)))
+    }
 }
 
 /// The memories of one note, written after its notes: one section at a time (sve_memories_from_section), each

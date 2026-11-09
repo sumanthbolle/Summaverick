@@ -33,9 +33,8 @@ final class ContinuedWork {
     }
     private var held: Held?
     private var wanted = false            // submitted (or running) and work is not done yet
-    private var fraction: Double = 0      // the task's progress; never goes back while it is held
-    private var noteBase: Double = 0      // the task's progress when the note in flight started
-    private var noteDone = false          // the note in flight has all its notes written
+    private var progress = TaskProgress()   // each note run its own 1000 units; never goes back in one task
+    private var noteRunning = false         // a note run (startNote) has not ended (endNote) yet
     private var subtitle = ""
 
     private init() {}
@@ -47,8 +46,8 @@ final class ContinuedWork {
     /// app is in the background). The run then has only the plain background time, and is cut off when it ends.
     private(set) var refused = false
 
-    /// The progress shown now, in whole percent (for the "paused at" notification).
-    var percent: Int { Int((fraction * 100).rounded(.down)) }
+    /// The note's own progress (its notes), in whole percent, for the "paused at" notification and the Live Activity.
+    var percent: Int { Int((progress.notesFraction * 100).rounded(.down)) }
 
     /// When the progress last moved, and when the work last showed it is alive (any thread: the model's callbacks).
     private final class Clock: @unchecked Sendable {
@@ -106,23 +105,22 @@ final class ContinuedWork {
     }
 
     /// Processing starts after Stop: call synchronously in the tap, while the app is in front. A task already
-    /// held or asked for with work left is kept (and shows this subtitle); a held task whose work is done is
-    /// completed first and a new one asked for (TaskLifecycle.onBegin): a finished task is never reused. From the
-    /// background a request is refused, so there a held task is kept whatever its state.
+    /// held or asked for while a note run is in flight is kept (and shows this subtitle): the new note joins it with
+    /// its own 1000 units. A held task whose run has ended is completed first and a new one asked for
+    /// (TaskLifecycle.onBegin): a finished task is never reused. From the background a request is refused, so there
+    /// a held task is kept whatever its state.
     func begin(key: String, subtitle: String) {
         guard #available(iOS 26, *) else { return }
         self.subtitle = subtitle
         if wanted {
             let inFront = UIApplication.shared.applicationState == .active
-            guard TaskLifecycle.onBegin(held: true, workLeft: !noteDone) == .finishThenSubmit, inFront else { apply(); return }
+            guard TaskLifecycle.onBegin(held: true, workLeft: noteRunning) == .finishThenSubmit, inFront else { apply(); return }
             NSLog("[sve] bg: old task ended, new task asked for")
             wanted = false
             complete(success: true)
         }
         refused = false
-        fraction = 0
-        noteBase = 0
-        noteDone = false
+        progress = TaskProgress()
         let id = Self.identifier(key: key)
         registerHandler(id)
         let request = BGContinuedProcessingTaskRequest(identifier: id, title: Self.title, subtitle: subtitle)
@@ -137,37 +135,43 @@ final class ContinuedWork {
         }
     }
 
-    /// The note's progress 0…1 and the stage line, shown by the system. The note fills `noteShare` of the room the
-    /// task has left (TaskLifecycle.rescaled), so the task never goes back and a note that joins it still moves.
+    /// The note's notes 0…1 (units 0…900 of its own 1000) and the stage line, shown by the system.
     func update(fraction: Double? = nil, subtitle: String? = nil) {
-        if let fraction {
-            let before = units
-            if fraction >= 1 { noteDone = true }
-            let task = TaskLifecycle.rescaled(taskFraction: noteBase, noteFraction: fraction * TaskLifecycle.noteShare)
-            self.fraction = max(self.fraction, task)
-            if units != before { Self.clock.stamp() }
-        }
+        if let fraction { move { $0.notes(fraction) } }
         if let subtitle, !subtitle.isEmpty { self.subtitle = subtitle }
         Self.clock.alive()   // the pipeline moved on (a stage change, a step done): the work is alive
         apply()
     }
 
-    /// A new note starts in the same task: its progress goes on from where the task is, never back to 0.
+    /// After the note's notes: its memories and insight, 0…1 of them (units 900…990 of its own 1000).
+    func update(afterNotes part: Double) {
+        move { $0.afterNotes(part) }
+        Self.clock.alive()
+        apply()
+    }
+
+    private func move(_ change: (inout TaskProgress) -> Void) {
+        let before = progress.completedUnits
+        change(&progress)
+        if progress.completedUnits != before { Self.clock.stamp() }
+    }
+
+    /// A note run starts: the first in the task uses its first 1000 units, a later one adds its own 1000, so the
+    /// progress never goes back.
     func startNote() {
-        noteBase = fraction
-        noteDone = false
+        progress.startNote()
+        noteRunning = true
         Self.clock.stamp()
         apply()
     }
 
-    private var units: Int64 { Int64(fraction * 1000) }
+    /// The note run ended (the pipeline is about to finish the task, or to start the next note in it).
+    func endNote() { noteRunning = false }
 
-    /// Never at done: a task at its end is not pushed along, it is finished.
+    /// On the note's own units, never past 990: a note at its end is not pushed along, the task is finished.
     private func pulse() {
-        let next = NotesProgress.heartbeatFraction(fraction)
-        guard held != nil, next > fraction else { return }
-        fraction = next
-        NSLog("[sve] bg: heartbeat, progress %.3f", fraction)
+        guard held != nil, progress.heartbeat() else { return }
+        NSLog("[sve] bg: heartbeat, progress %lld/%lld", progress.completedUnits, progress.totalUnits)
         apply()
     }
 
@@ -192,7 +196,6 @@ final class ContinuedWork {
         NSLog("[sve] bg: continued processing started")
         let h = Held(t)
         held = h
-        t.progress.totalUnitCount = 1000
         t.expirationHandler = {
             // Completed right here, on whatever thread this runs: the app may be suspended before a hop.
             h.complete(success: false)
@@ -214,14 +217,17 @@ final class ContinuedWork {
 
     private func apply() {
         guard #available(iOS 26, *), let t = held?.task as? BGContinuedProcessingTask else { return }
-        t.progress.completedUnitCount = units
+        t.progress.totalUnitCount = progress.totalUnits
+        t.progress.completedUnitCount = progress.completedUnits
         t.updateTitle(Self.title, subtitle: subtitle)
     }
 
     private func complete(success: Bool) {
         guard let h = held else { return }
         held = nil
-        if #available(iOS 26, *), success { (h.task as? BGContinuedProcessingTask)?.progress.completedUnitCount = 1000 }
+        if #available(iOS 26, *), success, let t = h.task as? BGContinuedProcessingTask {
+            t.progress.completedUnitCount = t.progress.totalUnitCount
+        }
         h.complete(success: success)
     }
 }
