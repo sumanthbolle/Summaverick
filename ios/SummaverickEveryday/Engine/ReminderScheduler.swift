@@ -235,25 +235,34 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: UNUserNotificationCenterDelegate
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+    // Completion-handler versions, answered on the main thread: with the async versions the system's completion runs
+    // on whatever thread the method returned on, and UIKit ends the app ("Call must be made on main thread"), seen
+    // on the owner's iPhone when a "paused" notification was tapped.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         // A note's notes notification arriving in front is not shown: the app already shows the note.
-        if notification.request.identifier.hasPrefix(NotesNotifier.prefix) { return [] }
-        return [.banner, .list, .sound]
+        let options: UNNotificationPresentationOptions =
+            notification.request.identifier.hasPrefix(NotesNotifier.prefix) ? [] : [.banner, .list, .sound]
+        DispatchQueue.main.async { completionHandler(options) }
     }
 
     /// Reminders, and a note's notes notifications (NotesNotifier: their userInfo has the note id), open their note.
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping () -> Void) {
         let identifier = response.notification.request.identifier
-        // Stop when quiet's warning: Keep recording carries on (a tap only opens the app).
-        if identifier == QuietNotifier.identifier {
-            if response.actionIdentifier == QuietNotifier.keepAction {
-                await MainActor.run { RecordingController.shared.keepRecording() }
-            }
-            return
-        }
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              identifier.hasPrefix(Self.prefix) || identifier.hasPrefix(NotesNotifier.prefix) else { return }
+        let action = response.actionIdentifier
         let route = Self.route(from: response.notification.request.content.userInfo)
-        await MainActor.run { ReminderScheduler.shared.pendingRoute = route }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                // Stop when quiet's warning: Keep recording carries on (a tap only opens the app).
+                if identifier == QuietNotifier.identifier {
+                    if action == QuietNotifier.keepAction { RecordingController.shared.keepRecording() }
+                } else if action == UNNotificationDefaultActionIdentifier,
+                          identifier.hasPrefix(Self.prefix) || identifier.hasPrefix(NotesNotifier.prefix) {
+                    ReminderScheduler.shared.pendingRoute = route
+                }
+            }
+            completionHandler()
+        }
     }
 }
