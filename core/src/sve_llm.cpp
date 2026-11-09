@@ -110,7 +110,8 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
 
 // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
 bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
-              sve_progress_cb cb, void *user, const char *phase, int done, int total, double *mean_prob) {
+              sve_progress_cb cb, void *user, const char *phase, int done, int total, double *mean_prob,
+              int *n_out) {
     llama_sampler_chain_params sp = llama_sampler_chain_default_params();
     sp.no_perf = true;
     llama_sampler *smpl = llama_sampler_chain_init(sp);
@@ -130,8 +131,10 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
 
     bool ok = true;
     char piece[256];
+    if (n_out) *n_out = 0;
     for (int i = 0; i < max_new_tokens; ++i) {
         llama_token id = llama_sampler_sample(smpl, ctx, -1);
+        if (n_out) ++*n_out;
         sve_log_tokens('o', &id, 1);
         if (llama_vocab_is_eog(vocab, id)) break;
         if (mean_prob) {

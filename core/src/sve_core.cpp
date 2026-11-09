@@ -10,6 +10,7 @@
 #include "sve_budget.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdarg>
 #include <fstream>
@@ -297,7 +298,11 @@ int sve_load_audio(sve_ctx *ctx, const char *mmproj_path) {
     // so transcription keeps running while the phone is locked (iOS refuses background GPU work).
     mp.use_gpu = ctx->llm->n_gpu_layers > 0;
     mp.print_timings = false;
-    mp.n_threads = ctx->llm->n_threads;
+    // The audio encoder is a short compute-bound burst per piece: it may use more cores than decoding
+    // (up to 8, never fewer than the model's). Measured on the Mac CPU: encode 1.04 s -> 0.59 s per
+    // 28 s piece, transcripts identical (docs/superpowers/2026-11-09-piece-speed.md).
+    const unsigned hw = std::thread::hardware_concurrency();
+    mp.n_threads = std::max(ctx->llm->n_threads, (int)std::min(hw, 8u));
     mp.warmup = false;
     ctx->mtmd = mtmd_init_from_file(mmproj_path, ctx->llm->model, mp);
     if (!ctx->mtmd) { sve_logf(2, "failed to load audio projector %s", mmproj_path); return -2; }
@@ -314,6 +319,12 @@ void sve_unload_audio(sve_ctx *ctx) {
 }
 
 int sve_audio_loaded(const sve_ctx *ctx) { return ctx && ctx->mtmd ? 1 : 0; }
+
+// SVE_TIMING=1 logs where each audio piece's time goes (off in the app).
+static bool timing_on() {
+    const char *v = getenv("SVE_TIMING");
+    return v && strcmp(v, "1") == 0;
+}
 
 // Transcribes one piece of 16 kHz mono audio with the loaded projector. False on failure/cancel.
 static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const std::string &prev,
@@ -338,14 +349,43 @@ static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const
             const llama_token *t = mtmd_input_chunk_get_tokens_text(mtmd_input_chunks_get(chunks, i), &nt);
             if (t) sve_log_tokens('i', t, nt);
         }
+    // The steps of mtmd_helper_eval_chunks, one chunk at a time, so the audio encode and the
+    // prefill can be timed apart (SVE_TIMING=1).
+    using clk = std::chrono::steady_clock;
+    auto secs = [](clk::time_point a, clk::time_point b) { return std::chrono::duration<double>(b - a).count(); };
+    double t_encode = 0, t_prefill = 0;
     llama_pos n_past = 0;
-    if (rc == 0) rc = mtmd_helper_eval_chunks(ctx->mtmd, llm.ctx, chunks, 0, 0, (int32_t)llama_n_batch(llm.ctx), true, &n_past);
+    const int32_t n_batch = (int32_t)llama_n_batch(llm.ctx);
+    const size_t n_chunks = rc == 0 ? mtmd_input_chunks_size(chunks) : 0;
+    for (size_t i = 0; rc == 0 && i < n_chunks; ++i) {
+        const mtmd_input_chunk *chunk = mtmd_input_chunks_get(chunks, i);
+        const bool logits_last = i + 1 == n_chunks;
+        const auto t0 = clk::now();
+        if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_TEXT) {
+            rc = mtmd_helper_eval_chunk_single(ctx->mtmd, llm.ctx, chunk, n_past, 0, n_batch, logits_last, &n_past);
+            t_prefill += secs(t0, clk::now());
+            continue;
+        }
+        rc = mtmd_encode_chunk(ctx->mtmd, chunk);
+        const auto t1 = clk::now();
+        t_encode += secs(t0, t1);
+        if (rc == 0)
+            rc = mtmd_helper_decode_image_chunk(ctx->mtmd, llm.ctx, chunk, mtmd_get_output_embd(ctx->mtmd), n_past, 0,
+                                                n_batch, &n_past, nullptr, nullptr);
+        t_prefill += secs(t1, clk::now());
+    }
     mtmd_input_chunks_free(chunks);
     mtmd_bitmap_free(bmp);
     if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", done + 1, total, rc); return false; }
     out.clear();
     int room = std::min(768, llm.n_ctx - (int)n_past - 4);
-    if (!llm.generate(room, true, out, cb, user, "chunk", done, total, conf)) return false;
+    int n_out = 0;
+    const auto t2 = clk::now();
+    const bool ok = llm.generate(room, true, out, cb, user, "chunk", done, total, conf, &n_out);
+    if (timing_on())
+        sve_logf(0, "piece timing: encode %.1f s, prefill %.1f s (%d tok), decode %.1f s (%d tok)", t_encode, t_prefill,
+                 (int)n_past, secs(t2, clk::now()), n_out);
+    if (!ok) return false;
     out = strip_thinking(out);
     return true;
 }

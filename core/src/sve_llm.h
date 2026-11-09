@@ -36,9 +36,10 @@ struct Llm {
     // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
     // mean_prob (optional): mean softmax probability of the chosen non-EOG tokens under the raw logits
     // (before penalties); NaN when no token was generated. Read after sampling, never changes the choice.
+    // n_out (optional): how many tokens were sampled, the end-of-generation token included.
     bool generate(int max_new_tokens, bool greedy, std::string &out,
                   sve_progress_cb cb, void *user, const char *phase, int done, int total,
-                  double *mean_prob = nullptr);
+                  double *mean_prob = nullptr, int *n_out = nullptr);
 };
 
 // Remove thinking blocks and surrounding whitespace.
