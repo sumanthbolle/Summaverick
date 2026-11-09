@@ -62,12 +62,16 @@ struct RootView: View {
     @State private var keyboardUp = false
 
     var body: some View {
-        ZStack {
-            tabContent(.today) { TodayView() }
-            tabContent(.deepDive) { DeepDiveView() }
-            tabContent(.ask) { AskView() }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // The bar takes its own space under the tabs. (As a .safeAreaInset it was drawn over the tabs without
+        // moving their content up on iOS 27: Ask's question box sat hidden behind it, owner's iPhone 2026-11-09.)
+        // Drawn after the tabs, so the raised Record circle stays on top of their content.
+        VStack(spacing: 0) {
+            ZStack {
+                tabContent(.today) { TodayView() }
+                tabContent(.deepDive) { DeepDiveView() }
+                tabContent(.ask) { AskView() }
+            }
+            .frame(maxHeight: .infinity)
             if !keyboardUp { RootTabBar(selection: $router.tab) { startRecordingFlow() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
