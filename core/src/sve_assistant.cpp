@@ -939,7 +939,7 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
 
 // ---------------------------------------------------------------- insights
 
-char *sve_insight_generate(sve_ctx *ctx, int64_t note_id) {
+char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
     return guard<char *>("sve_insight_generate", nullptr, [&]() -> char * {
         if (!ctx || !ctx->llm) return nullptr;
         sve::Store &st = *ctx->store;
@@ -966,7 +966,7 @@ char *sve_insight_generate(sve_ctx *ctx, int64_t note_id) {
             "Use only the material above. Do not mention medicines, doses or health advice. "
             "If nothing useful stands out, reply with exactly NONE.";
         std::string out;
-        if (!llm.complete(llm.apply_template(sys, userp), 120, out, nullptr, nullptr, "final", 0, 1, true)) return nullptr;
+        if (!llm.complete(llm.apply_template(sys, userp), 120, out, cb, user, "final", 0, 1, true)) return nullptr;
         std::string text = sve::strip_thinking(out);
         while (!text.empty() && (text.front() == '"' || text.front() == ' ')) text.erase(0, 1);
         while (!text.empty() && (text.back() == '"' || text.back() == ' ')) text.pop_back();

@@ -456,6 +456,13 @@ enum TaskLifecycle {
         !working && personRunsPending <= 0 && queued <= 0
     }
 
+    /// The task expired (or the background time ran out without one): the run in flight is cut off (resumed later,
+    /// "paused" posted) only while it still has notes to write. Memories, and the insight after a note's notes are
+    /// stored, are just stopped: there is nothing to resume.
+    static func expiryCutsOff(working: Bool, memoriesOnly: Bool, notesStored: Bool) -> Bool {
+        working && !memoriesOnly && !notesStored
+    }
+
 }
 
 /// The progress of one continued-processing task. Each note run in the task has its own 1000 units: the first

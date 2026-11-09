@@ -130,9 +130,9 @@ static int run_extract(sve_ctx *ctx, const std::string &fixture) {
         expect(sum.is_object() && sum["summary"].is_string(), "topic summary JSON");
     }
     sve_note_set_output(ctx, note, SVE_OUT_SHORT_SUMMARY, "Doctor visit: BP high, Amlodipine started, blood test report on Saturday.");
-    json ins = take(sve_insight_generate(ctx, note));
+    json ins = take(sve_insight_generate(ctx, note, progress, nullptr));
     printf("--- insight\n%s\n", ins.dump(2).c_str());
-    json again = take(sve_insight_generate(ctx, note));
+    json again = take(sve_insight_generate(ctx, note, nullptr, nullptr));
     expect(again.is_null(), "second insight the same day is null");
     return 0;
 }

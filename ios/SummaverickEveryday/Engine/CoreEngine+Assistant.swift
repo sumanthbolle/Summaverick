@@ -223,8 +223,13 @@ extension CoreEngine {
     nonisolated func noteExtracted(_ noteID: Int64) async -> Bool { await store { sve_note_extracted($0, noteID) != 0 } }
 
     nonisolated func latestInsight() async -> Insight? { await store { self.decode(Insight.self, self.take(sve_insight_latest($0))) } }
-    /// At most one per calendar day; nil when there is nothing new. Runs the model (this actor's context).
-    func generateInsight(noteID: Int64) -> Insight? { decode(Insight.self, take(sve_insight_generate(ctx, noteID))) }
+    /// At most one per calendar day; nil when there is nothing new, or when shouldStop cancelled it (nothing stored).
+    /// Runs the model (this actor's context).
+    func generateInsight(noteID: Int64, shouldStop: @escaping () -> Bool = { false }) -> Insight? {
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        return decode(Insight.self, take(sve_insight_generate(ctx, noteID, CoreEngine.progressTrampoline, user)))
+    }
     nonisolated func dismissInsight(_ id: Int64) async { await store { _ = sve_insight_dismiss($0, id) } }
 
     // MARK: transcript pieces (store context)

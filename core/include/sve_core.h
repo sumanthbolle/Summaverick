@@ -327,8 +327,9 @@ int   sve_assistant_wipe(sve_ctx *ctx);
  * transcript pieces, never generated. Answers are in the profile language. */
 char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, void *user);
 
-/* At most one insight per calendar day, from recent notes and open tasks: {"id":0,"text":""} or "null". */
-char *sve_insight_generate(sve_ctx *ctx, int64_t note_id);
+/* At most one insight per calendar day, from recent notes and open tasks: {"id":0,"text":""} or "null".
+ * cb (may be NULL) is called during generation; returning non-zero cancels it (returns NULL, nothing stored). */
+char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user);
 /* Newest undismissed {"id","text","note_id","dismissed","created_at"} or "null". */
 char *sve_insight_latest(sve_ctx *ctx);
 int   sve_insight_dismiss(sve_ctx *ctx, int64_t id);

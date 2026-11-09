@@ -199,6 +199,8 @@ final class ProcessingPipeline {
     /// The run in flight writes a note's notes (process, or resuming them; not a regenerate or a backfill): only
     /// such a run is enrolled after a cut-off and notifies ready, paused and failed.
     @ObservationIgnored private var notesRun = false
+    /// The run in flight has stored its note's notes (only the memories and the insight are left).
+    @ObservationIgnored private var notesStored = false
     /// Notes whose "paused" notification was posted for the cut-off of their current run (posted once).
     @ObservationIgnored private var pausedPosted: Set<Int64> = []
     /// Titles of the notes this launch worked on or queued, so a notification never waits for the core (busy until
@@ -684,14 +686,15 @@ final class ProcessingPipeline {
     private func continuedWorkExpired(hold: NotesNotifier.Hold) {
         defer { hold.end() }
         abort.set(true)
-        // Memories run after the notes are done: stopping them leaves nothing to resume or show.
+        // Memories and the insight run after the notes are stored: stopping them leaves nothing to resume or show.
         var running: Int64?
         if let r = regenerating, !appIsActive {
             // A regenerate is not resumed (the overnight task only finishes notes that are missing): say so.
             NSLog("[sve] bg: note %lld: regenerate cut off at %ld%%; the old text is kept", r.noteID, ContinuedWork.shared.percent)
             notify(r.noteID) { NotesNotifier.regenerateStopped(noteID: r.noteID, title: $0, hold: $1) }
         }
-        if isWorking, !memoryWork, let id = activeNoteID {
+        if TaskLifecycle.expiryCutsOff(working: isWorking, memoriesOnly: memoryWork, notesStored: notesStored),
+           let id = activeNoteID {
             interrupted.insert(id)
             lastFailure[id] = Self.cutOffMessage
             cutOff(id)
@@ -824,13 +827,16 @@ final class ProcessingPipeline {
         NSLog("[sve] bg: note %lld: notes ready (app %@)", id, appIsActive ? "in front" : "not in front")
         notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
         RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
+        notesStored = true   // from here an expiry only stops the run (TaskLifecycle.expiryCutsOff)
         // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
         memoryStop.set(false)
         _ = await writeMemories(noteID: id, quiet: false)
         ContinuedWork.shared.update(afterNotes: 0.5)   // the insight: the note's last part, under the same task
-        if (try? await ModelManager.shared.loadIntoCore(for: .generation)) != nil {
-            _ = await engine.generateInsight(noteID: id)
+        // The model calls back while it writes, so a long CPU insight keeps the heartbeat going; an expiry stops it.
+        if !abort.isSet, (try? await ModelManager.shared.loadIntoCore(for: .generation)) != nil {
+            ContinuedWork.beat()   // a CPU reload calls back nothing
+            _ = await engine.generateInsight(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
         }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
@@ -1239,6 +1245,7 @@ final class ProcessingPipeline {
     }
 
     private func beginBackground() {
+        notesStored = false
         wentToBackground = false
         stepOnGPU = false
         // A run of the overnight task that starts after it expired is cancelled at once; any other run starts clean.
