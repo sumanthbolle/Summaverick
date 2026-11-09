@@ -73,7 +73,7 @@ struct MemoryDetails: View {
             header
             Text(verbatim: m.text).font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
-                .strikethrough(m.done, color: .secondary)
+                .strikethrough(m.done, color: Theme.secondary)
             ForEach(Array(m.history.enumerated()), id: \.offset) { _, old in historyLine(old) }
             if m.lowConfidence, let first = m.sources.first, let onPlay {
                 Button { onPlay(first.noteID, first.startSec) } label: {
@@ -84,10 +84,10 @@ struct MemoryDetails: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.orange)
+                .foregroundStyle(Theme.caution)
             } else if m.lowConfidence {
                 Label("I may have heard this wrong. Listen?", systemImage: "ear")
-                    .font(.callout.weight(.medium)).foregroundStyle(.orange)
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.caution)
             }
             details
             ForEach(m.sources) { source($0) }
@@ -97,14 +97,14 @@ struct MemoryDetails: View {
     private var header: some View {
         HStack(spacing: 8) {
             Image(systemName: MemoryFormat.typeIcon(m)).font(.title3)
-                .foregroundStyle(m.isMedicine ? Color.red : Color.accentColor)
+                .foregroundStyle(m.isMedicine ? Theme.medicineIcon : Theme.accent)
                 .frame(width: 28)
                 .accessibilityHidden(true)
-            Text(MemoryFormat.typeLabel(m.type)).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text(MemoryFormat.typeLabel(m.type)).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
             if m.review == "new" {
-                Text("New").font(.caption.weight(.bold)).foregroundStyle(.white)
+                Text("New").font(.caption.weight(.bold)).foregroundStyle(Theme.primaryLabel)
                     .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(Color.accentColor, in: Capsule())
+                    .background(Theme.primaryFill, in: Capsule())
             }
             Spacer(minLength: 0)
         }
@@ -119,7 +119,7 @@ struct MemoryDetails: View {
                 Text("Was \(old.text), now \(m.text)")
             }
         }
-        .font(.callout).foregroundStyle(.secondary)
+        .font(.callout).foregroundStyle(Theme.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -143,11 +143,11 @@ struct MemoryDetails: View {
         VStack(alignment: .leading, spacing: 6) {
             if showsWaiting && m.waitingForCheck {
                 Label("Waiting for you to check", systemImage: "hourglass")
-                    .font(.callout.weight(.medium)).foregroundStyle(.orange)
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.caution)
             }
             ForEach(rows) { row in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(row.label).foregroundStyle(.secondary)
+                    Text(row.label).foregroundStyle(Theme.secondary)
                     Spacer(minLength: 8)
                     Text(verbatim: row.value).fontWeight(.medium).multilineTextAlignment(.trailing)
                 }
@@ -156,11 +156,11 @@ struct MemoryDetails: View {
             }
             if let due = MemoryFormat.due(m) {
                 Text(verbatim: due).font(.body.weight(.medium))
-                    .foregroundStyle(m.done ? Color.secondary : Color.primary)
+                    .foregroundStyle(m.done ? Theme.secondary : Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let said = m.saidDate {
-                Text("Said on \(AssistantFormat.day(said))").font(.callout).foregroundStyle(.secondary)
+                Text("Said on \(AssistantFormat.day(said))").font(.callout).foregroundStyle(Theme.secondary)
             }
         }
     }
@@ -172,7 +172,7 @@ struct MemoryDetails: View {
         return VStack(alignment: .leading, spacing: 4) {
             if !s.quote.isEmpty {
                 HStack(alignment: .top, spacing: 10) {
-                    RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)
+                    RoundedRectangle(cornerRadius: 2).fill(Theme.secondary).frame(width: 4)
                         .accessibilityHidden(true)
                     Text(verbatim: "“\(s.quote)”").font(.body.italic()).textSelection(.enabled)
                 }
@@ -187,10 +187,10 @@ struct MemoryDetails: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
                 .accessibilityLabel(Text("Open the recording: \(title) at \(stamp)"))
             } else {
-                Text(verbatim: "\(title) @\(stamp)").font(.subheadline).foregroundStyle(.secondary)
+                Text(verbatim: "\(title) @\(stamp)").font(.subheadline).foregroundStyle(Theme.secondary)
             }
         }
     }
@@ -201,11 +201,11 @@ struct HealthCheckBanner: View {
     var body: some View {
         Label("Health-related: please check", systemImage: "heart.text.square.fill")
             .font(.headline)
-            .foregroundStyle(.primary)
+            .foregroundStyle(Theme.text)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.yellow.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange, lineWidth: 1.5))
+            .background(Theme.healthFill, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.healthIcon, lineWidth: 1.5))
     }
 }
 
@@ -234,22 +234,26 @@ struct MemoryEditSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Wording", text: $draft, axis: .vertical)
+                    TextField("Wording", text: $draft, prompt: Theme.prompt("Wording"), axis: .vertical)
                         .font(.body)
                         .frame(minHeight: 44)
                 }
+                .listRowBackground(Theme.formRow)
                 if let q = memory.sources.first?.quote, !q.isEmpty {
                     Section("What was said") {
                         Text(verbatim: "“\(q)”").font(.body.italic()).textSelection(.enabled)
                     }
+                    .listRowBackground(Theme.formRow)
                 }
                 if failed {
                     Section {
                         Label("I couldn't save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.warning)
                     }
+                    .listRowBackground(Theme.formRow)
                 }
             }
+            .themedForm()
             .navigationTitle(Text("Edit"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -305,7 +309,7 @@ struct MemoryCardView: View {
             if let m = memory, !gone, m.review != "wrong" {
                 card(m)
             } else if gone || memory != nil {
-                Text("This one was removed from what I remember.").font(.body).foregroundStyle(.secondary)
+                Text("This one was removed from what I remember.").font(.body).foregroundStyle(Theme.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
             } else if readFailed {
@@ -325,21 +329,21 @@ struct MemoryCardView: View {
             MemoryDetails(memory: m, onPlay: onPlay)
             if m.isMedicine {
                 Label("This follows your medicine list. Change it there.", systemImage: "pills")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(Theme.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 actions(m)
             }
             if failed {
                 Label("I couldn't save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout.weight(.medium)).foregroundStyle(.red)
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if readFailed { loadFailedLine }
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(m.health && m.waitingForCheck ? Color.orange : Color.clear, lineWidth: 2))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(m.health && m.waitingForCheck ? Theme.healthIcon : Color.clear, lineWidth: 2))
         .sheet(isPresented: $editing) {
             MemoryEditSheet(memory: m) { text in await run { await CoreEngine.shared.editMemory(m.id, text) } }
         }
@@ -360,13 +364,13 @@ struct MemoryCardView: View {
                     Label("Done", systemImage: m.done ? "checkmark.circle.fill" : "circle")
                         .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.bordered).tint(.green)
+                .buttonStyle(.pillPositive)
                 .accessibilityAddTraits(m.done ? .isSelected : [])
             }
             MemoryActionButtons(busy: busy, buttons: [
-                .init(title: "Edit", icon: "pencil", tint: nil) { failed = false; editing = true },
-                .init(title: "Wrong", icon: "xmark", tint: .red) { decideLinked(.wrong, m) },
-                .init(title: "Forget this", icon: "trash", tint: .red) { confirmDelete = true },
+                .init(title: "Edit", icon: "pencil") { failed = false; editing = true },
+                .init(title: "Wrong", icon: "xmark", tone: .negative) { decideLinked(.wrong, m) },
+                .init(title: "Forget this", icon: "trash", tone: .warning) { confirmDelete = true },
             ])
         }
     }
@@ -387,10 +391,10 @@ struct MemoryCardView: View {
     private var loadFailedLine: some View {
         HStack(spacing: 12) {
             Label("I couldn't open this.", systemImage: "exclamationmark.triangle.fill")
-                .font(.callout.weight(.medium)).foregroundStyle(.red)
+                .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
             Spacer(minLength: 0)
             Button("Try again") { Task { await reload() } }
-                .buttonStyle(.bordered).frame(minHeight: 44)
+                .buttonStyle(.pill).frame(minHeight: 44)
         }
     }
 
@@ -444,13 +448,14 @@ struct MemoryActionButtons: View {
     struct Item: Identifiable {
         let title: LocalizedStringKey
         let icon: String
-        var tint: Color?
+        enum Tone { case plain, positive, negative, warning }
+        var tone = Tone.plain
         var prominent = false
         let action: () -> Void
         var id: String { icon }
 
-        init(title: LocalizedStringKey, icon: String, tint: Color?, prominent: Bool = false, action: @escaping () -> Void) {
-            self.title = title; self.icon = icon; self.tint = tint; self.prominent = prominent; self.action = action
+        init(title: LocalizedStringKey, icon: String, tone: Tone = .plain, prominent: Bool = false, action: @escaping () -> Void) {
+            self.title = title; self.icon = icon; self.tone = tone; self.prominent = prominent; self.action = action
         }
     }
 
@@ -463,9 +468,9 @@ struct MemoryActionButtons: View {
         layout {
             ForEach(buttons) { b in
                 if b.prominent {
-                    Button(action: b.action) { label(b) }.buttonStyle(.borderedProminent).tint(b.tint)
+                    Button(action: b.action) { label(b) }.buttonStyle(b.tone == .positive ? .pillPositiveFilled : .pillProminent)
                 } else {
-                    Button(action: b.action) { label(b) }.buttonStyle(.bordered).tint(b.tint)
+                    Button(action: b.action) { label(b) }.buttonStyle(b.tone == .negative ? .pillNegative : b.tone == .warning ? .pillWarning : b.tone == .positive ? .pillPositive : .pill)
                 }
             }
         }

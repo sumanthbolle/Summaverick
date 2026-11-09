@@ -24,6 +24,17 @@ struct SettingsView: View {
                         Label("Things I remember", systemImage: "brain.head.profile").frame(minHeight: 44)
                     }
                 }
+                .listRowBackground(Theme.formRow)
+
+                Section("Appearance") {
+                    Picker("Appearance", selection: $settings.appearance) {
+                        Text("System").tag(AppearanceChoice.system)
+                        Text("White").tag(AppearanceChoice.white)
+                        Text("Dark").tag(AppearanceChoice.dark)
+                    }
+                    .frame(minHeight: 44)
+                }
+                .listRowBackground(Theme.formRow)
 
                 Section("Notes language") {
                     Picker("Notes language", selection: $settings.notesLanguage) {
@@ -31,8 +42,9 @@ struct SettingsView: View {
                         Text("Tamil").tag("ta"); Text("Kannada").tag("kn"); Text("Malayalam").tag("ml")
                     }
                     Text("I listen to the recording itself, so Telugu, Hindi and mixed speech all work. I write the summary, notes and questions in the language above.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                 }
+                .listRowBackground(Theme.formRow)
 
                 aiSection
 
@@ -41,29 +53,35 @@ struct SettingsView: View {
                         Text("Off").tag(0); Text("2 min").tag(2); Text("5 min").tag(5); Text("10 min").tag(10)
                     }
                     Text("I stop recording after this long without voice, and keep everything said. I'll tell you 30 seconds before, and you can keep recording.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                 }
+                .listRowBackground(Theme.formRow)
 
                 Section("Keep recordings for") {
                     Picker("Audio retention", selection: $settings.retentionDays) {
                         Text("1 day").tag(1); Text("7 days").tag(7); Text("30 days").tag(30); Text("Forever").tag(0)
                     }
                     Text("Raw audio is deleted after this period to save space. What was said and your notes are kept until you delete them.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                 }
+                .listRowBackground(Theme.formRow)
 
                 Section("Privacy") {
                     Toggle("Require Face ID / passcode to open", isOn: $settings.requireUnlock)
+                        .tint(Theme.toggleOn)
                         .disabled(!AppLock.isAvailable)
                     Toggle("Show recording reminder", isOn: Binding(get: { !settings.consentAcknowledged }, set: { settings.consentAcknowledged = !$0 }))
+                        .tint(Theme.toggleOn)
                     Text("Summaverick has no account, no analytics and no server. The only network use is downloading Summaverick's language pack.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                 }
+                .listRowBackground(Theme.formRow)
 
                 Section("About") {
                     Text("Summaverick's notes are written by software running on this phone, and it can get things wrong. Please check anything important.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                 }
+                .listRowBackground(Theme.formRow)
 
                 Section {
                     Button(role: .destructive) {
@@ -79,8 +97,11 @@ struct SettingsView: View {
                 } footer: {
                     Text("Summaverick Everyday \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · core \(String(cString: sve_version()))")
                 }
+                .listRowBackground(Theme.formRow)
             }
+            .themedForm()
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .confirmationDialog("Delete everything on this phone?", isPresented: $confirmWipe, titleVisibility: .visible) {
                 Button("Delete all", role: .destructive) { wipe() }
@@ -117,7 +138,7 @@ struct SettingsView: View {
         let status = models.status
         Section("Summaverick's language pack") {
             if status == .unsupported {
-                Text(AIStatus.unsupportedMessage).font(.footnote).foregroundStyle(.secondary)
+                Text(AIStatus.unsupportedMessage).font(.footnote).foregroundStyle(Theme.secondary)
                 if models.hasFiles {   // left from an older version; never used on this phone
                     Button("Remove to free space", role: .destructive) {
                         if pipeline.isBusy { wipeBusy = true } else { confirmRemoveAI = true }
@@ -128,7 +149,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label(status.settingsLine, systemImage: status.symbol).frame(minHeight: 44, alignment: .leading)
                     if let p = status.progress { ProgressView(value: p) }
-                    if let d = status.detail { Text(d).font(.footnote).foregroundStyle(.secondary) }
+                    if let d = status.detail { Text(d).font(.footnote).foregroundStyle(Theme.secondary) }
                 }
                 if status.canRetry {
                     Button("Download again") { models.startIfNeeded(userInitiated: true) }.frame(minHeight: 44)
@@ -142,6 +163,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .listRowBackground(Theme.formRow)
     }
 
     /// Deletes the notes and their audio, then everything the assistant stored (profile, medicines,

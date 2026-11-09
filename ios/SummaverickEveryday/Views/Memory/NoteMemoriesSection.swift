@@ -20,7 +20,7 @@ struct NoteMemoriesSection: View {
         Group {
             if !memories.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Things I remember").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("Things I remember").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
                         .accessibilityAddTraits(.isHeader)
                     VStack(spacing: 0) {
                         let shown = expanded ? memories : Array(memories.prefix(Self.collapsedCount))
@@ -29,14 +29,14 @@ struct NoteMemoriesSection: View {
                             if m.id != shown.last?.id { Divider().padding(.leading, 14) }
                         }
                     }
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
                     if memories.count > Self.collapsedCount {
                         Button { withAnimation { expanded.toggle() } } label: {
                             Text(expanded ? "Show fewer" : "Show all \(memories.count)")
                                 .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
                         }
                         .buttonStyle(.plain)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Theme.accent)
                     }
                 }
             }
@@ -68,23 +68,23 @@ struct NoteMemoriesSection: View {
         return HStack(alignment: .center, spacing: 4) {
             Button { opened = m } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Image(systemName: MemoryFormat.typeIcon(m)).foregroundStyle(Color.accentColor)
+                    Image(systemName: MemoryFormat.typeIcon(m)).foregroundStyle(Theme.accent)
                         .frame(width: 24)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: m.text).font(.body).multilineTextAlignment(.leading)
-                            .strikethrough(m.done, color: .secondary)
+                            .strikethrough(m.done, color: Theme.secondary)
                         HStack(spacing: 6) {
                             Text(MemoryFormat.typeLabel(m.type))
                             if m.waitingForCheck {
                                 Text(verbatim: "·")
-                                Text("Waiting for you to check").foregroundStyle(.orange)
+                                Text("Waiting for you to check").foregroundStyle(Theme.caution)
                             } else if m.review == "new" {
                                 Text(verbatim: "·")
                                 Text("New")
                             }
                         }
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                     }
                     Spacer(minLength: 0)
                 }
@@ -99,7 +99,7 @@ struct NoteMemoriesSection: View {
                     Image(systemName: "play.circle").font(.title3).frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
                 .padding(.trailing, 4)
                 .accessibilityLabel(Text("Play from \(stamp): \(m.text)"))
             }

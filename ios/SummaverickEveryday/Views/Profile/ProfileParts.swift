@@ -82,12 +82,12 @@ struct RoutineRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: slot.icon).foregroundStyle(Color.accentColor).frame(width: 28).accessibilityHidden(true)
+            Image(systemName: slot.icon).foregroundStyle(Theme.accent).frame(width: 28).accessibilityHidden(true)
             if let v = value, ReminderScheduler.clock(v) != nil {
                 DatePicker(selection: Binding(get: { HHMM.date(v) }, set: { value = HHMM.string($0) }),
                            displayedComponents: .hourAndMinute) { Text(slot.label) }
                 Button { value = nil } label: {
-                    Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(.secondary)
+                    Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(Theme.secondary)
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.borderless)
@@ -128,7 +128,7 @@ struct ToastModifier: ViewModifier {
                     .font(.callout.weight(.medium))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16).padding(.vertical, 12)
-                    .background(.regularMaterial, in: Capsule())
+                    .background(Theme.chip, in: Capsule())
                     .padding(.bottom, 24).padding(.horizontal)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .onTapGesture { withAnimation { self.message = nil } }
@@ -190,18 +190,19 @@ struct MedicineForm: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Medicine name", text: $name)
+                    TextField("Medicine name", text: $name, prompt: Theme.prompt("Medicine name"))
                         .textInputAutocapitalization(.words)
                         .frame(minHeight: 44)
-                    TextField("Dose, e.g. 5 mg", text: $dose)
+                    TextField("Dose, e.g. 5 mg", text: $dose, prompt: Theme.prompt("Dose, e.g. 5 mg"))
                         .frame(minHeight: 44)
-                    TextField("When, e.g. after dinner", text: $when, axis: .vertical)
+                    TextField("When, e.g. after dinner", text: $when, prompt: Theme.prompt("When, e.g. after dinner"), axis: .vertical)
                         .frame(minHeight: 44)
                 } header: { Text("Medicine") } footer: {
                     if name.trimmingCharacters(in: .whitespaces).isEmpty {
                         Text("A name is needed to save.")
                     }
                 }
+                .listRowBackground(Theme.formRow)
 
                 Section {
                     ForEach(times.indices, id: \.self) { i in
@@ -217,7 +218,7 @@ struct MedicineForm: View {
                             }
                             if fromRoutine.contains(times[i]) {
                                 Text("From your routine: \(AssistantFormat.time(times[i])) — change if needed")
-                                    .font(.footnote).foregroundStyle(.secondary)
+                                    .font(.footnote).foregroundStyle(Theme.secondary)
                             }
                         }
                         .frame(minHeight: 44)
@@ -232,7 +233,7 @@ struct MedicineForm: View {
                         }
                     } label: { Text("Repeats") }
                     .frame(minHeight: 44)
-                    Toggle("Has an end date", isOn: hasUntil).frame(minHeight: 44)
+                    Toggle("Has an end date", isOn: hasUntil).tint(Theme.toggleOn).frame(minHeight: 44)
                     if let u = untilDate {
                         DatePicker("Until", selection: Binding(
                             get: { ReminderScheduler.day(u, .current) ?? Date() },
@@ -245,14 +246,16 @@ struct MedicineForm: View {
                             Text("No time yet. Add one, or the reminder on Today will ask you for it.")
                         }
                         if repeatRule == nil {
-                            Text("Choose how often it repeats before saving.").foregroundStyle(.red)
+                            Text("Choose how often it repeats before saving.").foregroundStyle(Theme.warning)
                         }
                         if twiceDailyShort {
-                            Text("Twice a day needs two times.").foregroundStyle(.red)
+                            Text("Twice a day needs two times.").foregroundStyle(Theme.warning)
                         }
                     }
                 }
+                .listRowBackground(Theme.formRow)
             }
+            .themedForm()
             .navigationTitle(original == nil ? Text("Add a medicine") : Text("Edit medicine"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -370,9 +373,9 @@ struct MedicinesList: View {
                 Button { onEdit(m) } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(verbatim: [m.name, m.dose ?? ""].filter { !$0.isEmpty }.joined(separator: " "))
-                            .font(.headline).foregroundStyle(.primary)
+                            .font(.headline).foregroundStyle(Theme.text)
                         if let line = detail(m) {
-                            Text(verbatim: line).font(.subheadline).foregroundStyle(.secondary)
+                            Text(verbatim: line).font(.subheadline).foregroundStyle(Theme.secondary)
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

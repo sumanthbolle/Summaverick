@@ -27,7 +27,7 @@ struct DeepDiveView: View {
                 }
                 if !models.isReady {
                     AIStatusLine().padding(.horizontal).padding(.vertical, 8)
-                        .background(Color(.secondarySystemBackground))
+                        .background(Theme.card)
                 }
                 Picker("Browse by", selection: $segment) {
                     Text("Topics").tag(Segment.topics)
@@ -35,6 +35,7 @@ struct DeepDiveView: View {
                     Text("Timeline").tag(Segment.timeline)
                 }
                 .pickerStyle(.segmented)
+                .controlSize(.large)
                 .padding(.horizontal).padding(.vertical, 8)
 
                 switch segment {
@@ -43,6 +44,7 @@ struct DeepDiveView: View {
                 case .timeline: TimelineView()
                 }
             }
+            .themedPage()
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Int64.self) { NoteDetailView(noteID: $0) }
             .navigationDestination(for: NoteMoment.self) { NoteDetailView(noteID: $0.noteID, startAt: $0.startSec) }
@@ -75,6 +77,7 @@ struct TopicListView: View {
                         ? "People you talk about show up here once I've gone through your recordings."
                         : "Topics show up here once I've gone through your recordings."))
                     .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             }
             ForEach(topics) { t in
                 HStack(spacing: 4) {
@@ -96,6 +99,7 @@ struct TopicListView: View {
                 }
             }
         }
+        .themedForm()
         .listStyle(.plain)
         .topicEditing(request: $request, gateKey: "deepdive.list.\(kind)") { _ in Task { await reload() } }
         .task { await reload() }
@@ -117,17 +121,17 @@ private struct TopicRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(topic.name).font(.headline).lineLimit(2)
                 if let last = topic.lastTitle, !last.isEmpty {
-                    Text("Latest: \(last)").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    Text("Latest: \(last)").font(.subheadline).foregroundStyle(Theme.secondary).lineLimit(1)
                 }
-                Text("\(topic.noteCount) recordings").font(.caption).foregroundStyle(.tertiary)
+                Text("\(topic.noteCount) recordings").font(.caption).foregroundStyle(Theme.secondary)
             }
             Spacer(minLength: 0)
             if topic.openTasks > 0 {
                 Text("\(topic.openTasks)")
-                    .font(.footnote.weight(.bold)).foregroundStyle(.white)
+                    .font(.footnote.weight(.bold)).foregroundStyle(Theme.badgeLabel)
                     .frame(minWidth: 24, minHeight: 24)
                     .padding(.horizontal, 4)
-                    .background(Capsule().fill(Brand.record))
+                    .background(Capsule().fill(Theme.badgeFill))
                     .accessibilityLabel(Text("\(topic.openTasks) open to-dos"))
             }
         }
@@ -175,7 +179,7 @@ private struct TopicEditing: ViewModifier {
                 }
             }
             .alert("Rename", isPresented: $showRename) {
-                TextField("Name", text: $newName)
+                TextField("Name", text: $newName, prompt: Theme.prompt("Name"))
                 Button("Save") { saveRename() }
                     .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 Button("Cancel", role: .cancel) { renaming = nil }
@@ -202,7 +206,7 @@ private struct TopicEditing: ViewModifier {
         NavigationStack {
             List {
                 if candidates.isEmpty {
-                    Text("There is nothing else to merge into.").foregroundStyle(.secondary)
+                    Text("There is nothing else to merge into.").foregroundStyle(Theme.secondary)
                 }
                 ForEach(candidates) { c in
                     Button {
@@ -210,14 +214,15 @@ private struct TopicEditing: ViewModifier {
                         showMergeConfirm = true
                     } label: {
                         HStack {
-                            Text(c.name).foregroundStyle(.primary)
+                            Text(c.name).foregroundStyle(Theme.text)
                             Spacer()
-                            Text("\(c.noteCount) recordings").font(.caption).foregroundStyle(.secondary)
+                            Text("\(c.noteCount) recordings").font(.caption).foregroundStyle(Theme.secondary)
                         }
                         .frame(minHeight: 44)
                     }
                 }
             }
+            .themedForm()
             .navigationTitle(Text("Merge into…"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

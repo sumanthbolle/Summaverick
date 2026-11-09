@@ -184,7 +184,7 @@ private struct RootTabBar: View {
         // the full screen and the .bar material behind it frosts every tab.
         .fixedSize(horizontal: false, vertical: true)
         .background {
-            Rectangle().fill(.bar).ignoresSafeArea(edges: .bottom)
+            Rectangle().fill(Theme.tabBar).ignoresSafeArea(edges: .bottom)
                 .overlay(alignment: .top) { Divider() }
         }
     }
@@ -200,7 +200,7 @@ private struct RootTabBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+        .foregroundStyle(selected ? Theme.accent : Theme.secondary)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -219,8 +219,8 @@ private struct RootTabBar: View {
                             Image(systemName: "mic.fill").font(.title2.weight(.semibold)).foregroundStyle(.white)
                         }
                         .frame(width: 52, height: 52)
-                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 3))
-                        Text("Record").font(.caption.weight(.semibold)).foregroundStyle(Brand.record)
+                        .overlay(Circle().stroke(Theme.tabBar, lineWidth: 3))
+                        Text("Record").font(.caption.weight(.semibold)).foregroundStyle(Theme.recordText)
                             .lineLimit(1).minimumScaleFactor(0.7)
                     }
                     .padding(.bottom, 4)

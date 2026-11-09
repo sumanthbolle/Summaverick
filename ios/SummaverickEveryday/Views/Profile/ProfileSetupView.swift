@@ -36,6 +36,7 @@ struct ProfileSetupView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 buttons
             }
+            .themedPage()
             .navigationTitle(Text("Set up Summaverick"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -76,10 +77,10 @@ struct ProfileSetupView: View {
 
     private func header(_ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Step \(step + 1) of \(stepCount)").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text("Step \(step + 1) of \(stepCount)").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
             Text(title).font(.title.bold()).fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            Text(detail).font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(detail).font(.body).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -88,13 +89,13 @@ struct ProfileSetupView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header("What should I call you?", "I use your name to greet you and to understand your recordings.")
-                TextField("Your name", text: $name)
+                TextField("Your name", text: $name, prompt: Theme.prompt("Your name"))
                     .textContentType(.givenName)
                     .textInputAutocapitalization(.words)
                     .font(.title3)
                     .padding(14)
                     .frame(minHeight: 44)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
                     .submitLabel(.next)
                     .onSubmit { next() }
             }
@@ -112,17 +113,17 @@ struct ProfileSetupView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(verbatim: l.native).font(.title3.weight(.semibold))
-                                    if l.code != "en" { Text(l.name).font(.subheadline).foregroundStyle(.secondary) }
+                                    if l.code != "en" { Text(l.name).font(.subheadline).foregroundStyle(Theme.secondary) }
                                 }
                                 Spacer()
                                 Image(systemName: lang == l.code ? "checkmark.circle.fill" : "circle")
                                     .font(.title2)
-                                    .foregroundStyle(lang == l.code ? Color.accentColor : Color.secondary)
+                                    .foregroundStyle(lang == l.code ? Theme.accent : Theme.secondary)
                                     .accessibilityHidden(true)
                             }
                             .padding(14)
                             .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -142,17 +143,21 @@ struct ProfileSetupView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
             }
+            .listRowBackground(Theme.formRow)
             Section {
                 ForEach(RoutineSlot.allCases) { slot in
                     RoutineRow(slot: slot, value: Binding(get: { routine[slot] }, set: { routine[slot] = $0 }))
                 }
             }
+            .listRowBackground(Theme.formRow)
             Section {
-                TextField("e.g. college 9 to 4", text: Binding(get: { routine.classes ?? "" }, set: { routine.classes = $0 }),
+                TextField("e.g. college 9 to 4", text: Binding(get: { routine.classes ?? "" }, set: { routine.classes = $0 }), prompt: Theme.prompt("e.g. college 9 to 4"),
                           axis: .vertical)
                     .frame(minHeight: 44)
             } header: { Text("Classes or work (optional)") }
+            .listRowBackground(Theme.formRow)
         }
+        .themedForm()
     }
 
     private var medicinesStep: some View {
@@ -162,6 +167,7 @@ struct ProfileSetupView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
             }
+            .listRowBackground(Theme.formRow)
             Section {
                 MedicinesList(medicines: medicines, onEdit: { editing = MedicineEditing(medicine: $0) },
                               onDelete: { deleting = $0 })
@@ -169,7 +175,9 @@ struct ProfileSetupView: View {
                     Label("Add a medicine", systemImage: "plus.circle.fill").font(.headline).frame(minHeight: 44)
                 }
             }
+            .listRowBackground(Theme.formRow)
         }
+        .themedForm()
         .task { await reloadMedicines() }
     }
 
@@ -180,7 +188,7 @@ struct ProfileSetupView: View {
             Button(action: next) {
                 Text(step == 3 ? "Done" : "Next").font(.headline).frame(maxWidth: .infinity, minHeight: 50)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.pillProminent)
             .disabled(saving)
             if step < 3 || medicines.isEmpty {
                 Button(action: skip) {

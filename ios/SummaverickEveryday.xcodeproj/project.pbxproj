@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02483ED28A106C83F67E1A8A = {
+			isa = PBXBuildFile;
+			fileRef = 647DAFDDC9793F2E68970D6F;
+		};
 		02B6E8042D07B8525DD08CA0 = {
 			isa = PBXBuildFile;
 			fileRef = 1E7DCC7C328B39763C50AB6C;
@@ -68,6 +72,10 @@
 		334316FE5AD49DBFE79A28C1 = {
 			isa = PBXBuildFile;
 			fileRef = FC581254F5C135DB22FD9C42;
+		};
+		38CB1246A85B0C24B1334947 = {
+			isa = PBXBuildFile;
+			fileRef = 4EC1FF35F8179A094C3AB745;
 		};
 		408386E2C748923A7048D478 = {
 			isa = PBXBuildFile;
@@ -217,6 +225,10 @@
 			isa = PBXBuildFile;
 			fileRef = 0B08BF124CD0B2571A98FABA;
 		};
+		C5A170B71BA26E9C67BBD6BF = {
+			isa = PBXBuildFile;
+			fileRef = 647DAFDDC9793F2E68970D6F;
+		};
 		C6AAA9F998388DF8734C616C = {
 			isa = PBXBuildFile;
 			fileRef = 2CC5EFA566DA98ADF20EDEAF;
@@ -293,6 +305,10 @@
 		E3B6ED99E22E4B0C0EC884D9 = {
 			isa = PBXBuildFile;
 			fileRef = 0A726C07BA65E563FB374790;
+		};
+		E9A17DB1C732407CC6C7359F = {
+			isa = PBXBuildFile;
+			fileRef = 4EC1FF35F8179A094C3AB745;
 		};
 		EAE1FEBFAD37F08A0E5AF91D = {
 			isa = PBXBuildFile;
@@ -535,6 +551,13 @@
 			path = SummaverickEveryday/Views/NoteDetailView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		4EC1FF35F8179A094C3AB745 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = Theme.swift;
+			path = Shared/Theme.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		515BBF6A31C68F3F903DB724 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -603,6 +626,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = RecordView.swift;
 			path = SummaverickEveryday/Views/RecordView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		647DAFDDC9793F2E68970D6F = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ThemePalette.swift;
+			path = Shared/ThemePalette.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		65E363A7B54CBC6FC72BFA66 = {
@@ -1165,6 +1195,8 @@
 				2CC5EFA566DA98ADF20EDEAF,
 				9C35A7555407BE9AE72D84A6,
 				65E363A7B54CBC6FC72BFA66,
+				4EC1FF35F8179A094C3AB745,
+				647DAFDDC9793F2E68970D6F,
 			);
 			name = Shared;
 			sourceTree = "<group>";
@@ -1369,6 +1401,8 @@
 				C6AAA9F998388DF8734C616C,
 				CFAE66CBEA2F64C482C52CCD,
 				A1CD78667A723270125077DD,
+				E9A17DB1C732407CC6C7359F,
+				C5A170B71BA26E9C67BBD6BF,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1439,6 +1473,8 @@
 				7930BD02F74FE1E998D43E14,
 				AECF9004BF6C64F9CF4640B9,
 				F4F570D994C6AAFF90AECBAF,
+				38CB1246A85B0C24B1334947,
+				02483ED28A106C83F67E1A8A,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

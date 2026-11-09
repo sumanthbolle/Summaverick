@@ -112,7 +112,7 @@ struct NoteDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    TextField("Title", text: $title, axis: .vertical)
+                    TextField("Title", text: $title, prompt: Theme.prompt("Title"), axis: .vertical)
                         .font(.title2.weight(.semibold))
                         .onSubmit { saveTitle() }
 
@@ -129,7 +129,7 @@ struct NoteDetailView: View {
                                 .accessibilityLabel(playing ? Text("Stop") : Text("Play the recording"))
                             }
                         }
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(Theme.secondary)
                     }
 
                     ChaptersView(chapters: chapters, onPlay: audioPath.map { p in { sec in playChapter(p, sec) } })
@@ -153,7 +153,7 @@ struct NoteDetailView: View {
                     } else if pipeline.hasQueuedTap(noteID) {
                         // A tap made while another note was being written (or the AI was not ready, or the phone was
                         // too warm): it runs by itself in its turn.
-                        Text(pipeline.tapWaitingLine(noteID)).font(.subheadline).foregroundStyle(.secondary)
+                        Text(pipeline.tapWaitingLine(noteID)).font(.subheadline).foregroundStyle(Theme.secondary)
                     } else if let failure = pipeline.lastFailure[noteID] {
                         // Paused or cut off: it continues by itself, and "Continue now" runs it at once. "Try again"
                         // only for a real failure.
@@ -182,7 +182,7 @@ struct NoteDetailView: View {
                         Button {
                             Task { await pipeline.regenerate(noteID: noteID) }
                         } label: { Label("Write my notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.pillProminent)
                         .disabled(pipeline.isBusy || !(hasTranscript || hasAudio))
                     }
 
@@ -193,7 +193,7 @@ struct NoteDetailView: View {
                                 await load()
                             }
                         } label: { Label("Find reminders and tasks", systemImage: "checklist").frame(maxWidth: .infinity) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.pill)
                         .frame(minHeight: 44)
                         .disabled(pipeline.isBusy)
                     }
@@ -211,13 +211,14 @@ struct NoteDetailView: View {
                 }
             }
         }
+        .themedPage()
         .overlay(alignment: .bottom) {
             if let toast {
                 Text(verbatim: toast)
                     .font(.callout.weight(.medium))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16).padding(.vertical, 12)
-                    .background(.regularMaterial, in: Capsule())
+                    .background(Theme.chip, in: Capsule())
                     .padding(.bottom, 24).padding(.horizontal)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -280,7 +281,7 @@ struct NoteDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 Text(isThisNoteBusy ? "Writing this now…" : (tab == .transcript ? "Nothing written down yet." : "I haven't written this yet."))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 24)
             }
@@ -295,18 +296,18 @@ struct NoteDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         } else if !isThisNoteBusy, let failed = pipeline.regenerateFailed[noteID] {
             HStack(spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.cautionIcon)
                 Text("I couldn't write this again. Please try once more.").font(.footnote)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button("Try again") { regenerate(failed.kind) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.pill)
                     .font(.footnote.weight(.semibold))
                     .frame(minHeight: 44)
                     .disabled(pipeline.isBusy || !models.isReady)
             }
             .padding(.horizontal).padding(.vertical, 8)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 8))
         } else if let kind = tab.kind {
             let hasText = !(note?.output(kind) ?? "").isEmpty
             let showRegenerate = RegenerateRules.showsRegenerate(hasText: hasText, noteBusy: isThisNoteBusy, aiReady: models.isReady,
@@ -318,14 +319,14 @@ struct NoteDetailView: View {
                         Button { regenerate(kind) } label: {
                             Label("Write again", systemImage: "arrow.clockwise").frame(minHeight: 44)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.pill)
                         .disabled(pipeline.isBusy)
                     }
                     if showUndo {
                         Button { undoRegenerate() } label: {
                             Label("Undo", systemImage: "arrow.uturn.backward").frame(minHeight: 44)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.pill)
                     }
                 }
             }
@@ -366,15 +367,15 @@ struct NoteDetailView: View {
                 Button { pipeline.finishOvernight(noteID: noteID) } label: {
                     Text("Yes").frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.pillProminent)
                 Button { pipeline.keepGoing(noteID: noteID) } label: {
                     Text("Keep going").frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.pill)
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: transcript pieces
@@ -387,7 +388,7 @@ struct NoteDetailView: View {
                 pieceRow(i, p).id(pieceID(i))
             }
             Text("Touch and hold a part to fix a word.")
-                .font(.footnote).foregroundStyle(.secondary).padding(.top, 8)
+                .font(.footnote).foregroundStyle(Theme.secondary).padding(.top, 8)
         }
     }
 
@@ -401,10 +402,10 @@ struct NoteDetailView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
                 .accessibilityLabel(Text("Play from \(stamp)"))
             } else {
-                Text(verbatim: stamp).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                Text(verbatim: stamp).font(.callout.monospacedDigit()).foregroundStyle(Theme.secondary)
                     .frame(minWidth: 52, alignment: .leading)
             }
             Text(verbatim: p.text)
@@ -412,7 +413,8 @@ struct NoteDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 8).padding(.vertical, 2)
-        .background(highlighted == i ? Color.yellow.opacity(0.28) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(highlighted == i ? Theme.highlight : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(highlighted == i ? Theme.secondary : Color.clear, lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: 8))
         .contextMenu {
             Button { fixing = FixTarget(text: p.text) } label: { Label("Fix a word", systemImage: "character.cursor.ibeam") }
@@ -450,7 +452,7 @@ struct NoteDetailView: View {
             Divider().padding(.vertical, 8)
             Text("Ask about this recording").font(.headline)
             HStack {
-                TextField("e.g. What was the homework?", text: $question)
+                TextField("e.g. What was the homework?", text: $question, prompt: Theme.prompt("e.g. What was the homework?"))
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { ask() }
                 Button { ask() } label: { Image(systemName: "paperplane.fill").frame(minWidth: 44, minHeight: 44) }
@@ -677,6 +679,7 @@ private struct FixWordSheet: View {
                 Section {
                     Text(verbatim: pieceText).font(.body)
                 } header: { Text("What was written") }
+                .listRowBackground(Theme.formRow)
 
                 if !words.isEmpty {
                     Section {
@@ -686,15 +689,16 @@ private struct FixWordSheet: View {
                                     Text(verbatim: w).font(.body).lineLimit(1).minimumScaleFactor(0.7)
                                         .frame(maxWidth: .infinity, minHeight: 44)
                                 }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.pill)
                             }
                         }
                         .padding(.vertical, 4)
                     } header: { Text("Tap the word that is wrong") }
+                    .listRowBackground(Theme.formRow)
                 }
 
                 Section {
-                    TextField("Correct word", text: $word)
+                    TextField("Correct word", text: $word, prompt: Theme.prompt("Correct word"))
                         .font(.title3)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -702,7 +706,9 @@ private struct FixWordSheet: View {
                 } header: { Text("Write it correctly") } footer: {
                     Text("I'll remember this word for your next recordings.")
                 }
+                .listRowBackground(Theme.formRow)
             }
+            .themedForm()
             .navigationTitle("Fix a word")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

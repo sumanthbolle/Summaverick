@@ -47,12 +47,12 @@ final class AppLock {
 struct LockScreen: View {
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            Theme.background.ignoresSafeArea()
             VStack(spacing: 20) {
-                Image(systemName: "lock.fill").font(.system(size: 44)).foregroundStyle(.secondary)
+                Image(systemName: "lock.fill").font(.system(size: 44)).foregroundStyle(Theme.secondary)
                 Text("Summaverick is locked").font(.title3.weight(.semibold))
                 Button("Unlock") { Task { await AppLock.shared.authenticate() } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pillProminent)
             }
         }
     }

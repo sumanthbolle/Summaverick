@@ -99,6 +99,7 @@ struct TodayView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 32)
             }
+            .themedPage()
             .alert("I couldn't save this. Please try again.", isPresented: errorShown) {
                 Button("OK", role: .cancel) {}
             }
@@ -144,7 +145,7 @@ struct TodayView: View {
     private var greeting: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(greetingLine).font(.largeTitle.bold()).fixedSize(horizontal: false, vertical: true)
-            Text(subtitle).font(.title3).foregroundStyle(.secondary)
+            Text(subtitle).font(.title3).foregroundStyle(Theme.secondary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
@@ -189,9 +190,9 @@ struct TodayView: View {
         HStack(alignment: .firstTextBaseline) {
             Text(title).font(.title2.bold())
             if let count, count > 0 {
-                Text(verbatim: "\(count)").font(.headline).foregroundStyle(.white)
+                Text(verbatim: "\(count)").font(.headline).foregroundStyle(Theme.badgeLabel)
                     .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(Brand.record, in: Capsule())
+                    .background(Theme.badgeFill, in: Capsule())
             }
             Spacer()
         }
@@ -199,10 +200,10 @@ struct TodayView: View {
     }
 
     private func emptyLine(_ text: LocalizedStringKey) -> some View {
-        Text(text).font(.body).foregroundStyle(.secondary)
+        Text(text).font(.body).foregroundStyle(Theme.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var waitingSection: some View {
@@ -232,10 +233,10 @@ struct TodayView: View {
             if queueFailed {
                 HStack(spacing: 12) {
                     Label("I couldn't open this.", systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout.weight(.medium)).foregroundStyle(.red)
+                        .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
                     Spacer(minLength: 0)
                     Button("Try again") { Task { await reload() } }
-                        .buttonStyle(.bordered).frame(minHeight: 44)
+                        .buttonStyle(.pill).frame(minHeight: 44)
                 }
             }
             ForEach(shown) { item in
@@ -252,7 +253,7 @@ struct TodayView: View {
                     Text(showAllToCheck ? "Show fewer" : "Show all \(queue.count)")
                         .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.pill)
             }
         }
     }
@@ -265,11 +266,11 @@ struct TodayView: View {
             if items.isEmpty { emptyLine("No reminders today or in the next 3 days.") }
             ForEach(days, id: \.self) { day in
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(dayLabel(day)).font(.headline).foregroundStyle(.secondary)
+                    Text(dayLabel(day)).font(.headline).foregroundStyle(Theme.secondary)
                         .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 4)
                     ForEach(items.filter { $0.day == day }) { o in reminderRow(o) }
                 }
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -293,20 +294,20 @@ struct TodayView: View {
                     .frame(minWidth: 72, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        if r.medicineID != nil { Image(systemName: "pills.fill").foregroundStyle(.red).accessibilityHidden(true) }
+                        if r.medicineID != nil { Image(systemName: "pills.fill").foregroundStyle(Theme.medicineIcon).accessibilityHidden(true) }
                         Text(r.text).font(.body).multilineTextAlignment(.leading)
                     }
                     if r.fromDeleted {
-                        Text("From a deleted recording").font(.footnote).foregroundStyle(.secondary)
+                        Text("From a deleted recording").font(.footnote).foregroundStyle(Theme.secondary)
                     }
                 }
                 Spacer(minLength: 0)
-                if canOpen { Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.tertiary) }
+                if canOpen { Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.secondary) }
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
-            .opacity(past ? 0.5 : 1)
+            .foregroundStyle(past ? Theme.secondary : Theme.text)
         }
         .buttonStyle(.plain)
         .disabled(!canOpen)
@@ -323,7 +324,7 @@ struct TodayView: View {
                         if t.id != tasks.last?.id { Divider().padding(.leading, 58) }
                     }
                 }
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -333,7 +334,7 @@ struct TodayView: View {
         let overdue = t.dueDate.map { $0 < todayYMD } ?? false
         return HStack(alignment: .center, spacing: 6) {
             Button { Task { await setDone(t) } } label: {
-                Image(systemName: "circle").font(.title2).foregroundStyle(Color.accentColor)
+                Image(systemName: "circle").font(.title2).foregroundStyle(Theme.accent)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -343,9 +344,9 @@ struct TodayView: View {
                 Text(t.text).font(.body)
                 HStack(spacing: 6) {
                     if let d = t.dueDate {
-                        Text("Due \(AssistantFormat.day(d))").foregroundStyle(overdue ? Color.red : Color.secondary)
+                        Text("Due \(AssistantFormat.day(d))").foregroundStyle(overdue ? Theme.warning : Theme.secondary)
                     }
-                    if let who = t.who, !who.isEmpty { Text(verbatim: "· \(who)").foregroundStyle(.secondary) }
+                    if let who = t.who, !who.isEmpty { Text(verbatim: "· \(who)").foregroundStyle(Theme.secondary) }
                 }
                 .font(.footnote)
             }
@@ -355,7 +356,7 @@ struct TodayView: View {
                     Image(systemName: "play.circle").font(.title3).frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
                 .accessibilityLabel(Text("Open the recording"))
             }
         }
@@ -365,26 +366,26 @@ struct TodayView: View {
     private func insightCard(_ i: Insight) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Something I noticed", systemImage: "sparkles").font(.headline).foregroundStyle(Color.accentColor)
+                Label("Something I noticed", systemImage: "sparkles").font(.headline).foregroundStyle(Theme.accent)
                 Spacer()
                 Button { Task { await dismissInsight(i) } } label: {
                     Image(systemName: "xmark").font(.headline).frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondary)
                 .accessibilityLabel(Text("Dismiss"))
             }
             Text(i.text).font(.body).fixedSize(horizontal: false, vertical: true)
             if let id = i.noteID {
                 Button { router.openNote = (id, nil) } label: {
-                    Text("Open the recording").font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+                    Text("Open the recording").font(.subheadline.weight(.semibold)).underline().frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
             }
         }
         .padding(.leading, 16).padding(.trailing, 4).padding(.bottom, 8)
-        .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var askBar: some View {
@@ -395,10 +396,10 @@ struct TodayView: View {
                 Spacer()
             }
             .font(.body)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.secondary)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 52)
-            .background(Color(.secondarySystemBackground), in: Capsule())
+            .background(Theme.card, in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -407,19 +408,19 @@ struct TodayView: View {
     private var setupProfileCard: some View {
         Button { showSetup = true } label: {
             HStack(spacing: 12) {
-                Image(systemName: "person.crop.circle.badge.plus").font(.largeTitle).foregroundStyle(Color.accentColor)
+                Image(systemName: "person.crop.circle.badge.plus").font(.largeTitle).foregroundStyle(Theme.accent)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Set up your profile").font(.headline).foregroundStyle(.primary)
+                    Text("Set up your profile").font(.headline).foregroundStyle(Theme.text)
                     Text("Your name, your day and your medicines help me time your reminders.")
-                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                        .font(.subheadline).foregroundStyle(Theme.secondary).multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").foregroundStyle(Theme.secondary)
             }
             .padding(16)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

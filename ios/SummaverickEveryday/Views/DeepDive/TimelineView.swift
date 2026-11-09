@@ -22,6 +22,7 @@ struct TimelineView: View {
             }
             .onDelete(perform: delete)
         }
+        .themedForm()
         .listStyle(.plain)
         .searchable(text: $query, prompt: "Search your notes")
         .onChange(of: query) { _, _ in Task { await reload() } }
@@ -61,14 +62,14 @@ struct NoteRow: View {
                 if isActive { ProgressView().controlSize(.small) }
             }
             Text(note.preview.isEmpty ? String(localized: "Nothing written down yet") : note.preview)
-                .font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                .font(.subheadline).foregroundStyle(Theme.secondary).lineLimit(2)
             HStack(spacing: 8) {
                 Text(note.createdAt, style: .date)
                 if note.duration_seconds > 0 { Text("· \(Duration.seconds(note.duration_seconds).formatted(.time(pattern: .minuteSecond)))") }
                 Text("· \(note.lang.uppercased())")
                 if note.has_audio { Image(systemName: "waveform") }
             }
-            .font(.caption).foregroundStyle(.tertiary)
+            .font(.caption).foregroundStyle(Theme.secondary)
         }
         .padding(.vertical, 4)
     }
@@ -88,40 +89,40 @@ struct StatusBanner: View {
     var body: some View {
         HStack(spacing: 10) {
             switch stage {
-            case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            case .paused: Image(systemName: "thermometer.medium").foregroundStyle(.orange)
-            case .overnight: Image(systemName: "moon.zzz.fill").foregroundStyle(.indigo)
+            case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.cautionIcon)
+            case .paused: Image(systemName: "thermometer.medium").foregroundStyle(Theme.cautionIcon)
+            case .overnight: Image(systemName: "moon.zzz.fill").foregroundStyle(Theme.infoIcon)
             default: ProgressView().controlSize(.small)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(stage.label).font(.footnote).lineLimit(2)
                 if stage.isWorking {
                     Text("You can close the app and get on with your day. I'll let you know when your notes are ready.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(Theme.secondary)
                 }
             }
             Spacer()
             if let onDoItNow {
                 Button("Do it now", action: onDoItNow)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.pill)
                     .font(.footnote.weight(.semibold))
                     .frame(minHeight: 44)
             }
             if let onStop {
                 Button("Stop", action: onStop)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.pill)
                     .font(.footnote.weight(.semibold))
                     .frame(minHeight: 44)
             }
             if let onTryAgain {
                 Button(continueNow ? String(localized: "Continue now") : String(localized: "Try again"), action: onTryAgain)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.pill)
                     .font(.footnote.weight(.semibold))
                     .frame(minHeight: 44)
                     .disabled(tryAgainDisabled)
             }
         }
         .padding(.horizontal).padding(.vertical, 8)
-        .background(Color(.secondarySystemBackground))
+        .background(Theme.card)
     }
 }

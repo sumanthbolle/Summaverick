@@ -10,32 +10,45 @@ import WidgetKit
 struct RecordingLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RecordingActivity.self) { context in
-            RecordingActivityView(state: context.state)
-                .padding(16)
-                .activityBackgroundTint(Color.black.opacity(0.6))
-                .activitySystemActionForegroundColor(.white)
+            LockScreenActivity(state: context.state)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.center) {
-                    RecordingActivityView(state: context.state)
+                    RecordingActivityView(state: context.state, mode: .dark)   // the island is always black
                 }
             } compactLeading: {
-                PhaseMark(phase: context.state.phase)
+                PhaseMark(phase: context.state.phase, mode: .dark)
             } compactTrailing: {
                 CompactDetail(state: context.state)
             } minimal: {
-                PhaseMark(phase: context.state.phase)
+                PhaseMark(phase: context.state.phase, mode: .dark)
             }
         }
     }
 }
 
+/// The Lock Screen and banner view, on White or Dark as the phone is set. WidgetKit archives this view, so its
+/// colours are picked from the colour scheme here rather than left to resolve later.
+private struct LockScreenActivity: View {
+    let state: RecordingActivity.ContentState
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let mode: ThemeMode = scheme == .dark ? .dark : .white
+        RecordingActivityView(state: state, mode: mode)
+            .padding(16)
+            .activityBackgroundTint(Theme.color(.card, mode))
+            .activitySystemActionForegroundColor(Theme.color(.text, mode))
+    }
+}
+
 private struct RecordingActivityView: View {
     let state: RecordingActivity.ContentState
+    let mode: ThemeMode
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            PhaseMark(phase: state.phase)
+            PhaseMark(phase: state.phase, mode: mode)
             VStack(alignment: .leading, spacing: 4) {
                 title.font(.headline)
                 switch state.phase {
@@ -45,13 +58,13 @@ private struct RecordingActivityView: View {
                 case .processing:
                     Text(state.stageLine).font(.subheadline).lineLimit(2)
                     ProgressView(value: Double(state.percent), total: 100)
-                        .tint(.white)
+                        .tint(Theme.color(.link, mode))
                 case .ready, .paused, .failed:
                     Text(state.stageLine).font(.subheadline).lineLimit(3)
                 }
                 // Stop when quiet: the warning while recording, or why it stopped (written by the app, localized there).
                 if let quiet = state.quietLine, !quiet.isEmpty {
-                    Text(verbatim: quiet).font(.caption).lineLimit(2).opacity(0.85)
+                    Text(verbatim: quiet).font(.caption).lineLimit(2).foregroundStyle(Theme.color(.secondary, mode))
                 }
             }
             Spacer(minLength: 0)
@@ -60,12 +73,12 @@ private struct RecordingActivityView: View {
                     Label("Stop", systemImage: "stop.fill")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(Capsule().fill(Color.white.opacity(0.2)))
+                        .background(Capsule().fill(Theme.color(.chip, mode)))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Theme.color(.text, mode))
     }
 
     private var title: Text {
@@ -81,14 +94,15 @@ private struct RecordingActivityView: View {
 
 private struct PhaseMark: View {
     let phase: RecordingActivity.ContentState.Phase
+    let mode: ThemeMode
 
     var body: some View {
         switch phase {
-        case .recording: Circle().fill(Color.red).frame(width: 12, height: 12)
+        case .recording: Circle().fill(Theme.color(.record, mode)).frame(width: 12, height: 12)
         case .processing: Image(systemName: "text.badge.star")
-        case .ready: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .paused: Image(systemName: "pause.circle.fill").foregroundStyle(.orange)
-        case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
+        case .ready: Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.color(.positiveIcon, mode))
+        case .paused: Image(systemName: "pause.circle.fill").foregroundStyle(Theme.color(.cautionIcon, mode))
+        case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.color(.warningIcon, mode))
         }
     }
 }

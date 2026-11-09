@@ -19,11 +19,12 @@ struct ProfileView: View {
     var body: some View {
         Form {
             Section("Name") {
-                TextField("Your name", text: $name)
+                TextField("Your name", text: $name, prompt: Theme.prompt("Your name"))
                     .textContentType(.givenName)
                     .textInputAutocapitalization(.words)
                     .frame(minHeight: 44)
             }
+            .listRowBackground(Theme.formRow)
 
             Section {
                 Picker(selection: $lang) {
@@ -36,17 +37,19 @@ struct ProfileView: View {
             } footer: {
                 Text("I talk to you in this language where I can. Some messages are in English for now.")
             }
+            .listRowBackground(Theme.formRow)
 
             Section {
                 ForEach(RoutineSlot.allCases) { slot in
                     RoutineRow(slot: slot, value: Binding(get: { routine[slot] }, set: { routine[slot] = $0 }))
                 }
-                TextField("Classes or work (optional)", text: Binding(get: { routine.classes ?? "" }, set: { routine.classes = $0 }),
+                TextField("Classes or work (optional)", text: Binding(get: { routine.classes ?? "" }, set: { routine.classes = $0 }), prompt: Theme.prompt("Classes or work (optional)"),
                           axis: .vertical)
                     .frame(minHeight: 44)
             } header: { Text("Your day") } footer: {
                 Text("Reminders like “after dinner” use these times.")
             }
+            .listRowBackground(Theme.formRow)
 
             Section {
                 Button(action: save) {
@@ -54,10 +57,11 @@ struct ProfileView: View {
                 }
                 .disabled(!changed || saving)
             }
+            .listRowBackground(Theme.formRow)
 
             Section {
                 if medicines.isEmpty {
-                    Text("No medicines yet.").foregroundStyle(.secondary).frame(minHeight: 44)
+                    Text("No medicines yet.").foregroundStyle(Theme.secondary).frame(minHeight: 44)
                 }
                 MedicinesList(medicines: medicines, onEdit: { openForm($0) }, onDelete: { deleting = $0 })
                 Button { openForm(nil) } label: {
@@ -66,8 +70,11 @@ struct ProfileView: View {
             } header: { Text("Medicines") } footer: {
                 Text("Saving a medicine offers a reminder on Today. Nothing rings until you say Yes.")
             }
+            .listRowBackground(Theme.formRow)
         }
+        .themedForm()
         .navigationTitle(Text("Profile"))
+        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .sheet(item: $editing) { e in
             MedicineForm(original: e.medicine) { _ in

@@ -10,7 +10,7 @@ struct ChaptersView: View {
     var body: some View {
         if chapters.count >= 2 {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Chapters").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                Text("Chapters").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(Array(chapters.enumerated()), id: \.offset) { _, c in chip(c) }
@@ -29,14 +29,14 @@ struct ChaptersView: View {
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 44)
-        .background(Color.secondary.opacity(0.12), in: Capsule())
+        .background(Theme.chip, in: Capsule())
         if let onPlay {
-            Button { onPlay(c.start_sec) } label: { label.foregroundStyle(Color.accentColor) }
+            Button { onPlay(c.start_sec) } label: { label.foregroundStyle(Theme.text) }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(verbatim: "\(stamp) \(title)"))
                 .accessibilityHint(Text("Play from \(stamp)"))
         } else {
-            label.foregroundStyle(.secondary)
+            label.foregroundStyle(Theme.secondary)
                 .accessibilityElement(children: .combine)
         }
     }

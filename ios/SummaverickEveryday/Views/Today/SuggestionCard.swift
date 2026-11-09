@@ -102,8 +102,8 @@ private struct FlagHighlight: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(.horizontal, on ? 8 : 0).padding(.vertical, on ? 6 : 0)
-            .background(on ? Color.yellow.opacity(0.28) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? Color.orange : Color.clear, lineWidth: 1.5))
+            .background(on ? Theme.cautionFill : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? Theme.cautionIcon : Color.clear, lineWidth: 1.5))
     }
 }
 
@@ -117,7 +117,7 @@ struct PleaseCheckBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.title2).foregroundStyle(.orange)
+                .font(.title2).foregroundStyle(Theme.caution)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Please check").font(.headline)
@@ -129,11 +129,11 @@ struct PleaseCheckBanner: View {
             }
             Spacer(minLength: 0)
         }
-        .foregroundStyle(.primary)
+        .foregroundStyle(Theme.text)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.yellow.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange, lineWidth: 2))
+        .background(Theme.cautionFill, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.cautionIcon, lineWidth: 2))
         .accessibilityElement(children: .combine)
     }
 }
@@ -147,15 +147,15 @@ struct QuoteBlock: View {
     var body: some View {
         let flagged = suggestion.checkFields.contains("quote")
         VStack(alignment: .leading, spacing: 8) {
-            Text("What was said").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text("What was said").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
             HStack(alignment: .top, spacing: 10) {
-                RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)
+                RoundedRectangle(cornerRadius: 2).fill(Theme.secondary).frame(width: 4)
                 if let q = suggestion.quote?.trimmingCharacters(in: .whitespacesAndNewlines), !q.isEmpty {
                     Text(verbatim: "“\(q)”").font(.body.italic()).textSelection(.enabled)
                 } else if suggestion.noteID == nil && suggestion.medicineID != nil {
-                    Text("From your profile.").font(.body).foregroundStyle(.secondary)
+                    Text("From your profile.").font(.body).foregroundStyle(Theme.secondary)
                 } else {
-                    Text("No recorded words were saved for this.").font(.body).foregroundStyle(.secondary)
+                    Text("No recorded words were saved for this.").font(.body).foregroundStyle(Theme.secondary)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -169,7 +169,7 @@ struct QuoteBlock: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
                 .accessibilityLabel(Text("Open the recording: \(noteTitle ?? String(localized: "Recording")) at \(AssistantFormat.mmss(suggestion.startSec ?? 0))"))
             }
         }
@@ -199,10 +199,10 @@ struct SuggestionCard: View {
             if isStale {
                 Label("This changed since it was suggested. Please check it again.", systemImage: "arrow.triangle.2.circlepath")
                     .font(.callout.weight(.medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Theme.text)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
+                    .background(Theme.cautionFill, in: RoundedRectangle(cornerRadius: 10))
             }
             if let text = s.payload.text, !text.isEmpty {
                 Text(text).font(.title3.weight(.semibold))
@@ -215,16 +215,16 @@ struct SuggestionCard: View {
                                       mustConfirm: isStale)
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(s.isFlagged ? Color.orange : Color.clear, lineWidth: 2))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(s.isFlagged ? Theme.cautionIcon : Color.clear, lineWidth: 2))
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon).font(.title3).foregroundStyle(s.isMedicine ? Color.red : Color.accentColor)
+            Image(systemName: icon).font(.title3).foregroundStyle(s.isMedicine ? Theme.medicineIcon : Theme.accent)
                 .frame(width: 28)
                 .accessibilityHidden(true)
-            Text(kindLabel).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text(kindLabel).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
             Spacer()
             if isBusy { ProgressView() }
         }
@@ -304,10 +304,10 @@ struct SuggestionCard: View {
                 let on = row.key.map(flagged) ?? false
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if on {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.cautionIcon)
                             .accessibilityLabel(Text("Please check"))
                     }
-                    Text(row.label).font(.body).foregroundStyle(.secondary)
+                    Text(row.label).font(.body).foregroundStyle(Theme.secondary)
                     Spacer(minLength: 8)
                     Text(row.value).font(.body.weight(on ? .bold : .medium)).multilineTextAlignment(.trailing)
                 }
@@ -369,15 +369,15 @@ struct SuggestionDecisionButtons: View {
             Button { yes() } label: {
                 Label("Yes", systemImage: "checkmark").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent).tint(.green)
+            .buttonStyle(.pillPositiveFilled)
             Button { resumeDraft = nil; showEdit = true } label: {
                 Label("Edit", systemImage: "pencil").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.pill)
             Button { onReject() } label: {
                 Label("No", systemImage: "xmark").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.bordered).tint(.red)
+            .buttonStyle(.pillNegative)
         }
         .labelStyle(.titleAndIcon)
         .disabled(isBusy)
@@ -544,23 +544,26 @@ struct SuggestionEditForm: View {
             Form {
                 if s.isFlagged {
                     Section { PleaseCheckBanner(fields: s.checkFields) }
+                    .listRowBackground(Theme.formRow)
                         .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                 }
                 if let answer {
                     answerSection(answer)
                 } else {
                     Section { QuoteBlock(suggestion: s, noteTitle: noteTitle) { id, sec in openMoment = NoteMoment(noteID: id, startSec: sec) } }
+                    .listRowBackground(Theme.formRow)
                 }
 
                 Section {
-                    TextField("Wording", text: $draft.text, axis: .vertical)
+                    TextField("Wording", text: $draft.text, prompt: Theme.prompt("Wording"), axis: .vertical)
                         .lineLimit(2...6)
                         .highlightedRow(flagged("text"))
                     if textMissing {
                         Label("Write what this is about before saving.", systemImage: "exclamationmark.circle.fill")
-                            .font(.callout.weight(.medium)).foregroundStyle(.red)
+                            .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
                     }
                 } header: { fieldHeader("Wording", flagged("text")) }
+                .listRowBackground(Theme.formRow)
 
                 if hasMedicine {
                     Section {
@@ -570,6 +573,7 @@ struct SuggestionEditForm: View {
                         labeled("How often", $draft.medFrequency, "frequency")
                         labeled("How long", $draft.medDuration, "duration")
                     } header: { Text("Medicine") }
+                    .listRowBackground(Theme.formRow)
                 }
 
                 if hasSchedule { scheduleSection }
@@ -577,7 +581,7 @@ struct SuggestionEditForm: View {
                 if s.kind == .task {
                     Section {
                         labeled("Who", $draft.who, "who")
-                        Toggle("Has a due date", isOn: hasDate($draft.dueDate, .due))
+                        Toggle("Has a due date", isOn: hasDate($draft.dueDate, .due)).tint(Theme.toggleOn)
                             .frame(minHeight: 44)
                             .highlightedRow(flagged("due_date"))
                         if let v = draft.dueDate {
@@ -585,8 +589,10 @@ struct SuggestionEditForm: View {
                                 .highlightedRow(flagged("due_date"))
                         }
                     } header: { fieldHeader("To do", flagged("due_date")) }
+                    .listRowBackground(Theme.formRow)
                 }
             }
+            .themedForm()
             .navigationTitle("Edit")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -658,9 +664,9 @@ struct SuggestionEditForm: View {
             Button { pickDate(what) } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Label("Not set — please pick a date", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Theme.text)
                     if !value.isEmpty {
-                        Text(verbatim: "“\(value)”").font(.footnote).foregroundStyle(.secondary)
+                        Text(verbatim: "“\(value)”").font(.footnote).foregroundStyle(Theme.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -713,9 +719,9 @@ struct SuggestionEditForm: View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
                 Text(a.medicine ? AssistantFormat.medicineAnswerLabel(a.text) : "My answer")
-                    .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
                 HStack(alignment: .top, spacing: 10) {
-                    RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)
+                    RoundedRectangle(cornerRadius: 2).fill(Theme.secondary).frame(width: 4)
                         .accessibilityHidden(true)
                     Text(verbatim: a.text).font(a.medicine ? .body.italic() : .body).textSelection(.enabled)
                 }
@@ -730,17 +736,18 @@ struct SuggestionEditForm: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Theme.accent)
                     .accessibilityLabel(Text("Open the recording: \(title) at \(AssistantFormat.mmss(s.startSec ?? 0))"))
                 }
             }
             if a.medicine {
                 Label("Please check the dose and time against your doctor's words above.", systemImage: "exclamationmark.triangle.fill")
                     .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .listRowBackground(Color.yellow.opacity(0.3))
+                    .foregroundStyle(Theme.text)
+                    .listRowBackground(Theme.cautionFill)
             }
         }
+        .listRowBackground(Theme.formRow)
     }
 
     private var scheduleSection: some View {
@@ -754,9 +761,9 @@ struct SuggestionEditForm: View {
                         Button { pickTime(at: i) } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Label("Not set — please pick a time", systemImage: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Theme.text)
                                 if !draft.times[i].isEmpty {
-                                    Text(verbatim: "“\(draft.times[i])”").font(.footnote).foregroundStyle(.secondary)
+                                    Text(verbatim: "“\(draft.times[i])”").font(.footnote).foregroundStyle(Theme.secondary)
                                 }
                             }
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -780,11 +787,11 @@ struct SuggestionEditForm: View {
             .highlightedRow(flagged("times") && draft.times.isEmpty)
             if let problem = timesProblem {
                 Label(problem, systemImage: "exclamationmark.circle.fill")
-                    .font(.callout.weight(.medium)).foregroundStyle(.red)
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
             }
             if repeatMissing {
                 Label("Choose how often it repeats before saving.", systemImage: "exclamationmark.circle.fill")
-                    .font(.callout.weight(.medium)).foregroundStyle(.red)
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
             }
             Picker("Repeats", selection: $draft.repeatRule) {
                 ForEach(repeatOptions, id: \.self) { r in
@@ -792,7 +799,7 @@ struct SuggestionEditForm: View {
                 }
             }
             .frame(minHeight: 44)
-            Toggle("Has an end date", isOn: hasDate($draft.untilDate, .until))
+            Toggle("Has an end date", isOn: hasDate($draft.untilDate, .until)).tint(Theme.toggleOn)
                 .frame(minHeight: 44)
                 .highlightedRow(flagged("until_date"))
             if let v = draft.untilDate {
@@ -800,6 +807,7 @@ struct SuggestionEditForm: View {
                     .highlightedRow(flagged("until_date"))
             }
         } header: { fieldHeader("When", flagged("times") || flagged("until_date")) }
+        .listRowBackground(Theme.formRow)
     }
 
     private var repeatOptions: [String] {
@@ -812,12 +820,12 @@ struct SuggestionEditForm: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 if flagged(key) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.cautionIcon)
                         .accessibilityLabel(Text("Please check this"))
                 }
-                Text(title).font(.footnote).foregroundStyle(flagged(key) ? Color.primary : Color.secondary)
+                Text(title).font(.footnote).foregroundStyle(flagged(key) ? Theme.text : Theme.secondary)
             }
-            TextField(title, text: value, axis: .vertical).font(.body.weight(flagged(key) ? .semibold : .regular))
+            TextField(title, text: value, prompt: Theme.prompt(title), axis: .vertical).font(.body.weight(flagged(key) ? .semibold : .regular))
         }
         .frame(minHeight: 44)
         .highlightedRow(flagged(key))
@@ -827,7 +835,7 @@ struct SuggestionEditForm: View {
         HStack(spacing: 6) {
             Text(title)
             if on {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.cautionIcon)
                     .accessibilityLabel(Text("Please check this"))
             }
         }
@@ -870,6 +878,6 @@ struct SuggestionEditForm: View {
 extension View {
     /// Yellow row background in a Form for a flagged field.
     fileprivate func highlightedRow(_ on: Bool) -> some View {
-        listRowBackground(on ? Color.yellow.opacity(0.3) : nil)
+        listRowBackground(on ? Theme.cautionFill : Theme.formRow)
     }
 }

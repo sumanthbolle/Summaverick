@@ -37,6 +37,7 @@ struct TopicDetailView: View {
             if !tasks.isEmpty { tasksSection }
             recordingsSection
         }
+        .themedForm()
         .navigationTitle(Text(verbatim: name))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -80,7 +81,7 @@ struct TopicDetailView: View {
                     if loadingSummary {
                         HStack(spacing: 12) {
                             ProgressView()
-                            Text("Reading your recordings…").foregroundStyle(.secondary)
+                            Text("Reading your recordings…").foregroundStyle(Theme.secondary)
                         }
                         .frame(minHeight: 44)
                     } else if summaryBusy {
@@ -88,29 +89,29 @@ struct TopicDetailView: View {
                     } else if let err = summaryError {
                         VStack(alignment: .leading, spacing: 6) {
                             Label("I couldn't write the summary again.", systemImage: "exclamationmark.triangle.fill")
-                                .font(.subheadline).foregroundStyle(.orange)
+                                .font(.subheadline).foregroundStyle(Theme.caution)
                             if err == tooWarmMessage || err == recordingMessage {
-                                Text(verbatim: err).font(.footnote).foregroundStyle(.secondary)
+                                Text(verbatim: err).font(.footnote).foregroundStyle(Theme.secondary)
                             }
                             Button("Try again") { Task { await loadSummary() } }
-                                .buttonStyle(.bordered).frame(minHeight: 44)
+                                .buttonStyle(.pill).frame(minHeight: 44)
                         }
                     } else if topic?.summaryStale == 1 {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("New recordings were added.").font(.subheadline).foregroundStyle(.secondary)
+                            Text("New recordings were added.").font(.subheadline).foregroundStyle(Theme.secondary)
                             Button("Write the summary again") { Task { await loadSummary() } }
-                                .buttonStyle(.bordered).frame(minHeight: 44)
+                                .buttonStyle(.pill).frame(minHeight: 44)
                         }
                     }
                     if s.summary.isEmpty {
-                        Text("No summary yet.").foregroundStyle(.secondary)
+                        Text("No summary yet.").foregroundStyle(Theme.secondary)
                     } else {
                         Text(verbatim: s.summary).font(.body)
                     }
                     ForEach(s.sources) { src in
                         NavigationLink(value: NoteMoment(noteID: src.noteID, startSec: src.startSec)) {
                             Text(verbatim: "▶ \(src.title.isEmpty ? String(localized: "Recording") : src.title) @\(AssistantFormat.mmss(src.startSec))")
-                                .font(.subheadline).foregroundStyle(Color.accentColor)
+                                .font(.subheadline).foregroundStyle(Theme.accent)
                                 .frame(minHeight: 44, alignment: .leading)
                         }
                         .accessibilityLabel(Text("Open the recording: \(src.title.isEmpty ? String(localized: "Recording") : src.title) at \(AssistantFormat.mmss(src.startSec))"))
@@ -120,9 +121,9 @@ struct TopicDetailView: View {
             } else if let err = summaryError {
                 VStack(alignment: .leading, spacing: 10) {
                     Label("I couldn't write the summary.", systemImage: "exclamationmark.triangle.fill").font(.headline)
-                    Text(verbatim: err).font(.footnote).foregroundStyle(.secondary)
+                    Text(verbatim: err).font(.footnote).foregroundStyle(Theme.secondary)
                     Button("Try again") { Task { await loadSummary() } }
-                        .buttonStyle(.borderedProminent).frame(minHeight: 44)
+                        .buttonStyle(.pillProminent).frame(minHeight: 44)
                 }
                 .padding(.vertical, 4)
             } else if summaryBusy {
@@ -130,23 +131,24 @@ struct TopicDetailView: View {
             } else if loadingSummary {
                 HStack(spacing: 12) {
                     ProgressView()
-                    Text("Reading your recordings…").foregroundStyle(.secondary)
+                    Text("Reading your recordings…").foregroundStyle(Theme.secondary)
                 }
                 .frame(minHeight: 44)
             } else {
                 Button("Write the summary") { Task { await loadSummary() } }
-                    .buttonStyle(.borderedProminent).frame(minHeight: 44)
+                    .buttonStyle(.pillProminent).frame(minHeight: 44)
             }
         } header: {
             Text("Summary")
         }
+        .listRowBackground(Theme.formRow)
     }
 
     private var busyView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("I'm working on another note. Try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
+            Text("I'm working on another note. Try again in a moment.").font(.subheadline).foregroundStyle(Theme.secondary)
             Button("Try again") { Task { await loadSummary() } }
-                .buttonStyle(.bordered).frame(minHeight: 44)
+                .buttonStyle(.pill).frame(minHeight: 44)
         }
     }
 
@@ -157,6 +159,7 @@ struct TopicDetailView: View {
                     .font(.body).padding(.vertical, 2)
             }
         }
+        .listRowBackground(Theme.formRow)
     }
 
     private func quizSection(_ quiz: [QuizItem]) -> some View {
@@ -168,14 +171,14 @@ struct TopicDetailView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .top) {
-                            Text(verbatim: item.q).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                            Text(verbatim: item.q).font(.body.weight(.semibold)).foregroundStyle(Theme.text)
                                 .multilineTextAlignment(.leading)
                             Spacer(minLength: 8)
                             Image(systemName: open ? "chevron.up" : "chevron.down")
-                                .font(.footnote).foregroundStyle(.secondary)
+                                .font(.footnote).foregroundStyle(Theme.secondary)
                         }
                         if open {
-                            Text(verbatim: item.a).font(.body).foregroundStyle(.secondary)
+                            Text(verbatim: item.a).font(.body).foregroundStyle(Theme.secondary)
                                 .multilineTextAlignment(.leading)
                         }
                     }
@@ -190,6 +193,7 @@ struct TopicDetailView: View {
         } footer: {
             Text("Tap a question to see the answer.")
         }
+        .listRowBackground(Theme.formRow)
     }
 
     private var tasksSection: some View {
@@ -198,7 +202,7 @@ struct TopicDetailView: View {
                 let row = VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: t.text).font(.body)
                     if let due = t.dueDate, !due.isEmpty {
-                        Text("Due: \(AssistantFormat.day(due))").font(.caption).foregroundStyle(.secondary)
+                        Text("Due: \(AssistantFormat.day(due))").font(.caption).foregroundStyle(Theme.secondary)
                     }
                 }
                 .frame(minHeight: 44, alignment: .leading)
@@ -209,6 +213,7 @@ struct TopicDetailView: View {
                 }
             }
         }
+        .listRowBackground(Theme.formRow)
     }
 
     private var recordingsSection: some View {
@@ -218,17 +223,18 @@ struct TopicDetailView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(verbatim: n.title).font(.headline).lineLimit(2)
                         if let s = n.shortSummary, !s.isEmpty {
-                            Text(verbatim: s).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                            Text(verbatim: s).font(.subheadline).foregroundStyle(Theme.secondary).lineLimit(2)
                         }
                         if let c = n.createdAt {
                             Text(Date(timeIntervalSince1970: TimeInterval(c)), style: .date)
-                                .font(.caption).foregroundStyle(.tertiary)
+                                .font(.caption).foregroundStyle(Theme.secondary)
                         }
                     }
                     .frame(minHeight: 44, alignment: .leading)
                 }
             }
         }
+        .listRowBackground(Theme.formRow)
     }
 
     // MARK: loading

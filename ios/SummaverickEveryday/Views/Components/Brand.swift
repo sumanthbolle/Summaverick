@@ -1,35 +1,22 @@
-// Brand tokens and the wordmark. Classic Apple feel: SF Pro, generous whitespace, one accent gradient,
-// nothing decorative that doesn't carry meaning.
+// The logo, the wordmark and the shared pills. Apple-classic: system fonts only.
 import SwiftUI
 
 enum Brand {
-    /// Apple-blue to cyan. Used for the mark, the wordmark accent and the recording pulse.
-    static let gradient = LinearGradient(
-        colors: [Color(red: 0.05, green: 0.45, blue: 1.0), Color(red: 0.30, green: 0.80, blue: 1.0)],
-        startPoint: .topLeading, endPoint: .bottomTrailing)
-    static let record = Color(red: 1.0, green: 0.23, blue: 0.19)   // systemRed, slightly warmer
+    static let record = Theme.record
 }
 
-/// The mark: a filled circle with three concentric arcs — "a voice, remembered".
+/// The owner's artwork, unchanged, in a black rounded tile so it looks the same on white and on black.
 struct BrandMark: View {
     var size: CGFloat = 28
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-                .fill(Brand.gradient)
-            Canvas { ctx, sz in
-                let c = CGPoint(x: sz.width * 0.40, y: sz.height * 0.5)
-                var dot = Path(); dot.addEllipse(in: CGRect(x: c.x - sz.width * 0.085, y: c.y - sz.width * 0.085, width: sz.width * 0.17, height: sz.width * 0.17))
-                ctx.fill(dot, with: .color(.white))
-                for (i, r) in [0.22, 0.34, 0.46].enumerated() {
-                    var arc = Path()
-                    arc.addArc(center: c, radius: sz.width * r, startAngle: .degrees(-38), endAngle: .degrees(38), clockwise: false)
-                    ctx.stroke(arc, with: .color(.white.opacity(1 - Double(i) * 0.22)), style: StrokeStyle(lineWidth: sz.width * 0.07, lineCap: .round))
-                }
-            }
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
+        Image("BrandLogo")
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+            .accessibilityHidden(true)
     }
 }
 
@@ -39,12 +26,12 @@ struct BrandHeader: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 10) {
                 BrandMark(size: 34)
-                (Text("Summaverick").font(.system(size: 34, weight: .bold, design: .default)).foregroundStyle(.primary)
-                 + Text(" Everyday").font(.system(size: 34, weight: .semibold, design: .rounded)).foregroundStyle(Brand.gradient))
+                (Text("Summaverick").font(.largeTitle.bold()).foregroundStyle(Theme.text)
+                 + Text(" Everyday").font(.largeTitle.weight(.semibold)).foregroundStyle(Theme.secondary))
                     .lineLimit(1).minimumScaleFactor(0.7)
             }
             Text("Your personal note-taker. Everything stays on this device.")
-                .font(.subheadline).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(Theme.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 4)
@@ -55,8 +42,72 @@ struct BrandHeader: View {
 struct BrandTitleInline: View {
     var body: some View {
         HStack(spacing: 6) {
-            BrandMark(size: 18)
+            BrandMark(size: 24)
             Text("Summaverick").font(.headline)
         }
+    }
+}
+
+/// Apple-style pill. `prominent` is the main action on a screen, `plain` the rest; the others carry a meaning.
+struct PillButtonStyle: ButtonStyle {
+    enum Kind { case prominent, plain, warning, positiveFilled, positive, negative }
+    let kind: Kind
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .foregroundStyle(foreground(configuration.role))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(fill, in: Capsule())
+            .overlay(Capsule().stroke(filled ? Color.clear : Theme.pillBorder, lineWidth: 1))
+            .contentShape(Capsule())
+            .opacity(!isEnabled ? 0.45 : configuration.isPressed ? 0.7 : 1)
+    }
+
+    private var filled: Bool { kind == .prominent || kind == .positiveFilled }
+
+    private var fill: Color {
+        switch kind {
+        case .prominent: return Theme.primaryFill
+        case .positiveFilled: return Theme.positiveIcon
+        case .plain, .warning, .positive, .negative: return Theme.pillFill
+        }
+    }
+
+    private func foreground(_ role: ButtonRole?) -> Color {
+        switch kind {
+        case .prominent: return Theme.primaryLabel
+        case .positiveFilled: return Theme.positiveLabel
+        case .positive: return Theme.positive
+        case .negative: return Theme.negative
+        case .warning: return Theme.warning
+        case .plain: return role == .destructive ? Theme.warning : Theme.text
+        }
+    }
+}
+
+extension ButtonStyle where Self == PillButtonStyle {
+    static var pillProminent: PillButtonStyle { PillButtonStyle(kind: .prominent) }
+    static var pill: PillButtonStyle { PillButtonStyle(kind: .plain) }
+    static var pillWarning: PillButtonStyle { PillButtonStyle(kind: .warning) }
+    static var pillPositiveFilled: PillButtonStyle { PillButtonStyle(kind: .positiveFilled) }
+    static var pillPositive: PillButtonStyle { PillButtonStyle(kind: .positive) }
+    static var pillNegative: PillButtonStyle { PillButtonStyle(kind: .negative) }
+}
+
+extension View {
+    /// A screen's own content on the page colour.
+    func themedPage() -> some View {
+        background(Theme.background.ignoresSafeArea())
+    }
+
+    /// A Form or List on the page colour, with its text in the theme's colours.
+    func themedForm() -> some View {
+        scrollContentBackground(.hidden)
+            .background(Theme.formPage)
+            .foregroundStyle(Theme.text, Theme.secondary, Theme.secondary)
     }
 }

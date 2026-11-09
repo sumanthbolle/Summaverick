@@ -59,7 +59,7 @@ extension AIStatus {
 struct AICellularToggle: View {
     @State private var models = ModelManager.shared
     var body: some View {
-        Toggle("Use mobile data for the download", isOn: $models.allowCellular)
+        Toggle("Use mobile data for the download", isOn: $models.allowCellular).tint(Theme.toggleOn)
             .frame(minHeight: 44)
     }
 }
@@ -75,19 +75,19 @@ struct AIDownloadCard: View {
                 .font(.headline).fixedSize(horizontal: false, vertical: true)
             if let p = status.progress { ProgressView(value: p) }
             if let d = status.detail {
-                Text(d).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(d).font(.subheadline).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if status.canRetry {
                 Button { models.startIfNeeded(userInitiated: true) } label: {
                     Text(status == .notDownloaded ? "Download again" : "Try again")
                         .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.pillProminent)
             }
             AICellularToggle().font(.subheadline)
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .contain)
     }
 }
@@ -102,10 +102,10 @@ struct AIUnsupportedCard: View {
             Button(action: dismiss) {
                 Text("OK").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.pill)
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -120,7 +120,7 @@ struct AIStatusLine: View {
                 Text(status.line).lineLimit(3)
                 Spacer(minLength: 0)
             }
-            .font(.footnote).foregroundStyle(.secondary)
+            .font(.footnote).foregroundStyle(Theme.secondary)
         }
     }
 }
@@ -136,15 +136,15 @@ struct AIGettingReadyPanel: View {
                     .font(.body).fixedSize(horizontal: false, vertical: true)
             } else {
                 Label("I'm still getting ready", systemImage: "sparkles").font(.title3.bold())
-                Text(status.line).font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(status.line).font(.body).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
                 if let p = status.progress { ProgressView(value: p) }
                 if let d = status.detail {
-                    Text(d).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(d).font(.subheadline).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
     }
 }

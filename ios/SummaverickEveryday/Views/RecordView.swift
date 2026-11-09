@@ -22,14 +22,14 @@ struct RecordView: View {
 
             // 0 until this recording runs (the shared recorder keeps the last one's time after Stop).
             Text(timeString(controller.isRecording ? controller.elapsed : 0))
-                .font(.system(size: 48, weight: .thin, design: .rounded).monospacedDigit())
+                .font(.largeTitle.weight(.light).monospacedDigit())
                 .contentTransition(.numericText())
 
             Text(controller.isRecording ? "Recording on this phone. Lock the screen if you like; recording continues." : "Starting…")
-                .font(.footnote).foregroundStyle(.secondary)
+                .font(.footnote).foregroundStyle(Theme.secondary)
                 .multilineTextAlignment(.center).padding(.horizontal, 32)
 
-            if let e = controller.recorder.lastError { Text(e).font(.footnote).foregroundStyle(.red) }
+            if let e = controller.recorder.lastError { Text(e).font(.footnote).foregroundStyle(Theme.warning) }
 
             // Stop when quiet: in front, this line takes the place of the notification.
             if controller.isRecording && controller.quietWarning { quietWarning }
@@ -43,16 +43,14 @@ struct RecordView: View {
                     .font(.title3.weight(.semibold))
                     .frame(maxWidth: .infinity).padding(.vertical, 16)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.pillProminent)
             .buttonBorderShape(.capsule)
-            .tint(.primary)
-            .foregroundStyle(Color(.systemBackground))
             .disabled(!controller.isRecording)
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
         .padding(.top)
-        .background(Color(.systemBackground))
+        .background(Theme.background)
         .interactiveDismissDisabled()
         .task { await begin() }
         .onAppear { controller.recordScreenShown = true }
@@ -68,10 +66,10 @@ struct RecordView: View {
     private var quietWarning: some View {
         VStack(spacing: 8) {
             Text("It's gone quiet. I'll stop recording in 30 seconds.")
-                .font(.footnote.weight(.medium)).foregroundStyle(.orange)
+                .font(.footnote.weight(.medium)).foregroundStyle(Theme.caution)
                 .multilineTextAlignment(.center)
             Button("Keep recording") { controller.keepRecording() }
-                .buttonStyle(.bordered)
+                .buttonStyle(.pill)
                 .frame(minHeight: 44)
         }
         .padding(.horizontal, 32)
@@ -98,7 +96,7 @@ struct RecordView: View {
                 }
             }
             Text(live.statusLine)
-                .font(.footnote.weight(.medium)).foregroundStyle(.secondary)
+                .font(.footnote.weight(.medium)).foregroundStyle(Theme.secondary)
                 .multilineTextAlignment(.center).padding(.horizontal, 32)
         }
     }

@@ -29,21 +29,21 @@ struct MemoryReviewCard: View {
             MemoryDetails(memory: m, onPlay: onPlay, showsWaiting: false)
             if failed {
                 Label("I couldn't save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout.weight(.medium)).foregroundStyle(.red)
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !m.isMedicine {
                 MemoryActionButtons(busy: busy, buttons: [
-                    .init(title: "Keep", icon: "checkmark", tint: .green, prominent: true) { decide(.keep) },
-                    .init(title: "Edit", icon: "pencil", tint: nil) { failed = false; editing = true },
-                    .init(title: "Wrong", icon: "xmark", tint: .red) { decide(.wrong) },
+                    .init(title: "Keep", icon: "checkmark", tone: .positive, prominent: true) { decide(.keep) },
+                    .init(title: "Edit", icon: "pencil") { failed = false; editing = true },
+                    .init(title: "Wrong", icon: "xmark", tone: .negative) { decide(.wrong) },
                 ])
             }
             if item.showsSuggestionRow, let s = item.suggestion { suggestionRow(s) }
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(m.health ? Color.orange : Color.clear, lineWidth: 2))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(m.health ? Theme.healthIcon : Color.clear, lineWidth: 2))
         .overlay(alignment: .topTrailing) { if busy { ProgressView().padding(12) } }
         .sheet(isPresented: $editing) {
             MemoryEditSheet(memory: m) { text in await run { await CoreEngine.shared.editMemory(m.id, text) } }
@@ -59,12 +59,12 @@ struct MemoryReviewCard: View {
             Divider()
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: s.kind == .task ? "checklist" : (s.isMedicine ? "pills.fill" : "bell.fill"))
-                    .foregroundStyle(s.isMedicine ? Color.red : Color.accentColor)
+                    .foregroundStyle(s.isMedicine ? Theme.medicineIcon : Theme.accent)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(s.kind == .task ? "Make a task" : "Remind me").font(.headline)
                     if let summary = summary(s) {
-                        Text(verbatim: summary).font(.body).foregroundStyle(.secondary)
+                        Text(verbatim: summary).font(.body).foregroundStyle(Theme.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -78,7 +78,7 @@ struct MemoryReviewCard: View {
                     .font(.callout.weight(.medium))
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
+                    .background(Theme.cautionFill, in: RoundedRectangle(cornerRadius: 10))
             }
             SuggestionDecisionButtons(suggestion: s, noteTitle: s.noteID == m.sources.first?.noteID ? m.sources.first?.title : nil,
                                       isBusy: suggestionBusy || busy,

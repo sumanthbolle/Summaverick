@@ -30,19 +30,22 @@ struct LearnedView: View {
         List {
             Section {
                 Text("I use these to understand you. Edit or delete anything.")
-                    .font(.body).foregroundStyle(.secondary)
+                    .font(.body).foregroundStyle(Theme.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .listRowBackground(Theme.formRow)
             ForEach(Self.groups) { g in
                 Section {
                     let rows = items.filter { $0.kind == g.kind }
                     if rows.isEmpty && loaded {
-                        Text(g.empty).font(.callout).foregroundStyle(.secondary).frame(minHeight: 44, alignment: .leading)
+                        Text(g.empty).font(.callout).foregroundStyle(Theme.secondary).frame(minHeight: 44, alignment: .leading)
                     }
                     ForEach(rows) { item in row(item) }
                 } header: { Text(g.title) }
+                .listRowBackground(Theme.formRow)
             }
         }
+        .themedForm()
         .navigationTitle(Text("Things I remember"))
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
@@ -68,7 +71,7 @@ struct LearnedView: View {
     private func row(_ item: MemoryItem) -> some View {
         if editingID == item.id {
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Text", text: $draft, axis: .vertical)
+                TextField("Text", text: $draft, prompt: Theme.prompt("Text"), axis: .vertical)
                     .font(.body)
                     .textFieldStyle(.roundedBorder)
                     .frame(minHeight: 44)
@@ -76,10 +79,10 @@ struct LearnedView: View {
                     .onSubmit { saveEdit(item) }
                 HStack(spacing: 12) {
                     Button("Cancel") { editingID = nil }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.pill)
                         .frame(minHeight: 44)
                     Button("Save") { saveEdit(item) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.pillProminent)
                         .frame(minHeight: 44)
                         .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -104,7 +107,7 @@ struct LearnedView: View {
             }
             .swipeActions {
                 Button("Delete", role: .destructive) { deleting = item }
-                Button("Edit") { startEdit(item) }.tint(.blue)
+                Button("Edit") { startEdit(item) }.tint(Theme.swipe)
             }
         }
     }

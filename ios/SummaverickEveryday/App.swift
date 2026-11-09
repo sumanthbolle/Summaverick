@@ -23,6 +23,19 @@ struct SummaverickEverydayApp: App {
         OvernightWork.register()
         // Reconnect to (or start) the AI download as early as possible.
         ModelManager.shared.activate()
+        // The navigation bar's colour, on every screen and sheet.
+        let bar = UINavigationBarAppearance()
+        bar.configureWithOpaqueBackground()
+        bar.backgroundColor = Theme.uiColor(.navBar)
+        bar.titleTextAttributes = [.foregroundColor: Theme.uiColor(.text)]
+        bar.largeTitleTextAttributes = [.foregroundColor: Theme.uiColor(.text)]
+        UINavigationBar.appearance().standardAppearance = bar
+        UINavigationBar.appearance().compactAppearance = bar
+        UINavigationBar.appearance().scrollEdgeAppearance = bar
+        // The Deep dive and note sections: the selected segment is the main-action colour.
+        let segments = UISegmentedControl.appearance()
+        segments.selectedSegmentTintColor = Theme.uiColor(.primaryFill)
+        segments.setTitleTextAttributes([.foregroundColor: Theme.uiColor(.primaryLabel)], for: .selected)
     }
 
     var body: some Scene {
@@ -35,6 +48,9 @@ struct SummaverickEverydayApp: App {
                         .transition(.opacity)
                 }
             }
+            .tint(Theme.accent)
+            .foregroundStyle(Theme.text, Theme.secondary, Theme.secondary)
+            .preferredColorScheme(settings.appearance.colorScheme)
             .task {
                 await Retention.applyPolicy(maxAgeDays: settings.retentionDays)
             }
@@ -71,6 +87,18 @@ struct SummaverickEverydayApp: App {
     }
 }
 
+/// The Appearance setting.
+enum AppearanceChoice: String, CaseIterable {
+    case system, white, dark
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .white: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 /// User preferences. Small and boring on purpose.
 @MainActor
 @Observable
@@ -86,6 +114,8 @@ final class AppSettings {
     /// Stop when quiet: minutes without voice after which a recording stops by itself; 0 is Off. Read when a
     /// recording starts.
     var quietStopMinutes: Int { didSet { d.set(quietStopMinutes, forKey: "quietStopMinutes") } }
+    /// White, Dark or whatever the phone is set to.
+    var appearance: AppearanceChoice { didSet { d.set(appearance.rawValue, forKey: "appearance") } }
 
     private init() {
         retentionDays = d.object(forKey: "retentionDays") as? Int ?? 7
@@ -94,6 +124,7 @@ final class AppSettings {
         notesLanguage = d.string(forKey: "notesLang") ?? "en"
         let quiet = d.object(forKey: "quietStopMinutes") as? Int ?? QuietStop.defaultMinutes
         quietStopMinutes = QuietStop.choices.contains(quiet) ? quiet : QuietStop.defaultMinutes
+        appearance = AppearanceChoice(rawValue: d.string(forKey: "appearance") ?? "") ?? .system
     }
 }
 

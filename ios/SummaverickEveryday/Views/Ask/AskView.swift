@@ -97,6 +97,7 @@ struct AskView: View {
         NavigationStack {
             // Always the chat: what is due and quizzes need no model. Until it is ready, its panel leads the chat.
             chat
+            .themedPage()
             .navigationTitle("Ask Summaverick")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -200,7 +201,7 @@ struct AskView: View {
                     Text(verbatim: toast)
                         .font(.callout.weight(.medium))
                         .padding(.horizontal, 16).padding(.vertical, 12)
-                        .background(.regularMaterial, in: Capsule())
+                        .background(Theme.chip, in: Capsule())
                         .padding(.bottom, 12)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -218,11 +219,11 @@ struct AskView: View {
 
     private var intro: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: "bubble.left.and.bubble.right").font(.largeTitle).foregroundStyle(Color.accentColor)
+            Image(systemName: "bubble.left.and.bubble.right").font(.largeTitle).foregroundStyle(Theme.accent)
                 .accessibilityHidden(true)
             Text("Ask about anything you recorded.").font(.title3.bold())
             Text("When the answer is in your recordings, I link to the moment it came from. Anything else is from what I know, and I'll say so. I can get things wrong, so check anything important.")
-                .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .font(.body).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 8)
@@ -235,9 +236,9 @@ struct AskView: View {
                 Spacer(minLength: 48)
                 Text(verbatim: turn.question)
                     .font(.body)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.bubbleLabel)
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18))
+                    .background(Theme.bubbleFill, in: RoundedRectangle(cornerRadius: 18))
                     .textSelection(.enabled)
             }
             .accessibilityElement(children: .combine)
@@ -259,14 +260,14 @@ struct AskView: View {
             case .failed:
                 VStack(alignment: .leading, spacing: 8) {
                     Label("I couldn't answer this. Please try again.", systemImage: "exclamationmark.triangle.fill")
-                        .font(.body).foregroundStyle(.primary)
+                        .font(.body).foregroundStyle(Theme.text)
                     Button("Try again") { retry(turn) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.pill)
                         .frame(minHeight: 44)
                         .disabled(generating)
                 }
                 .padding(14)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
             }
         }
     }
@@ -287,7 +288,7 @@ struct AskView: View {
         }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
             .accessibilityElement(children: .combine)
             .accessibilityLabel(Text("I'm writing your answer"))
     }
@@ -302,23 +303,23 @@ struct AskView: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("(stopped)").font(.footnote).foregroundStyle(.secondary)
+            Text("(stopped)").font(.footnote).foregroundStyle(Theme.secondary)
             HStack(spacing: 10) {
                 if !partial.isEmpty { copyButton(partial) }
                 Button("Try again") { retry(turn) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.pill)
                     .frame(minHeight: 44)
                     .disabled(generating)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var generalLabel: some View {
         Label("From what I know, not from your recordings", systemImage: "globe")
-            .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            .font(.footnote.weight(.semibold)).foregroundStyle(Theme.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -329,7 +330,7 @@ struct AskView: View {
         } label: {
             Label("Copy", systemImage: "doc.on.doc").frame(minHeight: 44)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.pill)
     }
 
     /// One revision question from a recording; the expected answer when the person asks, then the link and the next.
@@ -337,7 +338,7 @@ struct AskView: View {
     private func quizCard(_ a: AskAnswer, turn: UUID) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Quiz", systemImage: "questionmark.circle")
-                .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                .font(.footnote.weight(.semibold)).foregroundStyle(Theme.secondary)
             if let q = a.question {
                 Text(verbatim: q)
                     .font(.body.weight(.medium))
@@ -351,7 +352,7 @@ struct AskView: View {
                     ForEach(a.sources) { src in sourceLink(src) }
                 } else {
                     Button("Show answer") { revealed.insert(turn) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.pill)
                         .frame(minHeight: 44)
                 }
             } else {
@@ -365,12 +366,12 @@ struct AskView: View {
                         chats.clearQuiz(turn: turn)
                         send(String(localized: "Next question"), fromField: false)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.pill)
                     .frame(minHeight: 44)
                     .disabled(generating || listening || transcribing)
                 } else if a.question != nil {
                     Button("Next question") { send(String(localized: "Next question"), fromField: false) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.pill)
                         .frame(minHeight: 44)
                         .disabled(generating || listening || transcribing)
                 }
@@ -378,7 +379,7 @@ struct AskView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func answerView(_ a: AskAnswer, turn: UUID, named: [Int64]?) -> some View {
@@ -388,20 +389,20 @@ struct AskView: View {
             if a.kind == "general" && !a.medicine { generalLabel }
             if a.kind == "summary" && !a.notFound {
                 Label("Summary of your recordings", systemImage: "text.alignleft")
-                    .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Theme.secondary)
             }
             if a.kind == "due" && !a.medicine {
                 Label("From your reminders and to-dos", systemImage: "checklist")
-                    .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    .font(.footnote.weight(.semibold)).foregroundStyle(Theme.secondary)
             }
             if quoted {
                 // Built in the core from saved facts and recorded words: shown exactly, in full.
                 VStack(alignment: .leading, spacing: 6) {
                     Label(a.kind == "due" ? "From your reminders and to-dos" : AssistantFormat.medicineAnswerLabel(shown),
                           systemImage: "quote.opening")
-                        .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(Theme.secondary)
                     HStack(alignment: .top, spacing: 10) {
-                        RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)
+                        RoundedRectangle(cornerRadius: 2).fill(Theme.secondary).frame(width: 4)
                             .accessibilityHidden(true)
                         Text(verbatim: a.answer)
                             .font(.body)
@@ -421,7 +422,7 @@ struct AskView: View {
                     ForEach(Array(a.sources.prefix(Self.maxSourcesShown))) { src in sourceLink(src) }
                     if a.sources.count > Self.maxSourcesShown {
                         Text("and \(a.sources.count - Self.maxSourcesShown) more")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(Theme.secondary)
                             .frame(minHeight: 44, alignment: .leading)
                     }
                 }
@@ -436,14 +437,14 @@ struct AskView: View {
                 }
                 if !canMakeReminder(a, named) {
                     Text("Make reminders from each medicine in your profile.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func sourceLink(_ src: Source) -> some View {
@@ -456,7 +457,7 @@ struct AskView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Color.accentColor)
+        .foregroundStyle(Theme.accent)
         .accessibilityLabel(Text("Open the recording: \(title) at \(AssistantFormat.mmss(src.startSec))"))
     }
 
@@ -474,12 +475,12 @@ struct AskView: View {
         Button { Task { await openForm(.reminder, a, turn: turn) } } label: {
             Label("Make reminder", systemImage: "bell").frame(minHeight: 44)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.pill)
         .disabled(!canMakeReminder(a, named))
         Button { Task { await openForm(.task, a, turn: turn) } } label: {
             Label("Make to-do", systemImage: "checklist").frame(minHeight: 44)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.pill)
     }
 
     // MARK: input
@@ -489,13 +490,13 @@ struct AskView: View {
             if let notice {
                 Label(notice.text, systemImage: notice == .micReady ? "mic.fill" : "info.circle.fill")
                     .font(.callout)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
             }
             if listening {
                 Label("Listening… \(Int(recorder.elapsed)) s of 30. Let go to stop.", systemImage: "waveform")
-                    .font(.callout.weight(.medium)).foregroundStyle(Brand.record)
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.recordText)
                     .padding(.horizontal, 4)
             } else if transcribing {
                 HStack(spacing: 8) {
@@ -514,12 +515,12 @@ struct AskView: View {
             }
             HStack(alignment: .bottom, spacing: 8) {
                 micButton
-                TextField("Ask about your recordings…", text: $text, axis: .vertical)
+                TextField("Ask about your recordings…", text: $text, prompt: Theme.prompt("Ask about your recordings…"), axis: .vertical)
                     .lineLimit(1...5)
                     .focused($fieldFocused)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .frame(minHeight: 44)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
+                    .background(Theme.input, in: RoundedRectangle(cornerRadius: 22))
                     .disabled(listening || transcribing)
                     .onChange(of: text) { _, _ in if notice == .busy || notice == .notHeard { notice = nil } }
                 if generating && askTask != nil {   // while the kind is read there is nothing to stop yet
@@ -528,7 +529,7 @@ struct AskView: View {
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Theme.accent)
                     .accessibilityLabel(Text("Stop"))
                 } else {
                     Button { send(text) } label: {
@@ -536,7 +537,7 @@ struct AskView: View {
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(canSend ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(canSend ? Theme.accent : Theme.secondary)
                     .disabled(!canSend)
                     .accessibilityLabel(Text("Send"))
                 }
@@ -544,7 +545,7 @@ struct AskView: View {
         }
         .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 8)
         .background {
-            Rectangle().fill(.bar).overlay(alignment: .top) { Divider() }
+            Rectangle().fill(Theme.background).overlay(alignment: .top) { Divider() }
         }
     }
 
@@ -557,11 +558,11 @@ struct AskView: View {
             Text(label).font(.subheadline.weight(.medium))
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
-                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                .background(Theme.chip, in: Capsule())
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Color.accentColor)
+        .foregroundStyle(Theme.text)
         .disabled(generating || listening || transcribing)
     }
 
@@ -569,9 +570,9 @@ struct AskView: View {
     private var micButton: some View {
         Image(systemName: listening ? "mic.fill" : "mic")
             .font(.title2)
-            .foregroundStyle(listening ? Color.white : Color.accentColor)
+            .foregroundStyle(listening ? Color.white : Theme.accent)
             .frame(width: 44, height: 44)
-            .background(listening ? Brand.record : Color.accentColor.opacity(0.12), in: Circle())
+            .background(listening ? Brand.record : Theme.chip, in: Circle())
             .scaleEffect(listening ? 1.15 : 1)
             .animation(.easeOut(duration: 0.15), value: listening)
             .contentShape(Circle())
@@ -891,11 +892,11 @@ private struct TypingIndicator: View {
             let step = Int(ctx.date.timeIntervalSinceReferenceDate / 0.35) % 3
             HStack(spacing: 6) {
                 ForEach(0..<3, id: \.self) { i in
-                    Circle().fill(Color.secondary).frame(width: compact ? 6 : 9, height: compact ? 6 : 9).opacity(i == step ? 1 : 0.3)
+                    Circle().fill(Theme.secondary).frame(width: compact ? 6 : 9, height: compact ? 6 : 9).opacity(i == step ? 1 : 0.3)
                 }
             }
             .padding(.horizontal, compact ? 0 : 16).padding(.vertical, compact ? 0 : 14)
-            .background(compact ? Color.clear : Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+            .background(compact ? Color.clear : Theme.card, in: RoundedRectangle(cornerRadius: 18))
         }
         .accessibilityElement()
         .accessibilityLabel(Text("I'm writing your answer"))
