@@ -237,13 +237,19 @@ enum NotesProgress {
         return transcriptionShare + (1 - transcriptionShare) * min(1, max(0, done / Double(outputsTotal)))
     }
 
-    /// iOS may end a continued-processing task whose progress stands still, so the lock-screen progress
-    /// moves at least this often while the model works.
-    static let heartbeatSeconds: TimeInterval = 30
+    /// iOS ends a continued-processing task whose progress stands still for about 30 s (seen on the owner's iPhone:
+    /// expired 42 s after the last move, during a CPU regenerate), so the lock-screen progress moves at least this
+    /// often while the model works.
+    static let heartbeatSeconds: TimeInterval = 10
 
-    /// The progress has not moved for `heartbeatSeconds`: the next progress callback from the model moves it.
-    static func heartbeatDue(lastReport: Date, now: Date) -> Bool {
-        now.timeIntervalSince(lastReport) >= heartbeatSeconds
+    /// The work counts as running while the model (or the pipeline) showed a sign of life this recently. Longer than
+    /// a CPU model load or one 512-token prefill batch, which call back nothing.
+    static let aliveSeconds: TimeInterval = 90
+
+    /// A heartbeat now (a timer asks, not the model): the progress has not moved for `heartbeatSeconds` and the work
+    /// is still alive. Work that stopped calling back gets no pulses, so iOS may end it.
+    static func pulseDue(lastMove: Date, lastAlive: Date, now: Date) -> Bool {
+        now.timeIntervalSince(lastMove) >= heartbeatSeconds && now.timeIntervalSince(lastAlive) < aliveSeconds
     }
 
     /// One heartbeat: the progress moves by one unit of the system's 1000, and never reaches done (0.99 at most).

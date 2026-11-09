@@ -686,6 +686,11 @@ final class ProcessingPipeline {
         abort.set(true)
         // Memories run after the notes are done: stopping them leaves nothing to resume or show.
         var running: Int64?
+        if let r = regenerating, !appIsActive {
+            // A regenerate is not resumed (the overnight task only finishes notes that are missing): say so.
+            NSLog("[sve] bg: note %lld: regenerate cut off at %ld%%; the old text is kept", r.noteID, ContinuedWork.shared.percent)
+            notify(r.noteID) { NotesNotifier.regenerateStopped(noteID: r.noteID, title: $0, hold: $1) }
+        }
         if isWorking, !memoryWork, let id = activeNoteID {
             interrupted.insert(id)
             lastFailure[id] = Self.cutOffMessage

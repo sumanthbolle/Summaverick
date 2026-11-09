@@ -47,26 +47,38 @@ final class ContinuedWork {
     /// The progress shown now, in whole percent (for the "paused at" notification).
     var percent: Int { Int((fraction * 100).rounded(.down)) }
 
-    /// When the progress last moved (any thread reads it: the model's progress callbacks).
+    /// When the progress last moved, and when the work last showed it is alive (any thread: the model's callbacks).
     private final class Clock: @unchecked Sendable {
         private let lock = NSLock()
-        private var last = Date()
-        func stamp(_ now: Date = Date()) { lock.lock(); last = now; lock.unlock() }
-        /// True once per heartbeat: the progress has not moved for `NotesProgress.heartbeatSeconds`.
-        func beatDue(_ now: Date = Date()) -> Bool {
+        private var lastMove = Date()
+        private var lastAlive = Date()
+        func stamp(_ now: Date = Date()) { lock.lock(); lastMove = now; lastAlive = now; lock.unlock() }
+        func alive(_ now: Date = Date()) { lock.lock(); lastAlive = now; lock.unlock() }
+        /// True once per heartbeat: the progress stood still for `NotesProgress.heartbeatSeconds` while the work is alive.
+        func pulseDue(_ now: Date = Date()) -> Bool {
             lock.lock(); defer { lock.unlock() }
-            guard NotesProgress.heartbeatDue(lastReport: last, now: now) else { return false }
-            last = now
+            guard NotesProgress.pulseDue(lastMove: lastMove, lastAlive: lastAlive, now: now) else { return false }
+            lastMove = now
             return true
         }
     }
     nonisolated private static let clock = Clock()
 
-    /// From the model's progress callbacks (any thread, every few tokens): when the progress has stood still for
-    /// 30 s, it moves one unit, so iOS sees the work going on during a long section or output.
-    nonisolated static func beat() {
-        guard clock.beatDue() else { return }
-        Task { @MainActor in ContinuedWork.shared.pulse() }
+    /// From the model's progress callbacks (any thread, every few tokens or every prefill batch): the work is alive.
+    /// The heartbeat itself comes from a timer (startPulses), because callbacks can be further apart than iOS
+    /// waits for progress.
+    nonisolated static func beat() { clock.alive() }
+
+    /// While a task is held: every few seconds, a progress that stood still for `heartbeatSeconds` moves one unit.
+    private func startPulses(_ h: Held) {
+        Self.clock.alive()
+        Task { @MainActor [weak self] in
+            while let self, self.held === h {
+                try? await Task.sleep(for: .seconds(2))
+                guard self.held === h else { return }
+                if Self.clock.pulseDue() { self.pulse() }
+            }
+        }
     }
 
     static var title: String { String(localized: "Writing your notes") }
@@ -120,6 +132,7 @@ final class ContinuedWork {
             if units != before { Self.clock.stamp() }
         }
         if let subtitle, !subtitle.isEmpty { self.subtitle = subtitle }
+        Self.clock.alive()   // the pipeline moved on (a stage change, a step done): the work is alive
         apply()
     }
 
@@ -166,6 +179,7 @@ final class ContinuedWork {
             Task { @MainActor in ContinuedWork.shared.expired(h, hold: hold) }
         }
         apply()
+        startPulses(h)
     }
 
     private func expired(_ h: Held, hold: NotesNotifier.Hold) {
