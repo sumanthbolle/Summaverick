@@ -128,7 +128,11 @@ actor CoreEngine {
     func loadModel(at path: String, contextTokens: Int32 = 4096, mmprojPath: String? = nil, backend: ModelBackend = .gpu) throws {
         guard let ctx else { throw CoreError.initFailed }
         lastLoad = (path, contextTokens, mmprojPath)
-        if loadedModelPath == path, loadedBackend == backend, sve_llm_loaded(ctx) != 0,
+        // After a failed GPU run the Metal state stays broken (owner's iPhone: every later run failed at once with
+        // "command buffer 0 failed with status 5", in front too), so the same backend is loaded again.
+        let broken = sve_llm_needs_reload(ctx) != 0
+        if broken { NSLog("[sve] a GPU run failed; loading the model again") }
+        if !broken, loadedModelPath == path, loadedBackend == backend, sve_llm_loaded(ctx) != 0,
            mmprojPath == nil || sve_audio_loaded(ctx) != 0 { applyHeatThreads(); return }
         cpuThreads = nil
         if sve_load_llm(ctx, path, contextTokens, backend.threads, backend.gpuLayers) != 0 {
@@ -161,6 +165,9 @@ actor CoreEngine {
             NSLog("[sve] heat: CPU threads %d decode, %d batch (0: the core's rule)", want.decode, want.batch)
         }
     }
+
+    /// A GPU run failed since the load: the next loadModel loads it again.
+    var modelNeedsReload: Bool { sve_llm_needs_reload(ctx) != 0 }
 
     var isAudioLoaded: Bool { sve_audio_loaded(ctx) != 0 }
 

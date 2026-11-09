@@ -108,7 +108,7 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
     for (size_t i = 0; i < toks.size(); i += nb) {
         int n = (int)std::min<size_t>(nb, toks.size() - i);
         llama_batch batch = llama_batch_get_one(toks.data() + i, n);
-        if (llama_decode(ctx, batch) != 0) { sve_logf(2, "decode failed during prefill"); return false; }
+        if (llama_decode(ctx, batch) != 0) { decode_failed = true; sve_logf(2, "decode failed during prefill"); return false; }
         if (cb && cb(phase, done, total, user)) return false;
     }
     return generate(max_new_tokens, greedy, out, cb, user, phase, done, total, nullptr, nullptr, false, on_piece);
@@ -167,7 +167,7 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
         if (n > 0) out.append(piece, n);
         if (n > 0 && on_piece && !on_piece(std::string(piece, n))) { ok = false; break; }
         llama_batch batch = llama_batch_get_one(&id, 1);
-        if (llama_decode(ctx, batch) != 0) { sve_logf(2, "decode failed"); ok = false; break; }
+        if (llama_decode(ctx, batch) != 0) { decode_failed = true; sve_logf(2, "decode failed"); ok = false; break; }
         if ((i & 15) == 0 && cb && cb(phase, done, total, user)) { ok = false; break; }
     }
     llama_sampler_free(smpl);

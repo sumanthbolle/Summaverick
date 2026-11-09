@@ -72,6 +72,8 @@ void sve_unload_llm(sve_ctx *ctx);
  * encoder keeps the threads it was loaded with (mtmd has no runtime setter; ~6% of a piece). 0, or -1 with no model. */
 int  sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch);
 int  sve_llm_loaded(const sve_ctx *ctx);
+/* 1 when a run on the GPU failed since the model was loaded: load it again before the next run (the Metal state stays broken). */
+int  sve_llm_needs_reload(const sve_ctx *ctx);
 
 /* Generates one output kind from a transcript. Long transcripts are chunked, summarised
  * per chunk, then merged, so this works for a 90‑minute lecture on a 4096‑token context.

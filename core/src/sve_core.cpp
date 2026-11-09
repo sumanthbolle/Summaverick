@@ -101,6 +101,7 @@ int sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, 
 
 void sve_unload_llm(sve_ctx *ctx) { if (ctx) { sve_unload_audio(ctx); ctx->llm.reset(); } }
 int sve_llm_loaded(const sve_ctx *ctx) { return ctx && ctx->llm ? 1 : 0; }
+int sve_llm_needs_reload(const sve_ctx *ctx) { return ctx && ctx->llm && ctx->llm->n_gpu_layers > 0 && ctx->llm->decode_failed ? 1 : 0; }
 
 int sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch) {
     if (!ctx || !ctx->llm || !ctx->llm->ctx) return -1;
@@ -413,7 +414,11 @@ static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const
     }
     mtmd_input_chunks_free(chunks);
     mtmd_bitmap_free(bmp);
-    if (rc != 0) { sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", done + 1, total, rc); return false; }
+    if (rc != 0) {
+        llm.decode_failed = true;   // on the GPU: the next run loads the model again (sve_llm_needs_reload)
+        sve_logf(2, "audio piece %d/%d failed to evaluate (%d)", done + 1, total, rc);
+        return false;
+    }
     out.clear();
     int room = std::min(768, llm.n_ctx - (int)n_past - 4);
     int n_out = 0;

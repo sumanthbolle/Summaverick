@@ -1750,6 +1750,9 @@ int main(int argc, char **argv) {
     if (!ctx) { fprintf(stderr, "sve_init failed\n"); return 1; }
     if (!strcmp(mode, "api")) {
         run_api(ctx);
+        // No context or no model: nothing to load again. (The flag itself needs a failed GPU run: checked on the phone.)
+        expect(sve_llm_needs_reload(nullptr) == 0, "needs_reload is off with no context");
+        expect(sve_llm_needs_reload(ctx) == 0, "needs_reload is off with no model");
         sve_free(ctx);
         printf("%s (%d missed)\n", fails ? "API FAIL" : "API OK", fails);
         return fails ? 1 : 0;

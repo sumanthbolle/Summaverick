@@ -659,13 +659,24 @@ struct AskView: View {
                     // A recording started during the waits above: it keeps the model.
                     guard !LiveTranscriber.shared.liveRunning else { notice = .recording; chats.update(id, .failed); return }
                     try Task.checkCancellation()
-                    a = try await CoreEngine.shared.chat(messages: messages, langHint: profileLang,
+                    let run: () async throws -> AskAnswer = {
+                        try await CoreEngine.shared.chat(messages: messages, langHint: profileLang,
                                                          onKind: { kind in chats.setKind(kind, turn: id) },
                                                          onText: { partial in
-                        // Only while this answer is still being written (a late redraw after the end is dropped).
-                        guard isWriting(id) else { return }
-                        chats.update(id, .streaming(partial))
-                    })
+                            // Only while this answer is still being written (a late redraw after the end is dropped).
+                            guard isWriting(id) else { return }
+                            chats.update(id, .streaming(partial))
+                        })
+                    }
+                    do {
+                        a = try await run()
+                    } catch where !(error is CoreEngine.ChatStopped) && !Task.isCancelled {
+                        // The GPU was left broken by a run the system refused in the background: once more on a
+                        // freshly loaded model, instead of failing every "Try again".
+                        guard await CoreEngine.shared.modelNeedsReload else { throw error }
+                        try await loadSelectedModel()
+                        a = try await run()
+                    }
                 }
                 named[id] = await namedMedicines(a)
                 if let quizID = a.quizID { chats.markQuizAsked(quizID, turn: id) }
