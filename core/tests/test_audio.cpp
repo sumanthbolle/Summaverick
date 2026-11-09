@@ -246,3 +246,12 @@ TEST(should_retry_piece_below_080) {
     CHECK(!sve_should_retry_piece(0.95));
     CHECK(!sve_should_retry_piece(std::nan("")));  // no tokens: nothing to compare, no retry
 }
+
+// R-N7-g: never re-heard on the live path; after Stop, reruns and imports re-hear below 0.80.
+TEST(rehear_only_off_the_live_path) {
+    CHECK(!sve_rehear_piece(0.5, true));
+    CHECK(!sve_rehear_piece(0.79, true));
+    CHECK(sve_rehear_piece(0.79, false));
+    CHECK(!sve_rehear_piece(0.80, false));
+    CHECK(!sve_rehear_piece(std::nan(""), false));
+}

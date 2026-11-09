@@ -369,16 +369,22 @@ TEST(term_said_word_boundaries) {
     CHECK(term_said("IPO", "the IPO was priced"));
     CHECK(term_said("IPO", "ipo, then"));                 // case-insensitive
     CHECK(term_said("ipo", "The IPO."));
-    CHECK(!term_said("IPO", "two IPOs this year"));        // a word boundary: IPOs is another word
+    CHECK(term_said("IPO", "two IPOs this year"));         // a plural counts (fix round)
+    CHECK(term_said("IPO", "the IPO's price"));            // and a possessive
+    CHECK(term_said("IPO", "the IPO\xE2\x80\x99s price"));
+    CHECK(!term_said("IPO", "IPOss"));                     // anything longer is another word
+    CHECK(!term_said("IPO", "IPOx"));
     CHECK(!term_said("IPOs", "one IPO"));
     CHECK(!term_said("AI", "he SAID so"));
-    CHECK(!term_said("AI bubble", "AI bubbles everywhere"));
+    CHECK(term_said("AI bubble", "AI bubbles everywhere"));
+    CHECK(!term_said("AI bubble", "AI bubbled up"));
     CHECK(term_said("AI bubble", "is there an ai bubble?"));
     CHECK(term_said("S&P 500 index", "the S&P 500 index rose"));
     CHECK(!term_said("S&P 500 index", "the S&P 500 rose"));
     CHECK(term_said("IPO", "IPOలో పెట్టుబడి"));           // a Telugu case ending is not a Latin word letter
     CHECK(term_said("UPSC", "[unclear] UPSC exam"));
-    CHECK(!term_said("café", "cafés"));                    // Latin letters past ASCII are word letters too
+    CHECK(!term_said("café", "caféx"));                    // Latin letters past ASCII are word letters too
+    CHECK(!term_said("IPO", "IPOé"));
     CHECK(term_said("రవి", "రవికి చెప్పాను"));             // Telugu: a substring match
     CHECK(!term_said("రవి", "Ravi"));
     CHECK(!term_said("", "anything"));
@@ -389,8 +395,8 @@ TEST(term_said_word_boundaries) {
 
 TEST(terms_said_keeps_only_present_terms) {
     const std::vector<std::string> vocab = {"S&P 500 index", "IPO", "AI bubble", "రవి"};
-    const auto kept = terms_said(vocab, "Ravi spoke about the IPO. రవికి చెప్పాను");
-    CHECK_EQ(kept, (std::vector<std::string>{"IPO", "రవి"}));
+    const auto kept = terms_said(vocab, "Ravi spoke about the IPO. రవికి చెప్పాను. The S&P 500 index's fall");
+    CHECK_EQ(kept, (std::vector<std::string>{"S&P 500 index", "IPO", "రవి"}));
     CHECK(terms_said(vocab, "").empty());
 }
 
@@ -459,7 +465,7 @@ TEST(section_pieces_marked_for_the_prompt_only) {
     CHECK_EQ(in.marked[1].second, std::string("[unclear] Mumble."));
     CHECK_EQ(in.marked[0].second, std::string("Clear."));
     CHECK_EQ(in.starts, (std::vector<int64_t>{0, 28}));
-    CHECK_EQ(in.said, std::string("Clear.\nMumble."));
+    CHECK_EQ(in.said, std::string("Clear."));  // an unclear piece does not count as said (fix round)
     const std::string p = section_prompt(in.marked, "en", "");
     CHECK(p.find("[t=28] [unclear] Mumble.\n") != std::string::npos);
     CHECK(p.find("[t=0] Clear.\n") != std::string::npos);
@@ -475,4 +481,35 @@ TEST(sections_text_is_titles_and_points) {
     CHECK(t.find("Intro") != std::string::npos && t.find("UPSC talk") != std::string::npos);
     CHECK(t.find("IPO news") != std::string::npos);
     CHECK_EQ(sections_text(json::array()), std::string());
+}
+
+// --- fix round -------------------------------------------------------------------------------
+
+TEST(unclear_tags_never_reach_an_output) {
+    CHECK_EQ(strip_unclear_tags("## Key points\n- [unclear] Prelims are hard.\n- Mains [Unclear] has nine papers."),
+             std::string("## Key points\n- Prelims are hard.\n- Mains has nine papers."));
+    CHECK_EQ(strip_unclear_tags("[UNCLEAR]x [unclear]"), std::string("x "));
+    CHECK_EQ(strip_unclear_tags("no tag [unclea"), std::string("no tag [unclea"));
+    CHECK_EQ(strip_unclear_tags(""), std::string());
+}
+
+TEST(parse_section_summary_strips_unclear_tags) {
+    json s;
+    CHECK(parse_section_summary(R"({"title":"[unclear] Exams","topic":"[unclear] UPSC talk",
+        "points":[{"text":"[unclear] Prelims are hard.","start_sec":0},{"text":"[unclear]","start_sec":28}],
+        "terms":["[unclear] CSAT","[unclear]"],"hints":["Check [unclear] marks"]})", kStarts, s));
+    CHECK_EQ(s["title"].get<std::string>(), std::string("Exams"));
+    CHECK_EQ(s["topic"].get<std::string>(), std::string("UPSC talk"));
+    CHECK_EQ(s["points"].size(), (size_t)1);  // a point that was only the tag is gone
+    CHECK_EQ(s["points"][0]["text"].get<std::string>(), std::string("Prelims are hard."));
+    CHECK_EQ(s["terms"], json::parse(R"(["CSAT"])"));
+    CHECK_EQ(s["hints"], json::parse(R"(["Check marks"])"));
+    CHECK(!parse_section_summary(R"({"title":"[unclear]","points":[{"text":"p","start_sec":0}]})", kStarts, s));
+}
+
+TEST(said_text_leaves_out_unclear_lines) {
+    CHECK_EQ(said_text("Clear IPO.\n[unclear] AI bubble talk\nLast."), std::string("Clear IPO.\nLast."));
+    CHECK_EQ(said_text("[unclear] only"), std::string());
+    CHECK_EQ(said_text(""), std::string());
+    CHECK(!term_said("AI bubble", said_text("Clear IPO.\n[unclear] AI bubble talk")));
 }

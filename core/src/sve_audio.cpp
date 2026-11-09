@@ -121,3 +121,4 @@ std::string transcription_instruction(const std::string &marker, const std::stri
 } // namespace sve
 
 bool sve_should_retry_piece(double conf) { return conf < sve::kRetryConf; }  // false for NaN
+bool sve_rehear_piece(double conf, bool live) { return !live && sve_should_retry_piece(conf); }

@@ -118,13 +118,16 @@ int sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch) {
 // notes are free text and must not pick up the profile's doses (spec §4). Only the saved words that `material`
 // (the text the notes are written from) says are listed (N7 rev 1).
 static std::string notes_system(sve_ctx *ctx, const std::string &lang, const std::string &material) {
-    return sve::context_system(*ctx->store, sve::system_prompt(lang), false, &material);
+    const std::string said = sve::said_text(material);  // [unclear] lines do not count as said
+    return sve::context_system(*ctx->store, sve::system_prompt(lang), false, &said);
 }
 
 // The end of a notes output (sve_generate, sve_generate_from_sections): the first heading put back if the model
-// continued from it, and a reply cut at the token cap trimmed to its last whole sentence or bullet (N7 rev 1).
+// continued from it, [unclear] tags removed, and a reply cut at the token cap trimmed to its last whole sentence or
+// bullet (N7 rev 1).
 static std::string finish_output(const sve::Llm &llm, std::string out, const std::string &prefix, int max_out) {
-    out = strip_thinking(out);
+    // The material's [unclear] tags (also those carried over in reduce_to_fit's chunk bullets) are never shown.
+    out = strip_thinking(sve::strip_unclear_tags(out));
     // The prompt ended with the first heading/label; put it back if the model continued from it.
     if (!prefix.empty() && out.rfind(prefix, 0) != 0) out = prefix + " " + out;
     if (llm.last_cut) {
@@ -428,12 +431,16 @@ static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const
 // (vocabulary line, previous text), so the same planner cut and context; the second hearing samples
 // (Llm::generate second_hearing) because a greedy repeat of the same input is the same text. The text with the
 // higher conf is kept; at most one retry. A second hearing that fails keeps the first, unless it was a cancel.
-// label: the piece number in the log (sve_transcribe_next_piece: the piece's start second).
+// label: the piece number in the log (sve_transcribe_next_piece: the piece's start second). live: a recording's
+// piece (sve_transcribe_next_piece with is_final 0), never heard twice (R-N7-g). reheard: set when it was.
 static bool hear_piece(sve_ctx *ctx, const float *samples, size_t n, const std::string &prev, const std::string &vocab,
-                       sve_progress_cb cb, void *user, int done, int total, int label, std::string &out, double &conf) {
+                       sve_progress_cb cb, void *user, int done, int total, int label, std::string &out, double &conf,
+                       bool live, bool &reheard) {
     conf = std::nan("");
+    reheard = false;
     if (!transcribe_piece(ctx, samples, n, prev, vocab, cb, user, done, total, out, &conf)) return false;
-    if (!sve_should_retry_piece(conf)) return true;
+    if (!sve_rehear_piece(conf, live)) return true;
+    reheard = true;
     std::string again;
     double again_conf = std::nan("");
     if (!transcribe_piece(ctx, samples, n, prev, vocab, cb, user, done, total, again, &again_conf, true))
@@ -473,15 +480,19 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
     const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
     std::string prev;
     const int total = (int)pieces.size();
+    int reheard = 0;
     for (int i = 0; i < total; ++i) {
         if (cb && cb("chunk", i, total, user)) return false;
         std::string piece;
         double conf = std::nan("");
+        bool again = false;
         if (!hear_piece(ctx, pcm.data() + pieces[i].first, pieces[i].second - pieces[i].first, prev, vocab,
-                        cb, user, i, total, i + 1, piece, conf)) return false;
+                        cb, user, i, total, i + 1, piece, conf, false, again)) return false;
+        reheard += again ? 1 : 0;
         sve_logf(0, "piece %d/%d conf %.4f", i + 1, total, conf);
         if (!piece.empty()) { result.push_back({(int64_t)(pieces[i].first / sve::kAudioRate), piece, conf}); prev = piece; }
     }
+    sve_logf(0, "re-heard %d of %d pieces", reheard, total);
     if (cb) cb("final", total, total, user);
     return true;
 }
@@ -578,13 +589,26 @@ char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t star
         const size_t total_read = pcm.size() < std::min(total - std::min(start, total), sve::kPieceTarget) ? start + pcm.size() : total;
         sve::PiecePlan plan = sve::plan_next_piece(pcm, start, start, total_read, is_final != 0);
         if (plan.kind == sve::PiecePlan::wait) return dup_str("{\"status\":\"wait\"}");
-        if (plan.kind == sve::PiecePlan::end) return dup_str("{\"status\":\"end\"}");
+        if (plan.kind == sve::PiecePlan::end) {
+            auto h = ctx->hearings.find(wav_path);
+            if (h != ctx->hearings.end()) {
+                sve_logf(0, "re-heard %d of %d pieces", h->second.second, h->second.first);
+                ctx->hearings.erase(h);
+            }
+            return dup_str("{\"status\":\"end\"}");
+        }
         if (cb && cb("chunk", 0, 1, user)) return nullptr;
         const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
         std::string text;
         double conf = std::nan("");
+        // Live (is_final 0): heard once; after Stop the pieces still to do may be heard twice (R-N7-g).
+        bool again = false;
         if (!hear_piece(ctx, pcm.data() + (plan.start - start), plan.stop - plan.start, prev_text ? prev_text : "",
-                        vocab, cb, user, 0, 1, (int)(plan.start / sve::kAudioRate), text, conf)) return nullptr;
+                        vocab, cb, user, 0, 1, (int)(plan.start / sve::kAudioRate), text, conf, is_final == 0, again))
+            return nullptr;
+        auto &h = ctx->hearings[wav_path];
+        h.first += 1;
+        h.second += again ? 1 : 0;
         sve::json j = {{"status", "piece"}, {"start_sec", (int64_t)(plan.start / sve::kAudioRate)},
                        {"end_sample", (int64_t)plan.stop}, {"text", text}, {"conf", conf}};
         return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));

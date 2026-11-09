@@ -112,6 +112,16 @@ at the 700-token cap. The revision:
 | Section points | Up to 10, "about one point for each [t=SEC] line", output cap 1024 | Back to 3 to 6 (parser cap 6, output cap 512): "3 to 6 points, each one sentence. Draw points from the beginning, middle and end of this part, not only its start." Sections also get the abbreviation and advertisement rule. |
 | Notes output cap | 700 tokens at n_ctx 8192 | 1400 (`notes_max_out`: a quarter of the context below 5600; unchanged below 2800). The prompt scaffolding allowance goes from 250 to 400 tokens (`kNotesScaffold`), because the detailed-notes instructions with the rules are about 1250 characters. At n_ctx 8192 with a 300-token system prompt, the material budget is 6092 tokens (was 6942). A transcript between those sizes now goes to the sections path. `sve_transcript_fits` uses the same arithmetic, so it stays honest. A reply that still reaches the cap is trimmed to its last whole sentence or bullet (`trim_cut_reply`): a cut last line is dropped or cut after its last finished sentence, and trailing empty headings and a question without its answer go too. |
 
+Fix round, after review:
+- The "[unclear]" tag is removed from every output the person sees (summary, notes, questions, and the section
+  title, topic, points, terms and hints).
+- The second hearing of a low-confidence piece no longer runs while recording (live is already about 1.1x real time on
+  the CPU). It runs only for pieces after Stop, for reruns and for imported audio. The log says
+  `re-heard N of M pieces` per recording.
+- The vocabulary filter counts only clearly heard pieces.
+- A Latin term also matches its plural or possessive ("IPOs", "IPO's"). A point that names a saved word its section
+  never says is still dropped.
+
 Verification: on the owner's phone (pending). No model was run for this revision; the owner regenerates notes 19 and
 20 with the new build. Things to check there: no "AI bubble"/"S&P 500"/"IPO" in note 19's or note 20's sections and notes;
 note 20's notes reach "Open questions"; section 2 of note 19 does not state its garbled lines as facts; no

@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -79,6 +80,9 @@ void sve_log_tokens(char tag, const int32_t *ids, size_t n);
 
 struct sve_ctx {
     std::unique_ptr<sve::Store> store;
+    // Per recording (WAV path), since this process started: pieces heard by sve_transcribe_next_piece and how many
+    // of them were heard a second time; logged and cleared at its "end" (N7: the phone check measures the share).
+    std::map<std::string, std::pair<int, int>> hearings;
     std::unique_ptr<sve::Llm> llm;
 #ifdef SVE_WITH_MTMD
     mtmd_context *mtmd = nullptr; // audio projector; belongs to llm->model, freed before it

@@ -192,7 +192,7 @@ TEST(vocab_filtered_by_what_was_said) {
     const std::string said = "The IPO opens Monday. రవికి చెప్పాను.";
     CHECK_EQ(sve::spelling_vocab_line(s, 400, &said),
              std::string("Spell these words this way (") + sve::kVocabOnlyIfSaid + "): రవి, IPO");
-    const std::string none = "Nothing from the list here, only IPOs.";
+    const std::string none = "Nothing from the list here, only IPOx and bubbles.";
     CHECK_EQ(sve::spelling_vocab_line(s, 400, &none), std::string());
     // The notes system prompt (always block) too.
     const std::string sys = sve::context_system(s, "SYS", false, &said);

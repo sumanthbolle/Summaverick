@@ -92,6 +92,11 @@ std::string section_prompt(const SectionPieces &pieces, const std::string &lang,
 
 const char *const kUnclearTag = "[unclear] ";
 
+static std::string ascii_lower(std::string s) {
+    for (char &c : s) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+    return s;
+}
+
 bool piece_unclear(double conf) { return std::isfinite(conf) && conf < kUnclearConf; }
 
 static bool blank(const std::string &t) { return t.find_first_not_of(" \t\r\n") == std::string::npos; }
@@ -128,6 +133,33 @@ std::string notes_material(const json &pieces) {
     return trim_ws(out);
 }
 
+std::string strip_unclear_tags(const std::string &s) {
+    static const std::string tag = "[unclear]";
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size();) {
+        if (s[i] == '[' && s.size() - i >= tag.size() && ascii_lower(s.substr(i, tag.size())) == tag) {
+            i += tag.size();
+            if (i < s.size() && s[i] == ' ') ++i;  // the tag's own space
+            continue;
+        }
+        out += s[i++];
+    }
+    return out;
+}
+
+std::string said_text(const std::string &material) {
+    std::string out;
+    for (size_t a = 0; a <= material.size();) {
+        size_t nl = material.find('\n', a);
+        if (nl == std::string::npos) nl = material.size();
+        const std::string line = material.substr(a, nl - a);
+        if (line.rfind(kUnclearTag, 0) != 0) out += (out.empty() ? "" : "\n") + line;
+        a = nl + 1;
+    }
+    return out;
+}
+
 SectionInput section_input(const json &arr) {
     SectionInput in;
     if (!arr.is_array()) return in;
@@ -139,7 +171,8 @@ SectionInput section_input(const json &arr) {
         in.plain.push_back({s, t});
         in.marked.push_back({s, unclear_marked(t, piece_conf(e))});
         in.starts.push_back(s);
-        in.said += (in.said.empty() ? "" : "\n") + t;
+        // The vocabulary check counts only what was heard clearly (fix round, item 3).
+        if (!piece_unclear(piece_conf(e))) in.said += (in.said.empty() ? "" : "\n") + t;
     }
     return in;
 }
@@ -165,11 +198,6 @@ static bool latin_word_cp(char32_t c) {
     return c >= 0xC0 && c <= 0x24F && c != 0xD7 && c != 0xF7;
 }
 
-static std::string ascii_lower(std::string s) {
-    for (char &c : s) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
-    return s;
-}
-
 bool term_said(const std::string &term_in, const std::string &text) {
     const std::string term = ascii_lower(trim_ws(term_in));
     if (term.empty()) return false;
@@ -185,8 +213,12 @@ bool term_said(const std::string &term_in, const std::string &text) {
             while (b > 0 && ((unsigned char)hay[b] & 0xC0) == 0x80) --b;
             if (latin_word_cp(cp_at(hay, b, n))) continue;
         }
-        const size_t end = pos + term.size();
-        if (end < hay.size() && latin_word_cp(cp_at(hay, end, n))) continue;
+        size_t end = pos + term.size();
+        // A plural or possessive of the term counts: "IPOs", "IPO's", "IPO’s" (fix round, item 4).
+        if (hay.compare(end, 1, "s") == 0) end += 1;
+        else if (hay.compare(end, 2, "'s") == 0) end += 2;
+        else if (hay.compare(end, 4, "\xE2\x80\x99s") == 0) end += 4;
+        if (end < hay.size() && latin_word_cp(cp_at(hay, end, n))) continue;  // "IPOss", "IPOx": another word
         return true;
     }
     return false;
@@ -315,8 +347,11 @@ static json strings_of(const json &o, const char *key) {
     json out = json::array();
     auto it = o.find(key);
     if (it == o.end() || !it->is_array()) return out;
-    for (const auto &e : *it)
-        if (e.is_string() && !e.get<std::string>().empty()) out.push_back(e);
+    for (const auto &e : *it) {
+        if (!e.is_string()) continue;
+        const std::string t = trim_ws(strip_unclear_tags(e.get<std::string>()));
+        if (!t.empty()) out.push_back(t);
+    }
     return out;
 }
 
@@ -325,13 +360,18 @@ bool parse_section_summary(const std::string &model_out, const std::vector<int64
         json j;
         // Fences and leading prose sit outside the chosen object; a truncated object never balances.
         if (!first_json_object(drop_thinking(model_out), j)) return false;
-        if (!j.contains("title") || !j["title"].is_string() || j["title"].get<std::string>().empty()) return false;
+        if (!j.contains("title") || !j["title"].is_string()) return false;
+        // The [unclear] tag of the prompt never reaches what the person sees (fix round, item 1).
+        const std::string title = trim_ws(strip_unclear_tags(j["title"].get<std::string>()));
+        if (title.empty()) return false;
         auto pit = j.find("points");
         if (pit == j.end() || !pit->is_array()) return false;
         json points = json::array();
         for (const auto &e : *pit) {
             if (points.size() >= kSectionMaxPoints) break;
-            if (!e.is_object() || !e.contains("text") || !e["text"].is_string() || e["text"].get<std::string>().empty()) continue;
+            if (!e.is_object() || !e.contains("text") || !e["text"].is_string()) continue;
+            const std::string text = trim_ws(strip_unclear_tags(e["text"].get<std::string>()));
+            if (text.empty()) continue;
             int64_t s = 0;
             if (e.contains("start_sec") && e["start_sec"].is_number()) {
                 double d = e["start_sec"].get<double>();  // non-finite or absurd values count as 0, then clamp to a piece
@@ -342,11 +382,11 @@ bool parse_section_summary(const std::string &model_out, const std::vector<int64
                 for (int64_t c : piece_starts) if (std::llabs(c - s) < std::llabs(best - s)) best = c;
                 s = best;
             }
-            points.push_back({{"text", e["text"]}, {"start_sec", s}});
+            points.push_back({{"text", text}, {"start_sec", s}});
         }
         if (points.empty()) return false;
-        out = {{"title", j["title"]},
-               {"topic", j.contains("topic") && j["topic"].is_string() ? j["topic"] : json("")},
+        out = {{"title", title},
+               {"topic", j.contains("topic") && j["topic"].is_string() ? trim_ws(strip_unclear_tags(j["topic"].get<std::string>())) : ""},
                {"points", points}, {"terms", strings_of(j, "terms")}, {"hints", strings_of(j, "hints")}};
         return true;
     } catch (...) {

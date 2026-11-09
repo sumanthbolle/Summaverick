@@ -56,3 +56,7 @@ constexpr double kRetryConf = 0.80;
 
 // True when a piece heard with this conf gets its one second hearing: conf < 0.80. NaN (no token) is never retried.
 bool sve_should_retry_piece(double conf);
+// The one second hearing runs only off the live path (ruling R-N7-g): live transcription is already ~1.1x real time
+// on the CPU, so a recording's pieces (sve_transcribe_next_piece with is_final 0) are heard once. After Stop (is_final
+// 1), a rerun and imported audio (sve_transcribe_audio_pieces) re-hear a piece when sve_should_retry_piece.
+bool sve_rehear_piece(double conf, bool live);

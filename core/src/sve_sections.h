@@ -44,6 +44,11 @@ extern const char *const kUnclearTag;  // "[unclear] "
 bool piece_unclear(double conf);
 // text with kUnclearTag in front when piece_unclear(conf) and the text is not blank; else text unchanged.
 std::string unclear_marked(const std::string &text, double conf);
+// text without any "[unclear]" tag (any case) and the one space after it: every output the person sees (notes,
+// summary, questions, section title/topic/points/terms/hints) is cleaned with it.
+std::string strip_unclear_tags(const std::string &text);
+// The lines of a notes material that do not start with kUnclearTag: the text the vocabulary filter counts.
+std::string said_text(const std::string &material);
 // A piece's "conf" when it is a number, else NaN.
 double piece_conf(const nlohmann::json &piece);
 // The notes material of a note's pieces ([{"text","conf"?}], in order): the texts joined by "\n", each unclear
@@ -52,9 +57,9 @@ std::string notes_material(const nlohmann::json &pieces);
 
 // Saved vocabulary terms in a text (N7 rev 1: another note's "AI bubble" was listed as a term of note 20, so a saved
 // term reaches a section, memory or notes prompt only when that note says it). Case-insensitive (ASCII); a Latin-
-// script term (no code point past U+024F) must stand as whole words, so "IPO" is not said in "IPOs" (a Telugu
-// ending such as "IPOలో" still counts); any other term (Telugu) is a substring match. The term is trimmed; "" is
-// never said.
+// script term (no code point past U+024F) must stand as whole words, with an optional "s", "'s" or "’s" after it
+// ("IPOs", "IPO's"; not "IPOx"; a Telugu ending such as "IPOలో" counts too); any other term (Telugu) is a
+// substring match. The term is trimmed; "" is never said.
 bool term_said(const std::string &term, const std::string &text);
 // The vocab entries term_said in text, in their order.
 std::vector<std::string> terms_said(const std::vector<std::string> &vocab, const std::string &text);
@@ -67,13 +72,13 @@ int drop_unsaid_vocab(nlohmann::json &summary, const std::vector<std::string> &v
 struct SectionInput {
     SectionPieces plain, marked;
     std::vector<int64_t> starts;
-    std::string said;  // the plain texts joined by "\n"
+    std::string said;  // the plain texts of the pieces that are not unclear, joined by "\n"
 };
 SectionInput section_input(const nlohmann::json &pieces);
 // Instruction asking for that shape in `lang` ("te" -> Telugu, else English); each piece is marked [t=SEC].
 std::string section_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line);
 // Strips fences/thinking, parses the first JSON object, clamps each start_sec to the nearest piece start,
-// caps points at kSectionMaxPoints. False when there is no title or no point.
+// caps points at kSectionMaxPoints, removes [unclear] tags from every field. False when there is no title or no point.
 bool parse_section_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, nlohmann::json &out);
 // Memory candidates for one section, asked on their own (the section summary prompt above is unchanged).
 // kMemoryShape is the reply's shape line: {"memories":[{"type","text","who","to_whom","due_text","quote",
