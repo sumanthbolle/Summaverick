@@ -65,6 +65,10 @@ void sve_free(sve_ctx *ctx);
 /* Loads a GGUF model. n_ctx 0 => 4096. n_threads 0 => auto. n_gpu_layers: 99 on iOS (Metal), 0 on the device. */
 int  sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, int n_gpu_layers);
 void sve_unload_llm(sve_ctx *ctx);
+/* CPU threads for the next model calls (the heat ladder eases them off): n_decode for generation, n_batch for
+ * prefill. 0 => the load-time rule (decode up to 4 cores; batch up to 8, never fewer than decode). The audio
+ * encoder keeps the threads it was loaded with (mtmd has no runtime setter; ~6% of a piece). 0, or -1 with no model. */
+int  sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch);
 int  sve_llm_loaded(const sve_ctx *ctx);
 
 /* Generates one output kind from a transcript. Long transcripts are chunked, summarised

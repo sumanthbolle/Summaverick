@@ -2,6 +2,7 @@
 #include "sve_internal.h"
 #include "sve_prompts.h"
 #include "sve_budget.h"
+#include "sve_threads.h"
 
 #include <algorithm>
 #include <cmath>
@@ -28,12 +29,10 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     int train = llama_model_n_ctx_train(model);
     if (train > 0 && n_ctx > train) n_ctx = train;
 
-    unsigned hw = std::thread::hardware_concurrency();
-    n_threads = n_threads_req > 0 ? n_threads_req : (int)std::max(1u, std::min(hw, 4u));
-    // Prefill (and the audio encoder) are compute-bound bursts: up to 8 cores, never fewer than decoding.
-    // Mac CPU: prefill 11.8 s -> 7.2 s per 28 s piece, transcripts identical. A 6-core iPhone gets 6
-    // (not yet measured there). Decoding is memory-bound and stays on n_threads.
-    n_threads_batch = std::max(n_threads, (int)std::min(hw, 8u));
+    // Decoding (memory-bound) up to 4 cores; prefill and the audio encoder up to 8 (sve_threads.h).
+    ThreadPair th = resolve_threads((int)std::thread::hardware_concurrency(), n_threads_req, 0);
+    n_threads = th.decode;
+    n_threads_batch = th.batch;
 
     llama_context_params cp = llama_context_default_params();
     cp.n_ctx = n_ctx;

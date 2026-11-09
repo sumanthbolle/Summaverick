@@ -4,6 +4,7 @@
 //   live        CPU, 4 threads: sve_transcribe_next_piece in a loop over SVE_TEST_WAV as if it were being
 //               recorded (copied in 10 s steps into a WAV whose header says data size 0), then final
 //   extract     doctor-visit fixture: extract, list pending suggestions, two Ask questions
+//   threads     runtime CPU threads (SVE_GEMMA, CPU): load-time values, set, a run still works, set back
 //   api         assistant C API without a model (accept/reject, medicines, medicine Ask route)
 //   fits        model only: sve_transcript_fits on the doctor-visit fixture and on longer text, checked
 //               against the first phase sve_generate runs (final = one prompt, chunk = summarised first)
@@ -15,6 +16,7 @@
 // (both for tools/model/compare_outputs.sh).
 #include "sve_core.h"
 #include "sve_internal.h"
+#include "sve_threads.h"   // threads mode checks the core's thread rule
 #include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
 #include <sqlite3.h>
 #include <map>
@@ -27,6 +29,7 @@
 #include <algorithm>
 #include <fstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 using nlohmann::json;
@@ -832,6 +835,9 @@ static void run_api_memories(sve_ctx *ctx) {
 }
 
 static int run_api(sve_ctx *ctx) {
+    // Runtime CPU threads (the heat ladder): nothing to set without a model.
+    expect(sve_set_threads(ctx, 2, 2) == -1 && sve_set_threads(nullptr, 2, 2) == -1, "set threads with no model: -1");
+
     sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
     json prof = take(sve_profile_get(ctx));
     expect(prof.is_object() && prof["name"] == "Lakshmi", "profile round trip");
@@ -1274,6 +1280,22 @@ int main(int argc, char **argv) {
         printf("%s (%d missed)\n", fails || rc ? "MEMORIES FAIL" : "MEMORIES OK", fails);
         sve_free(ctx);
         return rc || fails ? 1 : 0;
+    }
+    if (!strcmp(mode, "threads")) {
+        // The heat ladder's knob: CPU threads change at run time (decode, batch) and a run still works after.
+        if (sve_load_llm(ctx, gguf, 2048, 4, 0) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
+        llama_context *lc = ctx->llm->ctx;
+        const int hw = (int)std::thread::hardware_concurrency();
+        expect(llama_n_threads(lc) == 4 && llama_n_threads_batch(lc) == sve::batch_threads(hw, 4), "load: 4 decode, the batch rule");
+        expect(sve_set_threads(ctx, 2, 2) == 0 && llama_n_threads(lc) == 2 && llama_n_threads_batch(lc) == 2, "minimal: 2 and 2");
+        char *t = sve_suggest_title(ctx, "We talked about the garden, the tomatoes and when to water them.", "en");
+        expect(t && *t, "a run on 2 threads still answers");
+        if (t) { printf("title on 2 threads: %s\n", t); sve_free_string(t); }
+        expect(sve_set_threads(ctx, 4, 0) == 0 && llama_n_threads(lc) == 4 && llama_n_threads_batch(lc) == sve::batch_threads(hw, 4),
+               "full: back to 4 and the batch rule");
+        printf("%s (%d missed)\n", fails ? "THREADS FAIL" : "THREADS OK", fails);
+        sve_free(ctx);
+        return fails ? 1 : 0;
     }
     const bool live = !strcmp(mode, "live") || !strcmp(mode, "sections") || !strcmp(mode, "longnotes");
     // live and sections run as on the phone: CPU only (the projector follows), 4 threads.

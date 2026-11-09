@@ -160,9 +160,9 @@ final class ProcessingPipeline {
     nonisolated private static var thermal: ProcessInfo.ThermalState { ProcessInfo.processInfo.thermalState }
     /// Critical: the only heat that cancels a model run in the middle.
     nonisolated private static var critical: Bool { Heat.cancelsRun(thermal) }
-    /// Notes paused at critical; they carry on only at nominal or fair (others may start at serious).
+    /// Notes paused for heat (the ladder at paused); they carry on once it is below paused, after a minute of calm.
     @ObservationIgnored private var heatPaused: Set<Int64> = []
-    /// The run in flight was paused by the heat gate at critical (reset when a run starts).
+    /// The run in flight was paused by the heat gate (the ladder at paused; reset when a run starts).
     @ObservationIgnored private var runPausedForHeat = false
     /// True while the only work is memories (after a note's notes, or a backfill): it yields to the person.
     private(set) var memoryWork = false
@@ -319,20 +319,21 @@ final class ProcessingPipeline {
         let leftFront = self.leftFront
         resignObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in leftFront.set(true) }
-        // Cooled down: carry on with the notes that were paused for heat.
+        // Cooled down (the heat ladder came down from paused): carry on with the notes that were paused for heat.
         thermalObserver = NotificationCenter.default.addObserver(
-            forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            forName: .heatLevelChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, Heat.canResume(Self.thermal), self.appIsActive else { return }
+                guard let self, HeatGovernor.shared.level < .paused, self.appIsActive else { return }
                 Task { await self.resumeInterrupted() }
             }
         }
     }
 
-    /// Critical: the note is paused and resumes once the phone is back to nominal or fair.
+    /// The heat ladder at paused (critical heat, or almost no free memory): the note is paused and resumes once the
+    /// ladder is below paused (a minute of calm).
     private func pausedForHeat(_ id: Int64) -> Bool {
-        guard Heat.beforeRun(Self.thermal) == .pause else { return false }
-        NSLog("[sve] pausing note %lld: thermal state %ld", id, ProcessInfo.processInfo.thermalState.rawValue)
+        guard HeatGovernor.shared.level == .paused else { return false }
+        NSLog("[sve] pausing note %lld: heat paused (thermal state %ld)", id, ProcessInfo.processInfo.thermalState.rawValue)
         interrupted.insert(id)
         heatPaused.insert(id)
         runPausedForHeat = true
@@ -342,28 +343,29 @@ final class ProcessingPipeline {
         return true
     }
 
-    /// Before each piece or stage. Serious: rest 30 s (cut short by an abort or a cooler phone), then go on,
-    /// so progress is always made, at a lower duty cycle. Critical: pause the note (false).
+    /// Before each piece, section or output: the heat ladder (HeatGovernor). Eased or minimal: rest 5 or 20 s (cut
+    /// short by an abort or a cooler phone), then go on, so progress is always made, at a lower duty cycle; CPU runs
+    /// also take fewer threads (CoreEngine). Paused: pause the note (false), quietly; it resumes by itself.
     /// A recording running: the run steps aside (stepsAside, false), also when it starts during the rest.
     private func heatGate(_ id: Int64) async -> Bool {
         if parkedForNight(id) { return false }
         if stepsAside(id) { return false }
-        switch Heat.beforeRun(Self.thermal) {
-        case .go: return true
-        case .pause: return !pausedForHeat(id)
-        case .rest:
-            let before = stage
-            stage = .cooling
-            NSLog("[sve] note %lld: phone is warm, resting %.0f s", id, Heat.restSeconds)
-            let end = Date().addingTimeInterval(Heat.restSeconds)
-            while Date() < end, !abort.isSet, Heat.beforeRun(Self.thermal) == .rest, !LiveTranscriber.shared.liveRunning {
-                do { try await Task.sleep(nanoseconds: 500_000_000) } catch { break }
-            }
-            if pausedForHeat(id) { return false }
-            if stepsAside(id) { return false }
-            stage = before
-            return true
+        let heat = HeatGovernor.shared
+        let level = heat.level
+        if level == .paused { return !pausedForHeat(id) }
+        guard HeatLadder.showsCooling(level) else { return true }   // full: no rest
+        let before = stage
+        stage = .cooling
+        NSLog("[sve] note %lld: heat %@, resting %.0f s", id, level.name, HeatLadder.restSeconds(level))
+        let start = Date()
+        while !HeatLadder.restOver(level: heat.level, started: start, now: Date()), !abort.isSet,
+              !LiveTranscriber.shared.liveRunning {
+            do { try await Task.sleep(nanoseconds: 500_000_000) } catch { break }
         }
+        if pausedForHeat(id) { return false }
+        if stepsAside(id) { return false }
+        stage = before
+        return true
     }
 
     /// Before each piece, section or output (from the heat gate): a recording runs, so this run steps aside and
@@ -1133,7 +1135,7 @@ final class ProcessingPipeline {
     }
 
     /// A due insight's turn (from the resume loop, after Stop): the insight alone, under the same LiveFirst and heat
-    /// rules (serious rests 30 s, critical leaves it due). No note shows busy and no stage is shown.
+    /// rules (the heat ladder's rest; paused leaves it due). No note shows busy and no stage is shown.
     private func runDueInsight(_ id: Int64) async {
         guard !isWorking, ModelManager.shared.isReady else { return }
         starting = true
@@ -1145,13 +1147,11 @@ final class ProcessingPipeline {
         notesStored = true   // an expiry only stops it
         let abort = self.abort
         func yields() -> Bool { LiveFirst.yields(recording: LiveTranscriber.shared.liveRunning, runIsLive: false) }
-        if Heat.beforeRun(Self.thermal) == .rest {
-            let end = Date().addingTimeInterval(Heat.restSeconds)
-            while Date() < end, !abort.isSet, !yields(), Heat.beforeRun(Self.thermal) == .rest {
-                do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return }
-            }
+        let heat = HeatGovernor.shared, start = Date()
+        while !HeatLadder.restOver(level: heat.level, started: start, now: Date()), !abort.isSet, !yields() {
+            do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return }
         }
-        guard !abort.isSet, !yields(), Heat.beforeRun(Self.thermal) != .pause else { return }   // stays due
+        guard !abort.isSet, !yields(), heat.level != .paused else { return }   // stays due
         NSLog("[sve] note %lld: insight after the recording", id)
         await writeInsight(id, due: true)
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
@@ -1288,19 +1288,18 @@ final class ProcessingPipeline {
         }
     }
 
-    /// The heat rule for quiet work: serious rests 30 s (cut short by `stop` or a cooler phone), critical stops.
+    /// The heat rule for quiet work: the ladder's rest (cut short by `stop` or a cooler phone); paused stops.
     private func quietHeatGate(_ stop: () -> Bool) async -> Bool {
-        switch Heat.beforeRun(Self.thermal) {
-        case .go: return true
-        case .pause: return false
-        case .rest:
-            stage = .cooling
-            let end = Date().addingTimeInterval(Heat.restSeconds)
-            while Date() < end, !stop(), Heat.beforeRun(Self.thermal) == .rest {
-                do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return false }
-            }
-            return !stop() && Heat.beforeRun(Self.thermal) != .pause
+        let heat = HeatGovernor.shared
+        let level = heat.level
+        if level == .paused { return false }
+        guard HeatLadder.showsCooling(level) else { return true }
+        stage = .cooling
+        let start = Date()
+        while !HeatLadder.restOver(level: heat.level, started: start, now: Date()), !stop() {
+            do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return false }
         }
+        return !stop() && heat.level != .paused
     }
 
     /// An older note opened (made before sections, or its sections were cut off) that already has all its
@@ -1310,7 +1309,7 @@ final class ProcessingPipeline {
     /// finished section. A note that still needs its notes gets its sections from regenerate instead.
     func backfillSections(noteID: Int64) async {
         guard !isWorking, appIsActive, ModelManager.shared.isReady, !LiveTranscriber.shared.isRecording,
-              !interrupted.contains(noteID), Heat.beforeRun(Self.thermal) != .pause else { return }
+              !interrupted.contains(noteID), HeatGovernor.shared.level != .paused else { return }
         starting = true
         defer { starting = false }
         let engine = CoreEngine.shared
@@ -1341,8 +1340,8 @@ final class ProcessingPipeline {
     // MARK: memories
 
     /// Writes the memories of the note's sections that do not have them yet (sve_memories_from_section), one section
-    /// at a time, each kept before the next, each after the heat rule for quiet work (serious rests 30 s, critical
-    /// stops), on the backend for right now. Memories never hold up notes and never fail them: before each section
+    /// at a time, each kept before the next, each after the heat rule for quiet work (the ladder's rest,
+    /// paused stops), on the backend for right now. Memories never hold up notes and never fail them: before each section
     /// it stops when a recording runs, another note's notes may start, the run was cut off, or the person chose
     /// overnight for this note; a recording starting, critical heat or the cut-off cancels the section in flight
     /// (nothing of it is stored; it stays due). It never sets a failure, pauses or queues the note.
@@ -1464,7 +1463,7 @@ final class ProcessingPipeline {
     func backfillMemories() async {
         guard !isWorking, !resuming, !memoriesHeld, ModelManager.shared.isReady, !LiveTranscriber.shared.isRecording,
               appIsActive || overnightRun != nil, !(overnightRun?.isSet ?? false),
-              Heat.beforeRun(Self.thermal) != .pause, nextToResume(tried: []) == nil else { return }
+              HeatGovernor.shared.level != .paused, nextToResume(tried: []) == nil else { return }
         starting = true
         memoryWork = true
         memoryStop.set(false)
@@ -1660,7 +1659,7 @@ final class ProcessingPipeline {
     private func waitingToRun(tried: Set<Int64>, triedTaps: [QueuedTap], triedInsights: Set<Int64> = []) -> Int {
         guard appIsActive || ContinuedWork.shared.isHeld || overnightRun != nil, !(overnightRun?.isSet ?? false),
               !LiveTranscriber.shared.isRecording, ModelManager.shared.isReady,
-              Heat.beforeRun(Self.thermal) != .pause else { return 0 }
+              HeatGovernor.shared.level != .paused else { return 0 }
         return runnableTaps(tried: triedTaps).count + resumable(tried: tried).count + insightDue.subtracting(triedInsights).count
     }
 
@@ -1720,7 +1719,7 @@ final class ProcessingPipeline {
         }
         while !isWorking, appIsActive || ContinuedWork.shared.isHeld || overnightRun != nil,
               !(overnightRun?.isSet ?? false), !LiveTranscriber.shared.isRecording,
-              ModelManager.shared.isReady, Heat.beforeRun(Self.thermal) != .pause {
+              ModelManager.shared.isReady, HeatGovernor.shared.level != .paused {
             let tap = TapQueue.next(runnableTaps(tried: triedTaps))
             let id: Int64
             var insightOnly = false
@@ -1788,11 +1787,12 @@ final class ProcessingPipeline {
     }
 
     /// The oldest note that may start now: cut off or waiting, or marked overnight while plugged in or inside
-    /// the overnight task; never one paused at critical until the phone is back to nominal or fair.
+    /// the overnight task; never one paused for heat until the ladder is below paused.
     private func nextToResume(tried: Set<Int64>) -> Int64? { resumable(tried: tried).first }
 
     /// The notes the resume loop may take next, oldest first.
     private func resumable(tried: Set<Int64>) -> [Int64] {
+        let cool = HeatGovernor.shared.level < .paused
         let inTask = overnightRun != nil, plugged = Self.pluggedIn, onPower = OvernightWork.shared.runOnPower
         let marked = Set(overnight)
         let automaticMarked = marked.intersection(automatic)   // cut-off notes kept across launches: always candidates
@@ -1800,7 +1800,7 @@ final class ProcessingPipeline {
             !tried.contains($0)
                 && OvernightList.mayStart(mark: OvernightList.mark(onList: marked.contains($0), automatic: automatic.contains($0)),
                                           pluggedIn: plugged, inOvernightTask: inTask, taskOnPower: onPower)
-                && (!heatPaused.contains($0) || Heat.canResume(Self.thermal))
+                && (!heatPaused.contains($0) || cool)
         })
     }
 

@@ -8,6 +8,7 @@
 #include "sve_audio.h"
 #include "sve_sections.h"
 #include "sve_budget.h"
+#include "sve_threads.h"
 
 #include <algorithm>
 #include <chrono>
@@ -100,6 +101,18 @@ int sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, 
 
 void sve_unload_llm(sve_ctx *ctx) { if (ctx) { sve_unload_audio(ctx); ctx->llm.reset(); } }
 int sve_llm_loaded(const sve_ctx *ctx) { return ctx && ctx->llm ? 1 : 0; }
+
+int sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch) {
+    if (!ctx || !ctx->llm || !ctx->llm->ctx) return -1;
+    sve::Llm &l = *ctx->llm;
+    sve::ThreadPair t = sve::resolve_threads((int)std::thread::hardware_concurrency(), n_decode, n_batch);
+    if (t.decode == l.n_threads && t.batch == l.n_threads_batch) return 0;
+    llama_set_n_threads(l.ctx, t.decode, t.batch);
+    l.n_threads = t.decode;
+    l.n_threads_batch = t.batch;
+    sve_logf(0, "threads: %d decode, %d batch", t.decode, t.batch);
+    return 0;
+}
 
 // System prompt of the notes outputs: the always block (profile, vocabulary) in front, without the medicines:
 // notes are free text and must not pick up the profile's doses (spec §4).

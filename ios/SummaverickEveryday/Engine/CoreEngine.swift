@@ -129,7 +129,8 @@ actor CoreEngine {
         guard let ctx else { throw CoreError.initFailed }
         lastLoad = (path, contextTokens, mmprojPath)
         if loadedModelPath == path, loadedBackend == backend, sve_llm_loaded(ctx) != 0,
-           mmprojPath == nil || sve_audio_loaded(ctx) != 0 { return }
+           mmprojPath == nil || sve_audio_loaded(ctx) != 0 { applyHeatThreads(); return }
+        cpuThreads = nil
         if sve_load_llm(ctx, path, contextTokens, backend.threads, backend.gpuLayers) != 0 {
             loadedModelPath = nil
             loadedBackend = nil
@@ -140,6 +141,22 @@ actor CoreEngine {
         NSLog("[sve] model loaded on the %@", backend == .gpu ? "GPU" : "CPU")
         if let mmprojPath, sve_load_audio(ctx, mmprojPath) != 0 {
             throw CoreError.modelLoadFailed(mmprojPath)
+        }
+        applyHeatThreads()   // after the projector: the audio encoder keeps its load-time threads
+    }
+
+    /// CPU threads set on the loaded CPU model since its load; nil: the load-time ones (the heat ladder's full).
+    private var cpuThreads: (decode: Int32, batch: Int32)?
+
+    /// Every model run passes through loadModel first: on the CPU it takes the heat ladder's threads
+    /// (HeatGovernor), and only when they changed. GPU runs keep the GPU and only rest.
+    private func applyHeatThreads() {
+        guard loadedBackend == .cpu, let ctx, sve_llm_loaded(ctx) != 0 else { return }
+        let want = HeatGovernor.threads.wanted
+        guard want != (cpuThreads ?? (ModelBackend.cpu.threads, 0)) else { return }
+        if sve_set_threads(ctx, want.decode, want.batch) == 0 {
+            cpuThreads = want
+            NSLog("[sve] heat: CPU threads %d decode, %d batch (0: the core's rule)", want.decode, want.batch)
         }
     }
 
@@ -168,6 +185,7 @@ actor CoreEngine {
         sve_unload_llm(ctx)
         loadedModelPath = nil
         loadedBackend = nil
+        cpuThreads = nil
     }
 
     // MARK: generation

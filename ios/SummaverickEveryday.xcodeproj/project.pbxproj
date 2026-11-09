@@ -31,6 +31,10 @@
 			isa = PBXBuildFile;
 			fileRef = 9E2ACA831A68C5FC7568EFA9;
 		};
+		1E01B2EFF4A31A1034B15098 = {
+			isa = PBXBuildFile;
+			fileRef = 13A63ABDA892EF2D8A1A560A;
+		};
 		23C44AF0CB03B5875E813B5F = {
 			isa = PBXBuildFile;
 			fileRef = C9899E0B799571C7B3ED48D8;
@@ -374,6 +378,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_english_words.h;
 			path = ../core/src/sve_english_words.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		13A63ABDA892EF2D8A1A560A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = HeatGovernor.swift;
+			path = SummaverickEveryday/Engine/HeatGovernor.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		171A4CC9E4CFD6CB1704585A = {
@@ -775,6 +786,13 @@
 			path = SummaverickEveryday/Engine/ModelManager.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		B3E4E6855986B5C184497144 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_threads.h;
+			path = ../core/src/sve_threads.h;
+			sourceTree = SOURCE_ROOT;
+		};
 		B785295E08BF51AAC35D02B4 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -1060,6 +1078,7 @@
 				618A438B4C8E5391746526C9,
 				32B4ECFC6F6AC631FDE8CCFB,
 				3E8C99285C2BD28FE0ECE99B,
+				13A63ABDA892EF2D8A1A560A,
 				515BBF6A31C68F3F903DB724,
 				FB9B4C78668184CF16F3ABA6,
 				DAD9D4F5BE940D31ED604618,
@@ -1183,6 +1202,7 @@
 				E5E3C7E62C1B0998F7D272BF,
 				6F60E66F2FF8D363A05C6C95,
 				ACA29E21DABD1A9615823569,
+				B3E4E6855986B5C184497144,
 			);
 			name = Core;
 			sourceTree = "<group>";
@@ -1333,6 +1353,7 @@
 				7DF93800DB3C9D1EB735C3CD,
 				535ACB83EDFCFBACA1FD4F3C,
 				B3682618E8A7DB35FCEEE996,
+				1E01B2EFF4A31A1034B15098,
 				B73BD37B74FFE5DE3C398EE9,
 				F8E97681421A53898F3C82E0,
 				832433C1965C36667340EE3B,

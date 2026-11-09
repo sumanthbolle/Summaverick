@@ -47,7 +47,7 @@ enum TranscriptRun {
         while true {
             if shouldStop() || Task.isCancelled { throw CancellationError() }
             if !shouldContinue() || !shouldStart() { return (progress, .yielded) }
-            // The heat gate (rest at serious, stop at critical); false yields.
+            // The heat gate (the heat ladder's rest; paused stops); false yields.
             if !(await beforePiece()) || !shouldContinue() || !shouldStart() { return (progress, .yielded) }
             // Loads the files if needed; the CPU itself is ensured inside the run (same actor turn).
             try await ModelManager.shared.loadIntoCore(for: .transcription)
@@ -103,7 +103,7 @@ final class LiveTranscriber {
         case behind(minutes: Int)
         case pausedHeat
         case pausedBattery
-        /// Serious: resting between pieces.
+        /// The heat ladder at eased or minimal: resting between pieces.
         case cooling
     }
 
@@ -163,7 +163,6 @@ final class LiveTranscriber {
         lines = []
         transcribedSeconds = 0
         self.elapsed = elapsed
-        heatPaused = false
         TranscriptSidecar.remove(audioPath: audio.path)   // a new recording always starts at 0
         // isReady also means the phone is supported.
         guard ModelManager.shared.isReady else { status = .later; return }
@@ -205,29 +204,29 @@ final class LiveTranscriber {
         if running.isEmpty && current == nil { UIDevice.current.isBatteryMonitoringEnabled = false }
     }
 
-    /// Paused at critical: stays paused until nominal or fair.
-    @ObservationIgnored private var heatPaused = false
-
+    /// Heat (the shared ladder at paused, which lasts a minute of calm past critical) or battery below 20%.
     private func pauseReason() -> LivePause? {
         let d = UIDevice.current
-        let r = LivePause.reason(thermal: ProcessInfo.processInfo.thermalState, batteryLevel: d.batteryLevel,
-                                 charging: d.batteryState == .charging || d.batteryState == .full, heatPaused: heatPaused)
-        heatPaused = r == .heat
-        return r
+        return LivePause.reason(heat: HeatGovernor.shared.level, batteryLevel: d.batteryLevel,
+                                charging: d.batteryState == .charging || d.batteryState == .full)
     }
 
-    /// Before each piece: at serious rest 30 s (Stop/Cancel cut it short), then go on; false at critical.
+    /// Before each piece and section: the shared heat ladder (HeatGovernor), as the pipeline's gate. Eased or
+    /// minimal: rest 5 or 20 s (Stop/Cancel or a cooler phone cut it short), then go on; the CPU run takes the
+    /// ladder's threads (CoreEngine). False when paused.
     private func heatGate(_ s: LiveSession) async -> Bool {
-        switch Heat.beforeRun(ProcessInfo.processInfo.thermalState) {
-        case .go: return true
-        case .pause: return false
-        case .rest:
-            show(s, .cooling)
-            await nap(Heat.restSeconds, s)
-            if Heat.beforeRun(ProcessInfo.processInfo.thermalState) == .pause { return false }
-            refresh(s)
-            return true
+        let heat = HeatGovernor.shared
+        let level = heat.level
+        if level == .paused { return false }
+        guard HeatLadder.showsCooling(level) else { return true }
+        show(s, .cooling)
+        let start = Date()
+        while !s.finishing.isSet, !HeatLadder.restOver(level: heat.level, started: start, now: Date()) {
+            do { try await Task.sleep(nanoseconds: 250_000_000) } catch { break }
         }
+        if heat.level == .paused { return false }
+        refresh(s)
+        return true
     }
 
     /// Only the current recording drives the screen.

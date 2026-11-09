@@ -70,33 +70,99 @@ enum Heat {
         state == .serious || state == .critical
     }
 
-    /// What long work (transcription pieces, note stages) does before each piece or stage.
-    enum Step: Equatable {
-        /// Start now.
-        case go
-        /// Serious: rest `restSeconds`, then start anyway, so progress is always made, just slower.
-        case rest
-        /// Critical: stop; carry on once the phone is back to nominal or fair.
-        case pause
-    }
+    /// Only critical cancels a piece or stage in the middle; the heat ladder (HeatLadder) otherwise only rests
+    /// between pieces and stages (cancelling at serious threw away the same piece again and again).
+    static func cancelsRun(_ state: ProcessInfo.ThermalState) -> Bool { state == .critical }
+}
 
-    /// Rest before a piece or stage while the phone is at serious.
-    static let restSeconds: Double = 30
-
-    static func beforeRun(_ state: ProcessInfo.ThermalState) -> Step {
-        switch state {
-        case .critical: return .pause
-        case .serious: return .rest
-        default: return .go
+/// Gradual heat control for long work (transcription pieces, sections, note outputs), after Edge Veda's runtime
+/// policy (ideas only): a ladder of levels fed by heat, free memory, battery and Low Power Mode. Worse is at once,
+/// better one level per minute of calm. The knobs are the rest before each piece, section or output and the CPU
+/// threads; decoding itself is never slowed.
+enum HeatLadder {
+    enum Level: Int, Comparable {
+        case full = 0, eased, minimal, paused
+        static func < (a: Level, b: Level) -> Bool { a.rawValue < b.rawValue }
+        var name: String {
+            switch self {
+            case .full: return "full"
+            case .eased: return "eased"
+            case .minimal: return "minimal"
+            case .paused: return "paused"
+            }
         }
     }
 
-    /// Only critical cancels a piece or stage in the middle; serious lets it finish (cancelling at serious
-    /// threw away the same piece again and again and made no progress).
-    static func cancelsRun(_ state: ProcessInfo.ThermalState) -> Bool { state == .critical }
+    /// Demand must stay below the level this long before the level comes down one step.
+    static let calmSeconds: Double = 60
 
-    /// A note paused at critical carries on only once the phone is back to nominal or fair.
-    static func canResume(_ state: ProcessInfo.ThermalState) -> Bool { state == .nominal || state == .fair }
+    /// The level the inputs ask for; the first match wins. batteryLevel is 0…1, or negative when unknown
+    /// (simulator, monitoring off), which never counts.
+    static func demanded(thermal: ProcessInfo.ThermalState, availableMemoryMB: Int, batteryLevel: Float,
+                         charging: Bool, lowPower: Bool) -> Level {
+        let battery = batteryLevel >= 0 && !charging ? batteryLevel : nil
+        if thermal == .critical || availableMemoryMB < 50 { return .paused }
+        if thermal == .serious || availableMemoryMB < 100 || (battery.map { $0 < 0.05 } ?? false) { return .minimal }
+        if thermal == .fair || lowPower || (battery.map { $0 < 0.15 } ?? false) { return .eased }
+        return .full
+    }
+
+    /// Worse is immediate; better is one level, once `demanded < current` has held for calmSeconds (calmSince,
+    /// kept by the caller: see State).
+    static func next(current: Level, demanded: Level, calmSince: Date?, now: Date) -> Level {
+        if demanded >= current { return max(current, demanded) }
+        guard let calmSince, now.timeIntervalSince(calmSince) >= calmSeconds else { return current }
+        return Level(rawValue: current.rawValue - 1) ?? current
+    }
+
+    /// The level with its calm clock, as one holder keeps it (HeatGovernor).
+    struct State: Equatable {
+        private(set) var level: Level = .full
+        /// Since when demand has been below the level; nil when it is not. Reset whenever demand rises, and
+        /// after each step down (the next step needs its own minute).
+        private(set) var calmSince: Date?
+        private var lastDemanded: Level?
+
+        /// Feeds one reading; true when the level changed.
+        mutating func update(demanded d: Level, now: Date) -> Bool {
+            if d < level {
+                if calmSince == nil || (lastDemanded.map { d > $0 } ?? false) { calmSince = now }
+            } else {
+                calmSince = nil
+            }
+            lastDemanded = d
+            let n = HeatLadder.next(current: level, demanded: d, calmSince: calmSince, now: now)
+            guard n != level else { return false }
+            level = n
+            calmSince = d < n ? now : nil
+            return true
+        }
+    }
+
+    /// Rest before each piece, section or output. Paused has no end: the work waits until the level is below paused.
+    static func restSeconds(_ l: Level) -> Double {
+        switch l {
+        case .full: return 0
+        case .eased: return 5
+        case .minimal: return 20
+        case .paused: return .infinity
+        }
+    }
+
+    /// A rest that began at `started` is over: its seconds at the current level have passed, the phone is back
+    /// at full, or it is paused (the gate pauses the work instead).
+    static func restOver(level: Level, started: Date, now: Date) -> Bool {
+        level == .paused || now.timeIntervalSince(started) >= restSeconds(level)
+    }
+
+    /// Decode threads for CPU runs (GPU runs keep the GPU and only rest).
+    static func cpuThreads(_ l: Level) -> Int { l >= .minimal ? 2 : 4 }
+
+    /// Prefill threads for CPU runs: 0 is the core's own rule (up to 8 cores), minimal 2.
+    static func batchThreads(_ l: Level) -> Int { l >= .minimal ? 2 : 0 }
+
+    /// The "going slower to keep the phone cool" line shows while resting.
+    static func showsCooling(_ l: Level) -> Bool { l == .eased || l == .minimal }
 }
 
 enum SizeCheck {
@@ -199,13 +265,11 @@ enum LivePause: Equatable {
     /// Below this battery level (and not charging) live transcription waits; the recording continues.
     static let lowBattery: Float = 0.20
 
-    /// Why live transcription should wait now, nil to go on. Heat (critical only; serious rests between
-    /// pieces instead, see Heat.beforeRun) comes first. batteryLevel is 0…1, or negative when unknown
-    /// (simulator, monitoring off), which never pauses.
-    /// heatPaused: already paused for heat, which lasts until nominal or fair (not just below critical).
-    static func reason(thermal: ProcessInfo.ThermalState, batteryLevel: Float, charging: Bool,
-                       heatPaused: Bool = false) -> LivePause? {
-        if Heat.beforeRun(thermal) == .pause || (heatPaused && !Heat.canResume(thermal)) { return .heat }
+    /// Why live transcription should wait now, nil to go on. Heat (the ladder at paused; the levels below rest
+    /// between pieces instead, and it leaves paused only after a minute of calm) comes first. batteryLevel is 0…1,
+    /// or negative when unknown (simulator, monitoring off), which never pauses.
+    static func reason(heat: HeatLadder.Level, batteryLevel: Float, charging: Bool) -> LivePause? {
+        if heat == .paused { return .heat }
         if batteryLevel >= 0, batteryLevel < lowBattery, !charging { return .battery }
         return nil
     }
