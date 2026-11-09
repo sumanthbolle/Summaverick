@@ -163,6 +163,8 @@ final class ProcessingPipeline {
     nonisolated private static var critical: Bool { Heat.cancelsRun(thermal) }
     /// Notes paused at critical; they carry on only at nominal or fair (others may start at serious).
     @ObservationIgnored private var heatPaused: Set<Int64> = []
+    /// The run in flight was paused by the heat gate at critical (reset when a run starts).
+    @ObservationIgnored private var runPausedForHeat = false
     /// True while the only work is memories (after a note's notes, or a backfill): it yields to the person.
     private(set) var memoryWork = false
     /// Set by the person's action (any thread reads it): the memory section in flight is cancelled, the run stops.
@@ -173,7 +175,8 @@ final class ProcessingPipeline {
     /// Taps made while another note's work ran (Regenerate, Generate notes, Try again, Find reminders), oldest first:
     /// each runs by itself in its turn, from the resume loop, before cut-off notes. The note shows the waiting line.
     private(set) var queued: [QueuedTap] = ProcessingPipeline.loadQueuedTaps() { didSet { saveQueuedTaps() } }
-    /// The regenerate running now, kept with the queue on disk: the app killed meanwhile runs it again next launch.
+    /// The tap running now (a regenerate or find reminders, tapped or from the queue), kept with the queue on disk:
+    /// the app killed meanwhile runs it again next launch.
     @ObservationIgnored private var runningTap: QueuedTap? { didSet { saveQueuedTaps() } }
     /// Set by Settings while "Delete everything" or "Remove AI" runs: no memory backfill starts meanwhile.
     var memoriesHeld = false
@@ -196,17 +199,18 @@ final class ProcessingPipeline {
     /// listed until their notes are done, so a kill or another cut-off never loses them. Kept across launches.
     @ObservationIgnored private var automatic: Set<Int64> = Set((UserDefaults.standard.array(forKey: ProcessingPipeline.automaticKey) as? [Int64]) ?? [])
     /// Any thread (OvernightWork's request): a note cut off after Stop is waiting to finish by itself, or a person's
-    /// tap waits its turn (it was made to run now, so it may run on battery too).
+    /// tap waits its turn (it was made to run now, so it may run on battery too; not one cut off 3 times in a row,
+    /// which waits for the charger or the app in front: TapQueue.mayRun).
     nonisolated static var automaticFinishPending: Bool {
         !((UserDefaults.standard.array(forKey: automaticKey) as? [Int64]) ?? []).isEmpty
-            || UserDefaults.standard.data(forKey: TapQueue.key) != nil
+            || loadQueuedTaps().contains { TapQueue.mayRun($0, appActive: false, pluggedIn: false) }
     }
 
     /// The note shows this while a tap on it waits its turn.
     static var tapWaitingMessage: String { String(localized: "Waiting: another note is being written") }
     func hasQueuedTap(_ id: Int64) -> Bool { queued.contains { $0.noteID == id } }
 
-    private static func loadQueuedTaps() -> [QueuedTap] {
+    nonisolated private static func loadQueuedTaps() -> [QueuedTap] {
         guard let data = UserDefaults.standard.data(forKey: TapQueue.key) else { return [] }
         return (try? JSONDecoder().decode([QueuedTap].self, from: data)) ?? []
     }
@@ -285,6 +289,7 @@ final class ProcessingPipeline {
         NSLog("[sve] pausing note %lld: thermal state %ld", id, ProcessInfo.processInfo.thermalState.rawValue)
         interrupted.insert(id)
         heatPaused.insert(id)
+        runPausedForHeat = true
         lastFailure[id] = Self.heatMessage
         stage = .paused(Self.heatMessage)
         if notesRun { cutOff(id) }   // in the background: finishes by itself later, "paused" once
@@ -514,12 +519,10 @@ final class ProcessingPipeline {
 
     /// The regenerate running now (its note shows the progress and Stop under the text).
     private(set) var regenerating: Regeneration?
-    /// The last regenerate of a note that failed (error, heat): the note shows "Try again". One cut off by the task's
-    /// expiry is queued again instead (regenerateCutOff).
+    /// The last regenerate of a note that failed for real: the note shows "Try again". One interrupted (expiry, heat,
+    /// the GPU stopped in the background) is queued again instead (TapQueue.requeuesRegenerate).
     private(set) var regenerateFailed: [Int64: Regeneration] = [:]
     @ObservationIgnored private var regenerateStopped = false
-    /// The regenerate running was cut off (the task expired) and queued again: not a failure, no "Try again".
-    @ObservationIgnored private var regenerateCutOff = false
 
     /// "Regenerate" (one output) or "Regenerate all" (kind nil: title and the three outputs; not reminders and
     /// tasks, and the sections are reused, not rewritten). Same source rule, heat rule and backend as the first
@@ -532,11 +535,14 @@ final class ProcessingPipeline {
         let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
         defer { personRunEnded(asked: asked) }
         guard await personMayStart(QueuedTap(noteID: id, kind: .regenerate(output: kind?.rawValue))) else { return nil }
-        return await runRegenerate(noteID: id, kind: kind)
+        return await runRegenerate(QueuedTap(noteID: id, kind: .regenerate(output: kind?.rawValue)))
     }
 
-    /// A regenerate, from the tap or the queue (its turn came).
-    private func runRegenerate(noteID id: Int64, kind: OutputKind?) async -> Previous? {
+    /// A regenerate, from the tap or the queue (its turn came; tap.cutOffs: its cut-offs in a row so far).
+    private func runRegenerate(_ tap: QueuedTap) async -> Previous? {
+        let id = tap.noteID
+        guard case .regenerate(let output) = tap.kind else { return nil }
+        let kind = output.flatMap(OutputKind.init(rawValue:))
         guard !isWorking else { return nil }
         starting = true
         defer { starting = false }
@@ -553,8 +559,7 @@ final class ProcessingPipeline {
         activeNoteID = id
         regenerating = request
         regenerateStopped = false
-        regenerateCutOff = false
-        runningTap = QueuedTap(noteID: id, kind: .regenerate(output: kind?.rawValue))   // on disk: a kill keeps it
+        runningTap = tap   // on disk: a kill keeps it
         defer { runningTap = nil }
         // A regenerate never queues the note for resuming nor changes its resume banner: put those back after.
         let wasQueued = interrupted.contains(id), wasHeatPaused = heatPaused.contains(id), failure = lastFailure[id]
@@ -581,7 +586,22 @@ final class ProcessingPipeline {
             stage = .done
             return previous
         }
-        if outcome == .failed, !regenerateCutOff { regenerateFailed[id] = request }   // cut off: queued again
+        if outcome == .failed {
+            let gpuCutOff = BackendChoice.failureIsCutOff(aborted: false, wentToBackground: wentToBackground || !appIsActive,
+                                                          gpuStep: stepOnGPU, continuedTaskHeld: ContinuedWork.shared.isHeld)
+            if TapQueue.requeuesRegenerate(stoppedByPerson: regenerateStopped, aborted: abort.isSet, heatPaused: runPausedForHeat,
+                                           parkedForNight: parked.contains(id), gpuCutOff: gpuCutOff) {
+                // Interrupted, not failed: the same request runs again by itself (the old text stays until the new
+                // is complete), and its "ready" notification says so.
+                let again = TapQueue.requeued(tap)
+                NSLog("[sve] bg: note %lld: regenerate cut off at %ld%% (%ld in a row); the old text is kept and it is queued again",
+                      id, ContinuedWork.shared.percent, again.cutOffs)
+                queued = TapQueue.enqueue(queued, again)
+                if !appIsActive, overnightRun == nil { OvernightWork.shared.schedule() }
+            } else {
+                regenerateFailed[id] = request
+            }
+        }
         stage = .idle
         return nil
     }
@@ -732,14 +752,7 @@ final class ProcessingPipeline {
         abort.set(true)
         // Memories and the insight run after the notes are stored: stopping them leaves nothing to resume or show.
         var running: Int64?
-        if let r = regenerating, !regenerateStopped {   // after Stop: nothing to run again
-            // Queued again with the same request: it runs by itself later (the old text stays until the new is
-            // complete), and its "ready" notification says so.
-            NSLog("[sve] bg: note %lld: regenerate cut off at %ld%%; the old text is kept and it is queued again",
-                  r.noteID, ContinuedWork.shared.percent)
-            regenerateCutOff = true
-            queued = TapQueue.enqueue(queued, QueuedTap(noteID: r.noteID, kind: .regenerate(output: r.kind?.rawValue)))
-        }
+        // A regenerate in flight is queued again once its run returns (runRegenerate: abort is set).
         if TaskLifecycle.expiryCutsOff(working: isWorking, memoriesOnly: memoryWork, notesStored: notesStored),
            let id = activeNoteID {
             interrupted.insert(id)
@@ -751,7 +764,7 @@ final class ProcessingPipeline {
         // every queued note is notes work, and nothing else would run them now.
         for id in interrupted.sorted() where id != running { cutOff(id, queued: true) }
         // Taps waiting their turn: nothing runs them now either; the overnight task (on battery too) or the next open does.
-        if !queued.isEmpty, !appIsActive {
+        if !(queued.isEmpty && regenerating == nil), !appIsActive {
             NSLog("[sve] bg: %ld queued taps wait for the overnight task or the next open", queued.count)
             OvernightWork.shared.schedule()
         }
@@ -1273,6 +1286,8 @@ final class ProcessingPipeline {
         }
         let engine = CoreEngine.shared
         guard let note = await engine.note(noteID) else { return }   // deleted (before its turn came): nothing to do
+        runningTap = QueuedTap(noteID: noteID, kind: .findReminders)   // on disk: a kill keeps it
+        defer { runningTap = nil }
         guard let t = note.transcript, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             stage = .failed(String(localized: "No speech was detected in the recording.")); return
         }
@@ -1299,6 +1314,7 @@ final class ProcessingPipeline {
 
     private func beginBackground() {
         notesStored = false
+        runPausedForHeat = false
         wentToBackground = false
         stepOnGPU = false
         // A run of the overnight task that starts after it expired is cancelled at once; any other run starts clean.
@@ -1378,7 +1394,11 @@ final class ProcessingPipeline {
     }
 
     /// The queued taps the resume loop may take next (each once per pass), oldest first.
-    private func runnableTaps(tried: [QueuedTap]) -> [QueuedTap] { queued.filter { !tried.contains($0) } }
+    /// A tap cut off 3 times in a row waits for the app in front or the charger (TapQueue.mayRun).
+    private func runnableTaps(tried: [QueuedTap]) -> [QueuedTap] {
+        let active = appIsActive, plugged = Self.pluggedIn
+        return queued.filter { !tried.contains($0) && TapQueue.mayRun($0, appActive: active, pluggedIn: plugged) }
+    }
 
     /// Person's runs (personTapped) that asked for the continued-processing task and have not ended yet.
     @ObservationIgnored private var personRunsPending = 0
@@ -1429,7 +1449,6 @@ final class ProcessingPipeline {
             if let tap {
                 // Before cut-off notes: the person asked for it. A note deleted meanwhile: dropped (each run checks).
                 triedTaps.append(tap)
-                queued.removeAll { $0 == tap }
                 NSLog("[sve] bg: queued tap runs (note %lld)", id)
                 overnightOwnsRun.set(owned)
                 await runQueued(tap)
@@ -1448,11 +1467,15 @@ final class ProcessingPipeline {
     }
 
     /// A queued tap's turn: the same run the tap would have started.
+    /// It is held as the running tap before it leaves the queue, so a kill at any moment keeps it on disk.
     private func runQueued(_ tap: QueuedTap) async {
         let id = tap.noteID
+        runningTap = tap
+        queued.removeAll { $0 == tap }
+        defer { runningTap = nil }
         switch tap.kind {
-        case .regenerate(let output):
-            _ = await runRegenerate(noteID: id, kind: output.flatMap(OutputKind.init(rawValue:)))
+        case .regenerate:
+            _ = await runRegenerate(tap)
         case .generate:
             interrupted.remove(id)   // runs now (as Try again does), not again as a cut-off note
             heatPaused.remove(id)

@@ -477,6 +477,26 @@ struct QueuedTap: Codable, Equatable {
     }
     let noteID: Int64
     let kind: Kind
+    /// How many times in a row this tap's run was cut off (expiry, heat, the GPU stopped) and queued again. Not part
+    /// of its identity: the same note and kind are one tap whatever the streak.
+    var cutOffs: Int = 0
+
+    init(noteID: Int64, kind: Kind, cutOffs: Int = 0) {
+        self.noteID = noteID
+        self.kind = kind
+        self.cutOffs = cutOffs
+    }
+
+    private enum CodingKeys: String, CodingKey { case noteID, kind, cutOffs }
+    /// A queue saved before the streak existed decodes with a streak of 0.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        noteID = try c.decode(Int64.self, forKey: .noteID)
+        kind = try c.decode(Kind.self, forKey: .kind)
+        cutOffs = try c.decodeIfPresent(Int.self, forKey: .cutOffs) ?? 0
+    }
+
+    static func == (a: QueuedTap, b: QueuedTap) -> Bool { a.noteID == b.noteID && a.kind == b.kind }
 }
 
 enum TapQueue {
@@ -502,6 +522,30 @@ enum TapQueue {
     /// notes, Try again and Find reminders on it are covered; a regenerate of it waits for it.
     static func accepts(_ t: QueuedTap, notesRunningFor running: Int64?) -> Bool {
         t.noteID != running || isRegenerate(t.kind)
+    }
+
+    /// A regenerate whose run ended without new text: queued again (an interruption) rather than failed. Interrupted:
+    /// the run was cancelled (abort: the continued-processing task expired, the background time ended, the
+    /// overnight task expired), the heat gate paused it at critical (not a stop for the night), or the GPU was
+    /// stopped in the background with nothing to retry it on the CPU. The person's Stop (which also sets abort) is
+    /// neither: nothing changes and nothing runs again. Anything else is a real failure ("Try again").
+    static func requeuesRegenerate(stoppedByPerson: Bool, aborted: Bool, heatPaused: Bool, parkedForNight: Bool,
+                                   gpuCutOff: Bool) -> Bool {
+        !stoppedByPerson && (aborted || (heatPaused && !parkedForNight) || gpuCutOff)
+    }
+
+    /// Cut-offs in a row after which a queued tap waits for the app in front or the charger.
+    static let cutOffsOnBattery = 3
+
+    /// The tap queued again after a cut-off: one more in its streak (a success ends the tap, and the streak).
+    static func requeued(_ t: QueuedTap) -> QueuedTap {
+        QueuedTap(noteID: t.noteID, kind: t.kind, cutOffs: t.cutOffs + 1)
+    }
+
+    /// A tap cut off 3 times in a row runs only with the app in front or on the charger, never on battery in the
+    /// background (the overnight task or a continued-processing task), so it cannot drain the battery over and over.
+    static func mayRun(_ t: QueuedTap, appActive: Bool, pluggedIn: Bool) -> Bool {
+        t.cutOffs < cutOffsOnBattery || appActive || pluggedIn
     }
 
     private static func isRegenerate(_ k: QueuedTap.Kind) -> Bool {
