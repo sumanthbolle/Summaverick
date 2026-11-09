@@ -1096,3 +1096,76 @@ enum OutputProgress {
         return min(1, (finished + inFlight) / Double(chunks))
     }
 }
+
+// MARK: - Ask as a chat (N9)
+
+/// A message of a chat as sve_assistant_chat takes it: role "user" or "assistant", newest last. An assistant
+/// message carries its sources (kept as text for the model) and whether it was a medicine answer (the core then
+/// never hands its text to the model).
+struct ChatMessage: Codable, Equatable {
+    struct SourceRef: Codable, Equatable {
+        let title: String
+        let start_sec: Int
+    }
+    let role: String
+    let text: String
+    var medicine: Bool? = nil
+    var sources: [SourceRef]? = nil
+}
+
+/// Which earlier turns of a chat go with a new question. The core trims them again to its token budget
+/// (1500 tokens, newest first); this keeps what is sent small and drops turns with nothing to say.
+enum ChatWindow {
+    /// One earlier turn: its question and what was shown for it.
+    struct Turn: Equatable {
+        let question: String
+        /// The answer shown; for a stopped answer the part written before Stop; nil when none (failed, waiting).
+        let answer: String?
+        var medicine = false
+        var sources: [ChatMessage.SourceRef] = []
+    }
+
+    static let maxTurns = 12
+    static let maxChars = 12_000
+
+    /// The messages for sve_assistant_chat: earlier turns with an answer, newest first while within maxTurns and
+    /// maxChars (whole turns), oldest first in the result, then the question. A turn with no answer (it failed,
+    /// or was stopped before any word) is left out whole, so a question is never sent without what followed it.
+    static func messages(earlier: [Turn], question: String) -> [ChatMessage] {
+        var picked: [[ChatMessage]] = []
+        var chars = question.count
+        for t in earlier.reversed() {
+            guard picked.count < maxTurns else { break }
+            let q = t.question.trimmingCharacters(in: .whitespacesAndNewlines)
+            let a = (t.answer ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !q.isEmpty, !a.isEmpty else { continue }
+            guard chars + q.count + a.count <= maxChars else { break }
+            chars += q.count + a.count
+            picked.append([ChatMessage(role: "user", text: q),
+                           ChatMessage(role: "assistant", text: a, medicine: t.medicine ? true : nil,
+                                       sources: t.sources.isEmpty ? nil : t.sources)])
+        }
+        return picked.reversed().flatMap { $0 } + [ChatMessage(role: "user", text: question)]
+    }
+}
+
+/// How often the streamed answer redraws: the core's pieces come from its thread; the bubble is updated at most
+/// once per interval, and always with the last text at the end.
+enum StreamThrottle {
+    static let interval: TimeInterval = 0.08
+
+    /// Whether a piece arriving at `now` redraws, the last redraw having been at `last` (nil: none yet).
+    static func due(last: TimeInterval?, now: TimeInterval) -> Bool {
+        guard let last else { return true }
+        return now - last >= interval
+    }
+}
+
+/// The chats kept on the phone: the newest `limit` by last change, newest first.
+enum ChatKeep {
+    static let limit = 50
+
+    static func kept<T>(_ chats: [T], updated: (T) -> Date) -> [T] {
+        Array(chats.sorted { updated($0) > updated($1) }.prefix(limit))
+    }
+}

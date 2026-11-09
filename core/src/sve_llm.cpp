@@ -89,7 +89,8 @@ std::string Llm::apply_template(const std::string &system, const std::string &us
 // Prompt → completion. Clears KV memory first, so every call is independent.
 // Returns false on cancel or error.
 bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &out,
-              sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy) {
+              sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy,
+              const PieceFn &on_piece) {
     out.clear();
     last_cut = false;
     llama_memory_clear(llama_get_memory(ctx), true);
@@ -110,13 +111,13 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
         if (llama_decode(ctx, batch) != 0) { sve_logf(2, "decode failed during prefill"); return false; }
         if (cb && cb(phase, done, total, user)) return false;
     }
-    return generate(max_new_tokens, greedy, out, cb, user, phase, done, total);
+    return generate(max_new_tokens, greedy, out, cb, user, phase, done, total, nullptr, nullptr, false, on_piece);
 }
 
 // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
 bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
               sve_progress_cb cb, void *user, const char *phase, int done, int total, double *mean_prob,
-              int *n_out, bool second_hearing) {
+              int *n_out, bool second_hearing, const PieceFn &on_piece) {
     llama_sampler_chain_params sp = llama_sampler_chain_default_params();
     sp.no_perf = true;
     llama_sampler *smpl = llama_sampler_chain_init(sp);
@@ -164,6 +165,7 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
         llama_sampler_accept(smpl, id);
         int n = llama_token_to_piece(vocab, id, piece, sizeof piece, 0, false);
         if (n > 0) out.append(piece, n);
+        if (n > 0 && on_piece && !on_piece(std::string(piece, n))) { ok = false; break; }
         llama_batch batch = llama_batch_get_one(&id, 1);
         if (llama_decode(ctx, batch) != 0) { sve_logf(2, "decode failed"); ok = false; break; }
         if ((i & 15) == 0 && cb && cb(phase, done, total, user)) { ok = false; break; }

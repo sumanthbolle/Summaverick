@@ -834,6 +834,114 @@ static void run_api_memories(sve_ctx *ctx) {
     g_sve_memory_drop = nullptr;
 }
 
+// Ask as a chat (N9) without a model (g_sve_model_reply stands in, its reply fed in 3-byte pieces): the streamed
+// pieces join to the answer, thinking and labels never shown; the question's language; history in the prompt,
+// sources as text, medicine answers left out of it; cancel through on_text; medicine never streamed.
+static std::string g_chat_prompt;
+static const char *g_chat_reply = nullptr;
+static const char *chat_model(const char *phase, const char *prompt) {
+    if (strcmp(phase, "chat")) return nullptr;
+    g_chat_prompt = prompt;
+    return g_chat_reply;
+}
+struct ChatSink {
+    std::string text;
+    int pieces = 0, stop_after = -1;
+};
+static int chat_text(const char *p, void *u) {
+    ChatSink *s = static_cast<ChatSink *>(u);
+    s->text += p;
+    ++s->pieces;
+    return s->stop_after >= 0 && s->pieces >= s->stop_after ? 1 : 0;
+}
+
+static void run_api_chat(sve_ctx *ctx) {
+    auto *saved = g_sve_model_reply;
+    g_sve_model_reply = chat_model;
+    sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"te"})");   // the profile is Telugu; the questions decide
+    json pieces = json::parse(R"([{"start_sec":0,"text":"The plumber said the kitchen pipe must be replaced soon."},
+        {"start_sec":30,"text":"Ravi will send the quotation for the kitchen pipe by Friday evening."}])");
+    make_note(ctx, pieces, "Kitchen repair");
+    auto chat = [&](const json &msgs, ChatSink &sink, const char *hint = nullptr) {
+        g_chat_prompt.clear();
+        return take(sve_assistant_chat(ctx, msgs.dump().c_str(), hint, chat_text, &sink, nullptr, nullptr));
+    };
+    const json q1 = {{"role", "user"}, {"text", "What did the plumber say about the kitchen pipe?"}};
+
+    g_chat_reply = "<|channel>thought\nThe material has it.<channel|>The kitchen pipe must be replaced soon [S1]. "
+                   "Ravi will send the quotation by Friday evening [S1].";
+    ChatSink s1;
+    json a = chat(json::array({q1}), s1);
+    printf("--- chat (no model)\n%s\n", a.dump(2).c_str());
+    expect(a.is_object() && a["kind"] == "recordings" && a["lang"] == "en" && a["not_found"] == false && a["medicine"] == false &&
+           !a["sources"].empty(), "chat: a recordings answer in English to an English question (profile Telugu)");
+    expect(a.is_object() && s1.text == a["answer"].get<std::string>() && s1.pieces >= 2,
+           "chat: the streamed pieces join to the answer, a sentence at a time");
+    expect(s1.text.find("[S") == std::string::npos && s1.text.find("thought") == std::string::npos,
+           "chat: no labels or thinking streamed");
+    expect(g_chat_prompt.find("in English") != std::string::npos && g_chat_prompt.find("Conversation so far") == std::string::npos,
+           "chat: the prompt asks for English; no history for a first question");
+
+    // A follow-up: earlier turns in the prompt, sources kept as text, a medicine answer left out; found through the
+    // earlier question's words.
+    ChatSink s2;
+    json msgs = json::array({{{"role", "user"}, {"text", "Which tablet was it?"}},
+        {{"role", "assistant"}, {"text", "Take Dolo 650 twice."}, {"medicine", true}}, q1,
+        {{"role", "assistant"}, {"text", "The pipe must be replaced soon."}, {"sources", json::array({{{"title", "Kitchen repair"}, {"start_sec", 30}}})}},
+        {{"role", "user"}, {"text", "And when?"}}});
+    json b = chat(msgs, s2);
+    expect(b.is_object() && b["kind"] == "recordings" && b["not_found"] == false, "chat: a short follow-up is answered from the earlier question's words");
+    expect(g_chat_prompt.find("Person: What did the plumber say") != std::string::npos &&
+           g_chat_prompt.find("(Sources: Kitchen repair at 0:30)") != std::string::npos &&
+           g_chat_prompt.find("Dolo") == std::string::npos && g_chat_prompt.find("Question: And when?") != std::string::npos,
+           "chat: history in the prompt with its sources as text; the medicine answer is not");
+
+    // Telugu question: answered in Telugu (here: nothing in the recordings), the not-found sentence never streamed.
+    ChatSink s3;
+    json c = chat(json::array({{{"role", "user"}, {"text", "వంటగది పైపు గురించి ప్లంబర్ ఏమన్నారు?"}}}), s3);
+    expect(c.is_object() && c["lang"] == "te" && c["not_found"] == true && s3.pieces == 0, "chat: a Telugu question gets Telugu; not-found not streamed");
+    ChatSink s3b;
+    json c2 = chat(json::array({{{"role", "user"}, {"text", "?"}}}), s3b, "te");
+    expect(c2.is_object() && c2["lang"] == "te", "chat: no letters: the hint's language");
+
+    // Cancel through on_text: NULL.
+    ChatSink s4;
+    s4.stop_after = 1;
+    expect(sve_assistant_chat(ctx, json::array({q1}).dump().c_str(), nullptr, chat_text, &s4, nullptr, nullptr) == nullptr && s4.pieces == 1,
+           "chat: on_text returning non-zero cancels");
+
+    // Medicine: answered in code, nothing streamed, no model call.
+    ChatSink s5;
+    json d = chat(json::array({{{"role", "user"}, {"text", "Which tablets do I take?"}}}), s5);
+    expect(d.is_object() && d["kind"] == "medicine" && d["medicine"] == true && s5.pieces == 0 && g_chat_prompt.empty(),
+           "chat: a medicine question is answered in code, never streamed");
+
+    // The model drifts into a medicine: that sentence is never shown; the answer is the cited words verbatim.
+    g_chat_reply = "The kitchen pipe must be replaced soon [S1]. Take 5 mg after it [S1].";
+    ChatSink s6;
+    json e = chat(json::array({q1}), s6);
+    expect(e.is_object() && e["kind"] == "medicine" && e["medicine"] == true && s6.text == "The kitchen pipe must be replaced soon." &&
+           e["answer"].get<std::string>().find("5 mg") == std::string::npos,
+           "chat: a medicine sentence from the model is held back; the answer is quoted");
+
+    g_chat_reply = "NOT_FOUND";
+    ChatSink s7;
+    json f = chat(json::array({q1}), s7);
+    expect(f.is_object() && f["not_found"] == true && s7.pieces == 0 && f["lang"] == "en", "chat: NOT_FOUND is never streamed");
+
+    ChatSink s8;
+    expect(sve_assistant_chat(ctx, "[]", nullptr, chat_text, &s8, nullptr, nullptr) == nullptr &&
+           sve_assistant_chat(ctx, R"([{"role":"assistant","text":"hi"}])", nullptr, nullptr, nullptr, nullptr, nullptr) == nullptr &&
+           sve_assistant_chat(ctx, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr) == nullptr &&
+           sve_assistant_chat(nullptr, "[]", nullptr, nullptr, nullptr, nullptr, nullptr) == nullptr,
+           "chat: no question last -> NULL");
+    g_sve_model_reply = nullptr;
+    expect(sve_assistant_chat(ctx, json::array({q1}).dump().c_str(), nullptr, nullptr, nullptr, nullptr, nullptr) == nullptr,
+           "chat: no model -> NULL");
+    g_sve_model_reply = saved;
+    sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en"})");
+}
+
 static int run_api(sve_ctx *ctx) {
     // Runtime CPU threads (the heat ladder): nothing to set without a model.
     expect(sve_set_threads(ctx, 2, 2) == -1 && sve_set_threads(nullptr, 2, 2) == -1, "set threads with no model: -1");
@@ -908,6 +1016,7 @@ static int run_api(sve_ctx *ctx) {
     run_api_times(ctx);
     run_api_final(ctx);
     run_api_memories(ctx);
+    run_api_chat(ctx);
     run_api_wipe(ctx);
     return 0;
 }

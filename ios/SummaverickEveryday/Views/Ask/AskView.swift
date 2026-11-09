@@ -1,23 +1,11 @@
 // Ask Summaverick (spec §6.3): a chat over all recordings, typed or spoken. Answers come from the core
-// (sve_assistant_ask) and are shown as given: medicine answers are quoted word for word, never reworded,
-// and nothing is added to them. Every answer links to the moments it came from. The chat lives in memory
-// for this session only.
+// (sve_assistant_chat) and are shown as given: medicine answers are quoted word for word, never reworded,
+// and nothing is added to them. Every answer links to the moments it came from. The answer appears as it is
+// written (Stop keeps what was written); follow-ups go with the earlier turns (ChatWindow); chats are kept on
+// the phone (ChatStore), with "New chat" and the earlier chats in the toolbar.
 import AVFoundation
 import SwiftUI
 import UserNotifications
-
-/// One question and what came back.
-private struct AskTurn: Identifiable {
-    enum Phase {
-        case waiting
-        /// named: saved medicine ids the core finds in a medicine answer ([] otherwise); nil = could not tell.
-        case answered(AskAnswer, named: [Int64]?)
-        case failed
-    }
-    let id = UUID()
-    let question: String
-    var state: Phase
-}
 
 /// What the "Make reminder" / "Make to-do" form is opened for.
 private struct AnswerFormRequest: Identifiable {
@@ -66,7 +54,10 @@ struct AskView: View {
     @State private var pipeline = ProcessingPipeline.shared
     @State private var models = ModelManager.shared
 
-    @State private var turns: [AskTurn] = []
+    @State private var chats = ChatStore.shared
+    /// Saved medicine ids the core finds in a medicine answer, by turn ([] otherwise); missing = could not tell yet.
+    @State private var named: [UUID: [Int64]] = [:]
+    @State private var askTask: Task<Void, Never>?
     @State private var text = ""
     @State private var generating = false
     @State private var notice: AskNotice?
@@ -89,6 +80,12 @@ struct AskView: View {
     private static let maxVoiceSeconds: TimeInterval = 30
 
     private var isTelugu: Bool { profileLang == "te" }
+    private var turns: [ChatTurn] { chats.current?.turns ?? [] }
+    /// Grows while an answer is written: the chat follows it down.
+    private var streamedCount: Int {
+        if case .streaming(let t) = turns.last?.state { return t.count }
+        return 0
+    }
     private var presenting: Bool { formRequest != nil || errorMessage != nil || notificationsOff || micDenied }
 
     var body: some View {
@@ -103,7 +100,28 @@ struct AskView: View {
             .navigationTitle("Ask Summaverick")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        ForEach(chats.chats) { c in
+                            Button { chats.select(c.id) } label: {
+                                if c.id == chats.currentID {
+                                    Label { Text(verbatim: c.title) } icon: { Image(systemName: "checkmark") }
+                                } else {
+                                    Text(verbatim: c.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath").frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel(Text("Earlier chats"))
+                    .disabled(generating || chats.chats.isEmpty)
+                }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button { chats.newChat() } label: {
+                        Label("New chat", systemImage: "square.and.pencil").frame(minWidth: 44, minHeight: 44)
+                    }
+                    .disabled(generating || turns.isEmpty)
                     Button { router.showSettings = true } label: {
                         Image(systemName: "gearshape").frame(minWidth: 44, minHeight: 44)
                     }
@@ -112,9 +130,15 @@ struct AskView: View {
             }
         }
         .task { await loadProfile() }
+        .task(id: chats.currentID) { await loadNamed() }
         .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await loadProfile() } }
-        // "Delete everything": answers on screen (medicine answers too) go with the data.
-        .onReceive(NotificationCenter.default.publisher(for: .assistantWiped)) { _ in turns.removeAll() }
+        // "Delete everything": the chats (medicine answers too) go with the data. Settings deletes them;
+        // an answer still being written stops.
+        .onReceive(NotificationCenter.default.publisher(for: .assistantWiped)) { _ in
+            askTask?.cancel()
+            chats.deleteAll()
+            named = [:]
+        }
         .onAppear { takeDraft() }
         .onChange(of: router.askDraft) { _, _ in takeDraft() }
         .onChange(of: recorder.elapsed) { _, t in if listening && t >= Self.maxVoiceSeconds { endVoice() } }
@@ -167,6 +191,8 @@ struct AskView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: turns.count) { _, _ in scrollDown(proxy) }
                 .onChange(of: generating) { _, _ in scrollDown(proxy) }
+                .onChange(of: chats.currentID) { _, _ in scrollDown(proxy) }
+                .onChange(of: streamedCount) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             }
             .overlay(alignment: .bottom) {
                 if let toast {
@@ -202,7 +228,7 @@ struct AskView: View {
     }
 
     @ViewBuilder
-    private func turnView(_ turn: AskTurn) -> some View {
+    private func turnView(_ turn: ChatTurn) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Spacer(minLength: 48)
@@ -219,8 +245,12 @@ struct AskView: View {
             switch turn.state {
             case .waiting:
                 TypingIndicator()
-            case .answered(let a, let named):
-                answerView(a, turn: turn.id, named: named)
+            case .streaming(let partial):
+                if partial.isEmpty { TypingIndicator() } else { streamingView(partial) }
+            case .answered(let a):
+                answerView(a, turn: turn.id, named: named[turn.id])
+            case .stopped(let partial):
+                stoppedView(partial, turn: turn)
             case .failed:
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Could not answer this. Please try again.", systemImage: "exclamationmark.triangle.fill")
@@ -237,14 +267,64 @@ struct AskView: View {
     }
 
     /// The not-found sentence in the answer language, word for word as the core writes it.
-    private var notFoundText: String {
-        isTelugu ? "మీ రికార్డింగ్‌లలో ఇది నేను వినలేదు." : "I didn't hear that in your recordings."
+    private func notFoundText(_ lang: String?) -> String {
+        (lang ?? profileLang) == "te" ? "మీ రికార్డింగ్‌లలో ఇది నేను వినలేదు." : "I didn't hear that in your recordings."
+    }
+
+    /// The answer as it is written. Never a medicine answer: those come whole, built in code.
+    private func streamingView(_ partial: String) -> some View {
+        Text(verbatim: partial)
+            .font(.body)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Text("Summaverick is writing an answer"))
+    }
+
+    /// Stop was tapped: what was written before it, marked "(stopped)".
+    private func stoppedView(_ partial: String, turn: ChatTurn) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !partial.isEmpty {
+                Text(verbatim: partial)
+                    .font(.body)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text("(stopped)").font(.footnote).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                if !partial.isEmpty { copyButton(partial) }
+                Button("Try again") { retry(turn) }
+                    .buttonStyle(.bordered)
+                    .frame(minHeight: 44)
+                    .disabled(generating)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func copyButton(_ words: String) -> some View {
+        Button {
+            UIPasteboard.general.string = words
+            showToast(String(localized: "Copied."))
+        } label: {
+            Label("Copy", systemImage: "doc.on.doc").frame(minHeight: 44)
+        }
+        .buttonStyle(.bordered)
     }
 
     private func answerView(_ a: AskAnswer, turn: UUID, named: [Int64]?) -> some View {
-        let shown = a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? notFoundText : a.answer
+        let shown = a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? notFoundText(a.lang) : a.answer
         let quoted = a.medicine && shown == a.answer
         return VStack(alignment: .leading, spacing: 10) {
+            if a.kind == "general" && !a.medicine {
+                Label("General knowledge — not from your recordings", systemImage: "globe")
+                    .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if quoted {
                 // Built in the core from saved facts and recorded words: shown exactly, in full.
                 VStack(alignment: .leading, spacing: 6) {
@@ -274,8 +354,8 @@ struct AskView: View {
 
             if !a.notFound && !a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) { makeButtons(a, turn: turn, named: named) }
-                    VStack(alignment: .leading, spacing: 8) { makeButtons(a, turn: turn, named: named) }
+                    HStack(spacing: 10) { makeButtons(a, turn: turn, named: named); copyButton(a.answer) }
+                    VStack(alignment: .leading, spacing: 8) { makeButtons(a, turn: turn, named: named); copyButton(a.answer) }
                 }
                 if !canMakeReminder(a, named) {
                     Text("Make reminders from each medicine in your profile.")
@@ -365,14 +445,24 @@ struct AskView: View {
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
                     .disabled(listening || transcribing)
                     .onChange(of: text) { _, _ in if notice == .busy || notice == .notHeard { notice = nil } }
-                Button { send(text) } label: {
-                    Image(systemName: "arrow.up.circle.fill").font(.system(size: 34))
-                        .frame(width: 44, height: 44)
+                if generating {
+                    Button { askTask?.cancel() } label: {
+                        Image(systemName: "stop.circle.fill").font(.system(size: 34))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityLabel(Text("Stop"))
+                } else {
+                    Button { send(text) } label: {
+                        Image(systemName: "arrow.up.circle.fill").font(.system(size: 34))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(canSend ? Color.accentColor : Color.secondary)
+                    .disabled(!canSend)
+                    .accessibilityLabel(Text("Send"))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(canSend ? Color.accentColor : Color.secondary)
-                .disabled(!canSend)
-                .accessibilityLabel(Text("Send"))
             }
         }
         .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 8)
@@ -435,42 +525,73 @@ struct AskView: View {
         if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
         notice = nil
         if fromField { text = "" }
-        let turn = AskTurn(question: q, state: .waiting)
-        turns.append(turn)
-        ask(turn.id, q)
+        let id = chats.append(q)
+        ask(id, q)
     }
 
-    private func retry(_ turn: AskTurn) {
+    private func retry(_ turn: ChatTurn) {
         guard !generating else { return }
         if pipeline.isBusy { notice = .busy; return }
         guard models.isReady else { notice = .needsModel; return }
         if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
         notice = nil
-        update(turn.id, .waiting)
+        chats.update(turn.id, .waiting)
         ask(turn.id, turn.question)
     }
 
     private func ask(_ id: UUID, _ q: String) {
         generating = true
-        Task {
-            defer { generating = false }
+        // The earlier turns of this chat go with it (the core trims them to its token budget).
+        let messages = ChatWindow.messages(earlier: chats.turns(before: id).map(\.windowTurn), question: q)
+        askTask = Task {
+            defer { generating = false; askTask = nil }
             // The person first: memory work stops for the answer. Other work still running: the busy notice.
-            guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; update(id, .failed); return }
+            guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
             do {
                 try await loadSelectedModel()   // the backend for right now (GPU in front)
-                guard !pipeline.isWorking else { notice = .busy; update(id, .failed); return }
-                let a = try await CoreEngine.shared.ask(q)
-                update(id, .answered(a, named: await namedMedicines(a)))
+                guard !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
+                try Task.checkCancellation()
+                let a = try await CoreEngine.shared.chat(messages: messages, langHint: profileLang) { partial in
+                    // Only while this answer is still being written (a late redraw after the end is dropped).
+                    guard isWriting(id) else { return }
+                    chats.update(id, .streaming(partial))
+                }
+                named[id] = await namedMedicines(a)
+                chats.update(id, .answered(a))
             } catch {
+                if Task.isCancelled {
+                    // Stop: what was written stays, marked "(stopped)".
+                    chats.update(id, .stopped(writtenSoFar(id)))
+                    return
+                }
                 NSLog("[sve] ask failed: %@", String(describing: error))
-                update(id, .failed)
+                chats.update(id, .failed)
             }
         }
     }
 
-    private func update(_ id: UUID, _ state: AskTurn.Phase) {
-        guard let i = turns.firstIndex(where: { $0.id == id }) else { return }
-        turns[i].state = state
+    private func state(of id: UUID) -> ChatTurn.State? {
+        chats.chats.lazy.flatMap(\.turns).first { $0.id == id }?.state
+    }
+
+    private func isWriting(_ id: UUID) -> Bool {
+        switch state(of: id) {
+        case .waiting, .streaming: return true
+        default: return false
+        }
+    }
+
+    private func writtenSoFar(_ id: UUID) -> String {
+        if case .streaming(let t) = state(of: id) { return t }
+        return ""
+    }
+
+    /// The medicine ids of the restored medicine answers of the chat on screen.
+    private func loadNamed() async {
+        for t in turns {
+            guard named[t.id] == nil, case .answered(let a) = t.state, a.medicine else { continue }
+            if let ids = await namedMedicines(a) { named[t.id] = ids }
+        }
     }
 
     private func loadSelectedModel() async throws {
@@ -564,10 +685,10 @@ struct AskView: View {
     private func openForm(_ kind: SuggestionKind, _ a: AskAnswer, turn: UUID) async {
         var medicineID: Int64?
         if kind == .reminder && a.medicine {
-            let named = await namedMedicines(a)
-            update(turn, .answered(a, named: named))
-            guard canMakeReminder(a, named) else { return }
-            medicineID = named?.first
+            let ids = await namedMedicines(a)
+            named[turn] = ids
+            guard canMakeReminder(a, ids) else { return }
+            medicineID = ids?.first
         }
         formRequest = AnswerFormRequest(kind: kind, text: a.answer, medicine: a.medicine, source: a.sources.first,
                                         medicineID: medicineID)

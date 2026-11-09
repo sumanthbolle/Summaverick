@@ -51,6 +51,10 @@
 			isa = PBXBuildFile;
 			fileRef = 33C50C60642D8852C316CF41;
 		};
+		2DE36113806377CB352E5A8E = {
+			isa = PBXBuildFile;
+			fileRef = D84ADCB93009100271D599EA;
+		};
 		2FD15473B6B920BB015E30EC = {
 			isa = PBXBuildFile;
 			fileRef = C30CC5397DAA09FBACA85197;
@@ -68,6 +72,10 @@
 		408386E2C748923A7048D478 = {
 			isa = PBXBuildFile;
 			fileRef = 8A6F757330F3179FB40BD3E2;
+		};
+		4F09E9A49F6F264A6E0572C7 = {
+			isa = PBXBuildFile;
+			fileRef = 678A49AA9B002AAA3E2FC364;
 		};
 		53208D279FD7D4526A01C523 = {
 			isa = PBXBuildFile;
@@ -604,6 +612,13 @@
 			path = Shared/RecordingIntents.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		678A49AA9B002AAA3E2FC364 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ChatStore.swift;
+			path = SummaverickEveryday/Engine/ChatStore.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		68019339B3FB26EF022BB32A = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -877,6 +892,13 @@
 			path = SummaverickEveryday/Views/Components/RecordingPulseView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		D84ADCB93009100271D599EA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_chat.cpp;
+			path = ../core/src/sve_chat.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
 		DAD9D4F5BE940D31ED604618 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -925,6 +947,13 @@
 			includeInIndex = 0;
 			path = SummaverickWidgets.appex;
 			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		ED74DFB438437AA10CDB5F3C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_chat.h;
+			path = ../core/src/sve_chat.h;
+			sourceTree = SOURCE_ROOT;
 		};
 		EE7D0A38215CFAEEF0A0E2BE = {
 			isa = PBXFileReference;
@@ -1074,6 +1103,7 @@
 			isa = PBXGroup;
 			children = (
 				69DFE9A274CA05C81C452276,
+				678A49AA9B002AAA3E2FC364,
 				45B50ED11A0933F793CD181E,
 				618A438B4C8E5391746526C9,
 				32B4ECFC6F6AC631FDE8CCFB,
@@ -1176,6 +1206,8 @@
 				BB44682AB82F093499931FDE,
 				491BB1ADB53C5E2A1F0AF6C8,
 				68019339B3FB26EF022BB32A,
+				D84ADCB93009100271D599EA,
+				ED74DFB438437AA10CDB5F3C,
 				9E2ACA831A68C5FC7568EFA9,
 				E6FD595D542BBAD86BA1B59B,
 				3C94D64FE92A566816D76B43,
@@ -1349,6 +1381,7 @@
 				1970E5A56D56F7BC7ACE9401,
 				9A5EA1AFF3F67FA08253F534,
 				53208D279FD7D4526A01C523,
+				4F09E9A49F6F264A6E0572C7,
 				C23AA49A9EE82365B4F4B783,
 				7DF93800DB3C9D1EB735C3CD,
 				535ACB83EDFCFBACA1FD4F3C,
@@ -1390,6 +1423,7 @@
 				E3B6ED99E22E4B0C0EC884D9,
 				CCABCA4B3E738FCE0399D402,
 				11C62DBEE92DAE5BAA003ED9,
+				2DE36113806377CB352E5A8E,
 				1D9397B49E2B55EDE5DC3560,
 				66567DD2A6C40F6BC6CB1C24,
 				7CD85F6783D894B9047A2C67,

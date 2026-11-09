@@ -43,6 +43,8 @@ typedef enum {
 /* Progress callback for long generations. phase: "chunk", "merge", "final".
  * done/total are chunk counters. Return non‑zero to cancel. */
 typedef int (*sve_progress_cb)(const char *phase, int done, int total, void *user);
+/* A new piece of streamed text (UTF-8, whole characters). Return non-zero to cancel. */
+typedef int (*sve_text_cb)(const char *piece, void *user);
 
 /* Optional log sink (defaults to stderr). */
 typedef void (*sve_log_cb)(int level, const char *msg, void *user);
@@ -341,6 +343,20 @@ int   sve_assistant_wipe(sve_ctx *ctx);
  * "not_found":false,"medicine":false}. Medicine questions are answered in code from the profile and quoted
  * transcript pieces, never generated. Answers are in the profile language. */
 char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, void *user);
+
+/* Ask as a chat: messages_json is [{"role":"user"|"assistant","text":"…"}] with the newest (the question, a
+ * "user" turn) last. An assistant turn may carry "sources" ([{"title","start_sec"}], kept as text for the model)
+ * and "medicine":true (its text is then never handed to the model). Earlier turns go with the question within
+ * 1500 tokens, newest first. The answer is written in the question's language (Telugu when Telugu script is at
+ * least 30% of its letters, else English); lang_hint ("te"/"en", may be NULL) is used only for a question with no
+ * letters, then the profile's. Returns the JSON of sve_assistant_ask plus "kind" ("recordings"|"general"|"medicine"|
+ * "summary"|"due"|"quiz"; this version gives "recordings" or "medicine") and "lang". on_text (may be NULL) gets
+ * the visible answer as it is written, a sentence at a time, thinking and [S1] labels removed; its pieces join to
+ * "answer" when the answer is the model's. Medicine answers (built in code, quoted word for word) and the
+ * not-found sentence are never streamed, nor any sentence that mentions a medicine: "answer" is the final text
+ * to show. on_text or cb returning non-zero cancels (NULL). NULL also on error or with no model. */
+char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *lang_hint,
+                         sve_text_cb on_text, void *user, sve_progress_cb cb, void *cbuser);
 
 /* At most one insight per calendar day, from recent notes and open tasks: {"id":0,"text":""} or "null".
  * cb (may be NULL) is called during generation; returning non-zero cancels it (returns NULL, nothing stored). */

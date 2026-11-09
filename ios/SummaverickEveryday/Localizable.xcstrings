@@ -5601,6 +5601,102 @@
           }
         }
       }
+    },
+    "New chat": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొత్త చాట్"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New chat"
+          }
+        }
+      }
+    },
+    "General knowledge — not from your recordings": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సాధారణ జ్ఞానం — మీ రికార్డింగ్‌ల నుండి కాదు"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General knowledge — not from your recordings"
+          }
+        }
+      }
+    },
+    "(stopped)": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(ఆపబడింది)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(stopped)"
+          }
+        }
+      }
+    },
+    "Copy": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కాపీ చేయి"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy"
+          }
+        }
+      }
+    },
+    "Copied.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కాపీ అయింది."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied."
+          }
+        }
+      }
+    },
+    "Earlier chats": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మునుపటి చాట్‌లు"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier chats"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

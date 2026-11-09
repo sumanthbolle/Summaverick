@@ -254,13 +254,19 @@ struct AskAnswer: Codable, Equatable {
     var sources: [Source]
     var notFound: Bool
     var medicine: Bool
+    /// What answered it (sve_assistant_chat): "recordings", "general", "medicine", "summary", "due", "quiz";
+    /// "recordings" when the core does not say (sve_assistant_ask).
+    var kind: String
+    /// The language the answer is written in ("te"/"en"); nil when the core does not say.
+    var lang: String?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         answer = c.lenient(.answer) ?? ""; sources = c.lenient(.sources) ?? []
         notFound = c.flag(.notFound) ?? false; medicine = c.flag(.medicine) ?? false
+        kind = c.lenient(.kind) ?? (medicine ? "medicine" : "recordings"); lang = c.lenient(.lang)
     }
-    enum CodingKeys: String, CodingKey { case answer, sources, medicine, notFound = "not_found" }
+    enum CodingKeys: String, CodingKey { case answer, sources, medicine, kind, lang, notFound = "not_found" }
 }
 
 // MARK: - transcript pieces

@@ -3,6 +3,7 @@
 // this file wires them to the store and the model. Nothing here throws out of a C function.
 #include "sve_core.h"
 #include "sve_internal.h"
+#include "sve_chat.h"
 #include "sve_context.h"
 #include "sve_extract.h"
 #include "sve_learn.h"
@@ -865,6 +866,68 @@ char *sve_topic_summary(sve_ctx *ctx, int64_t topic_id, const char *lang_c, sve_
 
 // ---------------------------------------------------------------- Ask
 
+namespace {
+
+// Retrieved material that mentions a medicine (even an unknown name), in a piece or a remembered fact, is quoted
+// word for word, never generated. Medicine pieces come first; at most 3. Null when the material mentions none.
+json medicine_material_answer(sve::Store &st, const sve::Relevant &rel, const std::vector<std::string> &names,
+                              const std::string &lang) {
+    json med_hits = json::array(), other = json::array(), med_facts = json::array();
+    for (const auto &src : rel.sources) {
+        json h = source_of(src);
+        h["text"] = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
+        (sve::mentions_medicine(jstr(h, "text"), names) ? med_hits : other).push_back(h);
+    }
+    size_t fh = rel.block.find("Remembered facts:\n");
+    if (fh != std::string::npos) {
+        std::string rest = rel.block.substr(fh), line;
+        for (size_t i = 0; i <= rest.size(); ++i) {
+            if (i < rest.size() && rest[i] != '\n') { line += rest[i]; continue; }
+            if (line.rfind("- ", 0) == 0 && sve::mentions_medicine(line.substr(2), names)) med_facts.push_back(line.substr(2));
+            line.clear();
+        }
+    }
+    if (med_hits.empty() && med_facts.empty()) return nullptr;
+    json hits = json::array();
+    add_hits(hits, med_hits, 3);
+    add_hits(hits, other, 3);
+    std::string answer = sve::medicine_answer(json::array(), hits, lang);
+    if (!med_facts.empty()) {
+        answer += std::string(answer.empty() ? "" : "\n\n") +
+                  (lang == "te" ? "Summaverick గుర్తుంచుకున్నవి:" : "Remembered facts:");
+        for (const auto &f : med_facts) answer += "\n\xE2\x80\x9C" + f.get<std::string>() + "\xE2\x80\x9D";
+    }
+    return ask_result(answer, sources_of(hits), false, true);
+}
+
+// The model's answer (thinking stripped) with its [S<n>] labels turned into sources. NOT_FOUND or no valid label:
+// the not-found sentence. An answer that drifted into medicines: the cited words verbatim instead.
+json cited_answer(sve::Store &st, const std::string &model_out, const sve::Relevant &rel,
+                  const std::vector<std::string> &names, const std::string &lang) {
+    sve::Cited c = sve::apply_citations(model_out, rel.sources);
+    if (c.not_found) return ask_result(sve::not_found_text(lang), json::array(), true, false);
+    if (sve::mentions_medicine(c.answer, names)) {
+        json hits = json::array();
+        for (const auto &s : c.sources) {
+            json h = s;
+            h["text"] = piece_text(st, jint(s, "note_id", 0), jint(s, "start_sec", 0));
+            hits.push_back(h);
+        }
+        std::string a = sve::medicine_answer(json::array(), hits, lang);
+        if (a.empty()) return ask_result(sve::not_found_text(lang), json::array(), true, true);
+        return ask_result(a, c.sources, false, true);
+    }
+    return ask_result(c.answer, c.sources, false, false);
+}
+
+std::string ask_system(sve::Store &st) {
+    return sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety);
+}
+
+constexpr int kChatMaxOut = 400;  // a chat answer: a few sentences, a little more room than sve_assistant_ask's 300
+
+}  // namespace
+
 char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, void *user) {
     return guard<char *>("sve_assistant_ask", nullptr, [&]() -> char * {
         if (!ctx || !question) return nullptr;
@@ -876,41 +939,14 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
 
         std::string kq = sve::keyword_query(q);
         sve::Relevant rel = sve::relevant(st, kq.empty() ? q : kq, 6000);
-        // Retrieved material that mentions a medicine (even an unknown name), in a piece or a remembered
-        // fact, is quoted word for word, never generated. Medicine pieces come first; at most 3.
-        json med_hits = json::array(), other = json::array(), med_facts = json::array();
-        for (const auto &src : rel.sources) {
-            json h = source_of(src);
-            h["text"] = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
-            (sve::mentions_medicine(jstr(h, "text"), names) ? med_hits : other).push_back(h);
-        }
-        size_t fh = rel.block.find("Remembered facts:\n");
-        if (fh != std::string::npos) {
-            std::string rest = rel.block.substr(fh), line;
-            for (size_t i = 0; i <= rest.size(); ++i) {
-                if (i < rest.size() && rest[i] != '\n') { line += rest[i]; continue; }
-                if (line.rfind("- ", 0) == 0 && sve::mentions_medicine(line.substr(2), names)) med_facts.push_back(line.substr(2));
-                line.clear();
-            }
-        }
-        if (!med_hits.empty() || !med_facts.empty()) {
-            json hits = json::array();
-            add_hits(hits, med_hits, 3);
-            add_hits(hits, other, 3);
-            std::string answer = sve::medicine_answer(json::array(), hits, lang);
-            if (!med_facts.empty()) {
-                answer += std::string(answer.empty() ? "" : "\n\n") +
-                          (lang == "te" ? "Summaverick గుర్తుంచుకున్నవి:" : "Remembered facts:");
-                for (const auto &f : med_facts) answer += "\n\xE2\x80\x9C" + f.get<std::string>() + "\xE2\x80\x9D";
-            }
-            return dump(ask_result(answer, sources_of(hits), false, true));
-        }
+        json med = medicine_material_answer(st, rel, names, lang);
+        if (!med.is_null()) return dump(med);
         if (rel.sources.empty()) return dump(ask_result(sve::not_found_text(lang), json::array(), true, false));
         if (!ctx->llm) return nullptr;
 
         sve::Llm &llm = *ctx->llm;
         const std::string lname = sve::language_name(lang);
-        const std::string sys = sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety);
+        const std::string sys = ask_system(st);
         const std::string userp =
             "Material from the person's recordings and memory. Each recording excerpt starts with a label such as [S1].\n\n" +
             rel.block + "\nQuestion: " + q + "\n\n"
@@ -919,21 +955,62 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
             "reply with exactly NOT_FOUND and nothing else.";
         std::string out;
         if (!llm.complete(llm.apply_template(sys, userp), 300, out, cb, user, "final", 0, 1, true)) return nullptr;
-        sve::Cited c = sve::apply_citations(sve::strip_thinking(out), rel.sources);
-        if (c.not_found) return dump(ask_result(sve::not_found_text(lang), json::array(), true, false));
-        if (sve::mentions_medicine(c.answer, names)) {
-            // A generated answer drifted into medicines: show the cited words verbatim instead.
-            json hits = json::array();
-            for (const auto &s : c.sources) {
-                json h = s;
-                h["text"] = piece_text(st, jint(s, "note_id", 0), jint(s, "start_sec", 0));
-                hits.push_back(h);
-            }
-            std::string a = sve::medicine_answer(json::array(), hits, lang);
-            if (a.empty()) return dump(ask_result(sve::not_found_text(lang), json::array(), true, true));
-            return dump(ask_result(a, c.sources, false, true));
+        return dump(cited_answer(st, sve::strip_thinking(out), rel, names, lang));
+    });
+}
+
+char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *lang_hint,
+                         sve_text_cb on_text, void *user, sve_progress_cb cb, void *cbuser) {
+    return guard<char *>("sve_assistant_chat", nullptr, [&]() -> char * {
+        if (!ctx || !messages_json) return nullptr;
+        std::vector<sve::ChatTurn> earlier = sve::chat_turns(parse(messages_json));
+        if (earlier.empty() || earlier.back().role != "user") return nullptr;
+        const std::string q = earlier.back().text;
+        earlier.pop_back();
+        sve::Store &st = *ctx->store;
+        const std::string lang = sve::chat_lang(q, lang_hint ? lang_hint : "", lang_of(st));
+        auto result = [&](json r, const char *kind) {
+            r["kind"] = kind;
+            r["lang"] = lang;
+            return dump(r);
+        };
+        const std::vector<std::string> names = known_med_names(st);
+        // Medicine: from stored facts only, in code, never streamed and never generated (spec §7.8a).
+        if (sve::is_medicine_question(q, names)) return result(medicine_route(st, q, names, lang), "medicine");
+
+        sve::Relevant rel = sve::relevant(st, sve::chat_search_query(q, earlier), 6000);
+        json med = medicine_material_answer(st, rel, names, lang);
+        if (!med.is_null()) return result(med, "medicine");
+        if (rel.sources.empty()) return result(ask_result(sve::not_found_text(lang), json::array(), true, false), "recordings");
+        const bool stand_in = g_sve_model_reply != nullptr;  // smoke "api": no model on the host
+        if (!ctx->llm && !stand_in) return nullptr;
+
+        sve::Llm *llm = stand_in ? nullptr : ctx->llm.get();
+        auto count = [&](const std::string &t) { return llm ? llm->count_tokens(t) : (int)t.size() / 3 + 1; };
+        const std::string sys = ask_system(st);
+        std::vector<sve::ChatTurn> window = sve::history_window(earlier, sve::kChatHistoryTokens, count);
+        std::string userp = sve::chat_recordings_prompt(sve::history_block(window), rel.block, q, sve::language_name(lang));
+        // Within the context: the oldest turns go first.
+        while (llm && !window.empty() && llm->count_tokens(llm->apply_template(sys, userp)) + kChatMaxOut + 16 > llm->n_ctx) {
+            window.erase(window.begin());
+            userp = sve::chat_recordings_prompt(sve::history_block(window), rel.block, q, sve::language_name(lang));
         }
-        return dump(ask_result(c.answer, c.sources, false, false));
+
+        sve::AnswerStream stream(names, [&](const std::string &piece) { return !on_text || on_text(piece.c_str(), user) == 0; });
+        std::string raw;
+        if (stand_in) {
+            const char *r = g_sve_model_reply("chat", userp.c_str());
+            if (!r) return nullptr;
+            raw = r;
+            for (size_t i = 0; i < raw.size(); i += 3)  // in small pieces, as tokens come
+                if (!stream.feed(raw.substr(i, 3))) return nullptr;
+        } else if (!llm->complete(llm->apply_template(sys, userp), kChatMaxOut, raw, cb, cbuser, "final", 0, 1, true,
+                                  [&](const std::string &piece) { return stream.feed(piece); })) {
+            return nullptr;
+        }
+        if (!stream.finish()) return nullptr;
+        json r = cited_answer(st, sve::strip_thinking(raw), rel, names, lang);
+        return result(r, r["medicine"] == true ? "medicine" : "recordings");
     });
 }
 

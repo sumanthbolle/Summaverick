@@ -9,10 +9,14 @@
 #include "llama.h"
 #endif
 
+#include <functional>
 #include <string>
 #include <vector>
 
 namespace sve {
+
+// Each generated piece of text as it is sampled (raw: thinking blocks included). Returns false to cancel.
+using PieceFn = std::function<bool(const std::string &piece)>;
 
 struct Llm {
     llama_model *model = nullptr;
@@ -33,8 +37,10 @@ struct Llm {
     std::string apply_template(const std::string &system, const std::string &user) const;
     // Prompt -> completion. Clears KV memory first, so every call is independent. False on cancel or error.
     // greedy = deterministic sampling (assistant JSON and answers); notes keep the sampled default.
+    // on_piece (optional): each token's text as it is sampled (Ask streams its answer); false cancels.
     bool complete(const std::string &prompt, int max_new_tokens, std::string &out,
-                  sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy = false);
+                  sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy = false,
+                  const PieceFn &on_piece = nullptr);
     // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
     // mean_prob (optional): mean softmax probability of the chosen non-EOG tokens under the raw logits
     // (before penalties); NaN when no token was generated. Read after sampling, never changes the choice.
@@ -42,9 +48,11 @@ struct Llm {
     // second_hearing: a transcription piece heard again (N7): the transcription's light penalty, then
     // top-p 0.9 / min-p 0.05 / temperature 0.3 with a fixed seed, even under g_sve_force_greedy (a greedy repeat
     // of the same input gives the same text). Overrides greedy.
+    // on_piece: as for complete.
     bool generate(int max_new_tokens, bool greedy, std::string &out,
                   sve_progress_cb cb, void *user, const char *phase, int done, int total,
-                  double *mean_prob = nullptr, int *n_out = nullptr, bool second_hearing = false);
+                  double *mean_prob = nullptr, int *n_out = nullptr, bool second_hearing = false,
+                  const PieceFn &on_piece = nullptr);
 };
 
 // Remove thinking blocks and surrounding whitespace.

@@ -205,6 +205,71 @@ extension CoreEngine {
         return a
     }
 
+    /// Streamed text passed through the C callback as an opaque pointer (sve_assistant_chat's on_text).
+    final class TextBox {
+        private let lock = NSLock()
+        private var text = ""
+        private var lastDraw: TimeInterval?
+        private let onText: @MainActor (String) -> Void
+        let isCancelled: () -> Bool
+        init(onText: @escaping @MainActor (String) -> Void, isCancelled: @escaping () -> Bool) {
+            self.onText = onText; self.isCancelled = isCancelled
+        }
+
+        /// A piece from the core's thread: added to the text; the bubble redraws on the main thread at most once
+        /// per StreamThrottle.interval.
+        func add(_ piece: String) {
+            let now = ProcessInfo.processInfo.systemUptime
+            lock.lock()
+            text += piece
+            let draw = StreamThrottle.due(last: lastDraw, now: now)
+            if draw { lastDraw = now }
+            let snapshot = text
+            lock.unlock()
+            if draw { redraw(snapshot) }
+        }
+
+        /// The last text, whatever the throttle said.
+        func flush() {
+            lock.lock()
+            let snapshot = text
+            lock.unlock()
+            if !snapshot.isEmpty { redraw(snapshot) }
+        }
+
+        private func redraw(_ snapshot: String) {
+            let onText = self.onText
+            DispatchQueue.main.async { MainActor.assumeIsolated { onText(snapshot) } }
+        }
+    }
+
+    static let textTrampoline: sve_text_cb = { piece, user in
+        guard let user else { return 0 }
+        let box = Unmanaged<TextBox>.fromOpaque(user).takeUnretainedValue()
+        if let piece { box.add(String(cString: piece)) }
+        return box.isCancelled() ? 1 : 0
+    }
+
+    /// Ask as a chat (sve_assistant_chat): `messages` end with the question (ChatWindow.messages). onText gets the
+    /// visible answer so far, on the main thread, as it is written (never for medicine answers, which come whole
+    /// in the result). Cancelling the calling task stops it (throws); what onText last got is what was shown.
+    func chat(messages: [ChatMessage], langHint: String? = nil,
+              onText: @escaping @MainActor (String) -> Void = { _ in }) async throws -> AskAnswer {
+        guard let ctx else { throw CoreError.initFailed }
+        guard let json = encodeJSON(messages) else { throw AssistantError.badJSON }
+        let text = TextBox(onText: onText, isCancelled: { Task.isCancelled })
+        let box = progressBox()
+        let tuser = Unmanaged.passUnretained(text).toOpaque()
+        let puser = Unmanaged.passUnretained(box).toOpaque()
+        let out = take(sve_assistant_chat(ctx, json, langHint, CoreEngine.textTrampoline, tuser,
+                                          CoreEngine.progressTrampoline, puser))
+        text.flush()
+        withExtendedLifetime((text, box)) {}
+        guard let out else { throw Task.isCancelled ? CancellationError() : CoreError.generationFailed }
+        guard let a = decode(AskAnswer.self, out) else { throw AssistantError.badJSON }
+        return a
+    }
+
     // MARK: extraction and insight
 
     /// Runs extraction on a note's pieces. Returns the number of pending suggestions added.

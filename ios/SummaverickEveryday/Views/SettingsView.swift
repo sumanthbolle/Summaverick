@@ -164,6 +164,7 @@ struct SettingsView: View {
             }
             await ReminderScheduler.shared.resync()   // no active reminders left: removes every scheduled one
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+            ChatStore.shared.deleteAll()   // Ask's chats (Application Support/Chats), even when Ask was never opened
             NotificationCenter.default.post(name: .assistantWiped, object: nil)
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
