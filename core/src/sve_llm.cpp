@@ -115,13 +115,19 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
 // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
 bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
               sve_progress_cb cb, void *user, const char *phase, int done, int total, double *mean_prob,
-              int *n_out) {
+              int *n_out, bool second_hearing) {
     llama_sampler_chain_params sp = llama_sampler_chain_default_params();
     sp.no_perf = true;
     llama_sampler *smpl = llama_sampler_chain_init(sp);
     double prob_sum = 0;
     int prob_n = 0;
-    if (greedy || g_sve_force_greedy) {
+    if (second_hearing) {
+        llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.05f, 0.0f, 0.0f));
+        llama_sampler_chain_add(smpl, llama_sampler_init_top_p(0.9f, 1));
+        llama_sampler_chain_add(smpl, llama_sampler_init_min_p(0.05f, 1));
+        llama_sampler_chain_add(smpl, llama_sampler_init_temp(0.3f));
+        llama_sampler_chain_add(smpl, llama_sampler_init_dist(42));
+    } else if (greedy || g_sve_force_greedy) {
         // light penalty only: real speech repeats words, but a stuck model repeats whole phrases
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.05f, 0.0f, 0.0f));
         llama_sampler_chain_add(smpl, llama_sampler_init_greedy());

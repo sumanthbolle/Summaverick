@@ -958,7 +958,7 @@ done:
 }
 
 // Transcribes the WAV piece by piece (as live does), plans ~5 minute sections, summarises each and prints
-// the JSON with the seconds it took. Expects a title and 1..6 points per section; "fallback" is reported.
+// the JSON with the seconds it took. Expects a title and 1..10 points per section; "fallback" is reported.
 // SVE_SECTION_MAX_OUT=8 truncates every answer, so the retry and the fallback path run and must still return a summary.
 static int run_sections(sve_ctx *ctx, const char *wav, const char *lang, json *stored = nullptr, double *dur_out = nullptr) {
     if (const char *m = getenv("SVE_SECTION_MAX_OUT")) g_sve_section_max_out = atoi(m);
@@ -991,8 +991,8 @@ static int run_sections(sve_ctx *ctx, const char *wav, const char *lang, json *s
         json s = take(sve_section_summarize(ctx, arr.dump().c_str(), lang, nullptr, nullptr));
         double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         printf("--- section %zu (pieces %zu..%zu, %.1f s)\n%s\n", k, secs[k].first, secs[k].second, sec, s.dump(2).c_str());
-        expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 6,
-               "section summary has a title and 1..6 points");
+        expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 10,
+               "section summary has a title and 1..10 points");
         if (stored) stored->push_back({{"idx", (int)k}, {"first_piece", (int)secs[k].first}, {"last_piece", (int)secs[k].second - 1},
                                        {"start_sec", refs[secs[k].first].start_sec}, {"end_sec", refs[secs[k].second - 1].end_sec}, {"summary", s}});
         if (s.value("fallback", false)) printf("(fallback used)\n");

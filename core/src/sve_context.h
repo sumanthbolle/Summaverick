@@ -20,7 +20,17 @@ std::string context_system(Store &store, const std::string &system, bool medicin
 // "Spell these words this way: a, b" from saved vocabulary, newest first, whole terms within
 // max_bytes (UTF-8 safe). Vocabulary only: never medicines or doses, so the transcriber is not
 // nudged to hear a dose that was not said (spec §7.4). Empty when there is no vocabulary.
+// The transcription prompt's line (hearing help); other prompts use spelling_vocab_line.
 std::string transcription_vocab_line(Store &store, size_t max_bytes = 400);
+
+// Said next to the saved words wherever they are not hearing help (sections, memories, notes, the always
+// block): they are spellings, not content. Another note's vocabulary ("S&P 500 index", "IPO") was listed
+// as terms and hints of an unrelated recording (N7).
+extern const char *const kVocabOnlyIfSaid;
+
+// The same words as transcription_vocab_line, with kVocabOnlyIfSaid: "Spell these words this way (<rule>): a, b".
+// For the section and memory prompts. Empty when there is no vocabulary.
+std::string spelling_vocab_line(Store &store, size_t max_bytes = 400);
 
 struct Relevant {
     std::string block;

@@ -114,7 +114,7 @@ int sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch) {
     return 0;
 }
 
-// System prompt of the notes outputs: the always block (profile, vocabulary) in front, without the medicines:
+// System prompt of the notes outputs: the always block (profile, vocabulary as spellings only if said) in front, without the medicines:
 // notes are free text and must not pick up the profile's doses (spec §4).
 static std::string notes_system(sve_ctx *ctx, const std::string &lang) {
     return sve::context_system(*ctx->store, sve::system_prompt(lang), false);
@@ -341,7 +341,7 @@ static bool timing_on() {
 // Transcribes one piece of 16 kHz mono audio with the loaded projector. False on failure/cancel.
 static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const std::string &prev,
                              const std::string &vocab, sve_progress_cb cb, void *user, int done, int total,
-                             std::string &out, double *conf = nullptr) {
+                             std::string &out, double *conf = nullptr, bool second_hearing = false) {
     sve::Llm &llm = *ctx->llm;
     const std::string prompt = llm.apply_template(sve::kTranscriberSystem,
                                                   sve::transcription_instruction(mtmd_get_marker(ctx->mtmd), vocab, prev));
@@ -393,12 +393,31 @@ static bool transcribe_piece(sve_ctx *ctx, const float *samples, size_t n, const
     int room = std::min(768, llm.n_ctx - (int)n_past - 4);
     int n_out = 0;
     const auto t2 = clk::now();
-    const bool ok = llm.generate(room, true, out, cb, user, "chunk", done, total, conf, &n_out);
+    const bool ok = llm.generate(room, true, out, cb, user, "chunk", done, total, conf, &n_out, second_hearing);
     if (timing_on())
         sve_logf(0, "piece timing: encode %.1f s, prefill %.1f s (%d tok), decode %.1f s (%d tok)", t_encode, t_prefill,
                  (int)n_past, secs(t2, clk::now()), n_out);
     if (!ok) return false;
     out = strip_thinking(out);
+    return true;
+}
+
+// One piece, heard a second time when its conf is low (sve_should_retry_piece): same samples, same prompt
+// (vocabulary line, previous text), so the same planner cut and context; the second hearing samples
+// (Llm::generate second_hearing) because a greedy repeat of the same input is the same text. The text with the
+// higher conf is kept; at most one retry. A second hearing that fails keeps the first, unless it was a cancel.
+// label: the piece number in the log (sve_transcribe_next_piece: the piece's start second).
+static bool hear_piece(sve_ctx *ctx, const float *samples, size_t n, const std::string &prev, const std::string &vocab,
+                       sve_progress_cb cb, void *user, int done, int total, int label, std::string &out, double &conf) {
+    conf = std::nan("");
+    if (!transcribe_piece(ctx, samples, n, prev, vocab, cb, user, done, total, out, &conf)) return false;
+    if (!sve_should_retry_piece(conf)) return true;
+    std::string again;
+    double again_conf = std::nan("");
+    if (!transcribe_piece(ctx, samples, n, prev, vocab, cb, user, done, total, again, &again_conf, true))
+        return !(cb && cb("chunk", done, total, user));
+    sve_logf(0, "piece %d conf %.2f: transcribed again (%.2f)", label, conf, again_conf);
+    if (again_conf > conf) { out = again; conf = again_conf; }
     return true;
 }
 
@@ -434,8 +453,8 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
         if (cb && cb("chunk", i, total, user)) return false;
         std::string piece;
         double conf = std::nan("");
-        if (!transcribe_piece(ctx, pcm.data() + pieces[i].first, pieces[i].second - pieces[i].first, prev, vocab,
-                              cb, user, i, total, piece, &conf)) return false;
+        if (!hear_piece(ctx, pcm.data() + pieces[i].first, pieces[i].second - pieces[i].first, prev, vocab,
+                        cb, user, i, total, i + 1, piece, conf)) return false;
         sve_logf(0, "piece %d/%d conf %.4f", i + 1, total, conf);
         if (!piece.empty()) { result.push_back({(int64_t)(pieces[i].first / sve::kAudioRate), piece, conf}); prev = piece; }
     }
@@ -443,7 +462,7 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
     return true;
 }
 
-int g_sve_section_max_out = 512;
+int g_sve_section_max_out = 1024;  // up to 10 points (N7); was 512 for 3 to 6
 bool g_sve_force_greedy = false;
 FILE *g_sve_token_log = nullptr;
 
@@ -472,7 +491,7 @@ char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *l
         const int kMaxOut = g_sve_section_max_out;
         const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
         const std::string prompt = llm.apply_template(
-            sys, sve::section_prompt(pieces, lang, sve::transcription_vocab_line(*ctx->store, 400)));
+            sys, sve::section_prompt(pieces, lang, sve::spelling_vocab_line(*ctx->store, 400)));
         auto dump = [](const sve::json &j) { return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace)); };
         // A section that cannot fit the context with room to answer goes straight to the fallback.
         if (llm.count_tokens(prompt) + kMaxOut + 16 > llm.n_ctx) return dump(sve::fallback_section_summary(pieces));
@@ -535,8 +554,8 @@ char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t star
         const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
         std::string text;
         double conf = std::nan("");
-        if (!transcribe_piece(ctx, pcm.data() + (plan.start - start), plan.stop - plan.start, prev_text ? prev_text : "",
-                              vocab, cb, user, 0, 1, text, &conf)) return nullptr;
+        if (!hear_piece(ctx, pcm.data() + (plan.start - start), plan.stop - plan.start, prev_text ? prev_text : "",
+                        vocab, cb, user, 0, 1, (int)(plan.start / sve::kAudioRate), text, conf)) return nullptr;
         sve::json j = {{"status", "piece"}, {"start_sec", (int64_t)(plan.start / sve::kAudioRate)},
                        {"end_sample", (int64_t)plan.stop}, {"text", text}, {"conf", conf}};
         return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));

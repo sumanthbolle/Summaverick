@@ -237,3 +237,12 @@ TEST(instruction_has_vocab_and_tail) {
     tail2.pop_back();
     CHECK_EQ(tail2, mid);
 }
+
+// N7: a piece heard with a mean token probability under 0.80 is transcribed once more.
+TEST(should_retry_piece_below_080) {
+    CHECK(sve_should_retry_piece(0.79));
+    CHECK(sve_should_retry_piece(0.0));
+    CHECK(!sve_should_retry_piece(0.80));
+    CHECK(!sve_should_retry_piece(0.95));
+    CHECK(!sve_should_retry_piece(std::nan("")));  // no tokens: nothing to compare, no retry
+}

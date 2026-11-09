@@ -162,6 +162,25 @@ TEST(transcription_vocab_line_from_saved_vocab) {
     CHECK_EQ(sve::transcription_vocab_line(s), std::string("Spell these words this way: Dr Rao, Lakshmi"));
 }
 
+TEST(spelling_vocab_line_says_only_if_said) {
+    // N7: outside the transcription prompt the saved words are spellings to use only if they are said,
+    // never topics to add (another note's vocabulary leaked into every section and note).
+    Store s(":memory:");
+    CHECK_EQ(sve::spelling_vocab_line(s), std::string());
+    s.add_memory("vocab", "AI bubble", std::nullopt);
+    s.add_memory("vocab", "IPO", std::nullopt);
+    CHECK_EQ(sve::spelling_vocab_line(s), std::string("Spell these words this way (") + sve::kVocabOnlyIfSaid + "): IPO, AI bubble");
+    // The transcription prompt keeps it as hearing help, unchanged.
+    CHECK_EQ(sve::transcription_vocab_line(s), std::string("Spell these words this way: IPO, AI bubble"));
+}
+
+TEST(notes_system_vocab_is_spelling_only) {
+    Store s(":memory:");
+    s.add_memory("vocab", "S&P 500 index", std::nullopt);
+    const std::string sys = sve::context_system(s, "SYS", false);
+    CHECK(sys.find(std::string("Words to spell this way (") + sve::kVocabOnlyIfSaid + "): S&P 500 index\n") != std::string::npos);
+}
+
 TEST(transcription_vocab_line_budget_utf8) {
     Store s(":memory:");
     for (int i = 0; i < 200; i++)

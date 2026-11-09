@@ -44,6 +44,20 @@ inline std::string chunk_prompt(const std::string &chunk, int idx, int total) {
 }
 
 // ---- final outputs ----
+
+// Rules of the detailed notes and the revision questions (N7, owner audit of note 19: the notes inverted
+// statements, turned "too many" into "two more" and "resignation" into "registration", gave the host's question
+// as the guest's claim, and made an action item out of garbled speech). The output language rules stay in
+// system_prompt.
+inline std::string faithful_rules(bool action_items) {
+    std::string r = "Rules:\n"
+                    "- Skip any passage that is unclear or garbled; do not guess what it means.\n";
+    if (action_items) r += "- Write an action item only when a speaker asks for it or commits to it.\n";
+    r += "- Keep who said what: a host's or interviewer's question is not the guest's claim.\n"
+         "- Never reverse a statement or drop a negation (not, never, no).\n"
+         "- Keep numbers, names and terms exactly as in the transcript.\n";
+    return r;
+}
 inline std::string short_summary_prompt(const std::string &material, bool from_bullets) {
     return std::string("Below ") + (from_bullets ? "are bullet points extracted from" : "is") +
            " a transcript of a recording.\n"
@@ -60,17 +74,17 @@ inline std::string detailed_notes_prompt(const std::string &material, bool from_
            "## Topic\n(one line)\n\n"
            "## Key points\n- bullet points, grouped by sub-topic, keep every definition, number, name and date\n\n"
            "## Decisions and instructions\n- anything that was decided, prescribed, assigned or promised\n\n"
-           "## Action items\n- [ ] task — who — when (only if stated)\n\n"
+           "## Action items\n- [ ] task — who — when (only if stated; only what a speaker asked for or committed to)\n\n"
            "## Dates and numbers mentioned\n- …\n\n"
            "## Open questions\n- things left unresolved\n\n"
-           "Use only what is in the text.\n\n\"\"\"\n" + material + "\n\"\"\"\n\n## Topic";
+           "Use only what is in the text.\n" + faithful_rules(true) + "\n\"\"\"\n" + material + "\n\"\"\"\n\n## Topic";
 }
 
 inline std::string revision_questions_prompt(const std::string &material, bool from_bullets) {
     return std::string("Below ") + (from_bullets ? "are bullet points extracted from" : "is") +
            " a transcript of a lesson or discussion.\n"
            "Write 6 revision questions a student could use to test themselves on this material, from easy to hard. "
-           "Every answer must come from the text; do not invent anything.\n"
+           "Every answer must come from the text; do not invent anything.\n" + faithful_rules(false) +
            "Use exactly this format, with a blank line between questions:\n\n"
            "Q1. <question about the text>\nA1. <answer taken from the text>\n\n"
            "Q2. <question about the text>\nA2. <answer taken from the text>\n\n"

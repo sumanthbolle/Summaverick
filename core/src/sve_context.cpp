@@ -4,6 +4,8 @@
 
 namespace sve {
 
+const char *const kVocabOnlyIfSaid = "not words of this recording: use one only if the transcript says it; never add it as a topic, term, hint or point";
+
 namespace {
 
 std::string str_of(const json &j, const char *k) {
@@ -63,7 +65,7 @@ std::string build_always(const json &profile, const json &meds, const std::vecto
         for (size_t i = prefs.size(); i-- > pref_from;) out += "- " + prefs[i] + "\n";
     }
     if (vocab_from < vocab.size()) {
-        out += std::string(out.empty() ? "" : "\n") + "Words to spell this way: ";
+        out += std::string(out.empty() ? "" : "\n") + "Words to spell this way (" + kVocabOnlyIfSaid + "): ";
         bool first = true;
         for (size_t i = vocab.size(); i-- > vocab_from;) {
             out += (first ? "" : ", ") + vocab[i];
@@ -144,6 +146,14 @@ std::string transcription_vocab_line(Store &store, size_t max_bytes) {
         out += add;
     }
     return out.size() > head.size() ? out : std::string();
+}
+
+std::string spelling_vocab_line(Store &store, size_t max_bytes) {
+    // The same terms as the transcription line (same budget), with the rule in its head.
+    static const std::string head = "Spell these words this way: ";
+    const std::string line = transcription_vocab_line(store, max_bytes);
+    if (line.size() <= head.size() || line.compare(0, head.size(), head) != 0) return std::string();
+    return "Spell these words this way (" + std::string(kVocabOnlyIfSaid) + "): " + line.substr(head.size());
 }
 
 Relevant relevant(Store &store, const std::string &query, size_t max_bytes) {

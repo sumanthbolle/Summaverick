@@ -38,9 +38,12 @@ struct Llm {
     // mean_prob (optional): mean softmax probability of the chosen non-EOG tokens under the raw logits
     // (before penalties); NaN when no token was generated. Read after sampling, never changes the choice.
     // n_out (optional): how many tokens were sampled, the end-of-generation token included.
+    // second_hearing: a transcription piece heard again (N7): the transcription's light penalty, then
+    // top-p 0.9 / min-p 0.05 / temperature 0.3 with a fixed seed, even under g_sve_force_greedy (a greedy repeat
+    // of the same input gives the same text). Overrides greedy.
     bool generate(int max_new_tokens, bool greedy, std::string &out,
                   sve_progress_cb cb, void *user, const char *phase, int done, int total,
-                  double *mean_prob = nullptr, int *n_out = nullptr);
+                  double *mean_prob = nullptr, int *n_out = nullptr, bool second_hearing = false);
 };
 
 // Remove thinking blocks and surrounding whitespace.

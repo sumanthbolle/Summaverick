@@ -49,4 +49,10 @@ PiecePlan plan_next_piece(const std::vector<float> &pcm, size_t offset, size_t s
 std::string transcription_instruction(const std::string &marker, const std::string &vocab, const std::string &prev);
 extern const char *const kTranscriberSystem;
 
+// A piece whose mean token probability (conf) is under this is transcribed once more (N7).
+constexpr double kRetryConf = 0.80;
+
 } // namespace sve
+
+// True when a piece heard with this conf gets its one second hearing: conf < 0.80. NaN (no token) is never retried.
+bool sve_should_retry_piece(double conf);

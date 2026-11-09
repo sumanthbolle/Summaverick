@@ -1,6 +1,7 @@
 #include "check.h"
 #include "sve_sections.h"
 #include "sve_store.h"
+#include "sve_context.h"
 
 using namespace sve;
 using nlohmann::json;
@@ -143,13 +144,14 @@ TEST(parse_section_summary_rejects_truncated) {
     CHECK(!parse_section_summary("", kStarts, s));
 }
 
-TEST(parse_section_summary_caps_points_at_6) {
+TEST(parse_section_summary_caps_points_at_10) {
     std::string o = "{\"title\":\"T\",\"points\":[";
-    for (int i = 0; i < 9; ++i) o += std::string(i ? "," : "") + "{\"text\":\"p" + std::to_string(i) + "\",\"start_sec\":0}";
+    for (int i = 0; i < 14; ++i) o += std::string(i ? "," : "") + "{\"text\":\"p" + std::to_string(i) + "\",\"start_sec\":0}";
     o += "]}";
     json s;
     CHECK(parse_section_summary(o, kStarts, s));
-    CHECK_EQ(s["points"].size(), (size_t)6);
+    CHECK_EQ(s["points"].size(), (size_t)10);  // a fuller section (N7): up to 10 points, was 6
+    CHECK_EQ(s["points"][9]["text"].get<std::string>(), std::string("p9"));
 }
 
 TEST(fallback_summary_shape) {
@@ -227,7 +229,7 @@ TEST(section_groups_respects_budget) {
 
 // --- memories from the section call ----------------------------------------------------------
 
-// Today's section_prompt output for these pieces (copied from the build before memories were added).
+// Today's section_prompt output for these pieces (N7: "cover every part", up to 10 points; was 3 to 6).
 static const Pieces kGoldPieces = {{0, "రవికి చెప్పాను"}, {42, "Meet Ravi on Friday at 5."}};
 static const char *kGoldTe =
     "Summarize this part of a recording. Write the summary in Telugu. Keep names, places and technical terms in the "
@@ -236,7 +238,9 @@ static const char *kGoldTe =
     "[{\"text\":\"one key point\",\"start_sec\":0}],\"terms\":[\"important names or technical terms\"],\"hints\":"
     "[\"things worth following up, if any\"]}\n"
     "Rules:\n"
-    "- 3 to 6 points, each one sentence.\n"
+    "- Cover every part, in order, to the last line: about one point for each [t=SEC] line, up to 10 points, each one "
+    "short sentence.\n"
+    "- Skip anything unclear or garbled instead of guessing what it means; fewer points are fine then.\n"
     "- Each point's \"start_sec\" is copied from the [t=SEC] marker of the transcript line it came from.\n"
     "- Use only what was said. Use an empty array when nothing applies.\n"
     "Words: Metformin, రవి\n"
@@ -253,7 +257,9 @@ static const char *kGoldEn =
     "[{\"text\":\"one key point\",\"start_sec\":0}],\"terms\":[\"important names or technical terms\"],\"hints\":"
     "[\"things worth following up, if any\"]}\n"
     "Rules:\n"
-    "- 3 to 6 points, each one sentence.\n"
+    "- Cover every part, in order, to the last line: about one point for each [t=SEC] line, up to 10 points, each one "
+    "short sentence.\n"
+    "- Skip anything unclear or garbled instead of guessing what it means; fewer points are fine then.\n"
     "- Each point's \"start_sec\" is copied from the [t=SEC] marker of the transcript line it came from.\n"
     "- Use only what was said. Use an empty array when nothing applies.\n"
     "\n"
@@ -264,7 +270,7 @@ static const char *kGoldEn =
     "JSON:\n";
 
 TEST(section_prompt_summary_part_unchanged) {
-    // Notes parity: the section summary prompt stays byte for byte as it was; memories have their own prompt.
+    // The section summary prompt byte for byte; memories have their own prompt.
     CHECK_EQ(section_prompt(kGoldPieces, "te", "Words: Metformin, రవి"), std::string(kGoldTe));
     CHECK_EQ(section_prompt(kGoldPieces, "en", ""), std::string(kGoldEn));
 }
@@ -324,4 +330,30 @@ TEST(complete_memory_items_from_a_cut_reply) {
     CHECK_EQ(complete_memory_items("{\"memories\":\"none\"}").size(), (size_t)0);
     CHECK_EQ(complete_memory_items("{\"title\":\"T\"}").size(), (size_t)0);
     CHECK_EQ(complete_memory_items("{\"memories\":[{\"type\":\"fa").size(), (size_t)0);
+}
+
+// --- N7: vocabulary is spelling help only; sections cover every part ---------------------------
+
+TEST(section_prompt_vocab_is_spelling_only) {
+    Store st(":memory:");
+    st.add_memory("vocab", "IPO", std::nullopt);
+    st.add_memory("vocab", "S&P 500 index", std::nullopt);
+    const std::string line = spelling_vocab_line(st);
+    const std::string p = section_prompt(kGoldPieces, "en", line);
+    // The instruction sits right next to the terms, in the same line.
+    const std::string expect = std::string("Spell these words this way (") + kVocabOnlyIfSaid + "): S&P 500 index, IPO\n";
+    CHECK(p.find(expect) != std::string::npos);
+    CHECK(std::string(kVocabOnlyIfSaid).find("only if") != std::string::npos);
+    CHECK(std::string(kVocabOnlyIfSaid).find("never add") != std::string::npos);
+    CHECK(std::string(kVocabOnlyIfSaid).find("topic") != std::string::npos);
+    const std::string m = memory_prompt(kGoldPieces, "en", line);
+    CHECK(m.find(expect) != std::string::npos);
+}
+
+TEST(section_prompt_covers_every_part) {
+    const std::string p = section_prompt(kGoldPieces, "en", "");
+    CHECK(p.find("Cover every part") != std::string::npos);
+    CHECK(p.find("up to 10 points") != std::string::npos);
+    CHECK(p.find("3 to 6") == std::string::npos);
+    CHECK(p.find("unclear or garbled") != std::string::npos);
 }

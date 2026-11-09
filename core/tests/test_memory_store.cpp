@@ -283,7 +283,7 @@ TEST(always_block_unchanged_after_migration) {
     const std::string expected =
         "About the person:\nName: Lakshmi\nPreferred language: Telugu\nRoutine: dinner 20:00\n\n"
         "Medicines:\n- Amlodipine 5 mg \xE2\x80\x94 after dinner (20:00) daily\n\n"
-        "Preferences:\n- Short answers\n\nWords to spell this way: Dr Rao\n";
+        "Preferences:\n- Short answers\n\nWords to spell this way (" + std::string(sve::kVocabOnlyIfSaid) + "): Dr Rao\n";
     CHECK_EQ(sve::always_block(before), expected);
 
     std::string p = make_v0();

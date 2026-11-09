@@ -224,7 +224,7 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
         if (!pieces.empty()) {
             if (!ctx->llm && !g_sve_model_reply) return -1;
             const std::string sys = sve::context_system(st, sve::system_prompt(lang), false);
-            const std::string prompt = sve::memory_prompt(pieces, lang, sve::transcription_vocab_line(st, 400));
+            const std::string prompt = sve::memory_prompt(pieces, lang, sve::spelling_vocab_line(st, 400));
             std::string out;
             Watch w{cb, user, false};
             if (!fits(ctx, sys, prompt, kMemoryMaxOut)) {

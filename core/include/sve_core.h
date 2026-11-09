@@ -116,6 +116,8 @@ char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progre
  *   {"status":"piece","start_sec":N,"end_sample":N,"text":"…"}  continue from end_sample (text may be "")
  *   {"status":"wait"}  not final and under 28 s + 3 s recorded after start_sample: call again later
  *   {"status":"end"}   nothing left (final: under 0.5 s left)
+ * "conf" (in the piece): mean token probability, NaN when no token. A piece under 0.80 is heard once more (same
+ * samples, prompt and previous text; sampled with a fixed seed) and the text with the higher conf is kept.
  * is_final: the recording has stopped; the last piece takes what is left. While not final, a file whose
  * header is missing, incomplete or not yet valid is a "wait". NULL on failure or cancel. */
 char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,
@@ -175,7 +177,7 @@ char *sve_plan_sections(const char *pieces_json, int64_t end_sec_of_last, int is
 /* Summary of one section. pieces_json: [{"start_sec":0,"text":"…"}]; lang "en"/"te". Returns the summary JSON
  * ({"title","topic","points":[{"text","start_sec"}],"terms","hints"}). Sampled first try, one greedy retry,
  * then a plain-text fallback ("fallback":true) built from the first sentences, so a model that ran never
- * gives NULL. NULL on cancel, no model or bad input. Output capped at 512 tokens. */
+ * gives NULL. NULL on cancel, no model or bad input. Output capped at 1024 tokens (up to 10 points). */
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang, sve_progress_cb cb, void *user);
 
 /* Notes built from a note's stored section summaries instead of the raw transcript. One group of summaries that

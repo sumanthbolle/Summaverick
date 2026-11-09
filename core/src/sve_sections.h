@@ -32,10 +32,13 @@ std::string plan_sections_json(const std::string &pieces_json, int64_t end_sec_o
 // Section summary JSON: {"title","topic","points":[{"text","start_sec"}],"terms":[],"hints":[]}.
 using SectionPieces = std::vector<std::pair<int64_t, std::string>>;  // (start_sec, text)
 
+// A section keeps up to 10 points and the prompt asks to cover every part (N7: 3 to 6 points skipped whole
+// stretches of a 12-piece section).
+constexpr size_t kSectionMaxPoints = 10;
 // Instruction asking for that shape in `lang` ("te" -> Telugu, else English); each piece is marked [t=SEC].
 std::string section_prompt(const SectionPieces &pieces, const std::string &lang, const std::string &vocab_line);
 // Strips fences/thinking, parses the first JSON object, clamps each start_sec to the nearest piece start,
-// caps points at 6. False when there is no title or no point.
+// caps points at kSectionMaxPoints. False when there is no title or no point.
 bool parse_section_summary(const std::string &model_out, const std::vector<int64_t> &piece_starts, nlohmann::json &out);
 // Memory candidates for one section, asked on their own (the section summary prompt above is unchanged).
 // kMemoryShape is the reply's shape line: {"memories":[{"type","text","who","to_whom","due_text","quote",

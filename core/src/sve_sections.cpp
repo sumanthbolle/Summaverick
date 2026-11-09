@@ -74,7 +74,9 @@ std::string section_prompt(const SectionPieces &pieces, const std::string &lang,
          "{\"title\":\"short title, at most 8 words\",\"topic\":\"one line on what this part is about\","
          "\"points\":[{\"text\":\"one key point\",\"start_sec\":0}],\"terms\":[\"important names or technical terms\"],"
          "\"hints\":[\"things worth following up, if any\"]}\n"
-         "Rules:\n- 3 to 6 points, each one sentence.\n"
+         "Rules:\n- Cover every part, in order, to the last line: about one point for each [t=SEC] line, up to 10 "
+         "points, each one short sentence.\n"
+         "- Skip anything unclear or garbled instead of guessing what it means; fewer points are fine then.\n"
          "- Each point's \"start_sec\" is copied from the [t=SEC] marker of the transcript line it came from.\n"
          "- Use only what was said. Use an empty array when nothing applies.\n";
     if (!vocab_line.empty()) p += vocab_line + "\n";
@@ -182,7 +184,7 @@ bool parse_section_summary(const std::string &model_out, const std::vector<int64
         if (pit == j.end() || !pit->is_array()) return false;
         json points = json::array();
         for (const auto &e : *pit) {
-            if (points.size() >= 6) break;
+            if (points.size() >= kSectionMaxPoints) break;
             if (!e.is_object() || !e.contains("text") || !e["text"].is_string() || e["text"].get<std::string>().empty()) continue;
             int64_t s = 0;
             if (e.contains("start_sec") && e["start_sec"].is_number()) {
