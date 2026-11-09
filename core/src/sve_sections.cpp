@@ -74,16 +74,162 @@ std::string section_prompt(const SectionPieces &pieces, const std::string &lang,
          "{\"title\":\"short title, at most 8 words\",\"topic\":\"one line on what this part is about\","
          "\"points\":[{\"text\":\"one key point\",\"start_sec\":0}],\"terms\":[\"important names or technical terms\"],"
          "\"hints\":[\"things worth following up, if any\"]}\n"
-         "Rules:\n- Cover every part, in order, to the last line: about one point for each [t=SEC] line, up to 10 "
-         "points, each one short sentence.\n"
-         "- Skip anything unclear or garbled instead of guessing what it means; fewer points are fine then.\n"
+         "Rules:\n- 3 to 6 points, each one sentence. Draw points from the beginning, middle and end of this part, "
+         "not only its start.\n"
+         "- Lines marked [unclear] were hard to hear: do not state anything from them as fact; skip them or say the "
+         "passage was unclear.\n"
          "- Each point's \"start_sec\" is copied from the [t=SEC] marker of the transcript line it came from.\n"
-         "- Use only what was said. Use an empty array when nothing applies.\n";
+         "- Use only what was said. Use an empty array when nothing applies.\n"
+         "- Never expand an abbreviation the speaker did not expand. Leave out advertisements and sponsor messages.\n";
     if (!vocab_line.empty()) p += vocab_line + "\n";
     p += "\nTranscript (each line starts with its [t=SEC] marker):\n";
     for (const auto &pc : pieces) p += "[t=" + std::to_string(pc.first) + "] " + pc.second + "\n";
     p += "\nJSON:\n";
     return p;
+}
+
+// ---- N7 rev 1: unclear pieces, vocabulary said or not ----
+
+const char *const kUnclearTag = "[unclear] ";
+
+bool piece_unclear(double conf) { return std::isfinite(conf) && conf < kUnclearConf; }
+
+static bool blank(const std::string &t) { return t.find_first_not_of(" \t\r\n") == std::string::npos; }
+
+std::string unclear_marked(const std::string &text, double conf) {
+    return piece_unclear(conf) && !blank(text) ? kUnclearTag + text : text;
+}
+
+double piece_conf(const json &e) {
+    if (e.is_object()) {
+        auto it = e.find("conf");
+        if (it != e.end() && it->is_number()) return it->get<double>();
+    }
+    return std::nan("");
+}
+
+static std::string trim_ws(const std::string &s) {
+    size_t a = s.find_first_not_of(" \t\r\n");
+    if (a == std::string::npos) return "";
+    size_t b = s.find_last_not_of(" \t\r\n");
+    return s.substr(a, b - a + 1);
+}
+
+std::string notes_material(const json &pieces) {
+    if (!pieces.is_array()) return "";
+    std::string out;
+    bool first = true;
+    for (const auto &e : pieces) {
+        if (!e.is_object() || !e.contains("text") || !e["text"].is_string()) continue;
+        if (!first) out += "\n";
+        out += unclear_marked(e["text"].get<std::string>(), piece_conf(e));
+        first = false;
+    }
+    return trim_ws(out);
+}
+
+SectionInput section_input(const json &arr) {
+    SectionInput in;
+    if (!arr.is_array()) return in;
+    for (const auto &e : arr) {
+        if (!e.is_object() || !e.contains("text") || !e["text"].is_string()) continue;
+        const std::string t = e["text"].get<std::string>();
+        if (blank(t)) continue;  // blank piece
+        int64_t s = e.contains("start_sec") && e["start_sec"].is_number() ? e["start_sec"].get<int64_t>() : 0;
+        in.plain.push_back({s, t});
+        in.marked.push_back({s, unclear_marked(t, piece_conf(e))});
+        in.starts.push_back(s);
+        in.said += (in.said.empty() ? "" : "\n") + t;
+    }
+    return in;
+}
+
+// The code point starting at byte i (len set to its byte length); U+FFFD for a bad byte.
+static char32_t cp_at(const std::string &s, size_t i, size_t &len) {
+    const unsigned char c = (unsigned char)s[i];
+    const int n = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 0;
+    if (n == 0 || i + n > s.size()) { len = 1; return 0xFFFD; }
+    char32_t cp = n == 1 ? c : c & (0xFF >> (n + 1));
+    for (int k = 1; k < n; ++k) {
+        const unsigned char d = (unsigned char)s[i + k];
+        if ((d & 0xC0) != 0x80) { len = 1; return 0xFFFD; }
+        cp = (cp << 6) | (d & 0x3F);
+    }
+    len = n;
+    return cp;
+}
+
+// A letter or digit of a Latin-script word: ASCII alphanumerics and the Latin letters up to U+024F.
+static bool latin_word_cp(char32_t c) {
+    if (c < 0x80) return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    return c >= 0xC0 && c <= 0x24F && c != 0xD7 && c != 0xF7;
+}
+
+static std::string ascii_lower(std::string s) {
+    for (char &c : s) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+    return s;
+}
+
+bool term_said(const std::string &term_in, const std::string &text) {
+    const std::string term = ascii_lower(trim_ws(term_in));
+    if (term.empty()) return false;
+    const std::string hay = ascii_lower(text);
+    bool latin = true;
+    for (size_t i = 0, n = 0; i < term.size(); i += n)
+        if (cp_at(term, i, n) > 0x24F) { latin = false; break; }
+    if (!latin) return hay.find(term) != std::string::npos;
+    for (size_t pos = hay.find(term); pos != std::string::npos; pos = hay.find(term, pos + 1)) {
+        size_t n = 0;
+        if (pos > 0) {  // the code point before the match
+            size_t b = pos - 1;
+            while (b > 0 && ((unsigned char)hay[b] & 0xC0) == 0x80) --b;
+            if (latin_word_cp(cp_at(hay, b, n))) continue;
+        }
+        const size_t end = pos + term.size();
+        if (end < hay.size() && latin_word_cp(cp_at(hay, end, n))) continue;
+        return true;
+    }
+    return false;
+}
+
+std::vector<std::string> terms_said(const std::vector<std::string> &vocab, const std::string &text) {
+    std::vector<std::string> out;
+    for (const auto &v : vocab) if (term_said(v, text)) out.push_back(v);
+    return out;
+}
+
+int drop_unsaid_vocab(json &summary, const std::vector<std::string> &vocab, const std::string &said) {
+    std::vector<std::string> unsaid;
+    for (const auto &v : vocab) if (!blank(v) && !term_said(v, said)) unsaid.push_back(v);
+    if (unsaid.empty() || !summary.is_object()) return 0;
+    auto mentions = [&](const std::string &t) {
+        for (const auto &u : unsaid) if (term_said(u, t)) return true;
+        return false;
+    };
+    int dropped = 0;
+    for (const char *key : {"terms", "hints"}) {
+        auto it = summary.find(key);
+        if (it == summary.end() || !it->is_array()) continue;
+        json keep = json::array();
+        for (const auto &e : *it) {
+            if (e.is_string() && mentions(e.get<std::string>())) { ++dropped; continue; }
+            keep.push_back(e);
+        }
+        *it = keep;
+    }
+    auto pit = summary.find("points");
+    if (pit != summary.end() && pit->is_array()) {
+        json keep = json::array();
+        for (const auto &p : *pit) {
+            if (p.is_object() && p.contains("text") && p["text"].is_string() && mentions(p["text"].get<std::string>())) {
+                ++dropped;
+                continue;
+            }
+            keep.push_back(p);
+        }
+        *pit = keep;
+    }
+    return dropped;
 }
 
 static std::string drop_thinking(std::string s) {
@@ -356,6 +502,99 @@ std::vector<std::string> section_groups(const json &sections, int budget_tokens,
     }
     if (!cur.empty()) groups.push_back(cur);
     return groups;
+}
+
+std::string sections_text(const json &sections) {
+    std::string out;
+    if (!sections.is_array()) return out;
+    for (const auto &sec : sections) out += render_section(sec);
+    return sections.empty() ? std::string() : out;
+}
+
+namespace {
+
+// The line ends a sentence: . ! ? or the danda (U+0964), optionally followed by closing brackets or quotes.
+bool ends_sentence(const std::string &line) {
+    std::string t = line;
+    while (!t.empty() && (t.back() == ' ' || t.back() == '\t' || t.back() == '\r')) t.pop_back();
+    while (!t.empty() && (t.back() == ')' || t.back() == ']' || t.back() == '"' || t.back() == '\'' || t.back() == '*')) t.pop_back();
+    if (t.empty()) return false;
+    const char c = t.back();
+    if (c == '.' || c == '!' || c == '?') return true;
+    return t.size() >= 3 && t.compare(t.size() - 3, 3, "\xE0\xA5\xA4") == 0;  // ।
+}
+
+// Words of a line before byte `upto`, not counting a list marker ("-", "*", "1.", "Q3.", "A3.", "[ ]").
+int words_before(const std::string &line, size_t upto) {
+    int n = 0;
+    size_t i = 0;
+    bool first = true;
+    while (i < upto) {
+        while (i < upto && (line[i] == ' ' || line[i] == '\t')) ++i;
+        size_t b = i;
+        while (i < upto && line[i] != ' ' && line[i] != '\t') ++i;
+        if (i == b) break;
+        const std::string w = line.substr(b, i - b);
+        bool marker = false;
+        if (first) {
+            std::string core = w;
+            if (!core.empty() && core.back() == '.') core.pop_back();
+            if (!core.empty() && (core[0] == 'Q' || core[0] == 'A')) core.erase(0, 1);
+            marker = w == "-" || w == "*" || w == "#" || w == "##" || w == "###" ||
+                     (!core.empty() && core.find_first_not_of("0123456789") == std::string::npos);
+        }
+        if (w == "[" || w == "]" || w == "[ ]" || w == "[x]") marker = true;
+        if (!marker) ++n;
+        first = false;
+    }
+    return n;
+}
+
+bool is_heading(const std::string &l) { return l.rfind("#", 0) == 0; }
+bool is_question(const std::string &l) {
+    return l.size() > 2 && l[0] == 'Q' && l[1] >= '0' && l[1] <= '9';
+}
+
+}  // namespace
+
+std::string trim_cut_reply(const std::string &reply) {
+    const std::string whole = trim_ws(reply);
+    if (whole.empty()) return whole;
+    std::vector<std::string> lines;
+    for (size_t a = 0;;) {
+        size_t nl = whole.find('\n', a);
+        lines.push_back(whole.substr(a, nl == std::string::npos ? std::string::npos : nl - a));
+        if (nl == std::string::npos) break;
+        a = nl + 1;
+    }
+    std::string &last = lines.back();
+    if (!ends_sentence(last)) {
+        // The last finished sentence on the line: ". " / "! " / "? " / "। ".
+        size_t cut = std::string::npos;
+        for (size_t i = 0; i + 1 < last.size(); ++i) {
+            const char c = last[i];
+            if ((c == '.' || c == '!' || c == '?') && last[i + 1] == ' ') cut = i + 1;
+            if (i + 3 < last.size() && last.compare(i, 3, "\xE0\xA5\xA4") == 0 && last[i + 3] == ' ') cut = i + 3;
+        }
+        if (cut != std::string::npos && words_before(last, cut) >= 3) {
+            last.resize(cut);
+        } else {
+            lines.pop_back();
+        }
+    }
+        // Trailing blank lines, headings with nothing under them, a question left without its answer.
+    for (;;) {
+        while (!lines.empty() && trim_ws(lines.back()).empty()) lines.pop_back();
+        if (lines.empty()) break;
+        const std::string l = trim_ws(lines.back());
+        if (is_heading(l) || l == "-" || l == "*") { lines.pop_back(); continue; }
+        if (is_question(l)) { lines.pop_back(); continue; }  // its answer was cut, or never came
+        break;
+    }
+    if (lines.empty()) return whole;
+    std::string out;
+    for (size_t i = 0; i < lines.size(); ++i) out += (i ? "\n" : "") + lines[i];
+    return trim_ws(out);
 }
 
 }  // namespace sve

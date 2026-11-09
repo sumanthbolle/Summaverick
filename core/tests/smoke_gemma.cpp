@@ -892,6 +892,12 @@ static int run_api(sve_ctx *ctx) {
 
     expect(sve_vocab_add(ctx, "Amlodipine") > 0 && sve_vocab_add(ctx, "amlodipine") == sve_vocab_add(ctx, "Amlodipine"), "vocab add dedupes");
     expect(sve_note_set_pieces(ctx, note, "{\"x\":1}") < 0, "pieces must be an array");
+    {   // N7 rev 1: the notes material marks pieces heard with conf < 0.80; no conf is not marked.
+        char *m = sve_notes_material(R"([{"start_sec":0,"text":"Clear.","conf":0.9},{"start_sec":28,"text":"Mumble.","conf":0.6},{"start_sec":56,"text":"Old."}])");
+        expect(m && std::string(m) == "Clear.\n[unclear] Mumble.\nOld.", "notes material marks the unclear piece only");
+        sve_free_string(m);
+        expect(sve_notes_material("{}") == nullptr && sve_notes_material(nullptr) == nullptr, "notes material needs an array");
+    }
     json np = take(sve_note_pieces(ctx, note));
     expect(np.size() == 2 && np[1]["start_sec"] == 28, "pieces round trip");
     expect(take(sve_insight_latest(ctx)).is_null(), "no insight yet");
@@ -958,7 +964,7 @@ done:
 }
 
 // Transcribes the WAV piece by piece (as live does), plans ~5 minute sections, summarises each and prints
-// the JSON with the seconds it took. Expects a title and 1..10 points per section; "fallback" is reported.
+// the JSON with the seconds it took. Expects a title and 1..6 points per section; "fallback" is reported.
 // SVE_SECTION_MAX_OUT=8 truncates every answer, so the retry and the fallback path run and must still return a summary.
 static int run_sections(sve_ctx *ctx, const char *wav, const char *lang, json *stored = nullptr, double *dur_out = nullptr) {
     if (const char *m = getenv("SVE_SECTION_MAX_OUT")) g_sve_section_max_out = atoi(m);
@@ -991,8 +997,8 @@ static int run_sections(sve_ctx *ctx, const char *wav, const char *lang, json *s
         json s = take(sve_section_summarize(ctx, arr.dump().c_str(), lang, nullptr, nullptr));
         double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         printf("--- section %zu (pieces %zu..%zu, %.1f s)\n%s\n", k, secs[k].first, secs[k].second, sec, s.dump(2).c_str());
-        expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 10,
-               "section summary has a title and 1..10 points");
+        expect(s.is_object() && s.contains("title") && s["points"].is_array() && !s["points"].empty() && s["points"].size() <= 6,
+               "section summary has a title and 1..6 points");
         if (stored) stored->push_back({{"idx", (int)k}, {"first_piece", (int)secs[k].first}, {"last_piece", (int)secs[k].second - 1},
                                        {"start_sec", refs[secs[k].first].start_sec}, {"end_sec", refs[secs[k].second - 1].end_sec}, {"summary", s}});
         if (s.value("fallback", false)) printf("(fallback used)\n");

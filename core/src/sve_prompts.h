@@ -34,28 +34,37 @@ inline std::string system_prompt(const std::string &lang) {
            "languages in brackets in their original script. /no_think";
 }
 
+// Transcript text from a piece heard with conf < 0.80 starts with "[unclear] " (sve::kUnclearTag, N7 rev 1); every
+// prompt that may see such text says what the tag means.
+inline const char *unclear_rule() {
+    return "Text marked [unclear] was hard to hear: do not state anything from it as fact; skip it or say the passage "
+           "was unclear.";
+}
+
 // ---- per‑chunk extraction (used when a transcript does not fit one context) ----
 inline std::string chunk_prompt(const std::string &chunk, int idx, int total) {
     return "This is part " + std::to_string(idx + 1) + " of " + std::to_string(total) +
            " of a transcript of a recording (a lecture, meeting, consultation or personal note).\n"
            "List the important points from THIS PART ONLY as short bullet points. Include every fact, "
            "definition, number, name, date, decision, instruction and task that is mentioned. "
-           "Do not add anything that is not in the text.\n\nTranscript part:\n\"\"\"\n" + chunk + "\n\"\"\"\n\nBullet points:";
+           "Do not add anything that is not in the text. " + unclear_rule() + "\n\nTranscript part:\n\"\"\"\n" + chunk + "\n\"\"\"\n\nBullet points:";
 }
 
 // ---- final outputs ----
 
 // Rules of the detailed notes and the revision questions (N7, owner audit of note 19: the notes inverted
 // statements, turned "too many" into "two more" and "resignation" into "registration", gave the host's question
-// as the guest's claim, and made an action item out of garbled speech). The output language rules stay in
-// system_prompt.
+// as the guest's claim, and made an action item out of garbled speech; rev 1: "CAC (Civil Action Committee)" was
+// an invented expansion, and an ad was given as a key point). The output language rules stay in system_prompt.
 inline std::string faithful_rules(bool action_items) {
-    std::string r = "Rules:\n"
-                    "- Skip any passage that is unclear or garbled; do not guess what it means.\n";
+    std::string r = std::string("Rules:\n- ") + unclear_rule() + "\n"
+                    "- Skip any other passage that is garbled; do not guess what it means.\n";
     if (action_items) r += "- Write an action item only when a speaker asks for it or commits to it.\n";
     r += "- Keep who said what: a host's or interviewer's question is not the guest's claim.\n"
          "- Never reverse a statement or drop a negation (not, never, no).\n"
-         "- Keep numbers, names and terms exactly as in the transcript.\n";
+         "- Keep numbers, names and terms exactly as in the transcript.\n"
+         "- Never expand an abbreviation the speaker did not expand.\n"
+         "- Leave out advertisements and sponsor messages.\n";
     return r;
 }
 inline std::string short_summary_prompt(const std::string &material, bool from_bullets) {
@@ -63,7 +72,7 @@ inline std::string short_summary_prompt(const std::string &material, bool from_b
            " a transcript of a recording.\n"
            "Write a short summary of at most 6 sentences that a person could read to remember what happened. "
            "Mention who/what it was about, the main points, and any decisions or next steps. "
-           "Use only what is in the text.\n\n\"\"\"\n" + material + "\n\"\"\"\n\nShort summary:";
+           "Use only what is in the text. " + unclear_rule() + "\n\n\"\"\"\n" + material + "\n\"\"\"\n\nShort summary:";
 }
 
 inline std::string detailed_notes_prompt(const std::string &material, bool from_bullets) {

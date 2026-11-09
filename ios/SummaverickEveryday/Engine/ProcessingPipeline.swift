@@ -730,7 +730,8 @@ final class ProcessingPipeline {
         }
         let pieces = await engine.pieces(id)
         let covered = SectionWriter.coversAll(await engine.sections(id), pieceCount: pieces.count)
-        let fromSections = await notesFromSections(covered: covered, transcript: transcript, lang: lang)
+        let material = Self.notesMaterial(pieces, transcript: transcript)
+        let fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
         var result = Previous(title: nil, outputs: [:])
         // Lock-screen progress: the title (regenerate all), then each output; the heartbeat runs inside each output.
         let steps = RegenerateRules.steps(all: request.kind == nil, outputs: request.kinds.count)
@@ -748,7 +749,7 @@ final class ProcessingPipeline {
             if !(await heatGate(id)) { return nil }
             do {
                 let step = done
-                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections,
+                let text = try await writeOutput(kind, noteID: id, transcript: material, lang: lang, fromSections: fromSections,
                                                  fraction: { RegenerateRules.fraction(done: step, part: $0, steps: steps) })
                 guard RegenerateRules.accepts(text) else { NSLog("[sve] regenerate: empty %@", kind.title); return nil }
                 result.outputs[kind] = text
@@ -822,6 +823,15 @@ final class ProcessingPipeline {
 
     private static func joined(_ pieces: [TranscriptPiece]) -> String {
         pieces.map(\.text).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The text the summary, notes and questions are written from (and the fit check counts): the transcript with
+    /// the pieces heard with conf < 0.80 marked "[unclear] " (N7 rev 1), when the stored pieces are that transcript;
+    /// otherwise the transcript as it is. The title and the stored transcript stay unmarked.
+    private static func notesMaterial(_ pieces: [TranscriptPiece], transcript: String) -> String {
+        guard !pieces.isEmpty, joined(pieces) == transcript.trimmingCharacters(in: .whitespacesAndNewlines),
+              let marked = CoreEngine.shared.notesMaterial(pieces), !marked.isEmpty else { return transcript }
+        return marked
     }
 
     private func loadSelectedModel() async throws {
@@ -1053,7 +1063,8 @@ final class ProcessingPipeline {
         // one prompt; from the sections only when it does not and they cover the whole recording.
         guard let covered = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
-        let fromSections = await notesFromSections(covered: covered, transcript: transcript, lang: lang)
+        let material = Self.notesMaterial(await engine.pieces(id), transcript: transcript)
+        let fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
         if setTitle, !(await heatGate(id)) { return }
 
         if setTitle, let t = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections) {
@@ -1077,7 +1088,7 @@ final class ProcessingPipeline {
             if !(await heatGate(id)) { return }
             do {
                 let step = Self.firstOutputStep + i, total = Self.notesSteps
-                let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections,
+                let text = try await writeOutput(kind, noteID: id, transcript: material, lang: lang, fromSections: fromSections,
                                                  fraction: { NotesProgress.fraction(outputsDone: step, part: $0, outputsTotal: total) })
                 // Stored as soon as written: the summary is readable before the notes.
                 await engine.setOutput(id, kind, text)

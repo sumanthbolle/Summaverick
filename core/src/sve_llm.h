@@ -23,6 +23,7 @@ struct Llm {
     int n_threads_batch = 4;   // prefill and the audio encoder (load sets it)
     int n_gpu_layers = 0;   // 0 = CPU only; the audio projector follows (sve_load_audio)
     std::string tmpl; // chat template (jinja source) from the GGUF, or empty
+    bool last_cut = false;  // the last generate stopped at max_new_tokens, before an end-of-generation token
 
     ~Llm();
     bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers);

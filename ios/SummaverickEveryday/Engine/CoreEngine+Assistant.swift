@@ -265,6 +265,13 @@ extension CoreEngine {
         return summary
     }
 
+    /// The text the notes are written from (sve_notes_material): the pieces joined as the transcript is, a piece heard
+    /// with conf < 0.80 marked "[unclear] " so the notes prompts do not state it as fact. nil on bad input.
+    nonisolated func notesMaterial(_ pieces: [TranscriptPiece]) -> String? {
+        guard let json = encodeJSON(pieces) else { return nil }
+        return take(sve_notes_material(json))
+    }
+
     /// Replaces the note's sections. False when it could not be stored, for example the note is gone.
     @discardableResult
     nonisolated func setSections(_ noteID: Int64, _ sections: [NoteSection]) async -> Bool {

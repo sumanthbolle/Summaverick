@@ -3,12 +3,16 @@
 
 using namespace sve;
 
-// Values as sve_generate computed them before the helpers (n_ctx 8192: max_out 700, chunk_out 400).
+// n_ctx 8192: max_out 1400 (N7 rev 1: was 700, which cut detailed notes mid-sentence), chunk_out 400.
 TEST(notes_budget_matches_sve_generate_arithmetic) {
-    CHECK_EQ(notes_max_out(8192), 700);
+    CHECK_EQ(notes_max_out(8192), 1400);
+    CHECK_EQ(notes_max_out(4096), 1024);
     CHECK_EQ(notes_max_out(2048), 512);
     CHECK_EQ(notes_max_out(512), 160);
-    CHECK_EQ(notes_budget(8192, 300), 8192 - 700 - 250 - 300);
+    CHECK_EQ(notes_budget(8192, 300), 8192 - 1400 - kNotesScaffold - 300);
+    // The prompt, the material at its budget and the longest answer fit the context together.
+    for (int n : {512, 2048, 4096, 8192})
+        CHECK(notes_budget(n, 300) + 300 + kNotesScaffold + notes_max_out(n) <= n);
     CHECK_EQ(chunk_max_out(8192), 400);
     CHECK_EQ(chunk_max_out(400), 120);
     CHECK_EQ(chunk_budget(8192, 300), 8192 - 400 - 300 - 80 - 32);
@@ -16,7 +20,8 @@ TEST(notes_budget_matches_sve_generate_arithmetic) {
 }
 
 TEST(fit_budget_is_the_smaller_budget_floored_at_128) {
-    CHECK_EQ(fit_budget(8192, 300, notes_budget(8192, 300)), 6942);   // notes budget below chunk budget
+    CHECK_EQ(fit_budget(8192, 300, notes_budget(8192, 300)), notes_budget(8192, 300));   // notes budget below chunk budget
+    CHECK(notes_budget(8192, 300) < chunk_budget(8192, 300));
     CHECK_EQ(fit_budget(8192, 300, 99999), chunk_budget(8192, 300));
     CHECK_EQ(fit_budget(8192, 300, 10), 128);
 }

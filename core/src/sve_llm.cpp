@@ -91,6 +91,7 @@ std::string Llm::apply_template(const std::string &system, const std::string &us
 bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &out,
               sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy) {
     out.clear();
+    last_cut = false;
     llama_memory_clear(llama_get_memory(ctx), true);
 
     std::vector<llama_token> toks = tokenize(prompt, true, true);
@@ -139,14 +140,15 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
         llama_sampler_chain_add(smpl, llama_sampler_init_dist(42));
     }
 
-    bool ok = true;
+    bool ok = true, eog = false;
     char piece[256];
     if (n_out) *n_out = 0;
+    last_cut = false;
     for (int i = 0; i < max_new_tokens; ++i) {
         llama_token id = llama_sampler_sample(smpl, ctx, -1);
         if (n_out) ++*n_out;
         sve_log_tokens('o', &id, 1);
-        if (llama_vocab_is_eog(vocab, id)) break;
+        if (llama_vocab_is_eog(vocab, id)) { eog = true; break; }
         if (mean_prob) {
             const float *lg = llama_get_logits_ith(ctx, -1);
             const int nv = llama_vocab_n_tokens(vocab);
@@ -167,6 +169,7 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
         if ((i & 15) == 0 && cb && cb(phase, done, total, user)) { ok = false; break; }
     }
     llama_sampler_free(smpl);
+    last_cut = ok && !eog;
     if (mean_prob) *mean_prob = prob_n ? prob_sum / prob_n : std::nan("");
     return ok;
 }

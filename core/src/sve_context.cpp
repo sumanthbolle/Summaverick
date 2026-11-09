@@ -1,10 +1,11 @@
 #include "sve_context.h"
 #include "sve_prompts.h"
+#include "sve_sections.h"  // terms_said
 #include <vector>
 
 namespace sve {
 
-const char *const kVocabOnlyIfSaid = "not words of this recording: use one only if the transcript says it; never add it as a topic, term, hint or point";
+const char *const kVocabOnlyIfSaid = "spellings only: use one only if the transcript says it; never add it as a topic, term, hint or point";
 
 namespace {
 
@@ -110,7 +111,9 @@ std::string truncate_utf8(const std::string &s, size_t max_bytes) {
     return s.substr(0, n);
 }
 
-std::string always_block(Store &store, size_t max_bytes, bool medicines) {
+std::vector<std::string> saved_vocab(Store &store) { return texts(store.memory("vocab")); }
+
+std::string always_block(Store &store, size_t max_bytes, bool medicines, const std::string *said) {
     json profile;
     if (auto p = store.setting_get("profile")) {
         profile = json::parse(*p, nullptr, false);
@@ -119,6 +122,7 @@ std::string always_block(Store &store, size_t max_bytes, bool medicines) {
     json meds = medicines ? store.medicines() : json::array();
     std::vector<std::string> prefs = texts(store.memory("preference"));
     std::vector<std::string> vocab = texts(store.memory("vocab"));
+    if (said) vocab = terms_said(vocab, *said);
     size_t pf = 0, vf = 0;
     std::string out = build_always(profile, meds, prefs, pf, vocab, vf);
     while (out.size() > max_bytes && vf < vocab.size()) out = build_always(profile, meds, prefs, pf, vocab, ++vf);
@@ -126,16 +130,17 @@ std::string always_block(Store &store, size_t max_bytes, bool medicines) {
     return truncate_utf8(out, max_bytes);
 }
 
-std::string context_system(Store &store, const std::string &system, bool medicines) {
-    std::string ab = always_block(store, 2000, medicines);
+std::string context_system(Store &store, const std::string &system, bool medicines, const std::string *said) {
+    std::string ab = always_block(store, 2000, medicines, said);
     if (ab.empty()) return system;
     return "Background about the person you work for (use it for names, spellings and preferences; "
            "do not repeat it unless it is asked for):\n" + ab + "\n" + system;
 }
 
-std::string transcription_vocab_line(Store &store, size_t max_bytes) {
-    std::vector<std::string> vocab = texts(store.memory("vocab"));  // oldest first
-    const std::string head = "Spell these words this way: ";
+namespace {
+
+// head + the terms (given oldest first) newest first, whole terms within max_bytes; "" when no term.
+std::string vocab_line(const std::vector<std::string> &vocab, const std::string &head, size_t max_bytes) {
     std::string out;
     for (size_t i = vocab.size(); i-- > 0;) {
         std::string add = (out.empty() ? head : std::string(", ")) + vocab[i];
@@ -148,11 +153,20 @@ std::string transcription_vocab_line(Store &store, size_t max_bytes) {
     return out.size() > head.size() ? out : std::string();
 }
 
-std::string spelling_vocab_line(Store &store, size_t max_bytes) {
-    // The same terms as the transcription line (same budget), with the rule in its head.
+}  // namespace
+
+std::string transcription_vocab_line(Store &store, size_t max_bytes) {
+    return vocab_line(texts(store.memory("vocab")), "Spell these words this way: ", max_bytes);  // oldest first
+}
+
+std::string spelling_vocab_line(Store &store, size_t max_bytes, const std::string *said) {
+    // The words that are said, newest first, within the transcription line's budget (its head is shorter: the
+    // budget counts the words, not the rule).
     static const std::string head = "Spell these words this way: ";
-    const std::string line = transcription_vocab_line(store, max_bytes);
-    if (line.size() <= head.size() || line.compare(0, head.size(), head) != 0) return std::string();
+    std::vector<std::string> vocab = texts(store.memory("vocab"));
+    if (said) vocab = terms_said(vocab, *said);
+    const std::string line = vocab_line(vocab, head, max_bytes);
+    if (line.empty()) return line;
     return "Spell these words this way (" + std::string(kVocabOnlyIfSaid) + "): " + line.substr(head.size());
 }
 

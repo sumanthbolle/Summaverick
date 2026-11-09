@@ -74,6 +74,7 @@ int  sve_llm_loaded(const sve_ctx *ctx);
 /* Generates one output kind from a transcript. Long transcripts are chunked, summarised
  * per chunk, then merged, so this works for a 90‑minute lecture on a 4096‑token context.
  * lang is a BCP‑47 code ("en", "hi", "te"); the model is asked to write in that language.
+ * An output that reaches its token cap ends on its last whole sentence or bullet (also sve_generate_from_sections).
  * Returns a malloc'd UTF‑8 string, or NULL on failure/cancel. */
 char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang,
                    sve_progress_cb cb, void *user);
@@ -82,6 +83,12 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
  * summarise it first, -1 with no model or bad input. Same budget as sve_generate (needs the model's tokenizer).
  * Notes and title come from the transcript when it fits, from the section summaries only when it does not. */
 int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang);
+
+/* The text to give sve_generate and sve_transcript_fits for a note (N7 rev 1): its pieces
+ * ([{"start_sec","text","conf"?}], as sve_note_pieces returns them) joined by newlines and trimmed, a piece heard
+ * with conf < 0.80 starting with "[unclear] " (the notes prompts say not to state it as fact). With no such piece it
+ * is the stored transcript. Pure; NULL on bad input. */
+char *sve_notes_material(const char *pieces_json);
 
 /* Free‑form question over a transcript or set of notes ("what was the homework?").
  * context_text should be the transcript (or concatenated note outputs). */
@@ -177,7 +184,9 @@ char *sve_plan_sections(const char *pieces_json, int64_t end_sec_of_last, int is
 /* Summary of one section. pieces_json: [{"start_sec":0,"text":"…"}]; lang "en"/"te". Returns the summary JSON
  * ({"title","topic","points":[{"text","start_sec"}],"terms","hints"}). Sampled first try, one greedy retry,
  * then a plain-text fallback ("fallback":true) built from the first sentences, so a model that ran never
- * gives NULL. NULL on cancel, no model or bad input. Output capped at 1024 tokens (up to 10 points). */
+ * gives NULL. NULL on cancel, no model or bad input. Output capped at 512 tokens (3 to 6 points). Pieces with a
+ * "conf" under 0.80 are marked [unclear] in the prompt; saved words the pieces do not say are left out of the prompt,
+ * and a term, hint or point that names one is dropped. */
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang, sve_progress_cb cb, void *user);
 
 /* Notes built from a note's stored section summaries instead of the raw transcript. One group of summaries that

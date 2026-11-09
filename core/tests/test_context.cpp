@@ -181,6 +181,31 @@ TEST(notes_system_vocab_is_spelling_only) {
     CHECK(sys.find(std::string("Words to spell this way (") + sve::kVocabOnlyIfSaid + "): S&P 500 index\n") != std::string::npos);
 }
 
+// N7 rev 1: a saved word reaches the section, memory and notes prompts only when this note says it (a prompt
+// instruction alone did not stop "AI bubble" from another note being listed as a term of note 20).
+TEST(vocab_filtered_by_what_was_said) {
+    Store s(":memory:");
+    s.add_memory("vocab", "AI bubble", std::nullopt);
+    s.add_memory("vocab", "IPO", std::nullopt);
+    s.add_memory("vocab", "S&P 500 index", std::nullopt);
+    s.add_memory("vocab", "రవి", std::nullopt);
+    const std::string said = "The IPO opens Monday. రవికి చెప్పాను.";
+    CHECK_EQ(sve::spelling_vocab_line(s, 400, &said),
+             std::string("Spell these words this way (") + sve::kVocabOnlyIfSaid + "): రవి, IPO");
+    const std::string none = "Nothing from the list here, only IPOs.";
+    CHECK_EQ(sve::spelling_vocab_line(s, 400, &none), std::string());
+    // The notes system prompt (always block) too.
+    const std::string sys = sve::context_system(s, "SYS", false, &said);
+    CHECK(sys.find(std::string("Words to spell this way (") + sve::kVocabOnlyIfSaid + "): రవి, IPO\n") != std::string::npos);
+    CHECK(sys.find("AI bubble") == std::string::npos && sys.find("S&P") == std::string::npos);
+    CHECK_EQ(sve::context_system(s, "SYS", false, &none), std::string("SYS"));  // no word said, nothing else known
+    CHECK(sve::always_block(s, 2000, false, &none).find("Words to spell") == std::string::npos);
+    // Without a text (Ask, extraction) every word stays; the transcription line keeps them all as hearing help.
+    CHECK(sve::context_system(s, "SYS", false).find("AI bubble") != std::string::npos);
+    CHECK_EQ(sve::transcription_vocab_line(s), std::string("Spell these words this way: రవి, S&P 500 index, IPO, AI bubble"));
+    CHECK_EQ(sve::saved_vocab(s).size(), (size_t)4);
+}
+
 TEST(transcription_vocab_line_budget_utf8) {
     Store s(":memory:");
     for (int i = 0; i < 200; i++)

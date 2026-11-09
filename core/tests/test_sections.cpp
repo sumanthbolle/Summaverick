@@ -1,4 +1,5 @@
 #include "check.h"
+#include <cmath>
 #include "sve_sections.h"
 #include "sve_store.h"
 #include "sve_context.h"
@@ -144,14 +145,13 @@ TEST(parse_section_summary_rejects_truncated) {
     CHECK(!parse_section_summary("", kStarts, s));
 }
 
-TEST(parse_section_summary_caps_points_at_10) {
+TEST(parse_section_summary_caps_points_at_6) {
     std::string o = "{\"title\":\"T\",\"points\":[";
-    for (int i = 0; i < 14; ++i) o += std::string(i ? "," : "") + "{\"text\":\"p" + std::to_string(i) + "\",\"start_sec\":0}";
+    for (int i = 0; i < 9; ++i) o += std::string(i ? "," : "") + "{\"text\":\"p" + std::to_string(i) + "\",\"start_sec\":0}";
     o += "]}";
     json s;
     CHECK(parse_section_summary(o, kStarts, s));
-    CHECK_EQ(s["points"].size(), (size_t)10);  // a fuller section (N7): up to 10 points, was 6
-    CHECK_EQ(s["points"][9]["text"].get<std::string>(), std::string("p9"));
+    CHECK_EQ(s["points"].size(), (size_t)6);  // N7 rev 1: back to 6 (10 points turned garbled audio into more points)
 }
 
 TEST(fallback_summary_shape) {
@@ -229,7 +229,8 @@ TEST(section_groups_respects_budget) {
 
 // --- memories from the section call ----------------------------------------------------------
 
-// Today's section_prompt output for these pieces (N7: "cover every part", up to 10 points; was 3 to 6).
+// Today's section_prompt output for these pieces (N7 rev 1: 3 to 6 points spread over the part, [unclear] lines,
+// no invented expansions, no ads).
 static const Pieces kGoldPieces = {{0, "రవికి చెప్పాను"}, {42, "Meet Ravi on Friday at 5."}};
 static const char *kGoldTe =
     "Summarize this part of a recording. Write the summary in Telugu. Keep names, places and technical terms in the "
@@ -238,11 +239,13 @@ static const char *kGoldTe =
     "[{\"text\":\"one key point\",\"start_sec\":0}],\"terms\":[\"important names or technical terms\"],\"hints\":"
     "[\"things worth following up, if any\"]}\n"
     "Rules:\n"
-    "- Cover every part, in order, to the last line: about one point for each [t=SEC] line, up to 10 points, each one "
-    "short sentence.\n"
-    "- Skip anything unclear or garbled instead of guessing what it means; fewer points are fine then.\n"
+    "- 3 to 6 points, each one sentence. Draw points from the beginning, middle and end of this part, not only its "
+    "start.\n"
+    "- Lines marked [unclear] were hard to hear: do not state anything from them as fact; skip them or say the passage "
+    "was unclear.\n"
     "- Each point's \"start_sec\" is copied from the [t=SEC] marker of the transcript line it came from.\n"
     "- Use only what was said. Use an empty array when nothing applies.\n"
+    "- Never expand an abbreviation the speaker did not expand. Leave out advertisements and sponsor messages.\n"
     "Words: Metformin, రవి\n"
     "\n"
     "Transcript (each line starts with its [t=SEC] marker):\n"
@@ -257,11 +260,13 @@ static const char *kGoldEn =
     "[{\"text\":\"one key point\",\"start_sec\":0}],\"terms\":[\"important names or technical terms\"],\"hints\":"
     "[\"things worth following up, if any\"]}\n"
     "Rules:\n"
-    "- Cover every part, in order, to the last line: about one point for each [t=SEC] line, up to 10 points, each one "
-    "short sentence.\n"
-    "- Skip anything unclear or garbled instead of guessing what it means; fewer points are fine then.\n"
+    "- 3 to 6 points, each one sentence. Draw points from the beginning, middle and end of this part, not only its "
+    "start.\n"
+    "- Lines marked [unclear] were hard to hear: do not state anything from them as fact; skip them or say the passage "
+    "was unclear.\n"
     "- Each point's \"start_sec\" is copied from the [t=SEC] marker of the transcript line it came from.\n"
     "- Use only what was said. Use an empty array when nothing applies.\n"
+    "- Never expand an abbreviation the speaker did not expand. Leave out advertisements and sponsor messages.\n"
     "\n"
     "Transcript (each line starts with its [t=SEC] marker):\n"
     "[t=0] రవికి చెప్పాను\n"
@@ -332,7 +337,7 @@ TEST(complete_memory_items_from_a_cut_reply) {
     CHECK_EQ(complete_memory_items("{\"memories\":[{\"type\":\"fa").size(), (size_t)0);
 }
 
-// --- N7: vocabulary is spelling help only; sections cover every part ---------------------------
+// --- N7: vocabulary is spelling help only and filtered in code; unclear pieces marked ------------
 
 TEST(section_prompt_vocab_is_spelling_only) {
     Store st(":memory:");
@@ -350,10 +355,124 @@ TEST(section_prompt_vocab_is_spelling_only) {
     CHECK(m.find(expect) != std::string::npos);
 }
 
-TEST(section_prompt_covers_every_part) {
+TEST(section_prompt_points_spread_and_capped) {
     const std::string p = section_prompt(kGoldPieces, "en", "");
-    CHECK(p.find("Cover every part") != std::string::npos);
-    CHECK(p.find("up to 10 points") != std::string::npos);
-    CHECK(p.find("3 to 6") == std::string::npos);
-    CHECK(p.find("unclear or garbled") != std::string::npos);
+    CHECK(p.find("3 to 6 points") != std::string::npos);
+    CHECK(p.find("beginning, middle and end") != std::string::npos);
+    CHECK(p.find("Cover every part") == std::string::npos);
+    CHECK(p.find("up to 10 points") == std::string::npos);
+    CHECK(p.find("[unclear]") != std::string::npos);
+    CHECK_EQ(kSectionMaxPoints, (size_t)6);
+}
+
+TEST(term_said_word_boundaries) {
+    CHECK(term_said("IPO", "the IPO was priced"));
+    CHECK(term_said("IPO", "ipo, then"));                 // case-insensitive
+    CHECK(term_said("ipo", "The IPO."));
+    CHECK(!term_said("IPO", "two IPOs this year"));        // a word boundary: IPOs is another word
+    CHECK(!term_said("IPOs", "one IPO"));
+    CHECK(!term_said("AI", "he SAID so"));
+    CHECK(!term_said("AI bubble", "AI bubbles everywhere"));
+    CHECK(term_said("AI bubble", "is there an ai bubble?"));
+    CHECK(term_said("S&P 500 index", "the S&P 500 index rose"));
+    CHECK(!term_said("S&P 500 index", "the S&P 500 rose"));
+    CHECK(term_said("IPO", "IPOలో పెట్టుబడి"));           // a Telugu case ending is not a Latin word letter
+    CHECK(term_said("UPSC", "[unclear] UPSC exam"));
+    CHECK(!term_said("café", "cafés"));                    // Latin letters past ASCII are word letters too
+    CHECK(term_said("రవి", "రవికి చెప్పాను"));             // Telugu: a substring match
+    CHECK(!term_said("రవి", "Ravi"));
+    CHECK(!term_said("", "anything"));
+    CHECK(!term_said("  ", "anything"));
+    CHECK(term_said(" IPO ", "an IPO"));                   // the saved term is trimmed
+    CHECK(term_said("IPO", "IPO"));
+}
+
+TEST(terms_said_keeps_only_present_terms) {
+    const std::vector<std::string> vocab = {"S&P 500 index", "IPO", "AI bubble", "రవి"};
+    const auto kept = terms_said(vocab, "Ravi spoke about the IPO. రవికి చెప్పాను");
+    CHECK_EQ(kept, (std::vector<std::string>{"IPO", "రవి"}));
+    CHECK(terms_said(vocab, "").empty());
+}
+
+TEST(drop_unsaid_vocab_from_a_section_summary) {
+    json s = json::parse(R"({"title":"Exam talk","topic":"UPSC","points":[
+        {"text":"UPSC prelims cut-off is 33%.","start_sec":0},
+        {"text":"The AI bubble may burst.","start_sec":28},
+        {"text":"An ipo is coming.","start_sec":28}],
+        "terms":["UPSC","AI bubble","IPO","Kannan Gopinathan"],"hints":["Read about the AI bubble","Check CSAT"]})");
+    const std::vector<std::string> vocab = {"AI bubble", "IPO", "UPSC"};
+    const int n = drop_unsaid_vocab(s, vocab, "UPSC prelims cut-off is thirty three percent. CSAT. Kannan Gopinathan");
+    CHECK_EQ(n, 5);
+    CHECK_EQ(s["terms"], json::parse(R"(["UPSC","Kannan Gopinathan"])"));
+    CHECK_EQ(s["hints"], json::parse(R"(["Check CSAT"])"));
+    CHECK_EQ(s["points"].size(), (size_t)1);
+    CHECK_EQ(s["points"][0]["text"].get<std::string>(), std::string("UPSC prelims cut-off is 33%."));
+    // A vocabulary term that was said stays everywhere.
+    json t = json::parse(R"({"title":"T","points":[{"text":"The IPO opens.","start_sec":0}],"terms":["IPO"],"hints":[]})");
+    CHECK_EQ(drop_unsaid_vocab(t, vocab, "the IPO opens on Monday"), 0);
+    CHECK_EQ(t["terms"].size(), (size_t)1);
+    CHECK_EQ(t["points"].size(), (size_t)1);
+    // No vocabulary: nothing to drop.
+    CHECK_EQ(drop_unsaid_vocab(t, {}, ""), 0);
+}
+
+TEST(unclear_pieces_are_marked) {
+    CHECK(piece_unclear(0.79));
+    CHECK(piece_unclear(0.0));
+    CHECK(!piece_unclear(0.80));
+    CHECK(!piece_unclear(0.95));
+    CHECK(!piece_unclear(std::nan("")));                   // no conf (older recordings, no token): not marked
+    CHECK_EQ(unclear_marked("hello", 0.75), std::string("[unclear] hello"));
+    CHECK_EQ(unclear_marked("hello", 0.80), std::string("hello"));
+    CHECK_EQ(unclear_marked("hello", std::nan("")), std::string("hello"));
+    CHECK_EQ(unclear_marked("  ", 0.5), std::string("  "));  // nothing to mark
+    CHECK_EQ(std::string(kUnclearTag), std::string("[unclear] "));
+    CHECK(std::isnan(piece_conf(json::parse(R"({"text":"a"})"))));
+    CHECK(std::isnan(piece_conf(json::parse(R"({"text":"a","conf":null})"))));
+    CHECK(std::isnan(piece_conf(json::parse(R"({"text":"a","conf":"0.5"})"))));
+    CHECK_EQ(piece_conf(json::parse(R"({"text":"a","conf":0.5})")), 0.5);
+}
+
+TEST(notes_material_marks_low_conf_pieces) {
+    const json pieces = json::parse(R"([
+        {"start_sec":0,"text":"Clear start.","conf":0.93},
+        {"start_sec":28,"text":"garbled bit","conf":0.73},
+        {"start_sec":56,"text":"old piece without conf"},
+        {"start_sec":84,"text":"exactly at the line","conf":0.80},
+        {"start_sec":112,"text":"no token","conf":null},
+        {"start_sec":140,"text":"  ","conf":0.2},
+        {"start_sec":168,"text":"last low","conf":0.5}])");
+    CHECK_EQ(notes_material(pieces), std::string("Clear start.\n[unclear] garbled bit\nold piece without conf\n"
+                                                 "exactly at the line\nno token\n  \n[unclear] last low"));
+    // Nothing unclear: the same text as the transcript (pieces joined by newlines, trimmed).
+    CHECK_EQ(notes_material(json::parse(R"([{"text":" a","conf":0.9},{"text":"b "}])")), std::string("a\nb"));
+    CHECK_EQ(notes_material(json::parse("{}")), std::string());
+}
+
+TEST(section_pieces_marked_for_the_prompt_only) {
+    const json arr = json::parse(R"([{"start_sec":0,"text":"Clear.","conf":0.9},{"start_sec":28,"text":"Mumble.","conf":0.6},
+                                     {"start_sec":56,"text":"   "},{"text":5}])");
+    SectionInput in = section_input(arr);
+    CHECK_EQ(in.plain.size(), (size_t)2);
+    CHECK_EQ(in.marked.size(), (size_t)2);
+    CHECK_EQ(in.plain[1].second, std::string("Mumble."));
+    CHECK_EQ(in.marked[1].second, std::string("[unclear] Mumble."));
+    CHECK_EQ(in.marked[0].second, std::string("Clear."));
+    CHECK_EQ(in.starts, (std::vector<int64_t>{0, 28}));
+    CHECK_EQ(in.said, std::string("Clear.\nMumble."));
+    const std::string p = section_prompt(in.marked, "en", "");
+    CHECK(p.find("[t=28] [unclear] Mumble.\n") != std::string::npos);
+    CHECK(p.find("[t=0] Clear.\n") != std::string::npos);
+    // The fallback copies the plain text: the tag is never shown as a point.
+    const json fb = fallback_section_summary(in.plain);
+    CHECK(fb.dump().find("[unclear]") == std::string::npos);
+}
+
+TEST(sections_text_is_titles_and_points) {
+    const json secs = json::parse(R"([{"start_sec":0,"summary":{"title":"Intro","points":[{"text":"UPSC talk"}]}},
+                                      {"start_sec":300,"summary":{"title":"Later","points":[{"text":"IPO news"}]}}])");
+    const std::string t = sections_text(secs);
+    CHECK(t.find("Intro") != std::string::npos && t.find("UPSC talk") != std::string::npos);
+    CHECK(t.find("IPO news") != std::string::npos);
+    CHECK_EQ(sections_text(json::array()), std::string());
 }

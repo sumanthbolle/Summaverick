@@ -115,9 +115,25 @@ int sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch) {
 }
 
 // System prompt of the notes outputs: the always block (profile, vocabulary as spellings only if said) in front, without the medicines:
-// notes are free text and must not pick up the profile's doses (spec §4).
-static std::string notes_system(sve_ctx *ctx, const std::string &lang) {
-    return sve::context_system(*ctx->store, sve::system_prompt(lang), false);
+// notes are free text and must not pick up the profile's doses (spec §4). Only the saved words that `material`
+// (the text the notes are written from) says are listed (N7 rev 1).
+static std::string notes_system(sve_ctx *ctx, const std::string &lang, const std::string &material) {
+    return sve::context_system(*ctx->store, sve::system_prompt(lang), false, &material);
+}
+
+// The end of a notes output (sve_generate, sve_generate_from_sections): the first heading put back if the model
+// continued from it, and a reply cut at the token cap trimmed to its last whole sentence or bullet (N7 rev 1).
+static std::string finish_output(const sve::Llm &llm, std::string out, const std::string &prefix, int max_out) {
+    out = strip_thinking(out);
+    // The prompt ended with the first heading/label; put it back if the model continued from it.
+    if (!prefix.empty() && out.rfind(prefix, 0) != 0) out = prefix + " " + out;
+    if (llm.last_cut) {
+        const std::string t = sve::trim_cut_reply(out);
+        sve_logf(1, "notes output reached its %d-token cap: trimmed to the last whole line (%zu -> %zu bytes)", max_out,
+                 out.size(), t.size());
+        out = t;
+    }
+    return out;
 }
 
 int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang_c) {
@@ -126,7 +142,7 @@ int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang_c
         sve::Llm &llm = *ctx->llm;
         const std::string text(transcript);
         if (strip_thinking(text).empty()) return 1;   // sve_generate returns "" without the model
-        const int sys_tokens = llm.count_tokens(notes_system(ctx, lang_c ? lang_c : "en"));
+        const int sys_tokens = llm.count_tokens(notes_system(ctx, lang_c ? lang_c : "en", text));
         // The check reduce_to_fit makes first, with the budget sve_generate gives it.
         return sve::notes_material_fits(llm.count_tokens(text), llm.n_ctx, sys_tokens) ? 1 : 0;
     } catch (...) {
@@ -144,9 +160,9 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
 
     // The always block (profile, vocabulary) goes in front of every system prompt (spec §7.3), here
     // without the medicines: notes are free text and must not pick up the profile's doses (spec §4).
-    const std::string sys = notes_system(ctx, lang);
+    const std::string sys = notes_system(ctx, lang, text);  // the same system prompt sve_transcript_fits counts
     const int max_out = sve::notes_max_out(llm.n_ctx);
-    // prompt scaffolding ≈ 250 tokens plus the system prompt (reduce_to_fit floors this)
+    // prompt scaffolding (kNotesScaffold) plus the system prompt (reduce_to_fit floors this)
     const int budget = sve::notes_budget(llm.n_ctx, llm.count_tokens(sys));
 
     std::string material;
@@ -163,10 +179,7 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
     std::string prompt = llm.apply_template(sys, userp);
     std::string out;
     if (!llm.complete(prompt, max_out, out, cb, user, "final", 0, 1)) return nullptr;
-    out = strip_thinking(out);
-    // The prompt ended with the first heading/label; put it back if the model continued from it.
-    if (!prefix.empty() && out.rfind(prefix, 0) != 0) out = prefix + " " + out;
-    return dup_str(out);
+    return dup_str(finish_output(llm, out, prefix, max_out));
 }
 
 char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c,
@@ -177,8 +190,8 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
         if (!secs.is_array() || secs.empty()) return nullptr;
         sve::Llm &llm = *ctx->llm;
         const std::string lang = lang_c ? lang_c : "en";
-        // Same budget as sve_generate.
-        const std::string sys = notes_system(ctx, lang);
+        // Same budget as sve_generate; the saved words are those the sections say.
+        const std::string sys = notes_system(ctx, lang, sve::sections_text(secs));
         const int sys_tokens = llm.count_tokens(sys);
         const int max_out = sve::notes_max_out(llm.n_ctx);
         const int budget = sve::notes_budget(llm.n_ctx, sys_tokens);
@@ -216,9 +229,7 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
         }
         std::string out;
         if (!llm.complete(llm.apply_template(sys, userp), max_out, out, cb, user, "final", 0, 1)) return nullptr;
-        out = strip_thinking(out);
-        if (!prefix.empty() && out.rfind(prefix, 0) != 0) out = prefix + " " + out;
-        return dup_str(out);
+        return dup_str(finish_output(llm, out, prefix, max_out));
     } catch (const std::exception &e) {
         sve_logf(2, "generate from sections failed: %s", e.what());
         return nullptr;
@@ -239,6 +250,17 @@ char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang_c)
             if (excerpt.size() > 1200) break;
         }
         return sve_suggest_title(ctx, excerpt.c_str(), lang_c);  // trims to 1200 bytes at a character boundary
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char *sve_notes_material(const char *pieces_json) {
+    try {
+        if (!pieces_json) return nullptr;
+        const sve::json arr = sve::json::parse(pieces_json, nullptr, false);
+        if (!arr.is_array()) return nullptr;
+        return dup_str(sve::notes_material(arr));
     } catch (...) {
         return nullptr;
     }
@@ -284,7 +306,7 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang_c
         excerpt.resize(1200);
         while (!excerpt.empty() && (static_cast<unsigned char>(excerpt.back()) & 0xC0) == 0x80) excerpt.pop_back();
     }
-    std::string prompt = ctx->llm->apply_template(sve::context_system(*ctx->store, sve::system_prompt(lang_c ? lang_c : "en"), false),
+    std::string prompt = ctx->llm->apply_template(sve::context_system(*ctx->store, sve::system_prompt(lang_c ? lang_c : "en"), false, &excerpt),
                                                   sve::title_prompt(excerpt));
     std::string out;
     if (!ctx->llm->complete(prompt, 24, out, nullptr, nullptr, "final", 0, 1)) return nullptr;
@@ -416,8 +438,10 @@ static bool hear_piece(sve_ctx *ctx, const float *samples, size_t n, const std::
     double again_conf = std::nan("");
     if (!transcribe_piece(ctx, samples, n, prev, vocab, cb, user, done, total, again, &again_conf, true))
         return !(cb && cb("chunk", done, total, user));
-    sve_logf(0, "piece %d conf %.2f: transcribed again (%.2f)", label, conf, again_conf);
-    if (again_conf > conf) { out = again; conf = again_conf; }
+    const bool second = again_conf > conf;
+    sve_logf(0, "piece %d conf %.2f: transcribed again (%.2f), kept the %s hearing", label, conf, again_conf,
+             second ? "second" : "first");
+    if (second) { out = again; conf = again_conf; }
     return true;
 }
 
@@ -462,7 +486,7 @@ static bool transcribe_pieces(sve_ctx *ctx, const char *wav_path, sve_progress_c
     return true;
 }
 
-int g_sve_section_max_out = 1024;  // up to 10 points (N7); was 512 for 3 to 6
+int g_sve_section_max_out = 512;  // 3 to 6 points (N7 rev 1: back from 1024 for up to 10)
 bool g_sve_force_greedy = false;
 FILE *g_sve_token_log = nullptr;
 
@@ -474,24 +498,22 @@ void sve_log_tokens(char tag, const int32_t *ids, size_t n) {
 char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *lang_c, sve_progress_cb cb, void *user) {
     try {
         if (!ctx || !ctx->llm || !pieces_json) return nullptr;
-        sve::SectionPieces pieces;
-        std::vector<int64_t> starts;
         sve::json arr = sve::json::parse(pieces_json, nullptr, false);
         if (!arr.is_array()) return nullptr;
-        for (const auto &e : arr) {
-            if (!e.is_object() || !e.contains("text") || !e["text"].is_string()) continue;
-            if (e["text"].get<std::string>().find_first_not_of(" \t\r\n") == std::string::npos) continue;  // blank piece
-            int64_t s = e.contains("start_sec") && e["start_sec"].is_number() ? e["start_sec"].get<int64_t>() : 0;
-            pieces.push_back({s, e["text"].get<std::string>()});
-            starts.push_back(s);
-        }
-        if (pieces.empty()) return nullptr;  // no piece has text: nothing to summarise
+        // Pieces heard with conf < 0.80 are marked [unclear] in the prompt only (N7 rev 1); the fallback and the
+        // vocabulary check use the plain text.
+        const sve::SectionInput in = sve::section_input(arr);
+        if (in.plain.empty()) return nullptr;  // no piece has text: nothing to summarise
         sve::Llm &llm = *ctx->llm;
         const std::string lang = lang_c ? lang_c : "en";
         const int kMaxOut = g_sve_section_max_out;
-        const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false);
+        // Only the saved words this section says, in the system prompt and the vocabulary line (N7 rev 1).
+        const std::string sys = sve::context_system(*ctx->store, sve::system_prompt(lang), false, &in.said);
         const std::string prompt = llm.apply_template(
-            sys, sve::section_prompt(pieces, lang, sve::spelling_vocab_line(*ctx->store, 400)));
+            sys, sve::section_prompt(in.marked, lang, sve::spelling_vocab_line(*ctx->store, 400, &in.said)));
+        const std::vector<std::string> vocab = sve::saved_vocab(*ctx->store);
+        const sve::SectionPieces &pieces = in.plain;
+        const std::vector<int64_t> &starts = in.starts;
         auto dump = [](const sve::json &j) { return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace)); };
         // A section that cannot fit the context with room to answer goes straight to the fallback.
         if (llm.count_tokens(prompt) + kMaxOut + 16 > llm.n_ctx) return dump(sve::fallback_section_summary(pieces));
@@ -510,7 +532,14 @@ char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *l
                 continue;
             }
             sve::json j;
-            if (sve::parse_section_summary(strip_thinking(out), starts, j)) return dump(j);
+            if (sve::parse_section_summary(strip_thinking(out), starts, j)) {
+                // A saved word the section never says is not one of its terms, hints or points (N7 rev 1).
+                if (const int n = sve::drop_unsaid_vocab(j, vocab, in.said)) {
+                    sve_logf(1, "section summary: %d term(s)/hint(s)/point(s) with a saved word not said here dropped", n);
+                    if (j["points"].empty()) return dump(sve::fallback_section_summary(pieces));
+                }
+                return dump(j);
+            }
             sve_logf(1, "section summary attempt %d did not parse", attempt + 1);
         }
         return dump(sve::fallback_section_summary(pieces));

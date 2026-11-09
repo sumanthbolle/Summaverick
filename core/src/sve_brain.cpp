@@ -223,8 +223,11 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
         json cands = json::array();
         if (!pieces.empty()) {
             if (!ctx->llm && !g_sve_model_reply) return -1;
-            const std::string sys = sve::context_system(st, sve::system_prompt(lang), false);
-            const std::string prompt = sve::memory_prompt(pieces, lang, sve::spelling_vocab_line(st, 400));
+            // Only the saved words this section says (N7 rev 1).
+            std::string said;
+            for (const auto &pc : pieces) said += (said.empty() ? "" : "\n") + pc.second;
+            const std::string sys = sve::context_system(st, sve::system_prompt(lang), false, &said);
+            const std::string prompt = sve::memory_prompt(pieces, lang, sve::spelling_vocab_line(st, 400, &said));
             std::string out;
             Watch w{cb, user, false};
             if (!fits(ctx, sys, prompt, kMemoryMaxOut)) {

@@ -6,10 +6,15 @@
 
 namespace sve {
 
-// Output tokens of one note output.
-inline int notes_max_out(int n_ctx) { return std::max(160, std::min(700, n_ctx / 4)); }
-// Room for the material in the final prompt: prompt scaffolding ≈ 250 tokens plus the system prompt.
-inline int notes_budget(int n_ctx, int sys_tokens) { return n_ctx - notes_max_out(n_ctx) - 250 - sys_tokens; }
+// Output tokens of one note output. N7 rev 1: 1400 at n_ctx 8192 (was 700, which cut note 20's detailed notes in
+// the middle of Key points, before Decisions, Action items and Dates); a quarter of the context below 5600 (unchanged
+// below 2800).
+inline int notes_max_out(int n_ctx) { return std::max(160, std::min(1400, n_ctx / 4)); }
+// Tokens of a notes prompt around the material: the instructions (the longest, detailed notes with its rules, is
+// about 1250 characters of English, ~300 tokens) and the chat template. Was 250 before the N7 rules.
+constexpr int kNotesScaffold = 400;
+// Room for the material in the final prompt: the scaffolding plus the system prompt, and the answer.
+inline int notes_budget(int n_ctx, int sys_tokens) { return n_ctx - notes_max_out(n_ctx) - kNotesScaffold - sys_tokens; }
 // Output tokens of one chunk summary (reduce_to_fit's per-chunk step).
 inline int chunk_max_out(int n_ctx) { return std::max(120, std::min(400, n_ctx / 5)); }
 // Room for one chunk: the system prompt, ~80 tokens of scaffolding and the chunk's own output.
