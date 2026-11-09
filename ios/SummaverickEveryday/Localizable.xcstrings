@@ -3462,16 +3462,6 @@
         }
       }
     },
-    "Could not save the note.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "నోట్‌ను సేవ్ చేయలేకపోయాం."
-          }
-        }
-      }
-    },
     "Could not start recording.": {
       "localizations": {
         "te": {
@@ -5153,22 +5143,6 @@
         }
       }
     },
-    "Paused when the phone locked. It will finish by itself later, or when you open Summaverick.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paused when the phone locked. It will finish by itself later, or when you open Summaverick."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఫోన్ లాక్ అయినప్పుడు ఆగిపోయింది. తర్వాత తనంతట తానే పూర్తవుతుంది, లేదా Summaverick ని తెరిచినప్పుడు పూర్తవుతుంది."
-          }
-        }
-      }
-    },
     "Notes ready: %@": {
       "localizations": {
         "en": {
@@ -5576,6 +5550,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "సారాంశం సిద్ధం: %@"
+          }
+        }
+      }
+    },
+    "Paused. It continues by itself.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused. It continues by itself."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆగింది. ఇది దానంతటదే కొనసాగుతుంది."
+          }
+        }
+      }
+    },
+    "Too warm right now. It continues when the phone cools.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too warm right now. It continues when the phone cools."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడు ఫోన్ వేడిగా ఉంది. చల్లబడ్డాక కొనసాగుతుంది."
+          }
+        }
+      }
+    },
+    "Continue now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue now"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడే కొనసాగించు"
           }
         }
       }

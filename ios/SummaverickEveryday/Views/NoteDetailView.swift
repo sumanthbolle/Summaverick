@@ -151,14 +151,18 @@ struct NoteDetailView: View {
                                                                                   : ProcessingPipeline.waitingMessage))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else if pipeline.hasQueuedTap(noteID) {
-                        // A tap made while another note was being written: it runs by itself in its turn.
-                        Text(ProcessingPipeline.tapWaitingMessage).font(.subheadline).foregroundStyle(.secondary)
+                        // A tap made while another note was being written (or the AI was not ready, or the phone was
+                        // too warm): it runs by itself in its turn.
+                        Text(pipeline.tapWaitingLine(noteID)).font(.subheadline).foregroundStyle(.secondary)
                     } else if let failure = pipeline.lastFailure[noteID] {
+                        // Paused or cut off: it continues by itself, and "Continue now" runs it at once. "Try again"
+                        // only for a real failure.
                         StatusBanner(stage: pipeline.interrupted.contains(noteID) ? .paused(failure) : .failed(failure),
                                      onTryAgain: RegenerateRules.showsTryAgain(needsWork: needsGeneration, aiReady: models.isReady,
                                                                                overnight: pipeline.isOvernight(noteID)) ? {
                                          Task { await pipeline.tryAgain(noteID: noteID) }
                                      } : nil,
+                                     continueNow: pipeline.interrupted.contains(noteID),
                                      tryAgainDisabled: pipeline.isBusy)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }

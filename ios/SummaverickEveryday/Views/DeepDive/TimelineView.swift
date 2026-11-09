@@ -82,6 +82,8 @@ struct StatusBanner: View {
     var onStop: (() -> Void)? = nil
     /// Failed or paused: Try again runs the note now. Disabled while another note is running.
     var onTryAgain: (() -> Void)? = nil
+    /// The note is paused or cut off (it continues by itself): the button runs it now, as "Continue now".
+    var continueNow = false
     var tryAgainDisabled = false
     var body: some View {
         HStack(spacing: 10) {
@@ -112,7 +114,7 @@ struct StatusBanner: View {
                     .frame(minHeight: 44)
             }
             if let onTryAgain {
-                Button("Try again", action: onTryAgain)
+                Button(continueNow ? String(localized: "Continue now") : String(localized: "Try again"), action: onTryAgain)
                     .buttonStyle(.bordered)
                     .font(.footnote.weight(.semibold))
                     .frame(minHeight: 44)

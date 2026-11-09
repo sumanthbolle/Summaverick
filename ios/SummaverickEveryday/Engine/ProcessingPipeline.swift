@@ -149,7 +149,7 @@ final class ProcessingPipeline {
     @ObservationIgnored private let abort = AtomicFlag()
 
     /// A note's work cut off with the phone locked: it finishes by itself later (the overnight task) or when opened.
-    static var cutOffMessage: String { String(localized: "Paused when the phone locked. It will finish by itself later, or when you open Summaverick.") }
+    static var cutOffMessage: String { String(localized: "Paused. It continues by itself.") }
     static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
     /// Stopped while another recording's notes are being written.
@@ -208,6 +208,16 @@ final class ProcessingPipeline {
     /// The note shows this while a tap on it waits its turn.
     static var tapWaitingMessage: String { String(localized: "Waiting: another note is being written") }
     func hasQueuedTap(_ id: Int64) -> Bool { queued.contains { $0.noteID == id } }
+    /// Find reminders cut off because the phone was too warm: it waits for the phone to cool.
+    static var tapTooWarmMessage: String { String(localized: "Too warm right now. It continues when the phone cools.") }
+    /// Notes whose queued find reminders waits for the phone to cool (cleared when it runs again).
+    private(set) var tapTooWarm: Set<Int64> = []
+    /// The line a note with a queued tap shows: waiting for the AI (the tap runs once it is ready), for the phone to
+    /// cool, or for another note's run.
+    func tapWaitingLine(_ id: Int64) -> String {
+        if !ModelManager.shared.isReady { return Self.waitingMessage }
+        return tapTooWarm.contains(id) ? Self.tapTooWarmMessage : Self.tapWaitingMessage
+    }
 
     nonisolated private static func loadQueuedTaps() -> [QueuedTap] {
         guard let data = UserDefaults.standard.data(forKey: TapQueue.key) else { return [] }
@@ -239,9 +249,21 @@ final class ProcessingPipeline {
     @ObservationIgnored private var pausedPosted: Set<Int64> = []
     /// The parts (NotifyRule.transcript, .summary, .notes) whose "ready" this note's current run already posted.
     @ObservationIgnored private var postedStages: [Int64: Set<String>] = [:]
-    /// Unknown errors in a row per note (FailureKind): the first is a cut-off, the second a failure. Reset on any
-    /// success (a part stored, a regenerate or find reminders done).
-    @ObservationIgnored private var failureStreak: [Int64: Int] = [:]
+    nonisolated private static let failureStreakKey = "pipeline.failureStreak"
+    /// Unknown errors in a row per note and run kind (FailureKind.streakKey): the first is a cut-off, the second a
+    /// failure. Reset on that kind's success (a part stored, a regenerate or find reminders done). Kept across launches.
+    @ObservationIgnored private var failureStreak: [String: Int] =
+        (UserDefaults.standard.dictionary(forKey: ProcessingPipeline.failureStreakKey) as? [String: Int]) ?? [:] {
+        didSet {
+            guard failureStreak != oldValue else { return }
+            if failureStreak.isEmpty { UserDefaults.standard.removeObject(forKey: Self.failureStreakKey) }
+            else { UserDefaults.standard.set(failureStreak, forKey: Self.failureStreakKey) }
+        }
+    }
+    private func streak(_ id: Int64, _ run: FailureKind.Run) -> Int { failureStreak[FailureKind.streakKey(noteID: id, run: run)] ?? 0 }
+    private func setStreak(_ id: Int64, _ run: FailureKind.Run, _ n: Int?) {
+        failureStreak[FailureKind.streakKey(noteID: id, run: run)] = n
+    }
     /// Titles of the notes this launch worked on or queued, so a notification never waits for the core (busy until
     /// the cancelled model call stops) before it takes its background time.
     @ObservationIgnored private var noteTitles: [Int64: String] = [:]
@@ -421,15 +443,12 @@ final class ProcessingPipeline {
         let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
         guard id > 0 else {
             // The marker stays on purpose (ruling B7): the next launch tries to save the recording as a note again.
-            // The app retries by itself (the next launch saves it), so it is a cut-off, never "failed" (FailureKind: an
-            // unknown error with no note, so no streak). Only this run's own claim ends its stage (so nothing stays
-            // busy). Another note running keeps its stage and its Live Activity; only this recording's activity ends.
+            // The app retries by itself (the next launch saves it), so it is a cut-off, never "failed". Only this run's
+            // own claim ends its stage (so nothing stays busy). Another note running keeps its stage and its Live
+            // Activity; only this recording's activity ends.
             NSLog("[sve] bg: the note for %@ was not saved; the next launch saves it", audio.lastPathComponent)
-            let outcome = FailureKind.classify(cancelled: false, aborted: abort.isSet, cutOffByBackground: false, heat: false,
-                                               noSpeech: false, audioGone: false)
-            let line = outcome == .cutOff ? Self.cutOffMessage : String(localized: "Could not save the note.")
-            if claimed { stage = outcome == .cutOff ? .idle : .failed(line) }
-            RecordingActivities.shared.update(audioPath: audio.path, outcome == .cutOff ? .cutOff : .failed, line: line, percent: 0)
+            if claimed { stage = .idle }
+            RecordingActivities.shared.update(audioPath: audio.path, .cutOff, line: Self.cutOffMessage, percent: 0)
             return nil
         }
         UnfinishedRecordings.remove(audio.path)   // the note has it now
@@ -620,8 +639,13 @@ final class ProcessingPipeline {
         let engine = CoreEngine.shared
         guard let note = await engine.note(id) else { return nil }   // deleted
         let transcript = note.transcript ?? ""
-        guard ModelManager.shared.isReady, !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            regenerateFailed[id] = request; return nil
+        // No speech: a real failure ("Try again" shows why nothing changed).
+        guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { regenerateFailed[id] = request; return nil }
+        guard ModelManager.shared.isReady else {
+            // The AI is not ready: queued (the resume loop runs taps only once it is), the note shows the waiting line.
+            NSLog("[sve] bg: note %lld: regenerate waits for the AI", id)
+            queued = TapQueue.enqueue(queued, tap)
+            return nil
         }
         beginBackground()
         defer { endBackground() }
@@ -650,7 +674,7 @@ final class ProcessingPipeline {
                 await engine.setOutput(id, k, text)
             }
             NotificationCenter.default.post(name: .notesChanged, object: nil)
-            failureStreak[id] = nil
+            setStreak(id, .regenerate, nil)
             if noteTitles[id] == nil { noteTitles[id] = now.title }
             // Written with the app closed: "ready", as for the first notes (nothing is posted with the app in front).
             notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
@@ -670,10 +694,10 @@ final class ProcessingPipeline {
             let gpuCutOff = BackendChoice.failureIsCutOff(aborted: false, wentToBackground: wentToBackground || !appIsActive,
                                                           gpuStep: stepOnGPU, continuedTaskHeld: ContinuedWork.shared.isHeld)
             // The note's streak of unknown errors (FailureKind): the first is queued again, the second is "Try again".
-            let streak = failureStreak[id] ?? 0
+            let streak = streak(id, .regenerate)
             if FailureKind.isUnknown(cancelled: false, aborted: abort.isSet, cutOffByBackground: gpuCutOff, heat: runPausedForHeat,
                                      noSpeech: false, audioGone: false) {
-                failureStreak[id] = streak + 1
+                setStreak(id, .regenerate, streak + 1)
             }
             if TapQueue.requeuesRegenerate(stoppedByPerson: regenerateStopped, aborted: abort.isSet, heatPaused: runPausedForHeat,
                                            parkedForNight: false, gpuCutOff: gpuCutOff, unknownStreak: streak) {
@@ -893,16 +917,17 @@ final class ProcessingPipeline {
     /// CancellationError, e.g. the transcription stopping), aborted (an expiry, the overnight task ended), the GPU cut
     /// off in the background (BackendChoice.failureIsCutOff), heat (paused at critical in this run, or too warm to
     /// start), no speech, the audio gone. An unknown error counts in the note's streak (failureStreak).
-    private func classify(_ id: Int64?, error: Error?, heat: Bool, noSpeech: Bool, audioGone: Bool) -> FailureKind.Outcome {
+    private func classify(_ id: Int64?, run: FailureKind.Run, error: Error?, heat: Bool, noSpeech: Bool,
+                          audioGone: Bool) -> FailureKind.Outcome {
         let cancelled = error is CancellationError || Task.isCancelled
         let aborted = abort.isSet
         let background = BackendChoice.failureIsCutOff(aborted: false, wentToBackground: wentToBackground || !appIsActive,
                                                        gpuStep: stepOnGPU, continuedTaskHeld: ContinuedWork.shared.isHeld)
         let hot = heat || runPausedForHeat
-        let streak = id.flatMap { failureStreak[$0] } ?? 0
+        let streak = id.map { self.streak($0, run) } ?? 0
         if let id, FailureKind.isUnknown(cancelled: cancelled, aborted: aborted, cutOffByBackground: background, heat: hot,
                                          noSpeech: noSpeech, audioGone: audioGone) {
-            failureStreak[id] = streak + 1
+            setStreak(id, run, streak + 1)
         }
         return FailureKind.classify(cancelled: cancelled, aborted: aborted, cutOffByBackground: background, heat: hot,
                                     noSpeech: noSpeech, audioGone: audioGone, unknownStreak: streak)
@@ -917,7 +942,8 @@ final class ProcessingPipeline {
     private func stopShort(_ line: String, error: Error? = nil, heat: Bool = false, noSpeech: Bool = false,
                            audioGone: Bool = false) -> FailureKind.Outcome {
         let id = activeNoteID
-        let outcome = classify(id, error: error, heat: heat, noSpeech: noSpeech, audioGone: audioGone)
+        let outcome = classify(id, run: notesRun ? .notes : .findReminders, error: error, heat: heat, noSpeech: noSpeech,
+                               audioGone: audioGone)
         guard outcome == .cutOff, let id else {
             if let id { NSLog("[sve] bg: note %lld failed: %@", id, line) }
             stage = .failed(line)
@@ -942,7 +968,7 @@ final class ProcessingPipeline {
 
     /// The transcript is stored after Stop (a notes run): "Transcript ready", once for this run.
     private func transcriptStored(_ id: Int64) {
-        failureStreak[id] = nil
+        setStreak(id, .notes, nil)
         notifyStage(id, NotifyRule.transcript) { NotesNotifier.transcriptReady(noteID: id, title: $0, hold: $1) }
     }
 
@@ -1030,7 +1056,16 @@ final class ProcessingPipeline {
         }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3, outputsTotal: steps))
 
+        // A resumed run writes only what is not stored yet: a summary already announced is not rewritten or announced again.
+        let stored = await engine.note(id).map { n in OutputKind.allCases.map { n.output($0) != nil } }
+            ?? OutputKind.allCases.map { _ in false }
+        let toWrite = WaitingNotes.outputsToWrite(stored: stored)
         for (i, kind) in OutputKind.allCases.enumerated() {
+            guard toWrite[i] else {
+                NSLog("[sve] note %lld: %@ already stored; not written again", id, kind.title)
+                ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.firstOutputStep + 1 + i, outputsTotal: steps))
+                continue
+            }
             if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }   // cut off (aborted)
             if !(await heatGate(id)) { return }
             do {
@@ -1039,7 +1074,7 @@ final class ProcessingPipeline {
                                                  fraction: { NotesProgress.fraction(outputsDone: step, part: $0, outputsTotal: total) })
                 // Stored as soon as written: the summary is readable before the notes.
                 await engine.setOutput(id, kind, text)
-                failureStreak[id] = nil
+                setStreak(id, .notes, nil)
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
                 ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.firstOutputStep + 1 + i, outputsTotal: steps))
                 if kind == .shortSummary {   // the title was written just before it
@@ -1469,7 +1504,10 @@ final class ProcessingPipeline {
     private func personMayStart(_ tap: QueuedTap) async -> Bool {
         await yieldMemories()
         guard isWorking else { return true }
-        if ModelManager.shared.isReady { enqueueTap(tap) }
+        // A regenerate is queued also while the AI is not ready (it runs once it is); other taps wait with the note.
+        var regenerate = false
+        if case .regenerate = tap.kind { regenerate = true }
+        if ModelManager.shared.isReady || regenerate { enqueueTap(tap) }
         return false
     }
 
@@ -1499,11 +1537,13 @@ final class ProcessingPipeline {
         activeNoteID = noteID
         lastFailure[noteID] = nil
         if Heat.isTooHot(Self.thermal) {   // heat: a cut-off; it runs again by itself once cooler
-            if stopShort(String(localized: "The phone is too warm. Try again when it has cooled down."), heat: true) == .cutOff {
+            if stopShort(Self.tapTooWarmMessage, heat: true) == .cutOff {
                 requeueFindReminders(noteID)
+                tapTooWarm.insert(noteID)
             }
             return
         }
+        tapTooWarm.remove(noteID)
         let engine = CoreEngine.shared
         guard let note = await engine.note(noteID) else { return }   // deleted (before its turn came): nothing to do
         runningTap = QueuedTap(noteID: noteID, kind: .findReminders)   // on disk: a kill keeps it
@@ -1525,7 +1565,7 @@ final class ProcessingPipeline {
             // On the backend for right now, retried once on the CPU when the app is closed mid-run (GPU stopped).
             let n = try await onBackend { try await engine.extract(noteID: noteID, shouldStop: { ContinuedWork.beat(); return false }) }
             NSLog("[sve] extract added %d suggestions", n)
-            failureStreak[noteID] = nil
+            setStreak(noteID, .findReminders, nil)
             stage = .done
         } catch {
             NSLog("[sve] extract failed: %@", String(describing: error))
@@ -2015,6 +2055,8 @@ final class ProcessingPipeline {
         heatPaused.remove(id)
         lastFailure[id] = nil
         regenerateFailed[id] = nil
+        tapTooWarm.remove(id)
+        failureStreak = FailureKind.forgetting(noteID: id, in: failureStreak)
         if overnightOffer == id { overnightOffer = nil }
     }
 

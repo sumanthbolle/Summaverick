@@ -120,6 +120,10 @@ enum SizeCheck {
 }
 
 enum WaitingNotes {
+    /// A resumed notes run writes only the outputs not stored yet (in OutputKind order): a summary the person was told
+    /// was ready is never rewritten, nor announced again.
+    static func outputsToWrite(stored: [Bool]) -> [Bool] { stored.map { !$0 } }
+
     struct Candidate: Equatable {
         let id: Int64
         let hasAudio: Bool
@@ -298,6 +302,17 @@ enum FailureKind {
         if noSpeech || audioGone { return .failed }
         if cancelled || aborted || cutOffByBackground || heat { return .cutOff }
         return unknownStreak < unknownRetries ? .cutOff : .failed
+    }
+
+    /// Which kind of run a streak belongs to: one kind's unknown error never fails another kind.
+    enum Run: String { case notes, regenerate, findReminders }
+
+    /// The streak's key in UserDefaults ([String: Int], kept across launches): note id and run kind.
+    static func streakKey(noteID: Int64, run: Run) -> String { "\(noteID).\(run.rawValue)" }
+
+    /// The streaks without any of a deleted note's.
+    static func forgetting(noteID: Int64, in streaks: [String: Int]) -> [String: Int] {
+        streaks.filter { !$0.key.hasPrefix("\(noteID).") }
     }
 
     /// The error is none of the known kinds: it counts in the note's streak.
