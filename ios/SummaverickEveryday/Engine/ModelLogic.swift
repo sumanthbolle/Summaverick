@@ -714,6 +714,25 @@ enum PersonFirst {
     static func backfillNotes(inFront: Bool, overnightLimit: Int = 20) -> Int { inFront ? 1 : overnightLimit }
 }
 
+/// While a recording runs, its live transcription comes before every other model run (seen on the owner's iPhone: an
+/// 11-minute recording started while another note's notes were written got a piece in only between that run's model
+/// calls, and had 70% of its transcription left at Stop). The model is one actor, so a run in flight finishes its
+/// piece, section or output; at its next boundary any other run steps aside: its note waits, quietly, keeping
+/// everything done, and carries on after Stop.
+enum LiveFirst {
+    /// runIsLive: the recording's own live transcription (its pieces and the sections it writes while recording).
+    static func yields(recording: Bool, runIsLive: Bool) -> Bool { recording && !runIsLive }
+
+    /// A regenerate that stepped aside goes back in the queue as it was: a step-aside is no cut-off, so its streak of
+    /// cut-offs in a row (TapQueue.requeued) does not grow.
+    static func requeued(_ t: QueuedTap) -> QueuedTap { t }
+
+    /// A note that stepped aside waits quietly while the recording runs: an expiry or the resume loop ending does not
+    /// cut it off (no paused notice, no failure, no overnight mark, no cut-off Live Activity). After Stop it waits as
+    /// any queued note.
+    static func waitsQuietly(steppedAside: Bool, recording: Bool) -> Bool { steppedAside && recording }
+}
+
 /// A WAV the recorder never finished (the app was closed mid-recording) still has the sizes written at its start: 0,
 /// 0xFFFFFFFF or an older value. The core reads past them, but AVAudioPlayer and AVAudioFile (playback, compression)
 /// trust them. This gives the two size fields to write so the header matches the file on disk.

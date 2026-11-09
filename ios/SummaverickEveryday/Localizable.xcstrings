@@ -5268,6 +5268,23 @@
         }
       }
     },
+    "Waiting for your recording": {
+      "comment": "Live Activity line: this note's notes stepped aside while a recording runs; they carry on after it",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for your recording"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్ కోసం వేచి ఉంది"
+          }
+        }
+      }
+    },
     "Paused": {
       "comment": "Live Activity title: a recording's notes stopped for now and will finish later",
       "localizations": {

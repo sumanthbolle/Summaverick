@@ -139,6 +139,7 @@ final class RecordingController {
         Task {
             await LiveTranscriber.shared.cancel(audioPath: url.path)
             AudioRecorder.removeAudio(atPath: url.path)
+            ProcessingPipeline.shared.recordingCancelled()   // what stepped aside for it goes on
         }
         NSLog("[sve] recording cancelled")
     }

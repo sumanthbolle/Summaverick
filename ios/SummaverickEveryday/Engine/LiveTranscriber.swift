@@ -2,6 +2,9 @@
 // phone locked (the recording's audio session keeps the app running; iOS refuses background GPU work).
 // After Stop it finishes the piece in flight and hands over to the pipeline, which continues from the
 // same cursor (TranscriptSidecar) with is_final. Not used for Ask's voice questions.
+// It comes first (LiveFirst): its pieces and the sections it writes never yield. The model is one actor, so a piece
+// waits only for the call in flight (another note's piece, section or output); at its next boundary that run steps
+// aside (ProcessingPipeline.stepsAside), so the pieces that follow get the model to themselves until Stop.
 import Foundation
 import Observation
 import UIKit

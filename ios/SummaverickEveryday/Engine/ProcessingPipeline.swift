@@ -106,6 +106,11 @@ final class ProcessingPipeline {
     /// The note being worked on has a recording Live Activity: it shows this stage (failures are handled above).
     private func followStage() {
         guard let id = activeNoteID, RecordingActivities.shared.isFollowing(noteID: id) else { return }
+        if case .idle = stage, steppedAside.contains(id), interrupted.contains(id) {
+            // Stepped aside for a recording (LiveFirst): it waits its turn, and is not paused or cut off.
+            RecordingActivities.shared.update(noteID: id, .queued, line: Self.recordingFirstMessage, percent: ContinuedWork.shared.percent)
+            return
+        }
         let line: String
         switch stage {
         case .idle: line = lastFailure[id] ?? Self.waitingMessage
@@ -157,6 +162,8 @@ final class ProcessingPipeline {
     static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
     /// Stopped while another recording's notes are being written.
     static var queuedMessage: String { String(localized: "Waiting for the earlier recording to finish") }
+    /// Stepped aside while a recording runs (LiveFirst): it carries on after that recording.
+    static var recordingFirstMessage: String { String(localized: "Waiting for your recording") }
     nonisolated static var overnightMessage: String { String(localized: "Waiting for the charger — finishes overnight") }
     nonisolated private static var thermal: ProcessInfo.ThermalState { ProcessInfo.processInfo.thermalState }
     /// Critical: the only heat that cancels a model run in the middle.
@@ -249,6 +256,11 @@ final class ProcessingPipeline {
     @ObservationIgnored private var parkRequested: Set<Int64> = []
     /// Notes that stopped for the night in this run (set by the heat gate, read once the run ends).
     @ObservationIgnored private var parked: Set<Int64> = []
+    /// Notes whose run stepped aside for a recording (LiveFirst): back in `interrupted`, quiet while it records
+    /// (waitsQuietly). Cleared when the note's notes run starts again.
+    @ObservationIgnored private var steppedAside: Set<Int64> = []
+    /// The run in flight stepped aside for a recording (reset when a run starts).
+    @ObservationIgnored private var runSteppedAside = false
     /// The overnight task's expired flag while it runs. Set: no new run starts, and the abort stays set.
     @ObservationIgnored private var overnightRun: AtomicFlag?
     /// Set while the run in flight was started by the overnight task (read on any thread): only that run is
@@ -298,8 +310,10 @@ final class ProcessingPipeline {
 
     /// Before each piece or stage. Serious: rest 30 s (cut short by an abort or a cooler phone), then go on,
     /// so progress is always made, at a lower duty cycle. Critical: pause the note (false).
+    /// A recording running: the run steps aside (stepsAside, false), also when it starts during the rest.
     private func heatGate(_ id: Int64) async -> Bool {
         if parkedForNight(id) { return false }
+        if stepsAside(id) { return false }
         switch Heat.beforeRun(Self.thermal) {
         case .go: return true
         case .pause: return !pausedForHeat(id)
@@ -308,13 +322,36 @@ final class ProcessingPipeline {
             stage = .cooling
             NSLog("[sve] note %lld: phone is warm, resting %.0f s", id, Heat.restSeconds)
             let end = Date().addingTimeInterval(Heat.restSeconds)
-            while Date() < end, !abort.isSet, Heat.beforeRun(Self.thermal) == .rest {
+            while Date() < end, !abort.isSet, Heat.beforeRun(Self.thermal) == .rest, !LiveTranscriber.shared.isRecording {
                 do { try await Task.sleep(nanoseconds: 500_000_000) } catch { break }
             }
             if pausedForHeat(id) { return false }
+            if stepsAside(id) { return false }
             stage = before
             return true
         }
+    }
+
+    /// Before each piece, section or output (from the heat gate): a recording runs, so this run steps aside and
+    /// releases the model to its live transcription (LiveFirst); the piece, section or output just finished is kept.
+    /// A notes run's note goes back to `interrupted`, quietly (no notice, no failure, no overnight mark, no cut-off
+    /// Live Activity: waitsQuietly), and carries on after Stop through the resume loop, which never runs while
+    /// recording. A regenerate is queued again instead (runRegenerate), with no cut-off counted.
+    private func stepsAside(_ id: Int64) -> Bool {
+        guard LiveFirst.yields(recording: LiveTranscriber.shared.isRecording, runIsLive: false) else { return false }
+        NSLog("[sve] note %lld steps aside for the recording", id)
+        runSteppedAside = true
+        guard regenerating == nil else { return true }   // runRegenerate sets the stage and queues it again
+        interrupted.insert(id)
+        steppedAside.insert(id)
+        stage = .idle
+        return true
+    }
+
+    /// Stepped aside for the recording that is still running: nothing cuts it off meanwhile.
+    private func waitsQuietly(_ id: Int64) -> Bool {
+        LiveFirst.waitsQuietly(steppedAside: steppedAside.contains(id) && interrupted.contains(id),
+                               recording: LiveTranscriber.shared.isRecording)
     }
 
     private func markAutoTried(_ id: Int64) {
@@ -420,7 +457,7 @@ final class ProcessingPipeline {
         do {
             done = try await transcribe(audio, noteID: id, durationSeconds: duration)
         } catch {
-            if parked.contains(id) { return id }   // stopped for the night; the cursor is kept
+            if parked.contains(id) || runSteppedAside { return id }   // stopped for the night or a recording; the cursor is kept
             NSLog("[sve] transcription failed: %@", String(describing: error))
             if !pausedForHeat(id) { stage = .failed(error.localizedDescription) }
             return id
@@ -438,6 +475,12 @@ final class ProcessingPipeline {
         // 2. notes
         await generateOutputs(noteID: id, transcript: transcript, lang: noteLang, setTitle: true)
         return id
+    }
+
+    /// A recording was cancelled (no Stop, so no run of its own follows): the runs that stepped aside for it carry on.
+    func recordingCancelled() {
+        guard !isWorking, !resuming, !(interrupted.isEmpty && queued.isEmpty) else { return }
+        Task { await self.resumeInterrupted() }
     }
 
     /// "Generate notes" on a note: memory work yields first; other work still running: the tap waits its turn.
@@ -485,7 +528,7 @@ final class ProcessingPipeline {
                 done = try await transcribe(URL(fileURLWithPath: path), noteID: noteID, durationSeconds: note.duration_seconds)
                 t = Self.joined(TranscriptRun.pieces(done))
             } catch {
-                if parked.contains(noteID) { return }   // stopped for the night; the cursor is kept
+                if parked.contains(noteID) || runSteppedAside { return }   // stopped for the night or a recording; the cursor is kept
                 NSLog("[sve] transcription failed: %@", String(describing: error))
                 if !pausedForHeat(noteID) { stage = .failed(error.localizedDescription) }
                 return
@@ -586,7 +629,11 @@ final class ProcessingPipeline {
             stage = .done
             return previous
         }
-        if outcome == .failed {
+        if outcome == .failed, runSteppedAside {
+            // Stepped aside for a recording: queued again as it was (no cut-off in its streak); it runs after Stop.
+            NSLog("[sve] bg: note %lld: regenerate stepped aside for the recording; the old text is kept and it is queued again", id)
+            queued = TapQueue.enqueue(queued, LiveFirst.requeued(tap))
+        } else if outcome == .failed {
             let gpuCutOff = BackendChoice.failureIsCutOff(aborted: false, wentToBackground: wentToBackground || !appIsActive,
                                                           gpuStep: stepOnGPU, continuedTaskHeld: ContinuedWork.shared.isHeld)
             if TapQueue.requeuesRegenerate(stoppedByPerson: regenerateStopped, aborted: abort.isSet, heatPaused: runPausedForHeat,
@@ -762,7 +809,8 @@ final class ProcessingPipeline {
         }
         // Notes waiting their turn (queued behind this one, waiting for the AI, cut off or paused for heat earlier):
         // every queued note is notes work, and nothing else would run them now.
-        for id in interrupted.sorted() where id != running { cutOff(id, queued: true) }
+        // Not a note that stepped aside for the recording still running: it waits quietly (LiveFirst).
+        for id in interrupted.sorted() where id != running && !waitsQuietly(id) { cutOff(id, queued: true) }
         // Taps waiting their turn: nothing runs them now either; the overnight task (on battery too) or the next open does.
         if !(queued.isEmpty && regenerating == nil), !appIsActive {
             NSLog("[sve] bg: %ld queued taps wait for the overnight task or the next open", queued.count)
@@ -774,6 +822,7 @@ final class ProcessingPipeline {
     private func startNotesRun(_ id: Int64) {
         notesRun = true
         pausedPosted.remove(id)
+        steppedAside.remove(id)
     }
 
     /// A notes run cut off with the app not in front (the continued-processing task expired, the app left the
@@ -899,9 +948,17 @@ final class ProcessingPipeline {
         _ = await writeMemories(noteID: id, quiet: false)
         ContinuedWork.shared.update(afterNotes: 0.5)   // the insight: the note's last part, under the same task
         // The model calls back while it writes, so a long CPU insight keeps the heartbeat going; an expiry stops it.
-        if !abort.isSet, (try? await ModelManager.shared.loadIntoCore(for: .generation)) != nil {
+        // A recording running steps it aside (LiveFirst), before it or in the middle (it is cheap to stop): as after an
+        // expiry, the notes are stored and there is nothing to resume.
+        let recording = LiveTranscriber.shared.recordingNow
+        if LiveFirst.yields(recording: recording.isSet, runIsLive: false) {
+            NSLog("[sve] note %lld steps aside for the recording", id)
+        } else if !abort.isSet, (try? await ModelManager.shared.loadIntoCore(for: .generation)) != nil {
             ContinuedWork.beat()   // a CPU reload calls back nothing
-            _ = await engine.generateInsight(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
+            _ = await engine.generateInsight(noteID: id, shouldStop: {
+                ContinuedWork.beat()
+                return abort.isSet || LiveFirst.yields(recording: recording.isSet, runIsLive: false)
+            })
         }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
@@ -1018,6 +1075,8 @@ final class ProcessingPipeline {
                     // paused for heat: heatGate set the stage and queued the note
                 } else if parked.contains(id) {
                     // stopped for the night: heatGate set the stage
+                } else if runSteppedAside {
+                    // stepped aside for a recording: heatGate set the stage and queued the note
                 } else {
                     stage = .failed(CoreError.generationFailed.localizedDescription)   // cut off (abort: resumed later)
                 }
@@ -1277,6 +1336,12 @@ final class ProcessingPipeline {
         starting = true
         defer { starting = false }
         guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
+        if LiveFirst.yields(recording: LiveTranscriber.shared.isRecording, runIsLive: false) {
+            // One model call with no boundary inside: it waits for the recording, queued (it runs after Stop).
+            NSLog("[sve] note %lld steps aside for the recording", noteID)
+            queued = TapQueue.enqueue(queued, QueuedTap(noteID: noteID, kind: .findReminders))
+            return
+        }
         beginBackground()
         defer { endBackground() }
         activeNoteID = noteID
@@ -1315,6 +1380,7 @@ final class ProcessingPipeline {
     private func beginBackground() {
         notesStored = false
         runPausedForHeat = false
+        runSteppedAside = false
         wentToBackground = false
         stepOnGPU = false
         // A run of the overnight task that starts after it expired is cancelled at once; any other run starts clean.
@@ -1491,7 +1557,7 @@ final class ProcessingPipeline {
     /// staying on "Waiting for the earlier recording to finish".
     private func endWaitingActivities() {
         guard !appIsActive, !isWorking else { return }
-        for id in interrupted.sorted() where RecordingActivities.shared.isFollowing(noteID: id) {
+        for id in interrupted.sorted() where RecordingActivities.shared.isFollowing(noteID: id) && !waitsQuietly(id) {
             RecordingActivities.shared.update(noteID: id, .cutOff, line: lastFailure[id] ?? Self.cutOffMessage, percent: 0)
         }
     }
@@ -1747,6 +1813,7 @@ final class ProcessingPipeline {
         noteTitles[id] = nil
         parkRequested.remove(id)
         interrupted.remove(id)
+        steppedAside.remove(id)
         heatPaused.remove(id)
         lastFailure[id] = nil
         regenerateFailed[id] = nil
