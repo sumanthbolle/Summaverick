@@ -251,8 +251,9 @@ struct ProfileSetupView: View {
             guard let read else { saving = false; errorShown = true; return }
             guard read.kind != .failed else { saving = false; errorShown = true; return }
             var profile = read.profile ?? Profile()
-            profile.name = trimmed.isEmpty ? nil : trimmed
-            profile.lang = lang
+            // Saved before the screen's own read filled the fields: an empty field keeps what is saved.
+            if !trimmed.isEmpty { profile.name = trimmed } else if read.profile == nil { profile.name = nil }
+            if let lang { profile.lang = lang }
             if withRoutine { profile.routine = r }   // skipped: a saved routine stays, none is made up
             do {
                 try await CoreEngine.shared.setProfile(profile)
