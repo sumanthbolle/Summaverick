@@ -396,6 +396,9 @@ final class ProcessingPipeline {
             stage = .failed(String(localized: "No speech was detected in the recording."))
             return id
         }
+        // The transcript is the note's and the sidecar is gone: nothing is handed over any more, so this recording
+        // no longer holds the task for itself (notesWritten).
+        handingOver.remove(audio.path)
 
         // 2. notes
         await generateOutputs(noteID: id, transcript: transcript, lang: noteLang, setTitle: true)
@@ -405,7 +408,7 @@ final class ProcessingPipeline {
     /// "Generate notes" on a note: memory work yields first; other work still running shows the busy line.
     func regenerate(noteID: Int64) async {
         let asked = personTapped(noteID, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
-        defer { personRunEnded(asked: asked) }
+        defer { personRunEnded(noteID, asked: asked) }
         guard await personMayStart(noteID) else { return }
         await rerun(noteID: noteID)
     }
@@ -493,7 +496,7 @@ final class ProcessingPipeline {
     @discardableResult
     func regenerateOutput(noteID id: Int64, kind: OutputKind?) async -> Previous? {
         let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
-        defer { personRunEnded(asked: asked) }
+        defer { personRunEnded(id, asked: asked) }
         guard await personMayStart(id) else { return nil }
         starting = true
         defer { starting = false }
@@ -603,7 +606,7 @@ final class ProcessingPipeline {
     /// "Try again" on a note's failed or paused banner: the usual resume path, now.
     func tryAgain(noteID id: Int64) async {
         let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
-        defer { personRunEnded(asked: asked) }
+        defer { personRunEnded(id, asked: asked) }
         guard await personMayStart(id) else { return }
         interrupted.remove(id)
         heatPaused.remove(id)
@@ -824,6 +827,7 @@ final class ProcessingPipeline {
         NSLog("[sve] bg: note %lld: notes ready (app %@)", id, appIsActive ? "in front" : "not in front")
         notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
         RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
+        notesWritten(id)
         // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
         memoryStop.set(false)
@@ -1197,7 +1201,7 @@ final class ProcessingPipeline {
     /// only, with the same busy guard as a recording.
     func findReminders(noteID: Int64) async {
         let asked = personTapped(noteID, subtitle: Stage.extracting.label)   // before any await: the app is in front
-        defer { personRunEnded(asked: asked) }
+        defer { personRunEnded(noteID, asked: asked) }
         guard await personMayStart(noteID) else { return }
         starting = true
         defer { starting = false }
@@ -1286,14 +1290,28 @@ final class ProcessingPipeline {
     }
 
     /// Nothing is running and nothing more can run now: release the continued-processing task. Not while a person's
-    /// run that asked for it has not ended (it may be waiting for memories to yield, so nothing runs for a moment).
+    /// run that asked for it has not ended (it may be waiting for memories to yield, so nothing runs for a moment),
+    /// nor while a Stop is still being handed over (it asked for the task and runs, or queues, once handed over).
     private func finishContinuedWork() {
-        guard PersonRun.releasesContinuedTask(working: isWorking, personRunsPending: personRunsPending) else { return }
+        guard TaskLifecycle.finishes(working: isWorking || !handingOver.isEmpty, personRunsPending: personRunNotes.count,
+                                     queued: 0) else { return }
         ContinuedWork.shared.finish(success: interrupted.isEmpty)
     }
 
-    /// Person's runs (personTapped) that asked for the continued-processing task and have not ended yet.
-    @ObservationIgnored private var personRunsPending = 0
+    /// A note's notes are stored: the task's work for it is done, so the task ends here unless more work waits for it
+    /// (a note queued, a Stop being handed over, a person's run for another note). The memories and the insight
+    /// after the notes never hold it: they stop when cut off and are done later. A person's run for this note is
+    /// this run (while notes run, no tap asks for the task: PersonRun.asksForContinuedTask).
+    private func notesWritten(_ id: Int64) {
+        let otherPersonRuns = personRunNotes.count - (personRunNotes.contains(id) ? 1 : 0)
+        guard TaskLifecycle.finishes(working: !interrupted.isEmpty || !handingOver.isEmpty,
+                                     personRunsPending: otherPersonRuns, queued: 0) else { return }
+        ContinuedWork.shared.finish(success: true)
+    }
+
+    /// Notes of the person's runs (personTapped) that asked for the continued-processing task and have not ended
+    /// yet, one entry per run.
+    @ObservationIgnored private var personRunNotes: [Int64] = []
 
     /// A person's tap on a note (Generate notes, Regenerate, Try again, Do it now, Find reminders), called before the
     /// entry point's first await, while the app is in front: asks for the continued-processing task, as
@@ -1303,7 +1321,7 @@ final class ProcessingPipeline {
     private func personTapped(_ id: Int64, subtitle: String) -> Bool {
         guard PersonRun.asksForContinuedTask(appActive: appIsActive, aiReady: ModelManager.shared.isReady,
                                              working: isWorking, memoriesOnly: memoryWork) else { return false }
-        personRunsPending += 1
+        personRunNotes.append(id)
         ContinuedWork.shared.begin(key: "note-\(id)", subtitle: subtitle)
         return true
     }
@@ -1312,8 +1330,8 @@ final class ProcessingPipeline {
     /// asked for in the tap is released once nothing is left, after the caller's other defers (its busy claim), as
     /// endBackground does. Notes still queued go next (the resume loop releases it when it ends); another run still
     /// working keeps it.
-    private func personRunEnded(asked: Bool) {
-        if asked { personRunsPending = max(0, personRunsPending - 1) }
+    private func personRunEnded(_ id: Int64, asked: Bool) {
+        if asked, let i = personRunNotes.firstIndex(of: id) { personRunNotes.remove(at: i) }
         guard !resuming else { return }   // the resume loop releases it when it ends
         if interrupted.isEmpty { Task { self.finishContinuedWork() } } else { Task { await self.resumeInterrupted() } }
     }
@@ -1587,7 +1605,7 @@ final class ProcessingPipeline {
     /// another note is being written).
     func doItNow(noteID id: Int64) async {
         let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
-        defer { personRunEnded(asked: asked) }
+        defer { personRunEnded(id, asked: asked) }
         unmarkOvernight(id)
         parkRequested.remove(id)
         lastFailure[id] = nil

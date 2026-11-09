@@ -3,6 +3,7 @@
 // Earlier iOS versions keep the plain background task the pipeline always takes.
 import BackgroundTasks
 import Foundation
+import UIKit
 
 @MainActor
 final class ContinuedWork {
@@ -32,7 +33,9 @@ final class ContinuedWork {
     }
     private var held: Held?
     private var wanted = false            // submitted (or running) and work is not done yet
-    private var fraction: Double = 0
+    private var fraction: Double = 0      // the task's progress; never goes back while it is held
+    private var noteBase: Double = 0      // the task's progress when the note in flight started
+    private var noteDone = false          // the note in flight has all its notes written
     private var subtitle = ""
 
     private init() {}
@@ -102,14 +105,24 @@ final class ContinuedWork {
         if !ok { NSLog("[sve] bg: continued processing handler not registered for %@", id) }
     }
 
-    /// Processing starts after Stop: call synchronously in the tap, while the app is in front. Submits
-    /// once; a task already held or asked for is kept (and shows this subtitle).
+    /// Processing starts after Stop: call synchronously in the tap, while the app is in front. A task already
+    /// held or asked for with work left is kept (and shows this subtitle); a held task whose work is done is
+    /// completed first and a new one asked for (TaskLifecycle.onBegin): a finished task is never reused. From the
+    /// background a request is refused, so there a held task is kept whatever its state.
     func begin(key: String, subtitle: String) {
         guard #available(iOS 26, *) else { return }
         self.subtitle = subtitle
-        guard !wanted else { apply(); return }
+        if wanted {
+            let inFront = UIApplication.shared.applicationState == .active
+            guard TaskLifecycle.onBegin(held: true, workLeft: !noteDone) == .finishThenSubmit, inFront else { apply(); return }
+            NSLog("[sve] bg: old task ended, new task asked for")
+            wanted = false
+            complete(success: true)
+        }
         refused = false
         fraction = 0
+        noteBase = 0
+        noteDone = false
         let id = Self.identifier(key: key)
         registerHandler(id)
         let request = BGContinuedProcessingTaskRequest(identifier: id, title: Self.title, subtitle: subtitle)
@@ -124,11 +137,14 @@ final class ContinuedWork {
         }
     }
 
-    /// Progress 0…1 and the stage line, shown by the system.
+    /// The note's progress 0…1 and the stage line, shown by the system. The note fills `noteShare` of the room the
+    /// task has left (TaskLifecycle.rescaled), so the task never goes back and a note that joins it still moves.
     func update(fraction: Double? = nil, subtitle: String? = nil) {
         if let fraction {
             let before = units
-            self.fraction = max(self.fraction, min(1, max(0, fraction)))
+            if fraction >= 1 { noteDone = true }
+            let task = TaskLifecycle.rescaled(taskFraction: noteBase, noteFraction: fraction * TaskLifecycle.noteShare)
+            self.fraction = max(self.fraction, task)
             if units != before { Self.clock.stamp() }
         }
         if let subtitle, !subtitle.isEmpty { self.subtitle = subtitle }
@@ -136,25 +152,31 @@ final class ContinuedWork {
         apply()
     }
 
-    /// A new note starts in the same task: progress starts again from 0.
+    /// A new note starts in the same task: its progress goes on from where the task is, never back to 0.
     func startNote() {
-        fraction = 0
+        noteBase = fraction
+        noteDone = false
         Self.clock.stamp()
         apply()
     }
 
     private var units: Int64 { Int64(fraction * 1000) }
 
+    /// Never at done: a task at its end is not pushed along, it is finished.
     private func pulse() {
-        guard held != nil else { return }
-        fraction = NotesProgress.heartbeatFraction(fraction)
+        let next = NotesProgress.heartbeatFraction(fraction)
+        guard held != nil, next > fraction else { return }
+        fraction = next
         NSLog("[sve] bg: heartbeat, progress %.3f", fraction)
         apply()
     }
 
     /// All work is done (or paused until the app is opened). Completes the task exactly once.
     func finish(success: Bool) {
-        if wanted || held != nil { NSLog("[sve] bg: continued processing finished (%@)", success ? "all done" : "work left") }
+        if wanted || held != nil {
+            if success { NSLog("[sve] bg: task finished (work done)") }
+            else { NSLog("[sve] bg: continued processing finished (work left)") }
+        }
         wanted = false
         refused = false
         complete(success: success)

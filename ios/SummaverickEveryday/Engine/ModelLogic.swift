@@ -431,12 +431,40 @@ enum PersonRun {
     static func asksForContinuedTask(appActive: Bool, aiReady: Bool, working: Bool, memoriesOnly: Bool) -> Bool {
         appActive && aiReady && PersonFirst.action(working: working, memoriesOnly: memoriesOnly) != .busy
     }
+}
 
-    /// The task is released only when nothing runs and no person's run asked for it and has not ended yet (it may be
-    /// waiting for memories to yield, so nothing runs for a moment).
-    static func releasesContinuedTask(working: Bool, personRunsPending: Int) -> Bool {
-        !working && personRunsPending <= 0
+/// One continued-processing task per run of work: it ends as soon as the work is done, a finished task is never
+/// reused for the next Stop or tap, and its progress never goes back.
+enum TaskLifecycle {
+    enum BeginAction: Equatable {
+        /// The held task has work left: the new work joins it.
+        case keep
+        /// Complete the held task (if any) first, then submit a new request.
+        case finishThenSubmit
     }
+
+    /// A Stop or tap asks for the task. A held task whose work is done is completed first and a new request is
+    /// submitted (seen on the owner's iPhone: a finished task reused for the next Stop went 100% to 0% and iOS
+    /// ended it a minute later). Nothing held: a new request.
+    static func onBegin(held: Bool, workLeft: Bool) -> BeginAction {
+        held && workLeft ? .keep : .finishThenSubmit
+    }
+
+    /// The task ends when nothing runs and nothing waits: no person's run that asked for it and has not ended yet
+    /// (it may be waiting for memories to yield, so nothing runs for a moment), and no tap queued.
+    static func finishes(working: Bool, personRunsPending: Int, queued: Int) -> Bool {
+        !working && personRunsPending <= 0 && queued <= 0
+    }
+
+    /// A note's progress 0...1 on the task: it uses the room the task has left, so the task never goes back.
+    static func rescaled(taskFraction: Double, noteFraction: Double) -> Double {
+        let t = min(1, max(0, taskFraction)), n = min(1, max(0, noteFraction))
+        return t + (1 - t) * n
+    }
+
+    /// The share of the room left that one note fills: a note that joins the task later still has room to move.
+    /// Done (1) is shown only when the task finishes.
+    static let noteShare = 0.9
 }
 
 /// The memories of one note, written after its notes: one section at a time (sve_memories_from_section), each
