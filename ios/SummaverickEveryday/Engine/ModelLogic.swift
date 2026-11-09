@@ -229,9 +229,33 @@ enum WaitingNotes {
         !(hasTranscript && outputs.count == 3 && outputs.allSatisfy { $0 })
     }
 
-    /// At launch: a notes run still saved as running was killed; its note joins the notes restored at launch.
-    static func afterKill(steppedAside: Set<Int64>, running: Int64?) -> Set<Int64> {
-        running.map { steppedAside.union([$0]) } ?? steppedAside
+    /// A note whose run was killed resumes by itself at most this many launches; then only the person starts it.
+    static let launchResumeLimit = 2
+
+    struct AfterKill: Equatable {
+        var steppedAside: Set<Int64>
+        var tried: Set<Int64>
+        var resumes: [String: Int]
+        /// The note that reached the limit at this launch.
+        var capped: Int64?
+    }
+
+    /// At launch: a notes run still saved as running was killed. Its note joins the notes restored at launch and the
+    /// resume is counted; past the limit it is left out and counts as tried, so a note with no transcript is not
+    /// queued either (a kill never reaches markAutoTried). running nil: nothing changes.
+    static func afterKill(steppedAside: Set<Int64>, tried: Set<Int64>, resumes: [String: Int], running: Int64?) -> AfterKill {
+        var r = AfterKill(steppedAside: steppedAside, tried: tried, resumes: resumes, capped: nil)
+        guard let running else { return r }
+        let key = String(running), count = resumes[key] ?? 0
+        if count >= launchResumeLimit {
+            r.steppedAside.remove(running)
+            r.tried.insert(running)
+            r.capped = running
+        } else {
+            r.steppedAside.insert(running)
+            r.resumes[key] = count + 1
+        }
+        return r
     }
 
     /// When a run ends, the saved running note stays only while that note is queued to go on (it was cut off or
@@ -1229,9 +1253,16 @@ enum ChatKeep {
         return now - last >= streamSaveInterval
     }
 
-    /// A note deleted: every turn citing it goes, whole, also a summary that cites other notes too.
-    static func withoutNote<T>(_ turns: [T], noteID: Int64, sources: (T) -> [Int64]) -> [T] {
-        turns.filter { !sources($0).contains(noteID) }
+    /// A note deleted: every turn citing it goes, whole, also a summary that cites other notes too, and every turn
+    /// that may hold its words with no sources to tell (holdsUnknownWords).
+    static func withoutNote<T>(_ turns: [T], noteID: Int64, sources: (T) -> [Int64], mayHoldNoteWords: (T) -> Bool) -> [T] {
+        turns.filter { !sources($0).contains(noteID) && !mayHoldNoteWords($0) }
+    }
+
+    /// A turn written without sources (the core sends them only with the finished answer): what it drew on is not
+    /// known, so it counts as possibly the deleted note's, unless it is general knowledge. No kind yet counts as possibly.
+    static func holdsUnknownWords(writtenWithoutSources: Bool, kind: String?) -> Bool {
+        writtenWithoutSources && kind != "general"
     }
 }
 

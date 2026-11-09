@@ -139,12 +139,14 @@ final class ChatStore {
         }
     }
 
-    /// A note deleted: its words leave the chats. Every turn citing it goes, and a chat left with no turns; on disk now.
+    /// A note deleted: its words leave the chats. Every turn citing it goes, every unfinished turn that may hold its
+    /// words (an answer in flight then finds its turn gone: update, setKind and isWriting drop what comes late), and a
+    /// chat left with no turns; on disk now.
     func forget(noteID id: Int64) {
         forgotten.insert(id)
         var changed = false
         for c in chats.indices {
-            let kept = ChatKeep.withoutNote(chats[c].turns, noteID: id, sources: Self.notes(cited:))
+            let kept = ChatKeep.withoutNote(chats[c].turns, noteID: id, sources: Self.notes(cited:), mayHoldNoteWords: Self.holdsUnknownWords)
             if kept.count != chats[c].turns.count {
                 chats[c].turns = kept
                 changed = true
@@ -154,6 +156,16 @@ final class ChatStore {
         chats.removeAll { $0.turns.isEmpty }
         tidy()
         saveNow()
+    }
+
+    private static func holdsUnknownWords(_ t: ChatTurn) -> Bool {
+        let withoutSources: Bool
+        switch t.state {
+        case .waiting, .streaming: withoutSources = true
+        case .stopped(let partial): withoutSources = !partial.isEmpty
+        case .answered, .failed: withoutSources = false
+        }
+        return ChatKeep.holdsUnknownWords(writtenWithoutSources: withoutSources, kind: t.kind)
     }
 
     private static func notes(cited t: ChatTurn) -> [Int64] {

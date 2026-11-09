@@ -89,7 +89,7 @@ struct TopicDetailView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Label("Could not refresh the summary.", systemImage: "exclamationmark.triangle.fill")
                                 .font(.subheadline).foregroundStyle(.orange)
-                            if err == tooWarmMessage {
+                            if err == tooWarmMessage || err == recordingMessage {
                                 Text(verbatim: err).font(.footnote).foregroundStyle(.secondary)
                             }
                             Button("Try again") { Task { await loadSummary() } }
@@ -144,7 +144,7 @@ struct TopicDetailView: View {
 
     private var busyView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Busy with a recording — try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
+            Text("Summaverick is working on another note. Try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
             Button("Try again") { Task { await loadSummary() } }
                 .buttonStyle(.bordered).frame(minHeight: 44)
         }
@@ -245,12 +245,15 @@ struct TopicDetailView: View {
     }
 
     private var tooWarmMessage: String { String(localized: "The phone is too warm. Try again when it has cooled down.") }
+    private var recordingMessage: String { String(localized: "Recording now. Ask again after you stop.") }
 
     /// Only called on first open and from the Refresh / Try again buttons: making a summary occupies the
     /// core for a while, so background changes never trigger it. An old summary stays while a new one is made.
     private func loadSummary() async {
         guard canSummarise, !loadingSummary else { return }
         summaryBusy = false
+        // Live transcription needs the model, piece after piece: a summary would hold it.
+        if LiveTranscriber.shared.liveRunning { summaryError = recordingMessage; return }
         if pipeline.isBusy { summaryBusy = true; return }
         guard await pipeline.yieldMemories(), !pipeline.isWorking else { summaryBusy = true; return }
         loadingSummary = true
@@ -261,6 +264,7 @@ struct TopicDetailView: View {
         do {
             try await ModelManager.shared.loadIntoCore()   // the backend for right now (GPU in front), never left on the CPU
             guard !pipeline.isWorking else { summaryBusy = true; return }
+            guard !LiveTranscriber.shared.liveRunning else { summaryError = recordingMessage; return }
             let s = try await CoreEngine.shared.topicSummary(route.id, lang: settings.notesLanguage)
             if Task.isCancelled { return }
             if s != summary { revealed = [] }

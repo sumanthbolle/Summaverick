@@ -134,7 +134,7 @@ final class ProcessingPipeline {
     /// can never start at once.
     private(set) var starting = false
     /// Notes the "AI is ready" pass already ran once, so a silent recording is not re-run every launch.
-    @ObservationIgnored private var autoTried: Set<Int64> = Set((UserDefaults.standard.array(forKey: "pipeline.autoTried") as? [Int64]) ?? [])
+    @ObservationIgnored private var autoTried: Set<Int64> = ProcessingPipeline.killRestore.tried
     @ObservationIgnored private var autoTriedPruned = false
     private(set) var activeNoteID: Int64?
     /// Last failure message per note, so the note screen can show why nothing was generated.
@@ -281,7 +281,7 @@ final class ProcessingPipeline {
     /// `interrupted`, quiet while it records (waitsQuietly). Cleared when the note's notes run starts again. Kept across
     /// launches, so a kill during the recording still resumes them (queueWaitingNotes), with no overnight mark.
     /// A notes run saved as running at launch was killed: its note joins them (restoredSteppedAside).
-    @ObservationIgnored private var steppedAside: Set<Int64> = ProcessingPipeline.restoredSteppedAside() {
+    @ObservationIgnored private var steppedAside: Set<Int64> = ProcessingPipeline.killRestore.steppedAside {
         didSet { if steppedAside != oldValue { Self.save(steppedAside, Self.steppedAsideKey) } }
     }
     nonisolated private static let runningNoteKey = "pipeline.runningNote"
@@ -293,18 +293,34 @@ final class ProcessingPipeline {
             else { UserDefaults.standard.removeObject(forKey: Self.runningNoteKey) }
         }
     }
-    /// The stepped-aside notes saved, plus the note of a run killed last launch. Moved over at launch, before a new run
-    /// can overwrite the key: in that set it is restored by queueWaitingNotes, stays through another kill until its run
-    /// starts again (startNotesRun takes it out, so it never runs twice), and waits quietly behind a recording.
-    nonisolated private static func restoredSteppedAside() -> Set<Int64> {
+    nonisolated private static let launchResumesKey = "pipeline.launchResumes"
+    /// Launches that resumed a killed run, per note (WaitingNotes.launchResumeLimit). Reset when a run ends cleanly.
+    @ObservationIgnored private var launchResumes: [String: Int] = ProcessingPipeline.killRestore.resumes {
+        didSet { if launchResumes != oldValue { Self.saveLaunchResumes(launchResumes) } }
+    }
+    nonisolated private static func saveLaunchResumes(_ r: [String: Int]) {
+        if r.isEmpty { UserDefaults.standard.removeObject(forKey: launchResumesKey) } else { UserDefaults.standard.set(r, forKey: launchResumesKey) }
+    }
+    /// Read once at launch, before a new run can overwrite the key, and shared by the properties it sets up: their
+    /// initial values cannot see each other. A killed run's note moves into the stepped-aside set: restored by
+    /// queueWaitingNotes, kept through another kill until its run starts again (startNotesRun takes it out, so it never
+    /// runs twice), quiet behind a recording. Past the limit it stays out and counts as tried; "Generate notes" still runs it.
+    nonisolated private static let killRestore: WaitingNotes.AfterKill = {
         let d = UserDefaults.standard
         let stored = Set((d.array(forKey: steppedAsideKey) as? [Int64]) ?? [])
-        let running = (d.object(forKey: runningNoteKey) as? NSNumber)?.int64Value
-        let all = WaitingNotes.afterKill(steppedAside: stored, running: running)
-        if all != stored { save(all, steppedAsideKey) }
+        let tried = Set((d.array(forKey: "pipeline.autoTried") as? [Int64]) ?? [])
+        let resumes = (d.dictionary(forKey: launchResumesKey) as? [String: Int]) ?? [:]
+        let r = WaitingNotes.afterKill(steppedAside: stored, tried: tried, resumes: resumes,
+                                       running: (d.object(forKey: runningNoteKey) as? NSNumber)?.int64Value)
+        if r.steppedAside != stored { save(r.steppedAside, steppedAsideKey) }
+        if r.tried != tried { d.set(r.tried.sorted(), forKey: "pipeline.autoTried") }
+        if r.resumes != resumes { saveLaunchResumes(r.resumes) }
         d.removeObject(forKey: runningNoteKey)
-        return all
-    }
+        if let id = r.capped {
+            NSLog("[sve] bg: note %lld not resumed again after %d launches", id, Int32(WaitingNotes.launchResumeLimit))
+        }
+        return r
+    }()
     /// The saved stepped-aside notes were queued again in this launch (queueWaitingNotes).
     @ObservationIgnored private var steppedAsideRestored = false
     nonisolated private static let insightDueKey = "pipeline.insightDue"
@@ -1595,7 +1611,6 @@ final class ProcessingPipeline {
         let abort = self.abort
         func yields() -> Bool { LiveFirst.yields(recording: LiveTranscriber.shared.liveRunning, runIsLive: false) }
         // The heat ladder: eased or minimal rests first (cut short by a cooler phone, an expiry or a recording).
-        let stageBefore = stage
         if !(await quietHeatGate({ abort.isSet || yields() })) {
             if yields() {   // a recording started during the rest: it waits, queued, as above
                 NSLog("[sve] note %lld steps aside for the recording", noteID)
@@ -1611,7 +1626,7 @@ final class ProcessingPipeline {
             }
             return
         }
-        stage = stageBefore
+        if case .cooling = stage { stage = .idle }
         tapTooWarm.remove(noteID)
         let engine = CoreEngine.shared
         guard let note = await engine.note(noteID) else { return }   // deleted (before its turn came): nothing to do
@@ -1632,13 +1647,17 @@ final class ProcessingPipeline {
         stage = .extracting
         do {
             // On the backend for right now, retried once on the CPU when the app is closed mid-run (GPU stopped).
-            let n = try await onBackend { try await engine.extract(noteID: noteID, shouldStop: { ContinuedWork.beat(); return abort.isSet }) }
+            let n = try await onBackend { try await engine.extract(noteID: noteID, shouldStop: { ContinuedWork.beat(); return abort.isSet || Self.critical }) }
             NSLog("[sve] extract added %d suggestions", n)
             setStreak(noteID, .findReminders, nil)
             stage = .done
         } catch {
             NSLog("[sve] extract failed: %@", String(describing: error))
-            if stopShort(error.localizedDescription, error: error) == .cutOff { requeueFindReminders(noteID) }
+            let hot = Self.critical
+            if stopShort(error.localizedDescription, error: error, heat: hot) == .cutOff {
+                requeueFindReminders(noteID)
+                if hot { tapTooWarm.insert(noteID) }
+            }
         }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
     }
@@ -1688,7 +1707,10 @@ final class ProcessingPipeline {
     }
     private func endBackground() {
         // Ended, not killed: nothing left to restore next launch, unless the note is queued to go on (the queue is not saved).
-        if let id = runningNote, !WaitingNotes.keepsRunningNote(queued: interrupted.contains(id)) { runningNote = nil }
+        if let id = runningNote, !WaitingNotes.keepsRunningNote(queued: interrupted.contains(id)) {
+            runningNote = nil
+            launchResumes[String(id)] = nil
+        }
         ContinuedWork.shared.endNote()   // a Stop or tap from here on finds this note's run over
         stoppedWhileNotActive = false   // this run's; a later run is not one stopped from the background
         UIApplication.shared.isIdleTimerDisabled = false
@@ -1919,6 +1941,7 @@ final class ProcessingPipeline {
                   WaitingNotes.needsWork(hasTranscript: !(note.transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                                          outputs: OutputKind.allCases.map { note.output($0) != nil }) else {
                 steppedAside.remove(id)
+                launchResumes[String(id)] = nil
                 continue
             }
             noteTitles[id] = note.title
@@ -2134,6 +2157,7 @@ final class ProcessingPipeline {
         interrupted.remove(id)
         steppedAside.remove(id)
         if runningNote == id { runningNote = nil }
+        launchResumes[String(id)] = nil
         queued = TapQueue.forgetting(noteID: id, in: queued)
         ChatStore.shared.forget(noteID: id)   // its quotes, titles and links in Ask's chats
         insightDue.remove(id)

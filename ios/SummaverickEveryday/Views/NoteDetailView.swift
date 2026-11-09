@@ -553,16 +553,20 @@ struct NoteDetailView: View {
         answer = nil
         Task {
             defer { asking = false }
+            // Live transcription needs the model, piece after piece: a question would hold it.
+            let recording = String(localized: "Recording now. Ask again after you stop.")
+            guard !LiveTranscriber.shared.liveRunning else { answer = recording; return }
             guard models.isReady else { answer = String(localized: "Summaverick is still getting ready"); return }
             guard !Heat.isTooHot(ProcessInfo.processInfo.thermalState) else {
                 answer = String(localized: "The phone is too warm. Try again when it has cooled down."); return
             }
             // The person first: memory work stops for the answer. Other work still running: the busy line.
-            let busy = String(localized: "Busy with a recording — try again in a moment.")
+            let busy = String(localized: "Summaverick is working on another note. Try again in a moment.")
             guard await pipeline.yieldMemories(), !pipeline.isWorking else { answer = busy; return }
             do {
                 try await models.loadIntoCore()   // the backend for right now (GPU in front)
                 guard !pipeline.isWorking else { answer = busy; return }
+                guard !LiveTranscriber.shared.liveRunning else { answer = recording; return }
                 let context = [n.detailed_notes, t].compactMap { $0 }.joined(separator: "\n\n")
                 answer = try await CoreEngine.shared.ask(context: context, question: q, lang: n.lang)
             } catch {

@@ -322,16 +322,6 @@
         }
       }
     },
-    "Busy with a recording — try again in a moment.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఒక రికార్డింగ్ మీద పని జరుగుతోంది — కొంత సేపటి తర్వాత మళ్లీ ప్రయత్నించండి."
-          }
-        }
-      }
-    },
     "Cancel": {
       "localizations": {
         "te": {
