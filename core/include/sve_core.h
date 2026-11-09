@@ -367,7 +367,7 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
 char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *lang_hint,
                          sve_text_cb on_text, void *user, sve_progress_cb cb, void *cbuser);
 /* The kind sve_assistant_chat's code rule gives a question ("medicine", "quiz", "due", "summary", "recordings"), for the
- * host: "due" and "quiz" need no model, so sve_assistant_chat can run them on a store-only context at once. */
+ * host: "due", "quiz" and "medicine" need no model, so sve_assistant_chat can run them on a store-only context at once. */
 char *sve_route_kind(sve_ctx *ctx, const char *question);
 
 /* At most one insight per calendar day, from recent notes and open tasks: {"id":0,"text":""} or "null".

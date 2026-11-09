@@ -914,6 +914,15 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
     ChatSink s6b;
     expect(chat(ask("Which tablets this week?"), s6b, nullptr)["kind"] == "medicine", "medicine word beats a period");
     ChatSink s6c;
+    // Medicine: runs with no model too, so the host answers it on the store context during other work.
+    {
+        char *rk = sve_route_kind(ctx, "Which tablet should I take?");
+        expect(rk && !strcmp(rk, "medicine"), "route kind: a medicine question");
+        sve_free_string(rk);
+        ChatSink sm;
+        json med = chat(ask("Which tablet should I take?"), sm, nullptr);
+        expect(med.is_object() && med["kind"] == "medicine" && med["medicine"] == true && sm.pieces == 0, "medicine: built in code with no model");
+    }
     // Nothing scores and no model: recordings, the not-found sentence; never general.
     json nomodel = chat(ask("Who wrote Gitanjali?"), s6c, nullptr);
     expect(nomodel.is_object() && nomodel["kind"] == "recordings" && nomodel["not_found"] == true, "no model: recordings, not general");
@@ -927,6 +936,13 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
     printf("--- general (no model)\n%s\n", gen.dump(2).c_str());
     expect(gen.is_object() && gen["kind"] == "recordings" && gen["not_found"] == true && contains(gen["answer"], "ask a doctor or pharmacist") &&
            s7.text == "Rabindranath Tagore wrote it.", "general: drifts into health: the code-built line; that sentence never shown");
+    // ... in the question's language, exactly the fixed line.
+    g_chat_reply = "రవీంద్రనాథ్ ఠాగూర్ రాశారు. జ్వరానికి paracetamol తీసుకోండి.";
+    ChatSink s7t;
+    json gent = chat(ask("గీతాంజలి ఎవరు రాశారు?"), s7t, nullptr);
+    expect(gent.is_object() && gent["answer"] == sve::health_only_text("te") && gent["lang"] == "te" && gent["kind"] != "general" &&
+               gent["medicine"] == false && s7t.text.find("paracetamol") == std::string::npos,
+           "general drifts into health in Telugu: the Telugu line, that sentence never shown");
     g_chat_reply = "Rabindranath Tagore wrote it. He won the Nobel Prize.";
     ChatSink s7a;
     json gen2 = chat(ask("Who wrote Gitanjali?"), s7a, nullptr);
@@ -1265,6 +1281,25 @@ static void run_api_chat(sve_ctx *ctx) {
     expect(held.is_object() && held["medicine"] == true && held["sources"].size() == 1 && s7c.text == "The kitchen pipe must be replaced soon.",
            "chat: held at the medicine sentence, generation stops there");
     run_api_route(ctx, chat);
+
+    // The insight: a health sentence is dropped, not only a medicine one (the model's hook stands in).
+    {
+        sve_setting_set(ctx, "insight.last_date", "");
+        for (const char *bad : {"You keep mentioning a fever and a sore throat. Rest and see how it goes.",
+                                "Take your tablets on time.", "జ్వరం గురించి మళ్ళీ చెప్పారు."}) {
+            g_chat_reply = bad;
+            json dropped = take(sve_insight_generate(ctx, 0, nullptr, nullptr));
+            expect(dropped.is_null(), (std::string("insight dropped: ") + bad).c_str());
+        }
+        char *date = sve_setting_get(ctx, "insight.last_date");
+        expect(!date || !*date, "a dropped insight does not use up the day");
+        sve_free_string(date);
+        g_chat_reply = "The kitchen pipe keeps coming up. Ravi's quote is due on Friday.";
+        json kept = take(sve_insight_generate(ctx, 0, nullptr, nullptr));
+        expect(kept.is_object() && kept["text"] == g_chat_reply, "an ordinary insight stays");
+        if (kept.is_object()) sve_insight_dismiss(ctx, kept["id"].get<int64_t>());
+        sve_setting_set(ctx, "insight.last_date", "");
+    }
 
     ChatSink s8;
     expect(sve_assistant_chat(ctx, "[]", nullptr, chat_text, &s8, nullptr, nullptr) == nullptr &&

@@ -1275,7 +1275,8 @@ char *sve_route_kind(sve_ctx *ctx, const char *question) {
 
 char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
     return guard<char *>("sve_insight_generate", nullptr, [&]() -> char * {
-        if (!ctx || !ctx->llm) return nullptr;
+        const bool stand_in = g_sve_model_reply != nullptr;  // smoke "api": no model on the host
+        if (!ctx || (!ctx->llm && !stand_in)) return nullptr;
         sve::Store &st = *ctx->store;
         const std::string today = today_iso();
         if (st.setting_get("insight.last_date").value_or("") == today) return dup("null");
@@ -1292,7 +1293,6 @@ char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, vo
             }
         }
         const std::string lang = lang_of(st);
-        sve::Llm &llm = *ctx->llm;
         const std::string sys = sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety);
         const std::string userp = material + "\nToday is " + today + ".\n"
             "Write ONE short, helpful insight for the person, at most 2 sentences, in " + sve::language_name(lang) +
@@ -1300,12 +1300,19 @@ char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, vo
             "Use only the material above. Do not mention medicines, doses or health advice. "
             "If nothing useful stands out, reply with exactly NONE.";
         std::string out;
-        if (!llm.complete(llm.apply_template(sys, userp), 120, out, cb, user, "final", 0, 1, true)) return nullptr;
+        if (stand_in) {
+            const char *r = g_sve_model_reply("insight", userp.c_str());
+            if (!r) return nullptr;
+            out = r;
+        } else {
+            sve::Llm &llm = *ctx->llm;
+            if (!llm.complete(llm.apply_template(sys, userp), 120, out, cb, user, "final", 0, 1, true)) return nullptr;
+        }
         std::string text = sve::strip_thinking(out);
         while (!text.empty() && (text.front() == '"' || text.front() == ' ')) text.erase(0, 1);
         while (!text.empty() && (text.back() == '"' || text.back() == ' ')) text.pop_back();
         if (text.empty() || text.find("NONE") != std::string::npos) return dup("null");
-        if (sve::mentions_medicine(text, known_med_names(st))) { sve_logf(1, "insight dropped: mentions a medicine"); return dup("null"); }
+        if (sve::health_text(text, known_med_names(st))) { sve_logf(1, "insight dropped: about health or a medicine"); return dup("null"); }
         std::optional<int64_t> nid;
         if (note_id > 0 && st.get(note_id)) nid = note_id;
         int64_t id = st.add_insight(text, nid);
