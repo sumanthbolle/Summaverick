@@ -87,19 +87,11 @@ final class ProcessingPipeline {
         didSet {
             if stage.isWorking { ContinuedWork.shared.update(subtitle: stage.label) }
             guard case .failed(let msg) = stage, let id = activeNoteID else { followStage(); return }
-            if BackendChoice.failureIsCutOff(aborted: abort.isSet, wentToBackground: wentToBackground, gpuStep: stepOnGPU,
-                                             continuedTaskHeld: ContinuedWork.shared.isHeld) {
-                // iOS stops the AI model on the GPU once the app is in the background, and an expiry cancels the
-                // run, so such a failure is an interruption, not a real error. Resume it later. Anything else
-                // (no speech, a failed CPU load) is a real failure, even after the phone locked.
-                interrupted.insert(id)
-                lastFailure[id] = Self.cutOffMessage
-                cutOff(id)
-            } else {
-                lastFailure[id] = msg
-                notifyFailed(id, line: msg)
-                RecordingActivities.shared.update(noteID: id, .failed, line: msg, percent: ContinuedWork.shared.percent)
-            }
+            // Only stopShort sets .failed, and only for a real failure (FailureKind): an interruption is a cut-off
+            // there and never reaches this.
+            lastFailure[id] = msg
+            notifyFailed(id, line: msg)
+            RecordingActivities.shared.update(noteID: id, .failed, line: msg, percent: ContinuedWork.shared.percent)
         }
     }
 
@@ -245,6 +237,11 @@ final class ProcessingPipeline {
     @ObservationIgnored private var notesStored = false
     /// Notes whose "paused" notification was posted for the cut-off of their current run (posted once).
     @ObservationIgnored private var pausedPosted: Set<Int64> = []
+    /// The parts (NotifyRule.transcript, .summary, .notes) whose "ready" this note's current run already posted.
+    @ObservationIgnored private var postedStages: [Int64: Set<String>] = [:]
+    /// Unknown errors in a row per note (FailureKind): the first is a cut-off, the second a failure. Reset on any
+    /// success (a part stored, a regenerate or find reminders done).
+    @ObservationIgnored private var failureStreak: [Int64: Int] = [:]
     /// Titles of the notes this launch worked on or queued, so a notification never waits for the core (busy until
     /// the cancelled model call stops) before it takes its background time.
     @ObservationIgnored private var noteTitles: [Int64: String] = [:]
@@ -424,11 +421,15 @@ final class ProcessingPipeline {
         let id = await engine.createNote(title: title, lang: noteLang, audioPath: audio.path, transcript: nil, durationSeconds: duration)
         guard id > 0 else {
             // The marker stays on purpose (ruling B7): the next launch tries to save the recording as a note again.
-            let line = String(localized: "Could not save the note.")
-            // Only this run's own claim shows the failure as the stage (and ends it, so nothing stays busy). Another
-            // note running keeps its stage and its Live Activity; only this recording's activity ends.
-            if claimed { stage = .failed(line) }
-            RecordingActivities.shared.update(audioPath: audio.path, .failed, line: line, percent: 0)
+            // The app retries by itself (the next launch saves it), so it is a cut-off, never "failed" (FailureKind: an
+            // unknown error with no note, so no streak). Only this run's own claim ends its stage (so nothing stays
+            // busy). Another note running keeps its stage and its Live Activity; only this recording's activity ends.
+            NSLog("[sve] bg: the note for %@ was not saved; the next launch saves it", audio.lastPathComponent)
+            let outcome = FailureKind.classify(cancelled: false, aborted: abort.isSet, cutOffByBackground: false, heat: false,
+                                               noSpeech: false, audioGone: false)
+            let line = outcome == .cutOff ? Self.cutOffMessage : String(localized: "Could not save the note.")
+            if claimed { stage = outcome == .cutOff ? .idle : .failed(line) }
+            RecordingActivities.shared.update(audioPath: audio.path, outcome == .cutOff ? .cutOff : .failed, line: line, percent: 0)
             return nil
         }
         UnfinishedRecordings.remove(audio.path)   // the note has it now
@@ -478,8 +479,8 @@ final class ProcessingPipeline {
             done = try await transcribe(audio, noteID: id, durationSeconds: duration)
         } catch {
             if parked.contains(id) || runSteppedAside { return id }   // stopped for the night or a recording; the cursor is kept
-            NSLog("[sve] transcription failed: %@", String(describing: error))
-            if !pausedForHeat(id) { stage = .failed(error.localizedDescription) }
+            NSLog("[sve] transcription stopped: %@", String(describing: error))
+            if !pausedForHeat(id) { stopShort(error.localizedDescription, error: error) }
             return id
         }
         let pieces = TranscriptRun.pieces(done)
@@ -488,9 +489,10 @@ final class ProcessingPipeline {
         TranscriptSidecar.remove(audioPath: audio.path)   // complete and saved to the note
         NotificationCenter.default.post(name: .notesChanged, object: nil)
         if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            stage = .failed(String(localized: "No speech was detected in the recording."))
+            stopShort(String(localized: "No speech was detected in the recording."), noSpeech: true)
             return id
         }
+        transcriptStored(id)
 
         // 2. notes
         await generateOutputs(noteID: id, transcript: transcript, lang: noteLang, setTitle: true)
@@ -543,7 +545,7 @@ final class ProcessingPipeline {
         var t = note.transcript ?? ""
         if t.isEmpty {
             guard let path = AudioRecorder.existingAudioPath(note.audio_path) else {
-                stage = .failed(String(localized: "No transcript and the audio is no longer available.")); return
+                stopShort(String(localized: "No transcript and the audio is no longer available."), audioGone: true); return
             }
             stage = .transcribing(0)
             let done: TranscriptSidecar
@@ -552,16 +554,17 @@ final class ProcessingPipeline {
                 t = Self.joined(TranscriptRun.pieces(done))
             } catch {
                 if parked.contains(noteID) || runSteppedAside { return }   // stopped for the night or a recording; the cursor is kept
-                NSLog("[sve] transcription failed: %@", String(describing: error))
-                if !pausedForHeat(noteID) { stage = .failed(error.localizedDescription) }
+                NSLog("[sve] transcription stopped: %@", String(describing: error))
+                if !pausedForHeat(noteID) { stopShort(error.localizedDescription, error: error) }
                 return
             }
             if t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                stage = .failed(String(localized: "No speech was detected in the recording.")); return
+                stopShort(String(localized: "No speech was detected in the recording."), noSpeech: true); return
             }
             await store(done, noteID: noteID, transcript: t)
             TranscriptSidecar.remove(audioPath: path)   // complete and saved to the note
             NotificationCenter.default.post(name: .notesChanged, object: nil)
+            transcriptStored(noteID)
         } else if let path = AudioRecorder.existingAudioPath(note.audio_path) {
             TranscriptSidecar.remove(audioPath: path)   // left over from before the transcript was saved
         }
@@ -637,6 +640,7 @@ final class ProcessingPipeline {
         regenerating = nil
 
         let outcome = RegenerateRules.outcome(written: written != nil, stopped: regenerateStopped)
+        let parkedNow = parked.remove(id) != nil   // stopped for the night (the heat gate); runs when that holds
         if outcome == .replaced, let written, let now = await engine.note(id) {   // deleted meanwhile: nothing is written
             var previous = Previous(title: nil, outputs: [:])
             if let t = written.title { previous.title = now.title; await engine.setTitle(id, t); noteTitles[id] = t }
@@ -646,6 +650,7 @@ final class ProcessingPipeline {
                 await engine.setOutput(id, k, text)
             }
             NotificationCenter.default.post(name: .notesChanged, object: nil)
+            failureStreak[id] = nil
             if noteTitles[id] == nil { noteTitles[id] = now.title }
             // Written with the app closed: "ready", as for the first notes (nothing is posted with the app in front).
             notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
@@ -656,11 +661,22 @@ final class ProcessingPipeline {
             // Stepped aside for a recording: queued again as it was (no cut-off in its streak); it runs after Stop.
             NSLog("[sve] bg: note %lld: regenerate stepped aside for the recording; the old text is kept and it is queued again", id)
             queued = TapQueue.enqueue(queued, LiveFirst.requeued(tap))
+        } else if outcome == .failed, parkedNow {
+            // Stopped for the night: queued again as it was (no cut-off in its streak); it waits for the charger or
+            // the overnight task (TapQueue.waitsForNight), as the note does.
+            NSLog("[sve] bg: note %lld: regenerate stopped for the night; the old text is kept and it is queued again", id)
+            queued = TapQueue.enqueue(queued, tap)
         } else if outcome == .failed {
             let gpuCutOff = BackendChoice.failureIsCutOff(aborted: false, wentToBackground: wentToBackground || !appIsActive,
                                                           gpuStep: stepOnGPU, continuedTaskHeld: ContinuedWork.shared.isHeld)
+            // The note's streak of unknown errors (FailureKind): the first is queued again, the second is "Try again".
+            let streak = failureStreak[id] ?? 0
+            if FailureKind.isUnknown(cancelled: false, aborted: abort.isSet, cutOffByBackground: gpuCutOff, heat: runPausedForHeat,
+                                     noSpeech: false, audioGone: false) {
+                failureStreak[id] = streak + 1
+            }
             if TapQueue.requeuesRegenerate(stoppedByPerson: regenerateStopped, aborted: abort.isSet, heatPaused: runPausedForHeat,
-                                           parkedForNight: parked.contains(id), gpuCutOff: gpuCutOff) {
+                                           parkedForNight: false, gpuCutOff: gpuCutOff, unknownStreak: streak) {
                 // Interrupted, not failed: the same request runs again by itself (the old text stays until the new
                 // is complete), and its "ready" notification says so.
                 let again = TapQueue.requeued(tap)
@@ -823,7 +839,9 @@ final class ProcessingPipeline {
         // Memories and the insight run after the notes are stored: stopping them leaves nothing to resume or show.
         var running: Int64?
         // A regenerate in flight is queued again once its run returns (runRegenerate: abort is set).
-        if TaskLifecycle.expiryCutsOff(working: isWorking, memoriesOnly: memoryWork, notesStored: notesStored),
+        // Only a notes run is cut off here: a regenerate (regenerating) is queued again by runRegenerate, and its Live
+        // Activity is not turned into a cut-off one.
+        if notesRun, TaskLifecycle.expiryCutsOff(working: isWorking, memoriesOnly: memoryWork, notesStored: notesStored),
            let id = activeNoteID {
             interrupted.insert(id)
             lastFailure[id] = Self.cutOffMessage
@@ -845,6 +863,7 @@ final class ProcessingPipeline {
     private func startNotesRun(_ id: Int64) {
         notesRun = true
         pausedPosted.remove(id)
+        postedStages[id] = nil
         steppedAside.remove(id)
     }
 
@@ -868,6 +887,72 @@ final class ProcessingPipeline {
         OvernightWork.shared.schedule()
         guard NotifyRule.postsPaused(cutOffByOvernightTask: overnightOwnsRun.isSet), pausedPosted.insert(id).inserted else { return }
         notify(id) { NotesNotifier.paused(noteID: id, title: $0, percent: percent, hold: $1) }
+    }
+
+    /// The one decision (FailureKind) for a run that stopped short, from what is known now: cancelled (a
+    /// CancellationError, e.g. the transcription stopping), aborted (an expiry, the overnight task ended), the GPU cut
+    /// off in the background (BackendChoice.failureIsCutOff), heat (paused at critical in this run, or too warm to
+    /// start), no speech, the audio gone. An unknown error counts in the note's streak (failureStreak).
+    private func classify(_ id: Int64?, error: Error?, heat: Bool, noSpeech: Bool, audioGone: Bool) -> FailureKind.Outcome {
+        let cancelled = error is CancellationError || Task.isCancelled
+        let aborted = abort.isSet
+        let background = BackendChoice.failureIsCutOff(aborted: false, wentToBackground: wentToBackground || !appIsActive,
+                                                       gpuStep: stepOnGPU, continuedTaskHeld: ContinuedWork.shared.isHeld)
+        let hot = heat || runPausedForHeat
+        let streak = id.flatMap { failureStreak[$0] } ?? 0
+        if let id, FailureKind.isUnknown(cancelled: cancelled, aborted: aborted, cutOffByBackground: background, heat: hot,
+                                         noSpeech: noSpeech, audioGone: audioGone) {
+            failureStreak[id] = streak + 1
+        }
+        return FailureKind.classify(cancelled: cancelled, aborted: aborted, cutOffByBackground: background, heat: hot,
+                                    noSpeech: noSpeech, audioGone: audioGone, unknownStreak: streak)
+    }
+
+    /// Every run of a note that stops short comes here (the only place that sets .failed). A cut-off keeps whatever
+    /// was finished and continues by itself: a notes run's note is queued again (interrupted) with the "continues by
+    /// itself" line and, with the app not in front, goes on the overnight list and posts "paused" once (cutOff); a
+    /// tap's caller queues the tap again. Only a real failure (no speech, the audio gone, an unknown error twice in a
+    /// row) shows as failed (the stage didSet: the note's line, the failed notification, the Live Activity).
+    @discardableResult
+    private func stopShort(_ line: String, error: Error? = nil, heat: Bool = false, noSpeech: Bool = false,
+                           audioGone: Bool = false) -> FailureKind.Outcome {
+        let id = activeNoteID
+        let outcome = classify(id, error: error, heat: heat, noSpeech: noSpeech, audioGone: audioGone)
+        guard outcome == .cutOff, let id else {
+            if let id { NSLog("[sve] bg: note %lld failed: %@", id, line) }
+            stage = .failed(line)
+            return .failed
+        }
+        NSLog("[sve] bg: note %lld stopped short (%@); a cut-off, it continues by itself", id,
+              error.map { String(describing: $0) } ?? line)
+        guard notesRun else { stage = .idle; return .cutOff }   // a tap: queued again by its caller
+        let message = heatPaused.contains(id) ? Self.heatMessage : Self.cutOffMessage
+        interrupted.insert(id)
+        lastFailure[id] = message
+        stage = .paused(message)
+        cutOff(id)
+        return .cutOff
+    }
+
+    /// Find reminders cut off (too warm, an interruption, an unknown error the first time): it runs again by itself.
+    private func requeueFindReminders(_ id: Int64) {
+        NSLog("[sve] bg: note %lld: find reminders cut off; it is queued again", id)
+        queued = TapQueue.enqueue(queued, QueuedTap(noteID: id, kind: .findReminders))
+    }
+
+    /// The transcript is stored after Stop (a notes run): "Transcript ready", once for this run.
+    private func transcriptStored(_ id: Int64) {
+        failureStreak[id] = nil
+        notifyStage(id, NotifyRule.transcript) { NotesNotifier.transcriptReady(noteID: id, title: $0, hold: $1) }
+    }
+
+    /// A part of the note's notes is ready: posted at most once per stage in this run (NotifyRule.next), under the
+    /// note's one identifier, so each replaces the one before. Nothing shows with the app in front (NotesNotifier).
+    private func notifyStage(_ id: Int64, _ part: String, _ post: @escaping (String, NotesNotifier.Hold) -> Void) {
+        guard NotifyRule.next(posted: postedStages[id] ?? [], stage: part) else { return }
+        postedStages[id, default: []].insert(part)
+        NSLog("[sve] bg: note %lld: %@ ready (app %@)", id, part, appIsActive ? "in front" : "not in front")
+        notify(id, post)
     }
 
     /// Takes the background time now, before any await, then posts with the note's title: the one known from this
@@ -902,7 +987,7 @@ final class ProcessingPipeline {
         do {
             try await loadSelectedModel()
         } catch {
-            stage = .failed(error.localizedDescription)
+            stopShort(error.localizedDescription, error: error)
             return
         }
 
@@ -927,7 +1012,7 @@ final class ProcessingPipeline {
             }
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
         }
-        if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
+        if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }   // cut off (aborted)
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
 
         // Section summaries the note does not have yet (all of them for a note from before sections; the chapters
@@ -946,23 +1031,28 @@ final class ProcessingPipeline {
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3, outputsTotal: steps))
 
         for (i, kind) in OutputKind.allCases.enumerated() {
-            if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return }
+            if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }   // cut off (aborted)
             if !(await heatGate(id)) { return }
             do {
                 let step = Self.firstOutputStep + i, total = Self.notesSteps
                 let text = try await writeOutput(kind, noteID: id, transcript: transcript, lang: lang, fromSections: fromSections,
                                                  fraction: { NotesProgress.fraction(outputsDone: step, part: $0, outputsTotal: total) })
+                // Stored as soon as written: the summary is readable before the notes.
                 await engine.setOutput(id, kind, text)
+                failureStreak[id] = nil
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
                 ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.firstOutputStep + 1 + i, outputsTotal: steps))
+                if kind == .shortSummary {   // the title was written just before it
+                    notifyStage(id, NotifyRule.summary) { NotesNotifier.summaryReady(noteID: id, title: $0, hold: $1) }
+                }
             } catch {
-                stage = .failed(error.localizedDescription)
+                stopShort(error.localizedDescription, error: error)
                 return
             }
         }
-        // The notes are stored: "ready" now (when the app is not in front), not after the memories.
-        NSLog("[sve] bg: note %lld: notes ready (app %@)", id, appIsActive ? "in front" : "not in front")
-        notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
+        // The detailed notes and the questions are stored: "ready" now (when the app is not in front), not after the
+        // memories.
+        notifyStage(id, NotifyRule.notes) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
         RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
         notesStored = true   // from here an expiry only stops the run (TaskLifecycle.expiryCutsOff)
         // Memories now, never before them; a stop or failure here never fails the notes
@@ -980,7 +1070,8 @@ final class ProcessingPipeline {
     /// writes, so a long CPU insight keeps the heartbeat going; an expiry stops it (nothing to resume: the notes are
     /// stored). Live transcription running steps it aside (LiveFirst), before it or in the middle (it is cheap to
     /// stop): it then stays due and is written after Stop (insightDue, from the resume loop).
-    private func writeInsight(_ id: Int64) async {
+    /// due: the insight was already due (runDueInsight): stopped by an expiry, it stays due.
+    private func writeInsight(_ id: Int64, due: Bool = false) async {
         let abort = self.abort, live = LiveTranscriber.shared.liveRunningNow, yielded = AtomicFlag()
         var written = false
         if LiveFirst.yields(recording: live.isSet, runIsLive: false) {
@@ -993,8 +1084,8 @@ final class ProcessingPipeline {
                 return abort.isSet
             }) != nil
         }
-        if LiveFirst.insightStaysDue(yielded: yielded.isSet, written: written) {
-            NSLog("[sve] note %lld steps aside for the recording", id)
+        if LiveFirst.insightStaysDue(yielded: yielded.isSet, written: written, stoppedWhileDue: due && abort.isSet) {
+            NSLog(yielded.isSet ? "[sve] note %lld steps aside for the recording" : "[sve] bg: note %lld: the due insight was stopped; it stays due", id)
             insightDue.insert(id)
         } else {
             insightDue.remove(id)
@@ -1022,7 +1113,7 @@ final class ProcessingPipeline {
         }
         guard !abort.isSet, !yields(), Heat.beforeRun(Self.thermal) != .pause else { return }   // stays due
         NSLog("[sve] note %lld: insight after the recording", id)
-        await writeInsight(id)
+        await writeInsight(id, due: true)
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
     }
 
@@ -1139,7 +1230,7 @@ final class ProcessingPipeline {
                 } else if runSteppedAside {
                     // stepped aside for a recording: heatGate set the stage and queued the note
                 } else {
-                    stage = .failed(CoreError.generationFailed.localizedDescription)   // cut off (abort: resumed later)
+                    stopShort(CoreError.generationFailed.localizedDescription)   // cut off (abort: resumed later)
                 }
                 return nil
             }
@@ -1150,7 +1241,7 @@ final class ProcessingPipeline {
                 stage = .idle
                 return nil
             }
-            if abort.isSet { stage = .failed(CoreError.generationFailed.localizedDescription); return nil }
+            if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription, error: error); return nil }
             if pausedForHeat(id) { return nil }
             NSLog("[sve] section summaries failed, notes come from the transcript: %@", String(describing: error))
             return false
@@ -1407,20 +1498,24 @@ final class ProcessingPipeline {
         defer { endBackground() }
         activeNoteID = noteID
         lastFailure[noteID] = nil
-        if Heat.isTooHot(Self.thermal) {
-            stage = .failed(String(localized: "The phone is too warm. Try again when it has cooled down.")); return
+        if Heat.isTooHot(Self.thermal) {   // heat: a cut-off; it runs again by itself once cooler
+            if stopShort(String(localized: "The phone is too warm. Try again when it has cooled down."), heat: true) == .cutOff {
+                requeueFindReminders(noteID)
+            }
+            return
         }
         let engine = CoreEngine.shared
         guard let note = await engine.note(noteID) else { return }   // deleted (before its turn came): nothing to do
         runningTap = QueuedTap(noteID: noteID, kind: .findReminders)   // on disk: a kill keeps it
         defer { runningTap = nil }
         guard let t = note.transcript, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            stage = .failed(String(localized: "No speech was detected in the recording.")); return
+            stopShort(String(localized: "No speech was detected in the recording."), noSpeech: true); return
         }
         do {
             try await loadSelectedModel()
         } catch {
-            stage = .failed(error.localizedDescription); return
+            if stopShort(error.localizedDescription, error: error) == .cutOff { requeueFindReminders(noteID) }
+            return
         }
         if await engine.pieces(noteID).isEmpty {
             await engine.setPieces(noteID, PiecesBackfill.pieces(transcript: t, durationSeconds: note.duration_seconds))
@@ -1430,10 +1525,11 @@ final class ProcessingPipeline {
             // On the backend for right now, retried once on the CPU when the app is closed mid-run (GPU stopped).
             let n = try await onBackend { try await engine.extract(noteID: noteID, shouldStop: { ContinuedWork.beat(); return false }) }
             NSLog("[sve] extract added %d suggestions", n)
+            failureStreak[noteID] = nil
             stage = .done
         } catch {
             NSLog("[sve] extract failed: %@", String(describing: error))
-            stage = .failed(error.localizedDescription)
+            if stopShort(error.localizedDescription, error: error) == .cutOff { requeueFindReminders(noteID) }
         }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
     }
@@ -1525,9 +1621,14 @@ final class ProcessingPipeline {
 
     /// The queued taps the resume loop may take next (each once per pass), oldest first.
     /// A tap cut off 3 times in a row waits for the app in front or the charger (TapQueue.mayRun).
+    /// A tap on a note the person chose to finish overnight (a regenerate stopped for the night) waits as the note does.
     private func runnableTaps(tried: [QueuedTap]) -> [QueuedTap] {
-        let active = appIsActive, plugged = Self.pluggedIn
-        return queued.filter { !tried.contains($0) && TapQueue.mayRun($0, appActive: active, pluggedIn: plugged) }
+        let active = appIsActive, plugged = Self.pluggedIn, inTask = overnightRun != nil, onPower = OvernightWork.shared.runOnPower
+        return queued.filter {
+            !tried.contains($0) && TapQueue.mayRun($0, appActive: active, pluggedIn: plugged)
+                && !TapQueue.waitsForNight(markedByPerson: isOvernight($0.noteID), pluggedIn: plugged,
+                                           inOvernightTask: inTask, taskOnPower: onPower)
+        }
     }
 
     /// Person's runs (personTapped) that asked for the continued-processing task and have not ended yet.

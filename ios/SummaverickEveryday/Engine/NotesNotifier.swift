@@ -1,6 +1,7 @@
-// Local notifications about a recording's notes while the app is not in front: ready, paused (the background work
-// was cut off) and failed. One identifier per note (notes.<id>), so a later state replaces the earlier one; at most
-// one per state change, never one per percent. Tapping opens the note through ReminderScheduler.pendingRoute. Uses
+// Local notifications about a recording's notes while the app is not in front: each part as it is ready (transcript,
+// summary, notes), paused (the background work was cut off; it continues by itself) and failed (a real failure only).
+// One identifier per note (notes.<id>), so a later state replaces the earlier one; at most one per stage per run
+// (NotifyRule.next), never one per percent. Tapping opens the note through ReminderScheduler.pendingRoute. Uses
 // the same notification permission as reminders. Nothing is posted while the app is active (it shows the note).
 import UIKit
 import UserNotifications
@@ -10,15 +11,25 @@ enum NotesNotifier {
     /// Identifiers of these notifications start with this (NotifyRule.identifier).
     nonisolated static let prefix = "notes."
 
-    /// The note's notes are written (the memories may still follow).
+    /// The transcript is stored after Stop (the summary and notes follow).
+    static func transcriptReady(noteID: Int64, title: String, hold: Hold? = nil) {
+        post(noteID, state: "transcript ready", body: String(localized: "Transcript ready: \(title)"), hold: hold)
+    }
+
+    /// The title and the short summary are stored (the detailed notes and the questions follow).
+    static func summaryReady(noteID: Int64, title: String, hold: Hold? = nil) {
+        post(noteID, state: "summary ready", body: String(localized: "Summary ready: \(title)"), hold: hold)
+    }
+
+    /// The note's detailed notes and questions are written (the memories may still follow).
     static func notesReady(noteID: Int64, title: String, hold: Hold? = nil) {
         post(noteID, state: "ready", body: String(localized: "Notes ready: \(title)"), hold: hold)
     }
 
-    /// The background work was cut off; the note finishes later by itself (the overnight task) or when tapped.
+    /// The background work was cut off; the note continues by itself (the overnight task, or when the app is opened).
     static func paused(noteID: Int64, title: String, percent: Int, hold: Hold? = nil) {
         post(noteID, state: "paused",
-             body: String(localized: "\(title): paused at \(percent)%. It will finish while charging, or tap to finish now.",
+             body: String(localized: "\(title): paused at \(percent)%. It continues by itself.",
                           comment: "Note title, percent of the work done"),
              hold: hold)
     }

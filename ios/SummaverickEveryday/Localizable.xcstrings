@@ -5185,23 +5185,6 @@
         }
       }
     },
-    "%@: paused at %lld%%. It will finish while charging, or tap to finish now.": {
-      "comment": "Note title, percent of the work done",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@: paused at %2$lld%%. It will finish while charging, or tap to finish now."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@: %2$lld%% వద్ద ఆగింది. ఛార్జింగ్‌లో ఉన్నప్పుడు పూర్తవుతుంది, లేదా ఇప్పుడే పూర్తి చేయడానికి నొక్కండి."
-          }
-        }
-      }
-    },
     "%@: notes could not be written": {
       "localizations": {
         "en": {
@@ -5544,6 +5527,55 @@
           "stringUnit": {
             "state": "translated",
             "value": "వేచి ఉంది: మరో నోట్ రాయబడుతోంది"
+          }
+        }
+      }
+    },
+    "%@: paused at %lld%%. It continues by itself.": {
+      "comment": "Note title, percent of the work done",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: paused at %2$lld%%. It continues by itself."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$lld%% వద్ద ఆగింది. ఇది దానంతటదే కొనసాగుతుంది."
+          }
+        }
+      }
+    },
+    "Transcript ready: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript ready: %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ట్రాన్స్క్రిప్ట్ సిద్ధం: %@"
+          }
+        }
+      }
+    },
+    "Summary ready: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summary ready: %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశం సిద్ధం: %@"
           }
         }
       }

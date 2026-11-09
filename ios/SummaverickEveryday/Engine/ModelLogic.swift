@@ -271,6 +271,40 @@ enum NotifyRule {
     /// "Paused" when work after Stop is cut off; not each time the overnight task is ended during the night (the
     /// note was already paused and finishes in a later run).
     static func postsPaused(cutOffByOvernightTask: Bool) -> Bool { !cutOffByOvernightTask }
+
+    /// The parts of a note's notes run that each say when they are ready: the transcript (stored after Stop), the
+    /// summary (title and short summary stored), the notes (detailed notes and questions stored).
+    static let transcript = "transcript", summary = "summary", notes = "notes"
+
+    /// One notification per stage per note per run: `posted` holds the stages this run already posted.
+    static func next(posted: Set<String>, stage: String) -> Bool { !posted.contains(stage) }
+}
+
+/// The one decision for a notes run (and a tap) that stopped short: a cut-off (the work is kept and continues by
+/// itself, "paused" at most once) or a real failure ("failed", the person sees why). Only no speech in the recording,
+/// or no transcript and no audio file, is a failure. Any interruption (cancelled: a CancellationError or the task
+/// cancelled; aborted: an expiry or the overnight task ended; cutOffByBackground: the GPU stopped in the background,
+/// BackendChoice.failureIsCutOff; heat) is a cut-off. Anything else is an unknown error: a cut-off the first time,
+/// failed the second time in a row for the same note (unknownStreak: unknown errors in a row before this one,
+/// failureStreak[noteID]; it resets on any success).
+enum FailureKind {
+    enum Outcome: Equatable { case cutOff, failed }
+
+    /// Unknown errors in a row that are still retried by themselves.
+    static let unknownRetries = 1
+
+    static func classify(cancelled: Bool, aborted: Bool, cutOffByBackground: Bool, heat: Bool, noSpeech: Bool,
+                         audioGone: Bool, unknownStreak: Int = 0) -> Outcome {
+        if noSpeech || audioGone { return .failed }
+        if cancelled || aborted || cutOffByBackground || heat { return .cutOff }
+        return unknownStreak < unknownRetries ? .cutOff : .failed
+    }
+
+    /// The error is none of the known kinds: it counts in the note's streak.
+    static func isUnknown(cancelled: Bool, aborted: Bool, cutOffByBackground: Bool, heat: Bool, noSpeech: Bool,
+                          audioGone: Bool) -> Bool {
+        !(cancelled || aborted || cutOffByBackground || heat || noSpeech || audioGone)
+    }
 }
 
 /// How long the work left on a note will take on the phone's CPU (measured on the device), to decide whether
@@ -524,14 +558,25 @@ enum TapQueue {
         t.noteID != running || isRegenerate(t.kind)
     }
 
-    /// A regenerate whose run ended without new text: queued again (an interruption) rather than failed. Interrupted:
-    /// the run was cancelled (abort: the continued-processing task expired, the background time ended, the
-    /// overnight task expired), the heat gate paused it at critical (not a stop for the night), or the GPU was
-    /// stopped in the background with nothing to retry it on the CPU. The person's Stop (which also sets abort) is
-    /// neither: nothing changes and nothing runs again. Anything else is a real failure ("Try again").
+    /// A regenerate whose run ended without new text: queued again rather than failed whenever FailureKind calls it
+    /// a cut-off: the run was cancelled (abort: the continued-processing task expired, the background time ended, the
+    /// overnight task expired), the heat gate paused it at critical, the GPU was stopped in the background with
+    /// nothing to retry it on the CPU, or an unknown error the first time in a row (unknownStreak). Stopped for the
+    /// night (the note was parked) is queued again too: it runs when the overnight conditions hold (waitsForNight).
+    /// The person's Stop (which also sets abort) is neither: nothing changes and nothing runs again. Anything else is
+    /// a real failure ("Try again").
     static func requeuesRegenerate(stoppedByPerson: Bool, aborted: Bool, heatPaused: Bool, parkedForNight: Bool,
-                                   gpuCutOff: Bool) -> Bool {
-        !stoppedByPerson && (aborted || (heatPaused && !parkedForNight) || gpuCutOff)
+                                   gpuCutOff: Bool, unknownStreak: Int) -> Bool {
+        !stoppedByPerson && (parkedForNight
+            || FailureKind.classify(cancelled: false, aborted: aborted, cutOffByBackground: gpuCutOff, heat: heatPaused,
+                                    noSpeech: false, audioGone: false, unknownStreak: unknownStreak) == .cutOff)
+    }
+
+    /// A queued tap on a note the person chose to finish overnight (a regenerate stopped for the night) waits for the
+    /// same conditions as the note: plugged in, or inside an overnight task that asked for the charger.
+    static func waitsForNight(markedByPerson: Bool, pluggedIn: Bool, inOvernightTask: Bool, taskOnPower: Bool) -> Bool {
+        !OvernightList.mayStart(mark: markedByPerson ? .person : .none, pluggedIn: pluggedIn,
+                                inOvernightTask: inOvernightTask, taskOnPower: taskOnPower)
     }
 
     /// Cut-offs in a row after which a queued tap waits for the app in front or the charger.
@@ -748,7 +793,10 @@ enum LiveFirst {
 
     /// A note's insight stays due (it runs after Stop, from the resume loop) when it stepped aside for the recording,
     /// skipped or stopped, and was not written. One that failed or had nothing to say is not tried again (as before).
-    static func insightStaysDue(yielded: Bool, written: Bool) -> Bool { yielded && !written }
+    /// stoppedWhileDue: an insight already due (runDueInsight) stopped by an abort (expiry): it stays due.
+    static func insightStaysDue(yielded: Bool, written: Bool, stoppedWhileDue: Bool = false) -> Bool {
+        (yielded || stoppedWhileDue) && !written
+    }
 }
 
 /// A WAV the recorder never finished (the app was closed mid-recording) still has the sizes written at its start: 0,
