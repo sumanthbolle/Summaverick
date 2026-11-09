@@ -16,7 +16,7 @@
 ## Global Constraints
 
 - **E4B stays the transcription model.** No smaller model, no cloud, no background GPU, no silent-audio workarounds.
-- **Heat rules stay as they are:** `Heat.beforeRun` rests 30 s at serious and pauses at critical.
+- **Heat:** until Task N6 lands, `Heat.beforeRun` stays as it is (rests 30 s at serious, pauses at critical). N6 replaces it with the heat ladder; critical always pauses.
 - **"Failed" means a real failure only:** no speech in the recording, or the audio gone with no transcript. Any interruption (expiry, cancel, heat, GPU cut off in the background, app killed) keeps the work and continues by itself.
 - **Notifications:** at most one per stage per note, under the identifier `notes.<id>`, so a later one replaces the earlier. None while the app is active.
 - **Strings:** every user-facing string is in `Localizable.xcstrings` with en and te, written as `json.dumps(d, ensure_ascii=False, indent=2)+"\n"`.
@@ -173,9 +173,55 @@
 - [ ] **Step 4:** Keep only the changes that pass, as the defaults. Write the table (time, accuracy, kept or not) to `docs/superpowers/2026-11-09-piece-speed.md`. Then run `core/tests/run.sh` and `smoke_gemma.sh api`.
 - [ ] **Step 5: Commit** `perf(core): cheaper transcription pieces with the same accuracy` (or `docs:` only, if nothing passed).
 
-### Task N6: Device check with the owner
+### Task N6: Gradual heat control (the heat ladder)
 
-- [ ] Install the build. Run each spec "Done when" case with `xcrun devicectl device process launch --console` logs:
+Owner request (2026-11-09): control heating like Edge Veda (github.com/ramanujammv1988/edge-veda, Apache-2.0). It uses a multi-level ladder with asymmetric hysteresis and thermal, memory, battery and Low Power inputs (flutter/lib/src/runtime_policy.dart:129-253). It never slows decoding itself. Here the knobs are rests at boundaries and CPU threads. Ideas only; no code is copied.
+
+**Files:**
+- Modify:
+  - `Engine/ModelLogic.swift`: a new `enum HeatLadder` replaces the `Heat.beforeRun`/`restSeconds` use; `Heat.isTooHot` stays for one-off runs.
+  - `Engine/ProcessingPipeline.swift`: `heatGate`.
+  - `Engine/LiveTranscriber.swift`: its `heatGate` and `pauseReason`; `LivePause` battery 20% stays for live.
+  - `core/include/sve_core.h`, `core/src/sve_core.cpp`, `core/src/sve_llm.cpp`: runtime CPU threads.
+  - `Localizable.xcstrings`, if a new line is shown.
+
+**Interfaces:**
+- Produces:
+  - `enum HeatLadder.Level: Int, Comparable { full = 0, eased, minimal, paused }`.
+  - `static func demanded(thermal: ProcessInfo.ThermalState, availableMemoryMB: Int, batteryLevel: Float, charging: Bool, lowPower: Bool) -> Level`. The first match wins:
+    - `.critical`, or memory < 50 MB → `.paused`;
+    - `.serious`, or memory < 100 MB, or battery < 0.05 and not charging → `.minimal`;
+    - `.fair`, or Low Power Mode, or battery < 0.15 and not charging → `.eased`;
+    - otherwise `.full`.
+    - Battery < 0 means unknown, and never counts.
+  - `static func next(current: Level, demanded: Level, calmSince: Date?, now: Date) -> Level`:
+    - worse is immediate (`max`);
+    - better comes one level at a time, and only after `demanded < current` has held for 60 s (`calmSince`). The caller keeps `calmSince` and resets it whenever demand rises or is not below current.
+  - `static func restSeconds(_ l: Level) -> Double`: full 0, eased 5, minimal 20; paused waits until the level is below paused.
+  - `static func cpuThreads(_ l: Level) -> Int`: full 4, eased 4, minimal 2. This applies only to CPU runs; GPU runs keep the GPU and rest.
+  - Core: `int sve_set_threads(sve_ctx *ctx, int n_threads)` sets the LLM context's threads (llama_set_n_threads) for the next calls. It returns 0, or -1 with no model.
+  - Available memory comes from `os_proc_available_memory()`.
+  - One shared `HeatLadder` state (a small @MainActor holder, `HeatGovernor.shared`) is read by both heat gates, so live and pipeline agree.
+  - Log on each level change: `[sve] heat: %@ -> %@ (thermal %ld, mem %d MB, battery %.2f)`.
+
+- [ ] **Step 1:** Write the swiftc check `heatladder_check`. It covers:
+  - every `demanded` row, including unknown battery and charging;
+  - `next`: worse is immediate; better only after 60 s; one level per 60 s (paused → full takes 3 × 60 s); `calmSince` resets when demand rises;
+  - the `restSeconds` and `cpuThreads` tables.
+
+  Fail, implement, pass. Paste the output.
+- [ ] **Step 2:** Add the core `sve_set_threads` and a core test that it changes the threads and returns -1 with no model. Run `core/tests/run.sh` (all passed) and `smoke_gemma.sh api`.
+- [ ] **Step 3: Wire it.**
+  - Both heat gates ask `HeatGovernor` before each piece, section and output: rest `restSeconds`, or wait while paused, as today's pause does (same quiet behaviour, same resume path).
+  - Before each CPU run, call `sve_set_threads` with `cpuThreads`, and only when the value changed.
+  - Critical in the middle of a run still cancels it (`Heat.cancelsRun` stays).
+  - The serious rest's UI line ("phone is warm") is shown at eased and at minimal.
+- [ ] **Step 4:** Device build and `STRINGS OK`.
+- [ ] **Step 5: Commit** `feat(ios,core): heat ladder: ease off gradually (rests, fewer threads) instead of stop-start; memory and battery count`.
+
+### Task N7: Device check with the owner
+
+- [ ] Install the build. Run each spec "Done when" case, plus heat: the same long recording or Regenerate once before N6 and once after (or with the ladder at full and at normal), comparing total time and the thermal states logged, with `xcrun devicectl device process launch --console` logs:
   1. A long recording (or the 81-minute note's Regenerate): locked, cable in, and left alone.
   2. A Regenerate while another note runs.
   3. A recording made while another note is being written.

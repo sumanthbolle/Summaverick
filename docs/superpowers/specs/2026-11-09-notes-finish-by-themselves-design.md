@@ -52,8 +52,10 @@ during the recording and from making each piece cheaper, never from a less accur
 
 - No smaller model for transcription (E2B measured and rejected). No cloud. No background GPU (not on iPhone).
 - No silent-audio or other workarounds of iOS background rules.
-- Heat: the serious/critical rules stay (rest at serious, pause at critical); this is the phone's own safety
-  signal. Only the order of work changes.
+- Heat (changed by the owner, 2026-11-09, after Edge Veda): instead of full speed then a 30 s rest at serious, a
+  gradual heat ladder (full / eased / minimal / paused) from thermal state, available memory, battery and Low Power
+  Mode, with immediate step-down and one step up per 60 s of calm. Its knobs are rests at boundaries and fewer CPU
+  threads. Critical always pauses; it is the phone's own safety signal.
 - Never "Try again" for something the app can retry by itself.
 
 ## Honest limits (to tell the owner, and to design for)
