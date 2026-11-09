@@ -5515,19 +5515,18 @@
         }
       }
     },
-    "%@: regenerating stopped. Your notes are unchanged; open the note to try again.": {
-      "comment": "Note title",
+    "Waiting: another note is being written": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: regenerating stopped. Your notes are unchanged; open the note to try again."
+            "value": "Waiting: another note is being written"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: మళ్ళీ రాయడం ఆగిపోయింది. మీ నోట్స్ మారలేదు; మళ్ళీ ప్రయత్నించడానికి నోట్ ని తెరవండి."
+            "value": "వేచి ఉంది: మరో నోట్ రాయబడుతోంది"
           }
         }
       }

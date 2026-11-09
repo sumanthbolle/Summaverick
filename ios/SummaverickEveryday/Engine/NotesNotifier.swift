@@ -23,14 +23,6 @@ enum NotesNotifier {
              hold: hold)
     }
 
-    /// A regenerate was cut off in the background: the old text is kept, and the note shows "Try again".
-    static func regenerateStopped(noteID: Int64, title: String, hold: Hold? = nil) {
-        post(noteID, state: "regenerate stopped",
-             body: String(localized: "\(title): regenerating stopped. Your notes are unchanged; open the note to try again.",
-                          comment: "Note title"),
-             hold: hold)
-    }
-
     /// The notes run failed for real (not a cut-off); `line` is the failure the note shows.
     static func failed(noteID: Int64, title: String, line: String, hold: Hold? = nil) {
         post(noteID, state: "failed", body: String(localized: "\(title): notes could not be written") + "\n" + line, hold: hold)

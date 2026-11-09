@@ -150,8 +150,9 @@ struct NoteDetailView: View {
                         StatusBanner(stage: .paused(models.status == .unsupported ? AIStatus.unsupportedMessage
                                                                                   : ProcessingPipeline.waitingMessage))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else if pipeline.busyNotice == noteID {
-                        Text("Busy with a recording — try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
+                    } else if pipeline.hasQueuedTap(noteID) {
+                        // A tap made while another note was being written: it runs by itself in its turn.
+                        Text(ProcessingPipeline.tapWaitingMessage).font(.subheadline).foregroundStyle(.secondary)
                     } else if let failure = pipeline.lastFailure[noteID] {
                         StatusBanner(stage: pipeline.interrupted.contains(noteID) ? .paused(failure) : .failed(failure),
                                      onTryAgain: RegenerateRules.showsTryAgain(needsWork: needsGeneration, aiReady: models.isReady,

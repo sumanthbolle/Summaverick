@@ -170,8 +170,11 @@ final class ProcessingPipeline {
     /// Notes whose memory model call failed (-3) in this launch: backfills (in front and overnight) skip them, so one
     /// such note never holds up the others. Tried again at the next launch.
     @ObservationIgnored private var memoryFailed: Set<Int64> = []
-    /// A person's action on this note could not start (other work still ran): the note shows the busy line.
-    private(set) var busyNotice: Int64?
+    /// Taps made while another note's work ran (Regenerate, Generate notes, Try again, Find reminders), oldest first:
+    /// each runs by itself in its turn, from the resume loop, before cut-off notes. The note shows the waiting line.
+    private(set) var queued: [QueuedTap] = ProcessingPipeline.loadQueuedTaps() { didSet { saveQueuedTaps() } }
+    /// The regenerate running now, kept with the queue on disk: the app killed meanwhile runs it again next launch.
+    @ObservationIgnored private var runningTap: QueuedTap? { didSet { saveQueuedTaps() } }
     /// Set by Settings while "Delete everything" or "Remove AI" runs: no memory backfill starts meanwhile.
     var memoriesHeld = false
     /// Set when the app stops being active (read on any thread): cancels a memory run on the GPU before iOS refuses
@@ -192,9 +195,37 @@ final class ProcessingPipeline {
     /// battery, and they resume whenever the resume loop runs (opening the app resumes them at once). They stay
     /// listed until their notes are done, so a kill or another cut-off never loses them. Kept across launches.
     @ObservationIgnored private var automatic: Set<Int64> = Set((UserDefaults.standard.array(forKey: ProcessingPipeline.automaticKey) as? [Int64]) ?? [])
-    /// Any thread (OvernightWork's request): a note cut off after Stop is waiting to finish by itself.
+    /// Any thread (OvernightWork's request): a note cut off after Stop is waiting to finish by itself, or a person's
+    /// tap waits its turn (it was made to run now, so it may run on battery too).
     nonisolated static var automaticFinishPending: Bool {
         !((UserDefaults.standard.array(forKey: automaticKey) as? [Int64]) ?? []).isEmpty
+            || UserDefaults.standard.data(forKey: TapQueue.key) != nil
+    }
+
+    /// The note shows this while a tap on it waits its turn.
+    static var tapWaitingMessage: String { String(localized: "Waiting: another note is being written") }
+    func hasQueuedTap(_ id: Int64) -> Bool { queued.contains { $0.noteID == id } }
+
+    private static func loadQueuedTaps() -> [QueuedTap] {
+        guard let data = UserDefaults.standard.data(forKey: TapQueue.key) else { return [] }
+        return (try? JSONDecoder().decode([QueuedTap].self, from: data)) ?? []
+    }
+    /// The queue and the regenerate running (first: it was tapped before any still queued). No key when empty.
+    private func saveQueuedTaps() {
+        let all = queued.reduce(runningTap.map { [$0] } ?? []) { TapQueue.enqueue($0, $1) }
+        if all.isEmpty { UserDefaults.standard.removeObject(forKey: TapQueue.key); return }
+        UserDefaults.standard.set(try? JSONEncoder().encode(all), forKey: TapQueue.key)
+    }
+
+    /// A tap that could not start (another run works): queued for its turn, unless that run is this note's own notes
+    /// and covers it.
+    private func enqueueTap(_ tap: QueuedTap) {
+        guard TapQueue.accepts(tap, notesRunningFor: notesRun ? activeNoteID : nil) else {
+            NSLog("[sve] bg: tap on note %lld covered by its notes run", tap.noteID)
+            return
+        }
+        queued = TapQueue.enqueue(queued, tap)
+        NSLog("[sve] bg: tap queued (note %lld, %@)", tap.noteID, String(describing: tap.kind))
     }
     /// The run in flight writes a note's notes (process, or resuming them; not a regenerate or a backfill): only
     /// such a run is enrolled after a cut-off and notifies ready, paused and failed.
@@ -404,16 +435,16 @@ final class ProcessingPipeline {
         return id
     }
 
-    /// "Generate notes" on a note: memory work yields first; other work still running shows the busy line.
+    /// "Generate notes" on a note: memory work yields first; other work still running: the tap waits its turn.
     func regenerate(noteID: Int64) async {
         let asked = personTapped(noteID, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
         defer { personRunEnded(asked: asked) }
-        guard await personMayStart(noteID) else { return }
+        guard await personMayStart(QueuedTap(noteID: noteID, kind: .generate)) else { return }
         await rerun(noteID: noteID)
     }
 
     /// Re-runs the AI stage for an existing note (resume after interruption, or after a model change). Internal
-    /// callers (the resume loop, Do it now, Try again) come here directly: no busy line without a tap.
+    /// callers (the resume loop, a queued tap, Do it now, Try again) come here directly: nothing is queued.
     private func rerun(noteID: Int64) async {
         guard !isWorking else { return }
         starting = true
@@ -483,20 +514,30 @@ final class ProcessingPipeline {
 
     /// The regenerate running now (its note shows the progress and Stop under the text).
     private(set) var regenerating: Regeneration?
-    /// The last regenerate of a note that failed (error, heat, cut off by iOS): the note shows "Try again".
+    /// The last regenerate of a note that failed (error, heat): the note shows "Try again". One cut off by the task's
+    /// expiry is queued again instead (regenerateCutOff).
     private(set) var regenerateFailed: [Int64: Regeneration] = [:]
     @ObservationIgnored private var regenerateStopped = false
+    /// The regenerate running was cut off (the task expired) and queued again: not a failure, no "Try again".
+    @ObservationIgnored private var regenerateCutOff = false
 
     /// "Regenerate" (one output) or "Regenerate all" (kind nil: title and the three outputs; not reminders and
     /// tasks, and the sections are reused, not rewritten). Same source rule, heat rule and backend as the first
     /// time, with sampling, so it gives a new version. The old text stays until everything asked for is written,
     /// then it is replaced at once; after a failure or Stop nothing changes. Returns the replaced text (for Undo)
     /// on success.
+    /// Another run still working: the tap waits its turn (nil returned; the queued run offers no Undo).
     @discardableResult
     func regenerateOutput(noteID id: Int64, kind: OutputKind?) async -> Previous? {
         let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
         defer { personRunEnded(asked: asked) }
-        guard await personMayStart(id) else { return nil }
+        guard await personMayStart(QueuedTap(noteID: id, kind: .regenerate(output: kind?.rawValue))) else { return nil }
+        return await runRegenerate(noteID: id, kind: kind)
+    }
+
+    /// A regenerate, from the tap or the queue (its turn came).
+    private func runRegenerate(noteID id: Int64, kind: OutputKind?) async -> Previous? {
+        guard !isWorking else { return nil }
         starting = true
         defer { starting = false }
         let request = Regeneration(noteID: id, kind: kind)
@@ -512,6 +553,9 @@ final class ProcessingPipeline {
         activeNoteID = id
         regenerating = request
         regenerateStopped = false
+        regenerateCutOff = false
+        runningTap = QueuedTap(noteID: id, kind: .regenerate(output: kind?.rawValue))   // on disk: a kill keeps it
+        defer { runningTap = nil }
         // A regenerate never queues the note for resuming nor changes its resume banner: put those back after.
         let wasQueued = interrupted.contains(id), wasHeatPaused = heatPaused.contains(id), failure = lastFailure[id]
         // In the language the note was written in (as section backfill does).
@@ -537,7 +581,7 @@ final class ProcessingPipeline {
             stage = .done
             return previous
         }
-        if outcome == .failed { regenerateFailed[id] = request }
+        if outcome == .failed, !regenerateCutOff { regenerateFailed[id] = request }   // cut off: queued again
         stage = .idle
         return nil
     }
@@ -606,7 +650,7 @@ final class ProcessingPipeline {
     func tryAgain(noteID id: Int64) async {
         let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
         defer { personRunEnded(asked: asked) }
-        guard await personMayStart(id) else { return }
+        guard await personMayStart(QueuedTap(noteID: id, kind: .generate)) else { return }
         interrupted.remove(id)
         heatPaused.remove(id)
         await rerun(noteID: id)
@@ -688,10 +732,13 @@ final class ProcessingPipeline {
         abort.set(true)
         // Memories and the insight run after the notes are stored: stopping them leaves nothing to resume or show.
         var running: Int64?
-        if let r = regenerating, !appIsActive {
-            // A regenerate is not resumed (the overnight task only finishes notes that are missing): say so.
-            NSLog("[sve] bg: note %lld: regenerate cut off at %ld%%; the old text is kept", r.noteID, ContinuedWork.shared.percent)
-            notify(r.noteID) { NotesNotifier.regenerateStopped(noteID: r.noteID, title: $0, hold: $1) }
+        if let r = regenerating, !regenerateStopped {   // after Stop: nothing to run again
+            // Queued again with the same request: it runs by itself later (the old text stays until the new is
+            // complete), and its "ready" notification says so.
+            NSLog("[sve] bg: note %lld: regenerate cut off at %ld%%; the old text is kept and it is queued again",
+                  r.noteID, ContinuedWork.shared.percent)
+            regenerateCutOff = true
+            queued = TapQueue.enqueue(queued, QueuedTap(noteID: r.noteID, kind: .regenerate(output: r.kind?.rawValue)))
         }
         if TaskLifecycle.expiryCutsOff(working: isWorking, memoriesOnly: memoryWork, notesStored: notesStored),
            let id = activeNoteID {
@@ -703,6 +750,11 @@ final class ProcessingPipeline {
         // Notes waiting their turn (queued behind this one, waiting for the AI, cut off or paused for heat earlier):
         // every queued note is notes work, and nothing else would run them now.
         for id in interrupted.sorted() where id != running { cutOff(id, queued: true) }
+        // Taps waiting their turn: nothing runs them now either; the overnight task (on battery too) or the next open does.
+        if !queued.isEmpty, !appIsActive {
+            NSLog("[sve] bg: %ld queued taps wait for the overnight task or the next open", queued.count)
+            OvernightWork.shared.schedule()
+        }
     }
 
     /// A notes run starts for this note: it may be cut off (and notify) again.
@@ -1188,17 +1240,12 @@ final class ProcessingPipeline {
         return !isWorking
     }
 
-    /// Before a person's action on a note: memory work yields. False when other work still runs; the note then shows
-    /// the busy line for a few seconds instead of the tap doing nothing.
-    private func personMayStart(_ id: Int64) async -> Bool {
-        if busyNotice == id { busyNotice = nil }
+    /// Before a person's action on a note: memory work yields. False when other work still runs: the tap is then
+    /// queued (not while the AI is not ready: the note waits for the AI as before) and runs by itself in its turn.
+    private func personMayStart(_ tap: QueuedTap) async -> Bool {
         await yieldMemories()
         guard isWorking else { return true }
-        busyNotice = id
-        Task {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            if self.busyNotice == id { self.busyNotice = nil }
-        }
+        if ModelManager.shared.isReady { enqueueTap(tap) }
         return false
     }
 
@@ -1207,7 +1254,13 @@ final class ProcessingPipeline {
     func findReminders(noteID: Int64) async {
         let asked = personTapped(noteID, subtitle: Stage.extracting.label)   // before any await: the app is in front
         defer { personRunEnded(asked: asked) }
-        guard await personMayStart(noteID) else { return }
+        guard await personMayStart(QueuedTap(noteID: noteID, kind: .findReminders)) else { return }
+        await runFindReminders(noteID: noteID)
+    }
+
+    /// Find reminders, from the tap or the queue (its turn came).
+    private func runFindReminders(noteID: Int64) async {
+        guard !isWorking else { return }
         starting = true
         defer { starting = false }
         guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
@@ -1219,8 +1272,8 @@ final class ProcessingPipeline {
             stage = .failed(String(localized: "The phone is too warm. Try again when it has cooled down.")); return
         }
         let engine = CoreEngine.shared
-        guard let note = await engine.note(noteID), let t = note.transcript,
-              !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let note = await engine.note(noteID) else { return }   // deleted (before its turn came): nothing to do
+        guard let t = note.transcript, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             stage = .failed(String(localized: "No speech was detected in the recording.")); return
         }
         do {
@@ -1290,8 +1343,8 @@ final class ProcessingPipeline {
         stoppedWhileNotActive = false   // this run's; a later run is not one stopped from the background
         UIApplication.shared.isIdleTimerDisabled = false
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
-        // A recording queued behind this run (or a paused note) goes next.
-        if !interrupted.isEmpty && !resuming { Task { await self.resumeInterrupted() } }
+        // A tap or a recording queued behind this run (or a paused note) goes next.
+        if !(interrupted.isEmpty && queued.isEmpty) && !resuming { Task { await self.resumeInterrupted() } }
         // After the caller's other defers (its busy claim) have run.
         else if !resuming { Task { self.finishContinuedWork() } }
     }
@@ -1299,10 +1352,11 @@ final class ProcessingPipeline {
     /// Nothing is running and nothing more can run now: release the continued-processing task. Not while a person's
     /// run that asked for it has not ended (it may be waiting for memories to yield, so nothing runs for a moment),
     /// nor while a Stop is still being handed over (it asked for the task and runs, or queues, once handed over).
-    /// Nor while notes may start now (waitingToRun): those run first, under this task. tried: the notes the resume
-    /// loop has just tried (its own call, which never starts another pass); nil from anywhere else.
-    private func finishContinuedWork(tried: Set<Int64>? = nil) {
-        let waiting = waitingToRun(tried: tried ?? [])
+    /// Nor while queued taps or notes may start now (waitingToRun): those run first, under this task. tried, triedTaps:
+    /// the notes and taps the resume loop has just tried (its own call, which never starts another pass); nil from
+    /// anywhere else.
+    private func finishContinuedWork(tried: Set<Int64>? = nil, triedTaps: [QueuedTap] = []) {
+        let waiting = waitingToRun(tried: tried ?? [], triedTaps: triedTaps)
         guard TaskLifecycle.finishes(working: isWorking || !handingOver.isEmpty, personRunsPending: personRunsPending,
                                      queued: waiting) else {
             if tried == nil, waiting > 0, !isWorking, !resuming, personRunsPending == 0, handingOver.isEmpty {
@@ -1310,18 +1364,21 @@ final class ProcessingPipeline {
             }
             return
         }
-        ContinuedWork.shared.finish(success: interrupted.isEmpty)
+        ContinuedWork.shared.finish(success: interrupted.isEmpty && queued.isEmpty)
     }
 
-    /// Notes that may start now, as the resume loop takes them (nextToResume): none while the app could not keep
+    /// Queued taps and notes that may start now, as the resume loop takes them: none while the app could not keep
     /// running them, a recording runs, the AI is not ready, the phone is too hot to start, or the overnight task
     /// has expired.
-    private func waitingToRun(tried: Set<Int64>) -> Int {
+    private func waitingToRun(tried: Set<Int64>, triedTaps: [QueuedTap]) -> Int {
         guard appIsActive || ContinuedWork.shared.isHeld || overnightRun != nil, !(overnightRun?.isSet ?? false),
               !LiveTranscriber.shared.isRecording, ModelManager.shared.isReady,
               Heat.beforeRun(Self.thermal) != .pause else { return 0 }
-        return resumable(tried: tried).count
+        return runnableTaps(tried: triedTaps).count + resumable(tried: tried).count
     }
+
+    /// The queued taps the resume loop may take next (each once per pass), oldest first.
+    private func runnableTaps(tried: [QueuedTap]) -> [QueuedTap] { queued.filter { !tried.contains($0) } }
 
     /// Person's runs (personTapped) that asked for the continued-processing task and have not ended yet.
     @ObservationIgnored private var personRunsPending = 0
@@ -1346,36 +1403,63 @@ final class ProcessingPipeline {
     private func personRunEnded(asked: Bool) {
         if asked { personRunsPending = max(0, personRunsPending - 1) }
         guard !resuming else { return }   // the resume loop releases it when it ends
-        if interrupted.isEmpty { Task { self.finishContinuedWork() } } else { Task { await self.resumeInterrupted() } }
+        if interrupted.isEmpty && queued.isEmpty { Task { self.finishContinuedWork() } } else { Task { await self.resumeInterrupted() } }
     }
 
-    /// Re-runs cut-off and waiting notes, oldest first, one at a time, while the app is active (or a
-    /// continued-processing or the overnight task keeps it running), not recording, the AI is ready and the
-    /// phone is not too hot. Each note is tried once per pass, so a note that is paused again (heat,
-    /// background) waits for the next pass instead of looping. Notes marked overnight join only while plugged
+    /// Runs the queued taps, then re-runs cut-off and waiting notes, oldest first, one at a time, while the app is
+    /// active (or a continued-processing or the overnight task keeps it running), not recording, the AI is ready and
+    /// the phone is not too hot. Each tap and note is tried once per pass, so one that is cut off or paused again
+    /// (heat, background) waits for the next pass instead of looping. Notes marked overnight join only while plugged
     /// in or inside the overnight task.
     func resumeInterrupted() async {
         guard !resuming else { return }
         resuming = true
         var tried: Set<Int64> = []
-        defer { resuming = false; finishContinuedWork(tried: tried); endWaitingActivities() }
+        var triedTaps: [QueuedTap] = []
+        defer { resuming = false; finishContinuedWork(tried: tried, triedTaps: triedTaps); endWaitingActivities() }
         while !isWorking, appIsActive || ContinuedWork.shared.isHeld || overnightRun != nil,
               !(overnightRun?.isSet ?? false), !LiveTranscriber.shared.isRecording,
-              ModelManager.shared.isReady, Heat.beforeRun(Self.thermal) != .pause,
-              let id = nextToResume(tried: tried) {
+              ModelManager.shared.isReady, Heat.beforeRun(Self.thermal) != .pause {
+            let tap = TapQueue.next(runnableTaps(tried: triedTaps))
+            let id: Int64
+            if let tap { id = tap.noteID } else if let n = nextToResume(tried: tried) { id = n } else { break }
+            let owned = OvernightList.ownsRun(inOvernightTask: overnightRun != nil, appActive: appIsActive,
+                                              continuedTaskHeld: ContinuedWork.shared.isHeld)
+            let how = ContinuedWork.shared.isHeld ? "continued processing" : (overnightRun != nil ? "overnight task" : "background time")
+            if let tap {
+                // Before cut-off notes: the person asked for it. A note deleted meanwhile: dropped (each run checks).
+                triedTaps.append(tap)
+                queued.removeAll { $0 == tap }
+                NSLog("[sve] bg: queued tap runs (note %lld)", id)
+                overnightOwnsRun.set(owned)
+                await runQueued(tap)
+                overnightOwnsRun.set(false)
+                continue
+            }
             tried.insert(id)
             interrupted.remove(id)
             heatPaused.remove(id)
-            let owned = OvernightList.ownsRun(inOvernightTask: overnightRun != nil, appActive: appIsActive,
-                                              continuedTaskHeld: ContinuedWork.shared.isHeld)
-            if !appIsActive {
-                NSLog("[sve] bg: resuming note %lld (%@)", id,
-                      ContinuedWork.shared.isHeld ? "continued processing" : (overnightRun != nil ? "overnight task" : "background time"))
-            }
+            if !appIsActive { NSLog("[sve] bg: resuming note %lld (%@)", id, how) }
             overnightOwnsRun.set(owned)
             await rerun(noteID: id)
             overnightOwnsRun.set(false)
             if !interrupted.contains(id) { markAutoTried(id) }
+        }
+    }
+
+    /// A queued tap's turn: the same run the tap would have started.
+    private func runQueued(_ tap: QueuedTap) async {
+        let id = tap.noteID
+        switch tap.kind {
+        case .regenerate(let output):
+            _ = await runRegenerate(noteID: id, kind: output.flatMap(OutputKind.init(rawValue:)))
+        case .generate:
+            interrupted.remove(id)   // runs now (as Try again does), not again as a cut-off note
+            heatPaused.remove(id)
+            await rerun(noteID: id)
+            if !interrupted.contains(id) { markAutoTried(id) }
+        case .findReminders:
+            await runFindReminders(noteID: id)
         }
     }
 
@@ -1747,7 +1831,7 @@ final class ProcessingPipeline {
             let needing = await CoreEngine.shared.notesNeedingMemories(limit: 1 + memoryFailed.count)
             memoriesLeft = !MemoryPass.backfillNotes(needing, skipping: memoryFailed, limit: 1).isEmpty
         }
-        return !overnight.isEmpty || !interrupted.isEmpty || memoriesLeft
+        return !overnight.isEmpty || !interrupted.isEmpty || !queued.isEmpty || memoriesLeft
     }
 
     /// The overnight task expired (any thread): cancel the model run in flight if the task started it. The

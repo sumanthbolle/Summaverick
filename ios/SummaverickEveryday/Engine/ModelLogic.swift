@@ -426,8 +426,8 @@ enum RegenerateRules {
 /// closed, as after Stop.
 enum PersonRun {
     /// Ask in the tap: the app is in front (a request from the background is refused), the AI is ready, and the run
-    /// may start: nothing runs, or only memories, which yield. Another note's notes running: the tap shows busy (or
-    /// queues the note) and that run keeps the task it has.
+    /// may start: nothing runs, or only memories, which yield. Another note's work running: the tap is queued
+    /// (TapQueue) and that run keeps the task it has.
     static func asksForContinuedTask(appActive: Bool, aiReady: Bool, working: Bool, memoriesOnly: Bool) -> Bool {
         appActive && aiReady && PersonFirst.action(working: working, memoriesOnly: memoriesOnly) != .busy
     }
@@ -463,6 +463,51 @@ enum TaskLifecycle {
         working && !memoriesOnly && !notesStored
     }
 
+}
+
+/// A person's tap (Regenerate, Generate notes or Try again, Find reminders) made while another note's work runs: it
+/// waits its turn and runs by itself, never dropped. Kept across launches (TapQueue.key).
+struct QueuedTap: Codable, Equatable {
+    enum Kind: Codable, Equatable {
+        /// output: an OutputKind raw value, or nil for the title and all three outputs.
+        case regenerate(output: Int?)
+        /// Generate notes, or Try again on the note's banner.
+        case generate
+        case findReminders
+    }
+    let noteID: Int64
+    let kind: Kind
+}
+
+enum TapQueue {
+    /// UserDefaults key of the queue (the regenerate running is kept there too, so a kill never loses it).
+    static let key = "pipeline.queuedTaps"
+
+    /// Appended (oldest first), with no duplicate for the same note and kind. A regenerate-all replaces the
+    /// note's single-output regenerates; a single-output regenerate with a regenerate-all of its note queued is
+    /// covered by it.
+    static func enqueue(_ q: [QueuedTap], _ t: QueuedTap) -> [QueuedTap] {
+        if q.contains(t) { return q }
+        guard case .regenerate(let output) = t.kind else { return q + [t] }
+        let all = QueuedTap(noteID: t.noteID, kind: .regenerate(output: nil))
+        if output != nil { return q.contains(all) ? q : q + [t] }
+        return q.filter { !($0.noteID == t.noteID && isRegenerate($0.kind)) } + [t]
+    }
+
+    /// The tap to run next: the oldest.
+    static func next(_ q: [QueuedTap]) -> QueuedTap? { q.first }
+
+    /// Whether a tap is queued at all. notesRunningFor: the note whose own notes are being written now (nil: none, or
+    /// the work running is not a note's notes). That run writes its notes and extracts its reminders, so Generate
+    /// notes, Try again and Find reminders on it are covered; a regenerate of it waits for it.
+    static func accepts(_ t: QueuedTap, notesRunningFor running: Int64?) -> Bool {
+        t.noteID != running || isRegenerate(t.kind)
+    }
+
+    private static func isRegenerate(_ k: QueuedTap.Kind) -> Bool {
+        if case .regenerate = k { return true }
+        return false
+    }
 }
 
 /// The progress of one continued-processing task. Each note run in the task has its own 1000 units: the first
