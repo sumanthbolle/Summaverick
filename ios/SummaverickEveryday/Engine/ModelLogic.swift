@@ -1069,3 +1069,30 @@ enum QuietStop {
         return (size, t.dataBytes, t.patches)
     }
 }
+
+/// Progress inside one output while the model writes it. The core calls back after each prefill batch and every 16
+/// tokens, but reports only whole chunks done (a regenerate of one output is one chunk), so without this the
+/// lock-screen progress sat at the start for minutes and then jumped to done (owner's iPhone, 2026-11-09).
+enum OutputProgress {
+    /// Tokens per core callback while generating.
+    static let tokensPerCallback = 16
+
+    /// About how long each output is (short summary, detailed notes, revision questions), in tokens.
+    static func expectedTokens(kind: Int) -> Int {
+        switch kind {
+        case 0: return 250
+        case 1: return 1000
+        default: return 400
+        }
+    }
+
+    /// 0…1 for the output: whole chunks done, plus the chunk in flight estimated from the callbacks seen in it
+    /// (capped at 0.95, so it reaches 1 only when the chunk is really done).
+    static func part(done: Int, total: Int, callbacks: Int, expectedTokens: Int) -> Double {
+        let chunks = max(1, total)
+        let finished = min(Double(chunks), Double(max(0, done)))
+        guard finished < Double(chunks) else { return 1 }
+        let inFlight = min(0.95, Double(max(0, callbacks) * tokensPerCallback) / Double(max(1, expectedTokens)))
+        return min(1, (finished + inFlight) / Double(chunks))
+    }
+}

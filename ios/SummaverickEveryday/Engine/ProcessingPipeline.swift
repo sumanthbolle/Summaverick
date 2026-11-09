@@ -1185,12 +1185,17 @@ final class ProcessingPipeline {
         let engine = CoreEngine.shared
         let abort = self.abort
         stage = .generating(kind, "final", 0, 1)
-        // Every few tokens (core thread): the stage line, the chunk progress, and the heartbeat.
+        // Every few tokens (core thread): the stage line, the progress inside the output, and the heartbeat. The core
+        // reports whole chunks only, so the callbacks seen in the chunk in flight estimate how far it is
+        // (OutputProgress); without that the lock-screen progress stood still for a whole output.
+        let counter = CallbackCounter()
+        let expected = OutputProgress.expectedTokens(kind: kind.rawValue)
         let progress: (String, Int, Int) -> Void = { phase, done, total in
             ContinuedWork.beat()
+            let seen = counter.next(key: "\(phase).\(done)")
+            let part = OutputProgress.part(done: done, total: total, callbacks: seen, expectedTokens: expected)
             Task { @MainActor in
                 self.stage = .generating(kind, phase, done, total)
-                let part = total > 0 ? Double(done) / Double(total) : 0
                 ContinuedWork.shared.update(fraction: fraction(part))
             }
         }
@@ -2269,5 +2274,18 @@ enum PiecesBackfill {
         }
         if allOK { d.set(true, forKey: doneKey) }
         if any { NotificationCenter.default.post(name: .assistantChanged, object: nil) }
+    }
+}
+
+/// Callbacks seen since the key (phase and chunk) last changed; the core calls from its own thread.
+private final class CallbackCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var key = ""
+    private var count = 0
+    func next(key k: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        if k != key { key = k; count = 0 }
+        count += 1
+        return count
     }
 }
