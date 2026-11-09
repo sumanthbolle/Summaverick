@@ -111,14 +111,27 @@ final class LiveTranscriber {
     var isRecording: Bool { current != nil }
     /// Same as isRecording, readable on any thread (a model run's cancel check).
     nonisolated let recordingNow = AtomicFlag()
-    private(set) var status: Status = .idle
+    /// Live transcription can run now: a recording is going, its loop runs, and it is not waiting for the AI
+    /// (.later, also its failure backoff) nor paused for heat or battery. Only then do other runs step aside for
+    /// it (LiveFirst). Main actor.
+    var liveRunning: Bool {
+        guard let c = current, running[c.audioPath] === c else { return false }
+        switch status {
+        case .later, .pausedHeat, .pausedBattery: return false
+        case .idle, .writing, .behind, .cooling: return true
+        }
+    }
+    /// Same as liveRunning, readable on any thread (a model run's cancel check).
+    nonisolated let liveRunningNow = AtomicFlag()
+    private func liveChanged() { liveRunningNow.set(liveRunning) }
+    private(set) var status: Status = .idle { didSet { liveChanged() } }
     /// Transcript so far of the current recording, one entry per piece, oldest first.
     private(set) var lines: [String] = []
 
     /// The recording going now; Stop or Cancel clears it at once.
-    private var current: LiveSession?
+    private var current: LiveSession? { didSet { liveChanged() } }
     /// Sessions whose loop has not ended yet (the current one, and stopped ones finishing their piece).
-    @ObservationIgnored private var running: [String: LiveSession] = [:]
+    @ObservationIgnored private var running: [String: LiveSession] = [:] { didSet { liveChanged() } }
     @ObservationIgnored private var elapsed: () -> TimeInterval = { 0 }
     @ObservationIgnored private var transcribedSeconds: Double = 0
 

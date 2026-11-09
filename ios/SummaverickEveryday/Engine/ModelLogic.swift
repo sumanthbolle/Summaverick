@@ -720,7 +720,10 @@ enum PersonFirst {
 /// piece, section or output; at its next boundary any other run steps aside: its note waits, quietly, keeping
 /// everything done, and carries on after Stop.
 enum LiveFirst {
-    /// runIsLive: the recording's own live transcription (its pieces and the sections it writes while recording).
+    /// recording: live transcription can run now (LiveTranscriber.liveRunning), not merely a recording going.
+    /// runIsLive: the recording's own live transcription (its pieces and the sections it writes while recording). No
+    /// caller passes true today: live transcription never asks (it is the run the others step aside for); the
+    /// parameter keeps the rule's two sides explicit.
     static func yields(recording: Bool, runIsLive: Bool) -> Bool { recording && !runIsLive }
 
     /// A regenerate that stepped aside goes back in the queue as it was: a step-aside is no cut-off, so its streak of
@@ -731,6 +734,21 @@ enum LiveFirst {
     /// cut it off (no paused notice, no failure, no overnight mark, no cut-off Live Activity). After Stop it waits as
     /// any queued note.
     static func waitsQuietly(steppedAside: Bool, recording: Bool) -> Bool { steppedAside && recording }
+
+    /// When a run steps aside, a note only waiting its turn behind it (queued, not cut off nor paused for heat) waits
+    /// for the recording with it, quietly.
+    static func joinsWait(waitingTurnOnly: Bool, recording: Bool) -> Bool { waitingTurnOnly && recording }
+
+    /// The continued-processing task finishes with success when nothing is left, or when everything left only waits
+    /// for the recording (it goes on after Stop, under that Stop's own task). otherNotesLeft: notes left that do not
+    /// wait quietly (cut off, paused for heat). While recording no tap and no insight can run: they wait for it.
+    static func finishSucceeds(otherNotesLeft: Int, tapsLeft: Int, insightsLeft: Int, recording: Bool) -> Bool {
+        otherNotesLeft == 0 && (recording || (tapsLeft == 0 && insightsLeft == 0))
+    }
+
+    /// A note's insight stays due (it runs after Stop, from the resume loop) when it stepped aside for the recording,
+    /// skipped or stopped, and was not written. One that failed or had nothing to say is not tried again (as before).
+    static func insightStaysDue(yielded: Bool, written: Bool) -> Bool { yielded && !written }
 }
 
 /// A WAV the recorder never finished (the app was closed mid-recording) still has the sizes written at its start: 0,
