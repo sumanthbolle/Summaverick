@@ -89,6 +89,8 @@ std::string keyword_query(const std::string &question);
 
 // Names (from `names`) that occur in the question, as normalized token runs.
 std::vector<std::string> names_in_question(const std::string &question, const std::vector<std::string> &names);
+// Text without the Telugu words మాత్రమే and మాత్రం ("only"), which start like మాత్ర (tablet).
+std::string without_only_words(const std::string &text);
 // Medicine route: a known medicine name, or a medicine word (tablet, medicine, dose, pill,
 // మందు, మాత్ర, డోస్ and their inflections) in the question.
 bool is_medicine_question(const std::string &question, const std::vector<std::string> &names);

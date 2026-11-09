@@ -2,6 +2,7 @@
 #include "sve_medcheck.h"
 
 #include <algorithm>
+#include <cstring>
 #include <cstdint>
 #include <set>
 
@@ -594,8 +595,16 @@ std::vector<std::string> names_in_question(const std::string &question, const st
     return out;
 }
 
-bool is_medicine_question(const std::string &question, const std::vector<std::string> &names) {
-    if (!names_in_question(question, names).empty()) return true;
+std::string without_only_words(const std::string &text) {
+    std::string s = text;
+    for (const char *w : {"మాత్రమే", "మాత్రం"})
+        for (size_t at = s.find(w); at != std::string::npos; at = s.find(w, at)) s.replace(at, strlen(w), " ");
+    return s;
+}
+
+bool is_medicine_question(const std::string &raw_question, const std::vector<std::string> &names) {
+    if (!names_in_question(raw_question, names).empty()) return true;
+    const std::string question = without_only_words(raw_question);
     static const std::set<std::string> kWords = {"tablet", "tablets", "medicine", "medicines", "medication",
         "medications", "dose", "doses", "dosage", "pill", "pills", "capsule", "capsules", "syrup"};
     for (const auto &t : norm_tokens(question)) if (kWords.count(t)) return true;
@@ -791,7 +800,8 @@ bool mentions_medicine(const std::string &text, const std::vector<std::string> &
         if (kWords.count(t[i])) return true;
         if (kAfterNumber.count(t[i]) && i > 0 && !t[i - 1].empty() && t[i - 1][0] >= '0' && t[i - 1][0] <= '9') return true;
     }
-    for (const char *w : {"మందు", "మాత్ర", "డోస్"}) if (text.find(w) != std::string::npos) return true;
+    const std::string plain = without_only_words(text);
+    for (const char *w : {"మందు", "మాత్ర", "డోస్"}) if (plain.find(w) != std::string::npos) return true;
     return !names_in_question(text, names).empty();
 }
 

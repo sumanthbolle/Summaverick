@@ -966,6 +966,87 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
         expect(got == nullptr && seen.order.size() == 2 && seen.order[0] == "kind:general" && seen.order[1].rfind("t:", 0) == 0,
                "the kind comes before the first piece (and the stopped call still gave it)");
     }
+    // Fix round 2: the reviewer's flows.
+    {
+        sve_ctx *c3 = sve_init(":memory:");
+        int64_t n3 = sve_note_create(c3, "Plumbing call", "en", nullptr, "x", 60);
+        sve_note_set_pieces(c3, n3, R"([{"start_sec":0,"text":"We used the old pipe and will bring it down tomorrow.","conf":0.9},
+            {"start_sec":30,"text":"We will try again at the airport.","conf":0.9},
+            {"start_sec":45,"text":"Ravi asked about the kitchen tap.","conf":0.9},
+            {"start_sec":60,"text":"The tap also causes pain in the budget and the pipe bill.","conf":0.9}])");
+        sve_note_set_output(c3, n3, SVE_OUT_SHORT_SUMMARY, "The team set the walnut budget.");
+        auto go = [&](const json &msgs, const char *reply, const char *cls, ChatSink &sk) {
+            g_chat_reply = reply;
+            g_classify_reply = cls;
+            g_chat_prompt.clear();
+            return take(sve_assistant_chat(c3, msgs.dump().c_str(), nullptr, chat_text, &sk, nullptr, nullptr));
+        };
+        const std::string line = sve::health_only_text("en");
+        ChatSink a1;
+        json j = go(ask("How do I bring down a fever?"), "Rest and drink plenty of water [S1].", "G", a1);
+        expect(j["answer"] == line && a1.pieces == 0 && g_chat_prompt.empty(), "junk hit on a health question: the health line, no model");
+        ChatSink a2;
+        j = go(ask("What is paracetamol used for?"), "Paracetamol is used for pain relief [S1].", "G", a2);
+        expect(j["answer"] == line && !contains(j["answer"], "pipe") && a2.pieces == 0, "health question: never quotes a junk line");
+        ChatSink a3;
+        j = go(json::array({{{"role", "user"}, {"text", "What should I take for a headache?"}}, {{"role", "assistant"}, {"text", line}},
+                            {{"role", "user"}, {"text", "And for a child of five?"}}}), "For a child, give half with water.", "G", a3);
+        expect(j["answer"] == line && a3.pieces == 0 && g_chat_prompt.empty(), "a follow-up of the refusal: no classify, no general");
+        for (const char *q : {"How do I treat a cold?", "జ్వరానికి ఏం చేయాలి?", "feverకి ఏం చేయాలి?", "What is Meftal used for?"}) {
+            ChatSink a4;
+            j = go(ask(q), "Rest and drink warm water.", "G", a4);
+            std::string what = std::string("never general: ") + q;
+            expect(j["kind"] != "general" && a4.pieces == 0 && j["not_found"] == true, what.c_str());
+        }
+        // Three-way classify: H gives the line, anything unparsable is recordings, never general.
+        ChatSink b1;
+        j = go(ask("Is my grandmother's walking ok for her age?"), "Maybe.", "H", b1);
+        expect(j["answer"] == line && b1.pieces == 0 && g_chat_prompt.empty(), "classify H: the health line");
+        for (const char *odd : {"Great", "G?maybe", "", "General knowledge"}) {
+            ChatSink b2;
+            j = go(ask("Who wrote Gitanjali?"), "Tagore.", odd, b2);
+            std::string what = std::string("classify unparsable -> recordings: [") + odd + "]";
+            expect(j["kind"] == "recordings" && j["not_found"] == true, what.c_str());
+        }
+        expect(sve::classify_prompt("q").find("H") != std::string::npos, "classify prompt is three-way");
+        // Telugu: not held for "only".
+        ChatSink c1;
+        j = go(ask("భారతదేశ రాజధాని ఏది?"), "భారతదేశానికి న్యూ ఢిల్లీ మాత్రమే రాజధాని.", "G", c1);
+        expect(j["kind"] == "general" && contains(j["answer"], "ఢిల్లీ") && c1.pieces == 1, "మాత్రమే does not hold a general answer");
+        // The Telugu refusal line goes out as itself and is not a medicine answer.
+        ChatSink c2;
+        j = go(ask("జ్వరం తగ్గడానికి ఏం చేయాలి?"), "x", "G", c2);
+        expect(j["answer"] == sve::health_only_text("te") && j["medicine"] == false, "the Telugu refusal is plain text");
+        // Scoring.
+        ChatSink d1;
+        j = go(ask("What is AI?"), "AI means artificial intelligence.", "G", d1);
+        expect(j["kind"] == "general", "What is AI? does not score on 'again' or 'airport'");
+        ChatSink d2;
+        j = go(ask("What did Ravi say today?"), "He asked about the tap [S1].", "G", d2);
+        expect(j["kind"] == "recordings" && j["not_found"] == false, "period word stripped: Ravi today scores with no classify");
+        // A flagged piece that does not score never reaches the model.
+        ChatSink d3;
+        j = go(ask("What did Ravi say about the kitchen tap?"), "He asked about the tap [S1].", "G", d3);
+        expect(j["kind"] == "recordings" && g_chat_prompt.find("Ravi asked about the kitchen tap") != std::string::npos &&
+               g_chat_prompt.find("causes pain") == std::string::npos, "a flagged piece that does not score is stripped from the material");
+        // Ordinary questions are not refused by the gate.
+        for (const char *q : {"What is a sales report?", "Who is Dr Ambedkar?", "How many times has India won the World Cup?"}) {
+            ChatSink e1;
+            j = go(ask(q), "An ordinary answer.", "G", e1);
+            std::string what = std::string("not refused: ") + q;
+            expect(j["kind"] == "general" && j["answer"] == "An ordinary answer.", what.c_str());
+        }
+        // A reminder with a medicine: a medicine turn when replayed.
+        sve_reminder_create(c3, R"({"text":"Take crocin","times":["08:00"],"repeat":"daily"})");
+        ChatSink f1;
+        j = go(ask("What's due soon?"), "x", "G", f1);
+        expect(j["kind"] == "due" && j["medicine"] == true && contains(j["answer"], "Take crocin"), "due with a health word is a medicine turn");
+        ChatSink f2;
+        j = go(ask("What is the deadline for the exam?"), "An ordinary answer.", "G", f2);
+        expect(j["kind"] != "due", "deadline with a subject is not due");
+        sve_free(c3);
+    }
+    g_classify_reply = "G";
     // sve_route_kind
     auto kind_of = [&](const char *q) { char *k = sve_route_kind(ctx, q); std::string r = k ? k : ""; sve_free_string(k); return r; };
     expect(kind_of("What's due soon?") == "due" && kind_of("Quiz me on my recent recordings") == "quiz" && kind_of("Which tablets?") == "medicine" &&

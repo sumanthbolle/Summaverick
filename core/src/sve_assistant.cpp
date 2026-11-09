@@ -1004,7 +1004,7 @@ json due_result(sve::Store &st, const std::vector<std::string> &names, const std
         s["title"] = row->title;
         sources.push_back(s);
     }
-    return ask_result(text, sources, false, sve::mentions_medicine(text, names));
+    return ask_result(text, sources, false, sve::health_text(text, names));   // a medicine turn when replayed
 }
 
 // The stored summaries of recent notes, as candidates for a recordings answer.
@@ -1123,7 +1123,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
                 notes.push_back({{"title", title}, {"created_at", jint(n, "created_at", 0)}, {"short_summary", jstr(n, "short_summary")},
                                  {"sections", st.sections(id)}});
                 sources.push_back({{"note_id", id}, {"start_sec", 0}, {"title", title}});
-                if (!sve::is_health_memory(title, names)) titles += "\n\xE2\x80\xA2 " + title;
+                if (!sve::health_gate(title, names)) titles += "\n\xE2\x80\xA2 " + title;
             }
             const std::string titles_answer = (lang == "te" ? "ఆ కాలంలో రికార్డింగ్‌లు:" : "Recordings in that period:") +
                                               (titles.empty() ? " " + std::to_string(rows.size()) : titles);
@@ -1167,7 +1167,10 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         const auto flagged = [&](const std::string &t) { return sve::health_text(t, names); };
         // Quoted word for word: what the health check flags in a passage that answers this question (a stray
         // word match in an unrelated one does not make it a medicine answer).
-        const auto quote_it = [&](const std::string &t) { return flagged(t) && sve::passage_scores(sve::keyword_hits(words, t), words); };
+        const auto answers_it = [&](const std::string &t) {
+            return sve::passage_scores(sve::keyword_hits(words, t), words) || (health_q && sve::health_passage_scores(words, t, names));
+        };
+        const auto quote_it = [&](const std::string &t) { return flagged(t) && answers_it(t); };
         json med = medicine_material_answer(st, rel, quote_it, lang);
         if (!med.is_null()) return result(med, "medicine");
 
@@ -1176,15 +1179,25 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         int best_hits = 0;
         std::string best_text;
         json best_source;
+        std::vector<std::string> unread;
         for (const auto &src : rel.sources) {
             std::string t = piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0));
             int h = sve::keyword_hits(words, t);
-            if (sve::passage_scores(h, words) && h > best_hits && !flagged(t)) { best_hits = h; best_text = t; best_source = source_of(src); }
+            if (sve::passage_scores(h, words) && (!health_q || sve::health_passage_scores(words, t, names)) && h > best_hits && !flagged(t)) {
+                best_hits = h;
+                best_text = t;
+                best_source = source_of(src);
+            }
+            // Flagged and not answering (it would have been quoted above): the model does not read it.
+            if (flagged(t)) unread.push_back(jstr(src, "label"));
         }
+        for (const auto &label : unread) sve::drop_source(rel, label);
+        sve::drop_flagged_facts(rel, names);
         std::vector<sve::Passage> passages = summary_passages(st, route.from, route.to);
         for (const auto &p : passages) {
             int h = sve::keyword_hits(words, p.title + "\n" + p.text);
-            if (sve::passage_scores(h, words) && h > best_hits && !flagged(p.title + "\n" + p.text)) {
+            if (sve::passage_scores(h, words) && (!health_q || sve::health_passage_scores(words, p.title + "\n" + p.text, names)) && h > best_hits &&
+                !flagged(p.title + "\n" + p.text)) {
                 best_hits = h;
                 best_text = p.text;
                 best_source = {{"note_id", p.note_id}, {"start_sec", p.start_sec}, {"title", p.title}};
@@ -1192,6 +1205,11 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         }
         sve::add_passages(rel, std::move(passages), words, names, 7000);
         const bool scores = best_hits > 0;
+        const auto nothing = [&]() {
+            return result(ask_result(health_q ? sve::health_only_text(lang) : sve::not_found_text(lang), json::array(), true, false), "recordings");
+        };
+        // A health question reaches the model only on a passage that answers it and is not flagged.
+        if (health_q && !scores) return nothing();
 
         if (!scores && !health_q && has_model) {
             // Nothing scores: a tiny call says whether the recordings could answer it. Model not ready: recordings.
@@ -1205,11 +1223,11 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
                 ok = llm->complete(llm->apply_template("You sort questions. Reply with one letter.", prompt), kClassifyMaxOut,
                                    reply, cb, cbuser, "classify", 0, 1, true);
             }
-            if (ok && sve::classify_general(reply)) return general();
+            const char route_to = ok ? sve::classify_route(reply) : 'R';
+            sve_logf(0, "ask route: %c", route_to);   // the phone test reads this
+            if (route_to == 'G') return general();
+            if (route_to == 'H') return result(ask_result(sve::health_only_text(lang), json::array(), true, false), "recordings");
         }
-        const auto nothing = [&]() {
-            return result(ask_result(health_q ? sve::health_only_text(lang) : sve::not_found_text(lang), json::array(), true, false), "recordings");
-        };
         if (rel.sources.empty()) return nothing();
         if (!has_model) return nullptr;
 

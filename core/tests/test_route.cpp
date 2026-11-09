@@ -112,12 +112,14 @@ TEST(route_quiz_due_medicine) {
 }
 
 TEST(classify_reply) {
-    CHECK(classify_general("G"));
-    CHECK(classify_general(" g\n"));
-    CHECK(classify_general("<|channel>thought\nR?<channel|>G"));
-    CHECK(!classify_general("R"));
-    CHECK(!classify_general(""));
-    CHECK(!classify_general("I think"));
+    CHECK_EQ(classify_route("G"), 'G');
+    CHECK_EQ(classify_route(" g\n"), 'G');
+    CHECK_EQ(classify_route("G."), 'G');
+    CHECK_EQ(classify_route("<|channel>thought\nR?<channel|>G"), 'G');
+    CHECK_EQ(classify_route("H"), 'H');
+    CHECK_EQ(classify_route("R"), 'R');
+    // anything unparsable is recordings, never general
+    for (const char *x : {"", "I think", "Great", "General", "G?maybe", "Health"}) CHECK_EQ(classify_route(x), 'R');
 }
 
 TEST(parse_revision_questions_pairs) {
@@ -433,4 +435,131 @@ TEST(store_retrieval_within_a_period) {
         CHECK(st.note_summaries(0, 5000, 10, true)[0]["title"] == "Old");
     }
     unlink(path);
+}
+
+// ---- Fix round 2
+
+TEST(gate_word_list_inflected_and_mixed) {
+    for (const char *q : {
+             // inflected and mixed-script forms
+             "జ్వరానికి ఏం చేయాలి?", "జ్వరాన్ని ఎలా తగ్గించాలి?", "feverకి ఏం చేయాలి", "headacheకి ఏం", "paracetamolకు ఏం", "tabletలు ఎప్పుడు",
+             "jvaram ki emi cheyali", "jvaramki emi cheyali", "jvaraniki emi", "noppiki emi cheyali", "kadupu noppi", "dagguki",
+             // fused digits and spellings
+             "what is dolo650", "Is crocin650 ok", "500mg of what", "paracetmol use", "పారసిటమాల్ దేనికి", "పేరాసిటమాల్ దేనికి",
+             // brands and drugs
+             "What is Benadryl used for?", "What is Meftal used for?", "What is Saridon?", "What is Digene for?", "What is Avil?", "What is Allegra?",
+             "What is tramadol?", "What is naproxen?", "What is alprazolam?", "What is sildenafil?", "What is Augmentin?", "What is Pan 40?",
+             // conditions and advice
+             "How do I treat a cold?", "How do I cure acidity?", "Home remedy for constipation", "What is the treatment for malaria?",
+             "What are signs of dengue?", "Is it safe to eat papaya during pregnancy?", "Am I pregnant?", "How do I lower my cholesterol?",
+             "What are the health benefits of turmeric?", "What helps a toothache?", "backache remedy", "stomachache remedy",
+             "How much vitamin D do I need?", "What is a good antacid?", "What ointment for a burn?", "How do I treat a burn?", "Is asthma curable?",
+             "How to control diabetes?", "What is thyroid?", "విరేచనం ఎందుకు", "రక్తపోటు ఎలా తగ్గించాలి", "మధుమేహం అంటే ఏమిటి", "చికిత్స ఏమిటి",
+             "వైద్యం ఏమిటి", "గర్భం సమయంలో ఏం తినాలి", "What should I take today?",
+             // must stay flagged
+             "రక్త పరీక్ష రిపోర్ట్ ఏమిటి?", "how many times a day?", "What did the doctor prescribe?", "What is a CT scan?", "What is my blood sugar level?"}) {
+        if (!chat_health_question(q, {}, {})) std::fprintf(stderr, "not flagged: %s\n", q);
+        CHECK(chat_health_question(q, {}, {}));
+    }
+}
+
+TEST(gate_does_not_flag_ordinary_questions) {
+    for (const char *q : {"What is a sales report?", "పరీక్ష ఎప్పుడు?", "పరీక్షకు ఎలా చదవాలి?", "Who is Dr Ambedkar?", "How much sugar in tea?",
+                          "How do I scan a document?", "How do I report a bug?", "How many times has India won the World Cup?",
+                          "How often should I water my plants?", "What is a pain point?", "What is a rash decision?",
+                          "భారత్ ఎన్నిసార్లు ప్రపంచ కప్ గెలిచింది?", "What is the cold war?", "That was a treat of a show", "రవి మాత్రం ఏమి చెప్పాడు?",
+                          "What is a moustache?", "What is a browser cache?"}) {
+        if (chat_health_question(q, {}, {})) std::fprintf(stderr, "flagged: %s\n", q);
+        CHECK(!chat_health_question(q, {}, {}));
+    }
+    // the sentence filters keep their strength
+    CHECK(health_text("We reviewed the customer pain points.", {}));
+    // note titles use the gate
+    json notes = json::parse(R"([{"title":"Sales report","created_at":0,"short_summary":"Up.","sections":[]},
+                                 {"title":"పరీక్ష తయారీ","created_at":0,"short_summary":"Up.","sections":[]},
+                                 {"title":"Doctor visit","created_at":0,"short_summary":"Up.","sections":[]}])");
+    std::string m = summary_material(notes);
+    CHECK(m.find("Sales report") != std::string::npos && m.find("పరీక్ష తయారీ") != std::string::npos && m.find("Doctor visit") == std::string::npos);
+}
+
+TEST(gate_follow_up_of_a_health_question) {
+    std::vector<ChatTurn> after = {{"user", "What should I take for a headache?"}, {"assistant", health_only_text("en")}};
+    CHECK(chat_health_question("And for a child of five?", after, {}));
+    std::vector<ChatTurn> older = {{"user", "What should I take for a headache?"}, {"assistant", "line"}, {"user", "Who wrote Gitanjali?"}, {"assistant", "Tagore."}};
+    CHECK(!chat_health_question("Where was he born?", older, {}));   // only the last question counts
+}
+
+TEST(telugu_only_words_are_not_tablets) {
+    CHECK(!health_text("భారతదేశానికి న్యూ ఢిల్లీ మాత్రమే రాజధాని.", {}));
+    CHECK(!mentions_medicine("రవి మాత్రమే వచ్చాడు.", {}));
+    CHECK(!is_medicine_question("రవి మాత్రం ఏమి చెప్పాడు?", {}));
+    CHECK_EQ(kind_of("రవి మాత్రం ఏమి చెప్పాడు?"), std::string("recordings"));
+    CHECK_EQ(drop_health_sentences("రవి మాత్రమే వచ్చాడు. బడ్జెట్ ఆమోదించారు.", {}), std::string("రవి మాత్రమే వచ్చాడు. బడ్జెట్ ఆమోదించారు."));
+    CHECK(health_text("ఈ మాత్రలు వేసుకోండి.", {}));   // the real word still counts
+    std::string shown;
+    AnswerStream s({}, [&](const std::string &p) { shown += p; return true; });
+    s.feed("భారతదేశానికి న్యూ ఢిల్లీ మాత్రమే రాజధాని. ");
+    s.finish();
+    CHECK(!s.held());
+    CHECK_EQ(shown, std::string("భారతదేశానికి న్యూ ఢిల్లీ మాత్రమే రాజధాని."));
+}
+
+TEST(short_keywords_match_whole_words) {
+    auto scores = [](const char *q, const char *t) {
+        std::string w = chat_search_query(q, {});
+        return passage_scores(keyword_hits(w, t), w);
+    };
+    CHECK(!scores("What is AI?", "We will try again tomorrow at the airport."));
+    CHECK(scores("What is AI?", "AI is coming to the office."));
+    CHECK(!scores("What is a car?", "She started her career in the card shop."));
+    CHECK(scores("What is a car?", "The car is parked."));
+    CHECK(!scores("How do I cook rice?", "The price of rice went up."));
+    // period words do not count against a passage
+    CHECK_EQ(chat_search_query("What did Ravi say today?", {}), std::string("ravi"));
+    CHECK(scores("What did Ravi say today?", "Ravi asked about the pipe."));
+    CHECK(scores("What did Ravi say yesterday?", "Ravi asked about the pipe."));
+    CHECK(scores("What did Ravi say today about the pipe?", "Ravi asked about the pipe."));
+    CHECK(!scores("What did Ravi say today about the pipe?", "The pipe burst."));
+    CHECK(scores("రవి ఈ రోజు ఏమి చెప్పాడు?", "రవి చెప్పాడు పైపు గురించి"));
+}
+
+TEST(route_subject_rule_on_due_and_shapes) {
+    CHECK_EQ(kind_of("What is the deadline for the exam?"), std::string("recordings"));
+    CHECK_EQ(kind_of("What did Ravi say about the deadline?"), std::string("recordings"));
+    CHECK_EQ(kind_of("Is the report due?"), std::string("recordings"));
+    CHECK_EQ(kind_of("What's due soon?"), std::string("due"));
+    CHECK_EQ(kind_of("Any deadlines coming up?"), std::string("due"));
+    for (const char *q : {"How are you today?", "What is today?", "What should I take today?"}) CHECK(kind_of(q) != "summary");
+    for (const char *q : {"Quiz results from Friday?", "Quizzes in the syllabus?", "పరీక్ష పెట్టారా?", "రవి నన్ను పరీక్ష గురించి అడిగాడు"}) CHECK(kind_of(q) != "quiz");
+    CHECK_EQ(kind_of("Quiz me"), std::string("quiz"));
+    CHECK_EQ(kind_of("Quiz"), std::string("quiz"));
+}
+
+TEST(health_passage_needs_the_health_word) {
+    CHECK(!health_passage_scores("bring down fever", "We used the old pipe and will bring it down tomorrow.", {}));
+    CHECK(health_passage_scores("bring down fever", "The fever stayed all night.", {}));
+    CHECK(!health_passage_scores("paracetamol used", "We used the old pipe.", {}));
+    CHECK(health_passage_scores("doctor prescribe", "The doctor came at nine.", {}));
+    CHECK(!health_passage_scores("child five", "The child sang.", {}));   // no health word: every keyword
+    CHECK(health_passage_scores("child five", "The child is five.", {}));
+    CHECK(!health_passage_scores("", "x", {}));
+}
+
+TEST(drop_material_from_the_block) {
+    Relevant r;
+    r.block = "From recordings:\n[S1] A 00:00: first\n[S2] A 00:30: pain line\n[S3] B 01:00: third\n\nRemembered facts:\n- Crocin at night\n- Ravi likes tea\n";
+    r.sources = json::parse(R"([{"label":"S1"},{"label":"S2"},{"label":"S3"}])");
+    drop_source(r, "S2");
+    CHECK(r.block.find("pain line") == std::string::npos);
+    CHECK(r.block.find("[S1] A 00:00: first\n[S3] B 01:00: third\n") != std::string::npos);
+    CHECK_EQ(r.sources.size(), (size_t)2);
+    drop_source(r, "S3");
+    CHECK(r.block.find("third") == std::string::npos && r.block.find("Remembered facts:") != std::string::npos);
+    drop_flagged_facts(r, {});
+    CHECK(r.block.find("Crocin") == std::string::npos && r.block.find("Ravi likes tea") != std::string::npos);
+    Relevant one;
+    one.block = "[S1] A 00:00: only\n";
+    one.sources = json::parse(R"([{"label":"S1"}])");
+    drop_source(one, "S1");
+    CHECK(one.block.empty() && one.sources.empty());
 }

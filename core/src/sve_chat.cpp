@@ -164,7 +164,18 @@ std::string history_block(const std::vector<ChatTurn> &window) {
 }
 
 std::string chat_search_query(const std::string &question, const std::vector<ChatTurn> &earlier) {
-    std::string kq = keyword_query(question);
+    // Period words pick the notes (Route), they are not what the passage must say.
+    static const std::set<std::string> kPeriod = {"today", "tonight", "yesterday", "tomorrow", "week", "weeks", "month", "months",
+                                                  "last", "ఈ", "రోజు", "ఈరోజు", "నేడు", "నిన్న", "వారం", "గత", "పోయిన", "నెల"};
+    std::string kq;
+    {
+        std::string cur;
+        for (char c : keyword_query(question) + " ") {
+            if (c != ' ') { cur += c; continue; }
+            if (!cur.empty() && !kPeriod.count(cur)) kq += (kq.empty() ? "" : " ") + cur;
+            cur.clear();
+        }
+    }
     if (words_in(kq) < 2)
         for (size_t k = earlier.size(); k-- > 0;)
             if (earlier[k].role == "user") {
@@ -493,6 +504,7 @@ bool has_subject(const std::string &text) {
         "summarise", "summarize", "summary", "summaries", "summarised", "summarized", "recap", "happen", "happened", "happening",
         "talk", "talked", "talking", "meeting", "meetings", "recording", "recordings", "note", "notes", "remember", "coming", "up",
         "pending", "list", "soon", "give", "show", "get", "need", "due", "remind", "reminds", "reminder", "reminders", "todo", "todos",
+        "deadline", "deadlines", "గడువు",
         "ఈ", "రోజు", "ఈరోజు", "నేడు", "నిన్న", "వారం", "గత", "పోయిన", "నెల", "ఏం", "జరిగింది", "మాట్లాడాం", "చర్చలు", "చెప్పారు", "చెప్పండి",
         "రికార్డింగ్‌ల", "రికార్డింగ్ల", "రికార్డింగ్‌లు", "రికార్డింగ్లు", "త్వరలో", "ఏమేమి", "ఉంది", "ముఖ్యమైన", "ముఖ్యాంశాలు", "సారాంశం", "చేయాల్సి", "గుర్తు", "చేయండి",
     };
@@ -512,17 +524,18 @@ Route route_question(const std::string &text, int64_t now, const std::vector<std
     const std::vector<std::string> w = ascii_words(text);
     const std::string low = lower_ascii_copy(text);
     const bool subject = has_subject(text);
-    if (has_phrase(w, {"quiz", "me"}) || has_phrase(w, {"test", "me"}) || has_phrase(w, {"next", "question"}) ||
-        (!w.empty() && w[0].compare(0, 4, "quiz") == 0 && low.find_first_not_of(" \t\n") == low.find(w[0])) ||
+    const bool starts_quiz = !w.empty() && w[0] == "quiz" && low.find_first_not_of(" \t\n") == low.find("quiz") &&
+                             (w.size() == 1 || w[1] == "on" || w[1] == "about" || w[1] == "for");
+    if (has_phrase(w, {"quiz", "me"}) || has_phrase(w, {"test", "me"}) || has_phrase(w, {"next", "question"}) || starts_quiz ||
         has_any(text, {"క్విజ్", "తర్వాతి ప్రశ్న", "మరో ప్రశ్న"}) ||
-        (has_any(text, {"పరీక్ష"}) && has_any(text, {"పెట్ట", "నన్ను"}))) {
+        (has_any(text, {"పరీక్ష"}) && (has_any(text, {"పెట్టండి", "పెట్టు"}) || (has_any(text, {"నన్ను"}) && has_any(text, {"చేయండి", "చేయి"}))))) {
         r.kind = "quiz"; r.by_rule = true; return r;
     }
     bool due_word = false;
     for (size_t i = 0; i < w.size(); ++i) due_word = due_word || (w[i] == "due" && !(i + 1 < w.size() && w[i + 1] == "to"));
-    if (due_word || has_word(w, "todo") || has_word(w, "todos") || has_any(low, {"to-do", "to do list"}) ||
-        has_prefix(w, "deadline") || has_any(text, {"గడువు"}) ||
-        (!subject && (has_phrase(w, {"what", "do", "i", "have"}) || has_prefix(w, "remind") || has_any(text, {"చేయాల్సి", "గుర్తు చేయ"})))) {
+    if (has_word(w, "todo") || has_word(w, "todos") || has_any(low, {"to-do", "to do list"}) ||
+        (!subject && (due_word || has_prefix(w, "deadline") || has_any(text, {"గడువు"}) || has_phrase(w, {"what", "do", "i", "have"}) ||
+                      has_prefix(w, "remind") || has_any(text, {"చేయాల్సి", "గుర్తు చేయ"})))) {
         r.kind = "due"; r.by_rule = true; return r;
     }
     const int64_t today = day_start(now, 0);
@@ -540,7 +553,10 @@ Route route_question(const std::string &text, int64_t now, const std::vector<std
     const bool summary_word = has_phrase(w, {"key", "discussions"}) || has_phrase(w, {"key", "discussion"}) || has_phrase(w, {"key", "points"}) ||
         has_prefix(w, "highlight") || has_phrase(w, {"important", "points"}) || has_prefix(w, "summar") ||
         has_prefix(w, "recap") || has_any(text, {"సారాంశ", "ముఖ్యాంశ", "ముఖ్యమైన"});
-    if ((named || summary_word) && !subject) {
+    // A period alone in small talk or a question of another shape is not asking for a summary.
+    const bool other_shape = !summary_word && (has_phrase(w, {"how", "are", "you"}) || has_phrase(w, {"what", "is"}) || has_phrase(w, {"what", "s"}) ||
+                                               has_phrase(w, {"should", "i"}) || has_phrase(w, {"how", "do", "i"}));
+    if ((named || summary_word) && !subject && !other_shape) {
         r.kind = "summary";
         r.by_rule = true;
         if (!named) { r.from = day_start(now, -6); r.to = day_start(now, 1); }
@@ -556,7 +572,10 @@ bool health_text(const std::string &text, const std::vector<std::string> &medici
 
 bool chat_health_question(const std::string &question, const std::vector<ChatTurn> &earlier,
                           const std::vector<std::string> &medicine_names) {
-    return is_health_memory(question, medicine_names) || (!earlier.empty() && earlier.back().medicine);
+    if (health_gate(question, medicine_names) || (!earlier.empty() && earlier.back().medicine)) return true;
+    for (size_t k = earlier.size(); k-- > 0;)
+        if (earlier[k].role == "user") return health_gate(earlier[k].text, medicine_names);
+    return false;
 }
 
 std::string health_only_text(const std::string &lang) {
@@ -583,18 +602,76 @@ std::string drop_health_sentences(const std::string &text, const std::vector<std
     return trim_copy(kept);
 }
 
-bool classify_general(const std::string &reply) {
+bool health_passage_scores(const std::string &keywords, const std::string &text, const std::vector<std::string> &medicine_names) {
+    std::vector<std::string> all, must;
+    std::string cur;
+    for (char c : keywords + " ") {
+        if (c != ' ') { cur += c; continue; }
+        if (!cur.empty()) {
+            all.push_back(cur);
+            if (health_gate(cur, medicine_names)) must.push_back(cur);
+        }
+        cur.clear();
+    }
+    if (must.empty()) must = all;
+    if (must.empty()) return false;
+    for (const auto &k : must) if (keyword_hits(k, text) == 0) return false;
+    return true;
+}
+
+void drop_source(Relevant &rel, const std::string &label) {
+    const std::string tag = "[" + label + "] ";
+    size_t a = rel.block.rfind(tag, 0) == 0 ? 0 : rel.block.find("\n" + tag);
+    if (a != std::string::npos) {
+        if (a != 0 || rel.block[0] == '\n') ++a;
+        // The line ends where the next labelled line or the next heading starts.
+        size_t e = std::string::npos;
+        for (const char *next : {"\n[S", "\nRemembered facts:", "\nSummaries of recordings:", "\n\n"}) e = std::min(e, rel.block.find(next, a));
+        e = e == std::string::npos ? rel.block.size() : e + 1;
+        rel.block.erase(a, e - a);
+    }
+    if (rel.sources.is_array()) {
+        json kept = json::array();
+        for (const auto &s : rel.sources) if (jstr(s, "label") != label) kept.push_back(s);
+        rel.sources = kept;
+    }
+}
+
+void drop_flagged_facts(Relevant &rel, const std::vector<std::string> &medicine_names) {
+    const std::string head = "Remembered facts:\n";
+    size_t at = rel.block.find(head);
+    if (at == std::string::npos) return;
+    size_t i = at + head.size();
+    while (i < rel.block.size()) {
+        size_t e = rel.block.find('\n', i);
+        e = e == std::string::npos ? rel.block.size() : e + 1;
+        const std::string line = rel.block.substr(i, e - i);
+        if (line.rfind("- ", 0) != 0) break;
+        if (health_text(line.substr(2), medicine_names)) rel.block.erase(i, e - i);
+        else i = e;
+    }
+}
+
+char classify_route(const std::string &reply) {
     ThinkStripper t;
     std::string v = t.feed(reply);
     v += t.finish();
     v = trim_copy(v);
-    return !v.empty() && (v[0] == 'G' || v[0] == 'g');
+    if (v.empty()) return 'R';
+    const char c = v[0] >= 'a' && v[0] <= 'z' ? (char)(v[0] - 32) : v[0];
+    if (c != 'R' && c != 'G' && c != 'H') return 'R';
+    for (size_t i = 1; i < v.size(); ++i) {   // one letter, nothing else but punctuation: "G." yes, "Great" no
+        const unsigned char x = (unsigned char)v[i];
+        if (x >= 0x80 || (x >= '0' && x <= '9') || (x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z')) return 'R';
+    }
+    return c;
 }
 
 std::string classify_prompt(const std::string &question) {
-    return "Is this question about the person's own recordings, notes, meetings, people, plans or life (R), or a "
-           "general knowledge question that their recordings would not answer (G)?\n\nQuestion: " + question +
-           "\n\nReply with the single letter R or G.";
+    return "Sort this question.\nR: about the person's own recordings, notes, meetings, people, plans or life.\n"
+           "H: about health, illness, medicine, diet for an illness, the body, pregnancy or first aid.\n"
+           "G: other general knowledge that their recordings would not answer.\n\nQuestion: " + question +
+           "\n\nReply with the single letter R, H or G.";
 }
 
 std::vector<std::pair<std::string, std::string>> parse_revision_questions(const std::string &text) {
@@ -740,7 +817,7 @@ std::string summary_material(const json &notes, const std::vector<std::string> &
         for (const auto &n : notes) {
             if (!n.is_object()) continue;
             std::string title = jstr(n, "title");
-            if (is_health_memory(title, medicine_names)) title.clear();
+            if (health_gate(title, medicine_names)) title.clear();
             out += "### " + (title.empty() ? std::string() : title + " ") + "(" + ymd_of(jint(n, "created_at", 0)) + ")\n";
             std::string body = drop_health_sentences(strip_unclear(jstr(n, "short_summary")), medicine_names);
             if (body.empty() && n.contains("sections") && n["sections"].is_array())
@@ -793,7 +870,10 @@ int keyword_hits(const std::string &keywords, const std::string &text) {
         bool ascii = true;
         for (unsigned char c : k) ascii = ascii && c < 0x80;
         for (size_t at = low.find(k); at != std::string::npos; at = low.find(k, at + 1))
-            if (!ascii || at == 0 || !is_ascii_word((unsigned char)low[at - 1])) return true;
+            if (!ascii) return true;
+            else if ((at == 0 || !is_ascii_word((unsigned char)low[at - 1])) &&
+                     (k.size() > 3 || at + k.size() == low.size() || !is_ascii_word((unsigned char)low[at + k.size()])))
+                return true;
         return false;
     };
     std::vector<std::string> seen;

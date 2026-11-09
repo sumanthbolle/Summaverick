@@ -521,7 +521,7 @@ struct AskView: View {
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
                     .disabled(listening || transcribing)
                     .onChange(of: text) { _, _ in if notice == .busy || notice == .notHeard { notice = nil } }
-                if generating {
+                if generating && askTask != nil {   // while the kind is read there is nothing to stop yet
                     Button { askTask?.cancel() } label: {
                         Image(systemName: "stop.circle.fill").font(.system(size: 34))
                             .frame(width: 44, height: 44)
@@ -607,15 +607,16 @@ struct AskView: View {
         let q = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !generating, !listening, !transcribing else { return }
         generating = true   // while the kind is read, nothing else starts
+        if fromField { text = "" }   // before the wait, so anything typed during it stays
         Task {
             let instant = needsNoModel(await CoreEngine.shared.routeKind(q))
             if !instant, let why = blocked {
                 notice = why
                 generating = false
+                if fromField && text.isEmpty { text = q }   // not asked: the question stays in the box
                 return
             }
             notice = nil
-            if fromField { text = "" }
             ask(chats.append(q), q, instant: instant)
         }
     }
