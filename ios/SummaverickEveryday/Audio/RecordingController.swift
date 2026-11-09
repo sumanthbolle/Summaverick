@@ -175,7 +175,7 @@ final class RecordingController {
         switch quiet.feed(time: t, level: Double(db)) {
         case .none: break
         case .warn:
-            let line = String(localized: "No voice for a while — stopping in 30 seconds")
+            let line = String(localized: "It's gone quiet. I'll stop recording in 30 seconds.")
             NSLog("[sve] quiet: warning at %.0f s", t)
             quietWarning = true
             if let url = recorder.currentURL { RecordingActivities.shared.setQuietLine(audioPath: url.path, line) }
@@ -186,7 +186,7 @@ final class RecordingController {
         case .stop(let keepUntil):
             let minutes = Int((quiet.limit / 60).rounded())
             NSLog("[sve] quiet: stopping at %.0f s, keeping %.0f s", t, keepUntil ?? -1)
-            stop(quietStop: (keepUntil, String(localized: "Stopped after \(minutes) min of quiet")))
+            stop(quietStop: (keepUntil, String(localized: "It stayed quiet for \(minutes) min, so I stopped.")))
         }
     }
 
@@ -306,7 +306,7 @@ final class RecordingActivities {
     /// is read before this launch can start one of its own.
     static func endStale() {
         guard #available(iOS 18, *) else { return }
-        // Only those still showing as live: an ended "Notes ready" card keeps its own dismissal time.
+        // Only those still showing as live: an ended "Your notes are ready" card keeps its own dismissal time.
         let stale = Activity<RecordingActivity>.activities.filter { $0.activityState == .active || $0.activityState == .stale }
         guard !stale.isEmpty else { return }
         NSLog("[sve] live activity: ending %ld left from before", stale.count)

@@ -99,7 +99,7 @@ struct TodayView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 32)
             }
-            .alert("Could not save this. Please try again.", isPresented: errorShown) {
+            .alert("I couldn't save this. Please try again.", isPresented: errorShown) {
                 Button("OK", role: .cancel) {}
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -209,7 +209,7 @@ struct TodayView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Waiting for you", count: suggestions.count)
             if suggestions.isEmpty {
-                emptyLine("Nothing is waiting. New suggestions from your recordings appear here.")
+                emptyLine("All clear. When I spot something in your recordings, it shows up here.")
             }
             ForEach(suggestions) { s in
                 SuggestionCard(suggestion: s,
@@ -231,7 +231,7 @@ struct TodayView: View {
             sectionTitle("To check", count: queue.count)
             if queueFailed {
                 HStack(spacing: 12) {
-                    Label("Could not load this.", systemImage: "exclamationmark.triangle.fill")
+                    Label("I couldn't open this.", systemImage: "exclamationmark.triangle.fill")
                         .font(.callout.weight(.medium)).foregroundStyle(.red)
                     Spacer(minLength: 0)
                     Button("Try again") { Task { await reload() } }
@@ -365,7 +365,7 @@ struct TodayView: View {
     private func insightCard(_ i: Insight) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Insight", systemImage: "sparkles").font(.headline).foregroundStyle(Color.accentColor)
+                Label("Something I noticed", systemImage: "sparkles").font(.headline).foregroundStyle(Color.accentColor)
                 Spacer()
                 Button { Task { await dismissInsight(i) } } label: {
                     Image(systemName: "xmark").font(.headline).frame(width: 44, height: 44)
@@ -411,7 +411,7 @@ struct TodayView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Set up your profile").font(.headline).foregroundStyle(.primary)
-                    Text("Your name, your day and your medicines help Summaverick time reminders for you.")
+                    Text("Your name, your day and your medicines help me time your reminders.")
                         .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: 0)

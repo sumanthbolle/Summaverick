@@ -286,12 +286,12 @@
         }
       }
     },
-    "Being written…": {
+    "Writing this now…": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Being written…"
+            "value": "Writing this now…"
           }
         },
         "te": {
@@ -327,7 +327,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రద్దు చేయి"
+            "value": "రద్దు చేయండి"
           }
         }
       }
@@ -423,12 +423,12 @@
         }
       }
     },
-    "Could not answer this. Please try again.": {
+    "I couldn't answer this. Please try again.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not answer this. Please try again."
+            "value": "I couldn't answer this. Please try again."
           }
         },
         "te": {
@@ -439,58 +439,58 @@
         }
       }
     },
-    "Could not make the summary.": {
+    "I couldn't write the summary.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సారాంశం తయారు చేయలేకపోయాం."
+            "value": "సారాంశం రాయలేకపోయాను."
           }
         }
       }
     },
-    "Could not refresh the summary.": {
+    "I couldn't write the summary again.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సారాంశాన్ని కొత్తది చేయలేకపోయాం."
+            "value": "సారాంశం మళ్ళీ రాయలేకపోయాను."
           }
         }
       }
     },
-    "Could not save this. Please try again.": {
+    "I couldn't save this. Please try again.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "దీన్ని సేవ్ చేయలేకపోయాం. దయచేసి మళ్ళీ ప్రయత్నించండి."
+            "value": "దీన్ని సేవ్ చేయలేకపోయాను. దయచేసి మళ్ళీ ప్రయత్నించండి."
           }
         }
       }
     },
-    "Could not start the microphone.": {
+    "I couldn't start the microphone.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not start the microphone."
+            "value": "I couldn't start the microphone."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మైక్రోఫోన్ మొదలవ్వలేదు."
+            "value": "మైక్రోఫోన్ మొదలుపెట్టలేకపోయాను."
           }
         }
       }
     },
-    "Could not write down your question. Please try again, or type it.": {
+    "I couldn't catch your question. Please try again, or type it.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not write down your question. Please try again, or type it."
+            "value": "I couldn't catch your question. Please try again, or type it."
           }
         },
         "te": {
@@ -544,7 +544,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "తొలగించు"
+            "value": "తొలగించండి"
           }
         }
       }
@@ -560,7 +560,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నోట్ తొలగించు"
+            "value": "నోట్ తొలగించండి"
           }
         }
       }
@@ -722,7 +722,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Markdown ఫైల్‌గా పంపు"
+            "value": "Markdown ఫైల్‌గా పంపండి"
           }
         }
       }
@@ -738,7 +738,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "పదం సరిచేయి"
+            "value": "పదం సరిచేయండి"
           }
         }
       }
@@ -763,18 +763,18 @@
         }
       }
     },
-    "Generate notes": {
+    "Write my notes": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Generate notes"
+            "value": "Write my notes"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నోట్స్ తయారు చేయి"
+            "value": "నోట్స్ రాయండి"
           }
         }
       }
@@ -972,12 +972,12 @@
         }
       }
     },
-    "Insight": {
+    "Something I noticed": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "గమనిక"
+            "value": "నేను గమనించింది"
           }
         }
       }
@@ -1050,7 +1050,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రిమైండర్ పెట్టు"
+            "value": "రిమైండర్ పెట్టండి"
           }
         }
       }
@@ -1071,12 +1071,12 @@
         }
       }
     },
-    "Make the summary": {
+    "Write the summary": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సారాంశం తయారు చేయండి"
+            "value": "సారాంశం రాయండి"
           }
         }
       }
@@ -1092,7 +1092,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "చేయాల్సిన పనిగా పెట్టు"
+            "value": "చేయాల్సిన పనిగా పెట్టండి"
           }
         }
       }
@@ -1300,34 +1300,34 @@
         }
       }
     },
-    "No transcript.": {
+    "Nothing written down yet.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No transcript."
+            "value": "Nothing written down yet."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రాత ప్రతి లేదు."
+            "value": "ఇంకా ఏమీ రాయలేదు."
           }
         }
       }
     },
-    "Not generated yet.": {
+    "I haven't written this yet.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Not generated yet."
+            "value": "I haven't written this yet."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇంకా తయారు కాలేదు."
+            "value": "ఇది ఇంకా రాయలేదు."
           }
         }
       }
@@ -1398,12 +1398,12 @@
         }
       }
     },
-    "Nothing is waiting. New suggestions from your recordings appear here.": {
+    "All clear. When I spot something in your recordings, it shows up here.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఏమీ ఎదురుచూడటం లేదు. మీ రికార్డింగ్‌ల నుండి కొత్త సూచనలు ఇక్కడ కనిపిస్తాయి."
+            "value": "అంతా క్లియర్. మీ రికార్డింగ్‌లలో నాకు ఏదైనా కనిపిస్తే ఇక్కడ చూపిస్తాను."
           }
         }
       }
@@ -1556,7 +1556,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ నుంచి వినిపించు"
+            "value": "%@ నుంచి వినిపించండి"
           }
         }
       }
@@ -1572,7 +1572,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్ వినిపించు"
+            "value": "రికార్డింగ్ వినిపించండి"
           }
         }
       }
@@ -1652,7 +1652,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నాకు క్విజ్ పెట్టు"
+            "value": "నాకు క్విజ్ పెట్టండి"
           }
         }
       }
@@ -1662,7 +1662,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ రికార్డింగ్‌లను చదువుతోంది…"
+            "value": "మీ రికార్డింగ్‌లను చదువుతున్నాను…"
           }
         }
       }
@@ -1698,12 +1698,12 @@
         }
       }
     },
-    "Refresh summary": {
+    "Write the summary again": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సారాంశాన్ని కొత్తది చేయండి"
+            "value": "సారాంశం మళ్ళీ రాయండి"
           }
         }
       }
@@ -1769,7 +1769,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "పేరు మార్చు"
+            "value": "పేరు మార్చండి"
           }
         }
       }
@@ -1806,18 +1806,18 @@
         }
       }
     },
-    "Saved “%@”. Summaverick will remember this word.": {
+    "Saved “%@”. I'll remember this word.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saved “%@”. Summaverick will remember this word."
+            "value": "Saved “%@”. I'll remember this word."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "“%@” సేవ్ అయింది. Summaverick ఈ పదాన్ని గుర్తుంచుకుంటుంది."
+            "value": "“%@” సేవ్ అయింది. ఈ పదాన్ని గుర్తుంచుకుంటాను."
           }
         }
       }
@@ -1859,7 +1859,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "పంపు"
+            "value": "పంపండి"
           }
         }
       }
@@ -1915,7 +1915,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "పంచుకో"
+            "value": "షేర్ చేయండి"
           }
         }
       }
@@ -1972,7 +1972,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఆపు"
+            "value": "ఆపండి"
           }
         }
       }
@@ -1999,7 +1999,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఆపి, నా ప్రశ్నను రాయి"
+            "value": "ఆపి, నా ప్రశ్నను రాయండి"
           }
         }
       }
@@ -2040,50 +2040,50 @@
         }
       }
     },
-    "Summaverick is writing an answer": {
+    "I'm writing your answer": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick is writing an answer"
+            "value": "I'm writing your answer"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick జవాబు రాస్తోంది"
+            "value": "జవాబు రాస్తున్నాను"
           }
         }
       }
     },
-    "Summaverick will remember this word for your next recordings.": {
+    "I'll remember this word for your next recordings.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick will remember this word for your next recordings."
+            "value": "I'll remember this word for your next recordings."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ తర్వాతి రికార్డింగ్‌ల కోసం Summaverick ఈ పదాన్ని గుర్తుంచుకుంటుంది."
+            "value": "మీ తర్వాతి రికార్డింగ్‌ల కోసం ఈ పదాన్ని గుర్తుంచుకుంటాను."
           }
         }
       }
     },
-    "Summaverick's answer": {
+    "My answer": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick's answer"
+            "value": "My answer"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick జవాబు"
+            "value": "నా జవాబు"
           }
         }
       }
@@ -2098,12 +2098,12 @@
         }
       }
     },
-    "Tap Record to capture a lecture, a meeting or a thought. Notes are written on this phone and never leave it.": {
+    "Tap Record for a lecture, a meeting or a thought. Notes are written on this phone and never leave it. I can get things wrong, so check anything important.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "పాఠం, సమావేశం లేదా మీ ఆలోచనను రికార్డ్ చేయడానికి రికార్డ్ నొక్కండి. నోట్స్ ఈ ఫోన్‌లోనే తయారవుతాయి, బయటకు వెళ్లవు."
+            "value": "పాఠం, సమావేశం లేదా మీ ఆలోచన కోసం రికార్డ్ నొక్కండి. నోట్స్ ఈ ఫోన్‌లోనే తయారవుతాయి, బయటకు వెళ్లవు. నేను పొరపాటు చేయవచ్చు, ముఖ్యమైనవి ఒకసారి చూసుకోండి."
           }
         }
       }
@@ -2386,18 +2386,18 @@
         }
       }
     },
-    "Transcript": {
+    "Word for word": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transcript"
+            "value": "Word for word"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రాత ప్రతి"
+            "value": "చెప్పిన మాటలు"
           }
         }
       }
@@ -2643,12 +2643,12 @@
         }
       }
     },
-    "Your name, your day and your medicines help Summaverick time reminders for you.": {
+    "Your name, your day and your medicines help me time your reminders.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ పేరు, మీ దినచర్య, మీ మందులు తెలిస్తే Summaverick సరైన సమయానికి రిమైండర్లు పెడుతుంది."
+            "value": "మీ పేరు, మీ దినచర్య, మీ మందులు తెలిస్తే సరైన సమయానికి రిమైండర్లు పెడతాను."
           }
         }
       }
@@ -2667,12 +2667,12 @@
         }
       }
     },
-    "Add them here and Summaverick will offer a reminder on Today. Nothing rings until you say Yes.": {
+    "Add them here and I'll offer a reminder on Today. Nothing rings until you say Yes.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇక్కడ చేర్చండి. Summaverick ఈరోజు పేజీలో రిమైండర్ సూచిస్తుంది. మీరు అవును అనే వరకు ఏదీ మోగదు."
+            "value": "ఇక్కడ చేర్చండి. ఈరోజు పేజీలో రిమైండర్ సూచిస్తాను. మీరు అవును అనే వరకు ఏదీ మోగదు."
           }
         }
       }
@@ -3008,12 +3008,12 @@
         }
       }
     },
-    "No words yet. When you fix a word in a recording, it is added here.": {
+    "No words yet. When you fix a word in a recording, I add it here.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇంకా పదాలు లేవు. రికార్డింగ్‌లో ఒక పదాన్ని మీరు సరిచేసినప్పుడు అది ఇక్కడ చేరుతుంది."
+            "value": "ఇంకా పదాలు లేవు. రికార్డింగ్‌లో ఒక పదాన్ని మీరు సరిచేసినప్పుడు ఇక్కడ చేరుస్తాను."
           }
         }
       }
@@ -3151,12 +3151,12 @@
       },
       "comment": "Setup progress, e.g. Step 1 of 4"
     },
-    "Summaverick uses these to understand you. Edit or delete anything.": {
+    "I use these to understand you. Edit or delete anything.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మిమ్మల్ని అర్థం చేసుకోవడానికి Summaverick వీటిని వాడుతుంది. ఏదైనా మార్చవచ్చు లేదా తొలగించవచ్చు."
+            "value": "మిమ్మల్ని అర్థం చేసుకోవడానికి నేను వీటిని వాడతాను. ఏదైనా మార్చవచ్చు లేదా తొలగించవచ్చు."
           }
         }
       }
@@ -3172,12 +3172,12 @@
       },
       "comment": "Placeholder for editing a remembered item"
     },
-    "What Summaverick has learned": {
+    "Things I remember": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick నేర్చుకున్నవి"
+            "value": "నాకు గుర్తున్నవి"
           }
         }
       }
@@ -3192,12 +3192,12 @@
         }
       }
     },
-    "What should Summaverick call you?": {
+    "What should I call you?": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick మిమ్మల్ని ఏమని పిలవాలి?"
+            "value": "మిమ్మల్ని ఏమని పిలవాలి?"
           }
         }
       }
@@ -3252,12 +3252,12 @@
         }
       }
     },
-    "Your name is used in greetings and to understand your recordings.": {
+    "I use your name to greet you and to understand your recordings.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "పలకరించడానికి, మీ రికార్డింగ్‌లు అర్థం చేసుకోవడానికి మీ పేరు వాడతాం."
+            "value": "మిమ్మల్ని పలకరించడానికి, మీ రికార్డింగ్‌లు అర్థం చేసుకోవడానికి మీ పేరు వాడతాను."
           }
         }
       }
@@ -3283,22 +3283,22 @@
       },
       "comment": "%@ is a date"
     },
-    "Could not delete everything. Try again.": {
+    "I couldn't delete everything. Try again.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "అన్నీ తొలగించలేకపోయాం. మళ్ళీ ప్రయత్నించండి."
+            "value": "అన్నీ తొలగించలేకపోయాను. మళ్ళీ ప్రయత్నించండి."
           }
         }
       }
     },
-    "Could not delete this. Please try again.": {
+    "I couldn't delete this. Please try again.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "దీన్ని తొలగించలేకపోయాం. దయచేసి మళ్ళీ ప్రయత్నించండి."
+            "value": "దీన్ని తొలగించలేకపోయాను. దయచేసి మళ్ళీ ప్రయత్నించండి."
           }
         }
       }
@@ -3323,22 +3323,22 @@
         }
       }
     },
-    "Summaverick is still working on a recording. Try again when it has finished.": {
+    "I'm still working on a recording. Try again when I've finished.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick ఇంకా ఒక రికార్డింగ్ మీద పని చేస్తోంది. అది పూర్తయ్యాక మళ్ళీ ప్రయత్నించండి."
+            "value": "ఇంకా ఒక రికార్డింగ్ మీద పని చేస్తున్నాను. అది పూర్తయ్యాక మళ్ళీ ప్రయత్నించండి."
           }
         }
       }
     },
-    "Summaverick talks to you in this language where it can. Some messages are in English for now.": {
+    "I talk to you in this language where I can. Some messages are in English for now.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "వీలైనచోట Summaverick మీతో ఈ భాషలోనే మాట్లాడుతుంది. ప్రస్తుతానికి కొన్ని సందేశాలు ఇంగ్లీష్‌లో ఉంటాయి."
+            "value": "వీలైనచోట మీతో ఈ భాషలోనే మాట్లాడతాను. ప్రస్తుతానికి కొన్ని సందేశాలు ఇంగ్లీష్‌లో ఉంటాయి."
           }
         }
       }
@@ -3394,7 +3394,7 @@
         }
       }
     },
-    "Could not %@.": {
+    "I couldn't %@.": {
       "localizations": {
         "te": {
           "stringUnit": {
@@ -3405,64 +3405,64 @@
       },
       "comment": "%@ is an action such as \"save the reminder\""
     },
-    "Could not load the AI model at %@.": {
+    "I couldn't start up. Please try again.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ దగ్గర ఉన్న AI మోడల్‌ను తెరవలేకపోయాం."
+            "value": "మొదలవ్వలేకపోయాను. మళ్ళీ ప్రయత్నించండి."
           }
         }
       },
       "comment": "%@ is a file path"
     },
-    "Could not open the notes database.": {
+    "I couldn't open your notes.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నోట్స్ డేటాబేస్ తెరవలేకపోయాం."
+            "value": "మీ నోట్స్ తెరవలేకపోయాను."
           }
         }
       }
     },
-    "Could not read the assistant's reply.": {
+    "Something went wrong on my side. Please try again.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "అసిస్టెంట్ జవాబును చదవలేకపోయాం."
+            "value": "నా వైపు ఏదో తప్పు జరిగింది. మళ్ళీ ప్రయత్నించండి."
           }
         }
       }
     },
-    "Could not start recording.": {
+    "I couldn't start recording.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్ మొదలవ్వలేదు."
+            "value": "రికార్డింగ్ మొదలుపెట్టలేకపోయాను."
           }
         }
       }
     },
-    "delete the assistant data": {
+    "delete your saved details": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "అసిస్టెంట్ డేటాను తొలగించడం"
+            "value": "మీ వివరాలు తొలగించడం"
           }
         }
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "Failed: %@": {
+    "I couldn't finish: %@": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "కాలేదు: %@"
+            "value": "పూర్తి చేయలేకపోయాను: %@"
           }
         }
       },
@@ -3479,12 +3479,12 @@
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "Finding reminders and tasks…": {
+    "Looking for reminders and tasks…": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రిమైండర్లు, పనులు వెతుకుతోంది…"
+            "value": "రిమైండర్లు, పనులు వెతుకుతున్నాను…"
           }
         }
       }
@@ -3509,12 +3509,12 @@
         }
       }
     },
-    "Loading AI model…": {
+    "Working on it…": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI మోడల్ తెరుస్తోంది…"
+            "value": "పని చేస్తున్నాను…"
           }
         }
       }
@@ -3529,22 +3529,22 @@
         }
       }
     },
-    "No speech was detected in the recording.": {
+    "I couldn't hear anyone speaking in this recording.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్‌లో మాటలు ఏవీ వినిపించలేదు."
+            "value": "ఈ రికార్డింగ్‌లో ఎవరి మాటలూ వినిపించలేదు."
           }
         }
       }
     },
-    "No transcript and the audio is no longer available.": {
+    "I have nothing written down for this, and the audio is gone.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రాత ప్రతి లేదు, ఆడియో కూడా ఇప్పుడు లేదు."
+            "value": "దీనికి నా దగ్గర రాసినది ఏమీ లేదు, ఆడియో కూడా ఇప్పుడు లేదు."
           }
         }
       }
@@ -3589,12 +3589,12 @@
         }
       }
     },
-    "Raw audio is deleted after this period to save space. Transcripts and notes are kept until you delete them.": {
+    "Raw audio is deleted after this period to save space. What was said and your notes are kept until you delete them.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "స్థలం ఆదా చేయడానికి ఈ కాలం తర్వాత ఆడియో తొలగిపోతుంది. రాత ప్రతులు, నోట్స్ మీరు తొలగించే వరకు ఉంటాయి."
+            "value": "స్థలం ఆదా చేయడానికి ఈ కాలం తర్వాత ఆడియో తొలగిపోతుంది. చెప్పిన మాటలు, నోట్స్ మీరు తొలగించే వరకు ఉంటాయి."
           }
         }
       }
@@ -3610,12 +3610,12 @@
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "read medicines (engine not ready)": {
+    "read medicines (I'm still starting up)": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మందుల వివరాలు చదవడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+            "value": "మందుల వివరాలు చదవడం (ఇంకా మొదలవుతున్నాను)"
           }
         }
       },
@@ -3632,23 +3632,23 @@
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "read reminders (engine not ready)": {
+    "read reminders (I'm still starting up)": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రిమైండర్లు చదవడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+            "value": "రిమైండర్లు చదవడం (ఇంకా మొదలవుతున్నాను)"
           }
         }
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "Reading part %lld of %lld for %@…": {
+    "Reading part %lld of %lld for your %@…": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%3$@ కోసం %2$lld భాగాల్లో %1$lldవ భాగం చదువుతోంది…"
+            "value": "%3$@ కోసం %2$lld భాగాల్లో %1$lldవ భాగం చదువుతున్నాను…"
           }
         }
       },
@@ -3669,7 +3669,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "తీసివేయి"
+            "value": "తీసివేయండి"
           }
         }
       }
@@ -3728,12 +3728,12 @@
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "save the reminder (engine not ready)": {
+    "save the reminder (I'm still starting up)": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రిమైండర్‌ను సేవ్ చేయడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+            "value": "రిమైండర్‌ను సేవ్ చేయడం (ఇంకా మొదలవుతున్నాను)"
           }
         }
       },
@@ -3750,12 +3750,12 @@
       },
       "comment": "Used in 'Could not %@.'"
     },
-    "save the to-do (engine not ready)": {
+    "save the to-do (I'm still starting up)": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "పనిని సేవ్ చేయడం (ఇంజిన్ ఇంకా సిద్ధంగా లేదు)"
+            "value": "పనిని సేవ్ చేయడం (ఇంకా మొదలవుతున్నాను)"
           }
         }
       },
@@ -3766,7 +3766,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్ గురించి గుర్తు చేయి"
+            "value": "రికార్డింగ్ గురించి గుర్తు చేయండి"
           }
         }
       }
@@ -3776,27 +3776,27 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మొదలవుతోంది…"
+            "value": "మొదలుపెడుతున్నాను…"
           }
         }
       }
     },
-    "Stop and make notes": {
+    "Stop and write my notes": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఆపి నోట్స్ తయారు చేయి"
+            "value": "ఆపి నోట్స్ రాయండి"
           }
         }
       }
     },
-    "Summaverick has no account, no analytics and no server. The only network use is downloading the AI model.": {
+    "Summaverick has no account, no analytics and no server. The only network use is downloading Summaverick's language pack.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverickకి అకౌంట్ లేదు, విశ్లేషణలు లేవు, సర్వర్ లేదు. AI మోడల్ డౌన్‌లోడ్ చేయడానికి మాత్రమే ఇంటర్నెట్ వాడుతుంది."
+            "value": "Summaverickకి అకౌంట్ లేదు, విశ్లేషణలు లేవు, సర్వర్ లేదు. Summaverick లాంగ్వేజ్ ప్యాక్ డౌన్‌లోడ్ చేయడానికి మాత్రమే ఇంటర్నెట్ వాడుతుంది."
           }
         }
       }
@@ -3811,42 +3811,42 @@
         }
       }
     },
-    "The AI model could not produce an answer.": {
+    "I couldn't come up with an answer this time.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI మోడల్ జవాబు ఇవ్వలేకపోయింది."
+            "value": "ఈసారి జవాబు ఇవ్వలేకపోయాను."
           }
         }
       }
     },
-    "The AI model could not transcribe the recording.": {
+    "I couldn't write down what was said in this recording.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI మోడల్ రికార్డింగ్‌ను రాయలేకపోయింది."
+            "value": "ఈ రికార్డింగ్‌లో చెప్పినది రాయలేకపోయాను."
           }
         }
       }
     },
-    "The selected AI model cannot listen to audio.": {
+    "I can't listen to audio right now.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఎంచుకున్న AI మోడల్ ఆడియో వినలేదు."
+            "value": "ఇప్పుడు నేను ఆడియో వినలేను."
           }
         }
       }
     },
-    "Transcribing… %lld%%": {
+    "Listening back… %lld%%": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రాత ప్రతి తయారవుతోంది… %lld%%"
+            "value": "మళ్ళీ వింటున్నాను… %lld%%"
           }
         }
       }
@@ -3856,7 +3856,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "అన్‌లాక్ చేయి"
+            "value": "అన్‌లాక్ చేయండి"
           }
         }
       }
@@ -3871,12 +3871,12 @@
         }
       }
     },
-    "Writing %@…": {
+    "Writing your %@…": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ రాస్తోంది…"
+            "value": "%@ రాస్తున్నాను…"
           }
         }
       },
@@ -4000,19 +4000,19 @@
         }
       }
     },
-    "Download failed": {
+    "The download stopped. Please try again.": {
       "comment": "The AI download stopped after several tries",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Download failed"
+            "value": "The download stopped. Please try again."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "డౌన్‌లోడ్ కాలేదు"
+            "value": "డౌన్‌లోడ్ ఆగిపోయింది. మళ్ళీ ప్రయత్నించండి."
           }
         }
       }
@@ -4034,64 +4034,64 @@
         }
       }
     },
-    "Free up about %lld GB to download Summaverick's AI.": {
+    "Free up about %lld GB so I can download Summaverick's language pack.": {
       "comment": "%lld is whole gigabytes to free",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Free up about %lld GB to download Summaverick's AI."
+            "value": "Free up about %lld GB so I can download Summaverick's language pack."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick AIని డౌన్‌లోడ్ చేయడానికి సుమారు %lld GB ఖాళీ చేయండి."
+            "value": "Summaverick లాంగ్వేజ్ ప్యాక్ డౌన్‌లోడ్ చేయడానికి సుమారు %lld GB ఖాళీ చేయండి."
           }
         }
       }
     },
-    "Getting Summaverick ready… %lld%%": {
+    "Getting ready. One big download and I never need the internet again. %lld%%": {
       "comment": "Download progress; %lld is percent done",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Getting Summaverick ready… %lld%%"
+            "value": "Getting ready. One big download and I never need the internet again. %lld%%"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick సిద్ధమవుతోంది… %lld%%"
+            "value": "రెడీ అవుతున్నాను. ఒక్క పెద్ద డౌన్‌లోడ్ అయితే ఇక ఇంటర్నెట్ అవసరం ఉండదు. %lld%%"
           }
         }
       }
     },
-    "Getting Summaverick ready… %lld%% · about %lld min left": {
+    "Getting ready. One big download and I never need the internet again. %lld%% · about %lld min left": {
       "comment": "Download progress; first %lld is percent done, second is minutes left",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Getting Summaverick ready… %lld%% · about %lld min left"
+            "value": "Getting ready. One big download and I never need the internet again. %lld%% · about %lld min left"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick సిద్ధమవుతోంది… %lld%% · సుమారు %lld నిమిషాలు మిగిలాయి"
+            "value": "రెడీ అవుతున్నాను. ఒక్క పెద్ద డౌన్‌లోడ్ అయితే ఇక ఇంటర్నెట్ అవసరం ఉండదు. %lld%% · సుమారు %lld నిమిషాలు మిగిలాయి"
           }
         }
       }
     },
-    "Not downloaded": {
+    "Not downloaded yet": {
       "comment": "The AI was removed to free space",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Not downloaded"
+            "value": "Not downloaded yet"
           }
         },
         "te": {
@@ -4102,51 +4102,51 @@
         }
       }
     },
-    "Paused to let the phone cool down. It will continue automatically.": {
+    "I stopped so the phone can cool down. I'll carry on by myself.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paused to let the phone cool down. It will continue automatically."
+            "value": "I stopped so the phone can cool down. I'll carry on by myself."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఫోన్ చల్లబడటానికి ఆపాం. అది తనంతట తానే కొనసాగుతుంది."
+            "value": "ఫోన్ చల్లబడటానికి ఆపాను. నేనే కొనసాగిస్తాను."
           }
         }
       }
     },
-    "Paused — no space": {
+    "Paused: I need more space": {
       "comment": "The AI download needs more free storage",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paused — no space"
+            "value": "Paused: I need more space"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఆగింది — స్థలం లేదు"
+            "value": "ఆగాను: నాకు ఇంకా స్థలం కావాలి"
           }
         }
       }
     },
-    "People you talk about appear here after your recordings are processed.": {
+    "People you talk about show up here once I've gone through your recordings.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "People you talk about appear here after your recordings are processed."
+            "value": "People you talk about show up here once I've gone through your recordings."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీరు మాట్లాడే వ్యక్తులు, మీ రికార్డింగ్‌లు ప్రాసెస్ అయిన తర్వాత ఇక్కడ కనిపిస్తారు."
+            "value": "మీ రికార్డింగ్‌లు విన్న తర్వాత, మీరు మాట్లాడే వ్యక్తులు ఇక్కడ కనిపిస్తారు."
           }
         }
       }
@@ -4185,18 +4185,18 @@
         }
       }
     },
-    "Remove Summaverick's AI?": {
+    "Remove Summaverick's language pack?": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Remove Summaverick's AI?"
+            "value": "Remove Summaverick's language pack?"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick AIని తీసివేయాలా?"
+            "value": "Summaverick లాంగ్వేజ్ ప్యాక్ తీసివేయాలా?"
           }
         }
       }
@@ -4218,52 +4218,52 @@
         }
       }
     },
-    "Summaverick is still getting ready": {
+    "I'm still getting ready": {
       "comment": "Shown where Ask and the assistant appear while the AI downloads",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick is still getting ready"
+            "value": "I'm still getting ready"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick ఇంకా సిద్ధమవుతోంది"
+            "value": "ఇంకా రెడీ అవుతున్నాను"
           }
         }
       }
     },
-    "Summaverick listens to the recording itself, so Telugu, Hindi and mixed speech all work. Summary, notes and questions are written in the language above.": {
+    "I listen to the recording itself, so Telugu, Hindi and mixed speech all work. I write the summary, notes and questions in the language above.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick listens to the recording itself, so Telugu, Hindi and mixed speech all work. Summary, notes and questions are written in the language above."
+            "value": "I listen to the recording itself, so Telugu, Hindi and mixed speech all work. I write the summary, notes and questions in the language above."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick రికార్డింగ్‌ను నేరుగా వింటుంది. అందుకే తెలుగు, హిందీ, కలగలిపిన మాటలు అన్నీ పనిచేస్తాయి. సారాంశం, నోట్స్, ప్రశ్నలు పైన ఎంచుకున్న భాషలో వస్తాయి."
+            "value": "నేను రికార్డింగ్‌ను నేరుగా వింటాను. అందుకే తెలుగు, హిందీ, కలగలిపిన మాటలు అన్నీ పనిచేస్తాయి. సారాంశం, నోట్స్, ప్రశ్నలు పైన ఎంచుకున్న భాషలో రాస్తాను."
           }
         }
       }
     },
-    "Summaverick's AI": {
+    "Summaverick's language pack": {
       "comment": "Settings section about the on-device AI",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick's AI"
+            "value": "Summaverick's language pack"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick AI"
+            "value": "Summaverick లాంగ్వేజ్ ప్యాక్"
           }
         }
       }
@@ -4284,34 +4284,34 @@
         }
       }
     },
-    "This iPhone doesn't have enough memory for Summaverick's AI. You can still record and play back; notes need an iPhone with 6 GB of memory or more.": {
+    "This iPhone doesn't have enough memory for me to write notes. You can still record and play back; notes need an iPhone with 6 GB of memory or more.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This iPhone doesn't have enough memory for Summaverick's AI. You can still record and play back; notes need an iPhone with 6 GB of memory or more."
+            "value": "This iPhone doesn't have enough memory for me to write notes. You can still record and play back; notes need an iPhone with 6 GB of memory or more."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఈ iPhoneలో Summaverick AIకి సరిపడా మెమరీ లేదు. మీరు రికార్డ్ చేసి వినవచ్చు; నోట్స్ కోసం 6 GB లేదా అంతకంటే ఎక్కువ మెమరీ ఉన్న iPhone కావాలి."
+            "value": "ఈ iPhoneలో నోట్స్ రాయడానికి నాకు సరిపడా మెమరీ లేదు. మీరు రికార్డ్ చేసి వినవచ్చు; నోట్స్ కోసం 6 GB లేదా అంతకంటే ఎక్కువ మెమరీ ఉన్న iPhone కావాలి."
           }
         }
       }
     },
-    "Topics appear here after your recordings are processed.": {
+    "Topics show up here once I've gone through your recordings.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Topics appear here after your recordings are processed."
+            "value": "Topics show up here once I've gone through your recordings."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ రికార్డింగ్‌లు ప్రాసెస్ అయిన తర్వాత అంశాలు ఇక్కడ కనిపిస్తాయి."
+            "value": "మీ రికార్డింగ్‌లు విన్న తర్వాత అంశాలు ఇక్కడ కనిపిస్తాయి."
           }
         }
       }
@@ -4332,19 +4332,19 @@
         }
       }
     },
-    "Waiting for Summaverick's AI to finish downloading": {
+    "Waiting for the download to finish, then I'll start": {
       "comment": "On a recording made before the AI finished downloading",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for Summaverick's AI to finish downloading"
+            "value": "Waiting for the download to finish, then I'll start"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick AI డౌన్‌లోడ్ పూర్తవడం కోసం వేచి ఉంది"
+            "value": "డౌన్‌లోడ్ పూర్తవ్వాలి, ఆ తర్వాత మొదలుపెడతాను"
           }
         }
       }
@@ -4361,7 +4361,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wi-Fi కోసం వేచి ఉంది"
+            "value": "Wi-Fi కోసం చూస్తున్నాను"
           }
         }
       }
@@ -4378,7 +4378,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇంటర్నెట్ కనెక్షన్ కోసం వేచి ఉంది"
+            "value": "ఇంటర్నెట్ కనెక్షన్ కోసం చూస్తున్నాను"
           }
         }
       }
@@ -4399,66 +4399,66 @@
         }
       }
     },
-    "About %lld min behind": {
+    "Running about %lld min behind": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "About %lld min behind"
+            "value": "Running about %lld min behind"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సుమారు %lld నిమిషాలు వెనుక ఉంది"
+            "value": "సుమారు %lld నిమిషాలు వెనుక ఉన్నాను"
           }
         }
       }
     },
-    "Notes will be written after you stop": {
+    "I'll write your notes after you stop": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notes will be written after you stop"
+            "value": "I'll write your notes after you stop"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీరు ఆపిన తర్వాత నోట్స్ రాయబడతాయి"
+            "value": "మీరు ఆపిన తర్వాత నోట్స్ రాస్తాను"
           }
         }
       }
     },
-    "Paused while the phone cools down": {
+    "Waiting for the phone to cool down": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paused while the phone cools down"
+            "value": "Waiting for the phone to cool down"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఫోన్ చల్లబడే వరకు ఆగింది"
+            "value": "ఫోన్ చల్లబడే వరకు ఆగాను"
           }
         }
       }
     },
-    "Paused: battery low — notes will be written later": {
+    "Battery's low, so I'll write your notes later": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paused: battery low — notes will be written later"
+            "value": "Battery's low, so I'll write your notes later"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఆగింది: బ్యాటరీ తక్కువగా ఉంది — నోట్స్ తర్వాత రాయబడతాయి"
+            "value": "బ్యాటరీ తక్కువగా ఉంది, నోట్స్ తర్వాత రాస్తాను"
           }
         }
       }
@@ -4474,7 +4474,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీరు మాట్లాడుతుండగానే రాస్తోంది"
+            "value": "మీరు మాట్లాడుతుండగానే రాస్తున్నాను"
           }
         }
       }
@@ -4490,7 +4490,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ నోట్స్ రాస్తోంది"
+            "value": "మీ నోట్స్ రాస్తున్నాను"
           }
         }
       }
@@ -4506,7 +4506,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఫోన్ చల్లగా ఉండేందుకు నెమ్మదిగా రాస్తోంది"
+            "value": "ఫోన్ చల్లగా ఉండేందుకు నెమ్మదిగా రాస్తున్నాను"
           }
         }
       }
@@ -4527,29 +4527,29 @@
         }
       }
     },
-    "Summarising part %lld of %lld…": {
+    "Going through part %lld of %lld…": {
       "comment": "Part number, total parts of a long recording",
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%2$lld భాగాల్లో %1$lldవ భాగం సారాంశం రాస్తోంది…"
+            "value": "%2$lld భాగాల్లో %1$lldవ భాగం చూస్తున్నాను…"
           }
         }
       }
     },
-    "This will take a while. Finish overnight while charging?": {
+    "This one will take a while. Shall I finish it overnight while the phone charges?": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This will take a while. Finish overnight while charging?"
+            "value": "This one will take a while. Shall I finish it overnight while the phone charges?"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "దీనికి చాలా సమయం పడుతుంది. ఛార్జింగ్‌లో ఉన్నప్పుడు రాత్రిపూట పూర్తి చేయాలా?"
+            "value": "దీనికి చాలా సమయం పడుతుంది. ఛార్జింగ్‌లో ఉన్నప్పుడు రాత్రిపూట పూర్తి చేయనా?"
           }
         }
       }
@@ -4565,23 +4565,23 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "కొనసాగించు"
+            "value": "కొనసాగించండి"
           }
         }
       }
     },
-    "Waiting for the charger — finishes overnight": {
+    "Waiting for the charger. I'll finish overnight.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for the charger — finishes overnight"
+            "value": "Waiting for the charger. I'll finish overnight."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఛార్జర్ కోసం వేచి ఉంది — రాత్రిపూట పూర్తవుతుంది"
+            "value": "ఛార్జర్ కోసం చూస్తున్నాను. రాత్రిపూట పూర్తి చేస్తాను."
           }
         }
       }
@@ -4597,39 +4597,39 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇప్పుడే చేయి"
+            "value": "ఇప్పుడే చేయండి"
           }
         }
       }
     },
-    "Regenerate": {
+    "Write again": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regenerate"
+            "value": "Write again"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మళ్ళీ రాయి"
+            "value": "మళ్ళీ రాయండి"
           }
         }
       }
     },
-    "Regenerate all": {
+    "Write it all again": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regenerate all"
+            "value": "Write it all again"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "అన్నీ మళ్ళీ రాయి"
+            "value": "అన్నీ మళ్ళీ రాయండి"
           }
         }
       }
@@ -4645,23 +4645,23 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "వెనక్కి తీసుకో"
+            "value": "వెనక్కి తీసుకోండి"
           }
         }
       }
     },
-    "Could not write this again. Try again.": {
+    "I couldn't write this again. Please try once more.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not write this again. Try again."
+            "value": "I couldn't write this again. Please try once more."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "దీన్ని మళ్లీ రాయలేకపోయాం. మళ్లీ ప్రయత్నించండి."
+            "value": "దీన్ని మళ్లీ రాయలేకపోయాను. ఇంకోసారి ప్రయత్నించండి."
           }
         }
       }
@@ -4678,7 +4678,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "గుర్తుంచుకోవాల్సినవి వెతుకుతోంది… %2$lld భాగాల్లో %1$lldవ భాగం"
+            "value": "గుర్తుంచుకోవాల్సినవి వెతుకుతున్నాను… %2$lld భాగాల్లో %1$lldవ భాగం"
           }
         }
       }
@@ -4734,38 +4734,21 @@
       },
       "comment": "Memory review: the memory is wrong"
     },
-    "Delete memory": {
+    "Forget this": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Delete memory"
+            "value": "Forget this"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "జ్ఞాపకాన్ని తొలగించండి"
+            "value": "ఇది తొలగించండి"
           }
         }
       }
-    },
-    "Remembered": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remembered"
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "గుర్తుంచుకున్నవి"
-          }
-        }
-      },
-      "comment": "Note section: memories made from this recording"
     },
     "New": {
       "localizations": {
@@ -4845,7 +4828,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీరు సరిచూడటం కోసం వేచి ఉంది"
+            "value": "మీరు సరిచూడాలి"
           }
         }
       }
@@ -5063,7 +5046,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "అన్నీ చూపించు (%lld)"
+            "value": "అన్నీ చూపించండి (%lld)"
           }
         }
       },
@@ -5080,7 +5063,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "కొన్ని మాత్రమే చూపించు"
+            "value": "కొన్ని మాత్రమే చూపించండి"
           }
         }
       }
@@ -5101,66 +5084,34 @@
         }
       }
     },
-    "This memory was removed.": {
+    "This one was removed from what I remember.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This memory was removed."
+            "value": "This one was removed from what I remember."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఈ జ్ఞాపకం తీసివేయబడింది."
+            "value": "నాకు గుర్తున్నవాటి నుంచి ఇది తీసివేశాను."
           }
         }
       }
     },
-    "Notes ready: %@": {
+    "I couldn't open this.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notes ready: %@"
+            "value": "I couldn't open this."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నోట్స్ సిద్ధం: %@"
-          }
-        }
-      }
-    },
-    "%@: notes could not be written": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@: notes could not be written"
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@: నోట్స్ రాయలేకపోయాం"
-          }
-        }
-      }
-    },
-    "Could not load this.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not load this."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "దీన్ని తెరవలేకపోయాం."
+            "value": "దీన్ని తెరవలేకపోయాను."
           }
         }
       }
@@ -5176,113 +5127,113 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ నుంచి వినిపించు: %@"
+            "value": "%1$@ నుంచి వినిపించండి: %2$@"
           }
         }
       },
       "comment": "First %@ is a time in the recording, second %@ the memory's words"
     },
-    "Waiting for the earlier recording to finish": {
+    "I'll get to this after the earlier recording": {
       "comment": "Live Activity line: this recording was stopped while an earlier recording's notes were still being written",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for the earlier recording to finish"
+            "value": "I'll get to this after the earlier recording"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ముందటి రికార్డింగ్ పూర్తయ్యే వరకు వేచి ఉంది"
+            "value": "ముందటి రికార్డింగ్ అయ్యాక దీన్ని చూస్తాను"
           }
         }
       }
     },
-    "Waiting for your recording": {
+    "Waiting for you to finish recording": {
       "comment": "Live Activity line: this note's notes stepped aside while a recording runs; they carry on after it",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for your recording"
+            "value": "Waiting for you to finish recording"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ రికార్డింగ్ కోసం వేచి ఉంది"
+            "value": "మీ రికార్డింగ్ అయ్యే వరకు ఆగుతున్నాను"
           }
         }
       }
     },
-    "Paused": {
+    "Taking a short break": {
       "comment": "Live Activity title: a recording's notes stopped for now and will finish later",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paused"
+            "value": "Taking a short break"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఆగింది"
+            "value": "చిన్న బ్రేక్"
           }
         }
       }
     },
-    "Notes could not be written": {
+    "I couldn't write your notes": {
       "comment": "Live Activity title: a recording's notes failed",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notes could not be written"
+            "value": "I couldn't write your notes"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నోట్స్ రాయలేకపోయాం"
+            "value": "మీ నోట్స్ రాయలేకపోయాను"
           }
         }
       }
     },
-    "Notes ready": {
+    "Your notes are ready": {
       "comment": "Live Activity title: a recording's notes are written; the note's title follows",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notes ready"
+            "value": "Your notes are ready"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నోట్స్ సిద్ధం"
+            "value": "మీ నోట్స్ రెడీ"
           }
         }
       }
     },
-    "Already recording": {
+    "I'm already recording.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇప్పటికే రికార్డ్ అవుతోంది"
+            "value": "ఇప్పటికే రికార్డ్ చేస్తున్నాను."
           }
         }
       }
     },
-    "Nothing is being recorded.": {
+    "I'm not recording anything.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఏదీ రికార్డ్ కావడం లేదు."
+            "value": "నేను ఏదీ రికార్డ్ చేయడం లేదు."
           }
         }
       }
@@ -5297,12 +5248,12 @@
         }
       }
     },
-    "Recording stopped. Your notes are being written.": {
+    "Stopped. I'm writing your notes now.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్ ఆగింది. మీ నోట్స్ రాస్తోంది."
+            "value": "ఆపాను. ఇప్పుడే మీ నోట్స్ రాస్తున్నాను."
           }
         }
       }
@@ -5322,7 +5273,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్ మొదలుపెట్టు"
+            "value": "రికార్డింగ్ మొదలుపెట్టండి"
           }
         }
       }
@@ -5342,7 +5293,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్ ఆపు"
+            "value": "రికార్డింగ్ ఆపండి"
           }
         }
       }
@@ -5357,18 +5308,18 @@
         }
       }
     },
-    "You can close Summaverick and get on with your day. You'll get a notification when your notes are ready.": {
+    "You can close the app and get on with your day. I'll let you know when your notes are ready.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You can close Summaverick and get on with your day. You'll get a notification when your notes are ready."
+            "value": "You can close the app and get on with your day. I'll let you know when your notes are ready."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీరు Summaverick ని మూసేసి మీ పనులు చూసుకోవచ్చు. నోట్స్ సిద్ధమైనప్పుడు మీకు నోటిఫికేషన్ వస్తుంది."
+            "value": "మీరు యాప్ మూసేసి మీ పనులు చూసుకోవచ్చు. నోట్స్ రెడీ అయినప్పుడు చెబుతాను."
           }
         }
       }
@@ -5378,7 +5329,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "నిశ్శబ్దంగా ఉంటే ఆపు"
+            "value": "నిశ్శబ్దంగా ఉంటే ఆపండి"
           }
         }
       }
@@ -5423,12 +5374,12 @@
         }
       }
     },
-    "A recording stops by itself after this long without voice and keeps everything said. You are told 30 seconds before, and can keep recording.": {
+    "I stop recording after this long without voice, and keep everything said. I'll tell you 30 seconds before, and you can keep recording.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇంత సేపు ఎవరి గొంతూ వినిపించకపోతే రికార్డింగ్ తనంతట తానే ఆగిపోతుంది, అప్పటివరకు మాట్లాడినదంతా ఉంచుతుంది. 30 సెకన్ల ముందే మీకు చెబుతుంది, మీరు రికార్డింగ్ కొనసాగించవచ్చు."
+            "value": "ఇంత సేపు ఎవరి గొంతూ వినిపించకపోతే రికార్డింగ్ ఆపేస్తాను, అప్పటివరకు చెప్పినదంతా ఉంచుతాను. 30 సెకన్ల ముందే చెబుతాను, మీరు రికార్డింగ్ కొనసాగించవచ్చు."
           }
         }
       }
@@ -5438,124 +5389,75 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "రికార్డింగ్ కొనసాగించు"
+            "value": "రికార్డింగ్ కొనసాగించండి"
           }
         }
       }
     },
-    "No voice for a while — stopping in 30 seconds": {
+    "It's gone quiet. I'll stop recording in 30 seconds.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "కొంతసేపుగా గొంతు వినిపించలేదు — 30 సెకన్లలో ఆగిపోతుంది"
+            "value": "నిశ్శబ్దంగా ఉంది. 30 సెకన్లలో రికార్డింగ్ ఆపేస్తాను."
           }
         }
       }
     },
-    "Stopped after %lld min of quiet": {
+    "It stayed quiet for %lld min, so I stopped.": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld నిమిషాలు నిశ్శబ్దంగా ఉండటంతో ఆగిపోయింది"
+            "value": "%lld నిమిషాలు నిశ్శబ్దంగా ఉండటంతో ఆపేశాను."
           }
         }
       }
     },
-    "Waiting: another note is being written": {
+    "One moment, I'm writing another note": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting: another note is being written"
+            "value": "One moment, I'm writing another note"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "వేచి ఉంది: మరో నోట్ రాయబడుతోంది"
+            "value": "ఒక్క నిమిషం, ఇంకో నోట్ రాస్తున్నాను"
           }
         }
       }
     },
-    "%@: paused at %lld%%. It continues by itself.": {
-      "comment": "Note title, percent of the work done",
+    "Your notes are safe. I'll carry on by myself soon.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@: paused at %2$lld%%. It continues by itself."
+            "value": "Your notes are safe. I'll carry on by myself soon."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@: %2$lld%% వద్ద ఆగింది. ఇది దానంతటదే కొనసాగుతుంది."
+            "value": "మీ నోట్స్ భద్రంగా ఉన్నాయి. త్వరలోనే నేనే కొనసాగిస్తాను."
           }
         }
       }
     },
-    "Transcript ready: %@": {
+    "The phone's too warm right now. I'll carry on when it cools.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transcript ready: %@"
+            "value": "The phone's too warm right now. I'll carry on when it cools."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ట్రాన్స్క్రిప్ట్ సిద్ధం: %@"
-          }
-        }
-      }
-    },
-    "Summary ready: %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Summary ready: %@"
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "సారాంశం సిద్ధం: %@"
-          }
-        }
-      }
-    },
-    "Paused. It continues by itself.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paused. It continues by itself."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఆగింది. ఇది దానంతటదే కొనసాగుతుంది."
-          }
-        }
-      }
-    },
-    "Too warm right now. It continues when the phone cools.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Too warm right now. It continues when the phone cools."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఇప్పుడు ఫోన్ వేడిగా ఉంది. చల్లబడ్డాక కొనసాగుతుంది."
+            "value": "ఇప్పుడు ఫోన్ వేడిగా ఉంది. చల్లబడ్డాక కొనసాగిస్తాను."
           }
         }
       }
@@ -5571,7 +5473,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "ఇప్పుడే కొనసాగించు"
+            "value": "ఇప్పుడే కొనసాగించండి"
           }
         }
       }
@@ -5592,18 +5494,18 @@
         }
       }
     },
-    "General knowledge — not from your recordings": {
+    "From what I know, not from your recordings": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సాధారణ జ్ఞానం — మీ రికార్డింగ్‌ల నుండి కాదు"
+            "value": "నాకు తెలిసిన దాని నుంచి, మీ రికార్డింగ్‌ల నుంచి కాదు"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "General knowledge — not from your recordings"
+            "value": "From what I know, not from your recordings"
           }
         }
       }
@@ -5613,7 +5515,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "(ఆపబడింది)"
+            "value": "(ఆపేశాను)"
           }
         },
         "en": {
@@ -5629,7 +5531,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "కాపీ చేయి"
+            "value": "కాపీ చేయండి"
           }
         },
         "en": {
@@ -5683,7 +5585,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సమాధానం చూపించు"
+            "value": "సమాధానం చూపించండి"
           }
         }
       }
@@ -5715,7 +5617,7 @@
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మళ్లీ మొదలుపెట్టు"
+            "value": "మళ్లీ మొదలుపెట్టండి"
           }
         }
       }
@@ -5752,18 +5654,18 @@
         }
       }
     },
-    "Answers from your recordings link to the moment they came from. Anything else comes from general knowledge, and says so.": {
+    "When the answer is in your recordings, I link to the moment it came from. Anything else is from what I know, and I'll say so. I can get things wrong, so check anything important.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Answers from your recordings link to the moment they came from. Anything else comes from general knowledge, and says so."
+            "value": "When the answer is in your recordings, I link to the moment it came from. Anything else is from what I know, and I'll say so. I can get things wrong, so check anything important."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ రికార్డింగ్‌ల నుండి వచ్చే సమాధానాలు ఆ క్షణానికి లింక్ ఇస్తాయి. మిగతావి సాధారణ జ్ఞానం నుండి వస్తాయి, ఆ విషయం చెబుతాయి."
+            "value": "జవాబు మీ రికార్డింగ్‌లలో ఉంటే ఆ క్షణానికి లింక్ ఇస్తాను. మిగతావి నాకు తెలిసిన దాని నుంచి చెబుతాను, ఆ విషయం కూడా చెబుతాను. నేను పొరపాటు చేయవచ్చు, ముఖ్యమైనవి ఒకసారి చూసుకోండి."
           }
         }
       }
@@ -5784,18 +5686,18 @@
         }
       }
     },
-    "Summaverick is working on another note. Try again in a moment.": {
+    "I'm working on another note. Try again in a moment.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick is working on another note. Try again in a moment."
+            "value": "I'm working on another note. Try again in a moment."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "Summaverick మరో నోట్ మీద పని చేస్తోంది. కొద్దిసేపటి తర్వాత మళ్ళీ ప్రయత్నించండి."
+            "value": "మరో నోట్ మీద పని చేస్తున్నాను. కొద్దిసేపటి తర్వాత మళ్ళీ ప్రయత్నించండి."
           }
         }
       }
@@ -5812,6 +5714,226 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఇప్పుడు రికార్డ్ అవుతోంది. ఆపిన తర్వాత మళ్ళీ అడగండి."
+          }
+        }
+      }
+    },
+    "About": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ యాప్ గురించి"
+          }
+        }
+      }
+    },
+    "Summaverick's notes are written by software running on this phone, and it can get things wrong. Please check anything important.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick నోట్స్ ఈ ఫోన్‌లో నడిచే సాఫ్ట్‌వేర్ రాస్తుంది, పొరపాట్లు జరగవచ్చు. ముఖ్యమైన విషయాలు ఒకసారి చూసుకోండి."
+          }
+        }
+      }
+    },
+    "I'm recording.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డ్ చేస్తున్నాను."
+          }
+        }
+      }
+    },
+    "Nothing written down yet": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా ఏమీ రాయలేదు"
+          }
+        }
+      }
+    },
+    "Heard it all": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అంతా విన్నాను"
+          }
+        }
+      }
+    },
+    "\"%@\": writing your notes now.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%@\": ఇప్పుడు నోట్స్ రాస్తున్నాను."
+          }
+        }
+      }
+    },
+    "%@, the short version is here ☕": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, క్లుప్తంగా రెడీ ☕"
+          }
+        }
+      }
+    },
+    "The short version is here ☕": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "క్లుప్తంగా రెడీ ☕"
+          }
+        }
+      }
+    },
+    "\"%@\": read it in a minute.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%@\": ఒక్క నిమిషంలో చదివేయండి."
+          }
+        }
+      }
+    },
+    "Got the gist!": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "విషయం అర్థమైంది!"
+          }
+        }
+      }
+    },
+    "\"%@\": the full notes are on the way.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%@\": పూర్తి నోట్స్ వస్తున్నాయి."
+          }
+        }
+      }
+    },
+    "All done, %@ 🎉": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అంతా రెడీ, %@ 🎉"
+          }
+        }
+      }
+    },
+    "All done 🎉": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అంతా రెడీ 🎉"
+          }
+        }
+      }
+    },
+    "\"%@\": notes and quiz questions are ready.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%@\": నోట్స్, ప్రశ్నలు సిద్ధం."
+          }
+        }
+      }
+    },
+    "Fresh notes, just served 🍽️": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వేడి వేడి నోట్స్ రెడీ 🍽️"
+          }
+        }
+      }
+    },
+    "\"%@\" is ready when you are.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%@\" మీ కోసం సిద్ధంగా ఉంది."
+          }
+        }
+      }
+    },
+    "You can relax now": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇక రిలాక్స్ అవ్వండి"
+          }
+        }
+      }
+    },
+    "I wrote it all down: \"%@\".": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అంతా రాసేశాను: \"%@\"."
+          }
+        }
+      }
+    },
+    "\"%@\" is safe. I'll carry on by myself soon.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%@\" భద్రంగా ఉంది. త్వరలోనే నేనే కొనసాగిస్తాను."
+          }
+        }
+      }
+    },
+    "Sorry, I couldn't write this one": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "క్షమించండి, ఇది రాయలేకపోయాను"
+          }
+        }
+      }
+    },
+    "\"%@\": %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%1$@\": %2$@"
+          }
+        }
+      }
+    },
+    "Still there? 👀": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఉన్నారా? 👀"
           }
         }
       }

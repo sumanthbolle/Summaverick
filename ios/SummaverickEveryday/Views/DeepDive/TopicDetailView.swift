@@ -87,7 +87,7 @@ struct TopicDetailView: View {
                         busyView
                     } else if let err = summaryError {
                         VStack(alignment: .leading, spacing: 6) {
-                            Label("Could not refresh the summary.", systemImage: "exclamationmark.triangle.fill")
+                            Label("I couldn't write the summary again.", systemImage: "exclamationmark.triangle.fill")
                                 .font(.subheadline).foregroundStyle(.orange)
                             if err == tooWarmMessage || err == recordingMessage {
                                 Text(verbatim: err).font(.footnote).foregroundStyle(.secondary)
@@ -98,7 +98,7 @@ struct TopicDetailView: View {
                     } else if topic?.summaryStale == 1 {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("New recordings were added.").font(.subheadline).foregroundStyle(.secondary)
-                            Button("Refresh summary") { Task { await loadSummary() } }
+                            Button("Write the summary again") { Task { await loadSummary() } }
                                 .buttonStyle(.bordered).frame(minHeight: 44)
                         }
                     }
@@ -119,7 +119,7 @@ struct TopicDetailView: View {
                 .padding(.vertical, 4)
             } else if let err = summaryError {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("Could not make the summary.", systemImage: "exclamationmark.triangle.fill").font(.headline)
+                    Label("I couldn't write the summary.", systemImage: "exclamationmark.triangle.fill").font(.headline)
                     Text(verbatim: err).font(.footnote).foregroundStyle(.secondary)
                     Button("Try again") { Task { await loadSummary() } }
                         .buttonStyle(.borderedProminent).frame(minHeight: 44)
@@ -134,7 +134,7 @@ struct TopicDetailView: View {
                 }
                 .frame(minHeight: 44)
             } else {
-                Button("Make the summary") { Task { await loadSummary() } }
+                Button("Write the summary") { Task { await loadSummary() } }
                     .buttonStyle(.borderedProminent).frame(minHeight: 44)
             }
         } header: {
@@ -144,7 +144,7 @@ struct TopicDetailView: View {
 
     private var busyView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Summaverick is working on another note. Try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
+            Text("I'm working on another note. Try again in a moment.").font(.subheadline).foregroundStyle(.secondary)
             Button("Try again") { Task { await loadSummary() } }
                 .buttonStyle(.bordered).frame(minHeight: 44)
         }

@@ -34,7 +34,7 @@ struct ProfileView: View {
                 } label: { Text("Preferred language") }
                 .frame(minHeight: 44)
             } footer: {
-                Text("Summaverick talks to you in this language where it can. Some messages are in English for now.")
+                Text("I talk to you in this language where I can. Some messages are in English for now.")
             }
 
             Section {
@@ -79,10 +79,10 @@ struct ProfileView: View {
             if !ok { deleteFailed = true }
             Task { await reloadMedicines() }
         }
-        .alert("Could not delete this. Please try again.", isPresented: $deleteFailed) {
+        .alert("I couldn't delete this. Please try again.", isPresented: $deleteFailed) {
             Button("OK", role: .cancel) {}
         }
-        .alert("Could not save this. Please try again.", isPresented: $errorShown) {
+        .alert("I couldn't save this. Please try again.", isPresented: $errorShown) {
             Button("OK", role: .cancel) {}
         }
         .onChange(of: errorShown || deleteFailed) { _, open in PresentationGate.shared.set("profileError", open) }

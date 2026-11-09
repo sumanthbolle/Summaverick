@@ -28,7 +28,7 @@ struct MemoryReviewCard: View {
         VStack(alignment: .leading, spacing: 12) {
             MemoryDetails(memory: m, onPlay: onPlay, showsWaiting: false)
             if failed {
-                Label("Could not save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
+                Label("I couldn't save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }

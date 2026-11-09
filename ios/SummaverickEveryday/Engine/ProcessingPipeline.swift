@@ -3,7 +3,7 @@
 // the saved cursor (TranscriptSidecar). Notes use the GPU while the app is in front, else the CPU.
 // On iOS 26+ a continued-processing task keeps the work going with the phone locked. If iOS suspends the
 // app mid-way, or the phone gets too hot, the note keeps whatever was finished and is resumed
-// automatically later; the user can also tap "Generate notes". Cut off with the app not in front, the note goes on
+// automatically later; the user can also tap "Write my notes". Cut off with the app not in front, the note goes on
 // the overnight list by itself and finishes in the overnight task (on battery too), with a notification when its
 // notes are ready (NotesNotifier); opening the app resumes it at once (it stays listed until it is done).
 // Recordings made before the AI has downloaded wait and are processed, one at a time, once it is ready. A long
@@ -42,16 +42,16 @@ final class ProcessingPipeline {
         var label: String {
             switch self {
             case .idle: return ""
-            case .transcribing(let p): return String(localized: "Transcribing… \(Int(p * 100))%")
-            case .loadingModel: return String(localized: "Loading AI model…")
-            case .extracting: return String(localized: "Finding reminders and tasks…")
+            case .transcribing(let p): return String(localized: "Listening back… \(Int(p * 100))%")
+            case .loadingModel: return String(localized: "Working on it…")
+            case .extracting: return String(localized: "Looking for reminders and tasks…")
             case .sections(let d, let t):
-                return String(localized: "Summarising part \(min(d + 1, max(t, 1))) of \(max(t, 1))…",
+                return String(localized: "Going through part \(min(d + 1, max(t, 1))) of \(max(t, 1))…",
                               comment: "Part number, total parts of a long recording")
             case .generating(let k, let phase, let d, let t):
-                return phase == "chunk" && t > 1 ? String(localized: "Reading part \(d + 1) of \(t) for \(k.title.lowercased())…") : String(localized: "Writing \(k.title.lowercased())…")
+                return phase == "chunk" && t > 1 ? String(localized: "Reading part \(d + 1) of \(t) for your \(k.title.lowercased())…") : String(localized: "Writing your \(k.title.lowercased())…")
             case .done: return String(localized: "Done")
-            case .failed(let e): return String(localized: "Failed: \(e)")
+            case .failed(let e): return String(localized: "I couldn't finish: \(e)")
             case .paused(let m): return m
             case .cooling: return String(localized: "Going slower to keep the phone cool")
             case .overnight: return ProcessingPipeline.overnightMessage
@@ -150,14 +150,14 @@ final class ProcessingPipeline {
     @ObservationIgnored private let abort = AtomicFlag()
 
     /// A note's work cut off with the phone locked: it finishes by itself later (the overnight task) or when opened.
-    static var cutOffMessage: String { String(localized: "Paused. It continues by itself.") }
-    static var heatMessage: String { String(localized: "Paused to let the phone cool down. It will continue automatically.") }
-    static var waitingMessage: String { String(localized: "Waiting for Summaverick's AI to finish downloading") }
+    static var cutOffMessage: String { String(localized: "Your notes are safe. I'll carry on by myself soon.") }
+    static var heatMessage: String { String(localized: "I stopped so the phone can cool down. I'll carry on by myself.") }
+    static var waitingMessage: String { String(localized: "Waiting for the download to finish, then I'll start") }
     /// Stopped while another recording's notes are being written.
-    static var queuedMessage: String { String(localized: "Waiting for the earlier recording to finish") }
+    static var queuedMessage: String { String(localized: "I'll get to this after the earlier recording") }
     /// Stepped aside while a recording runs (LiveFirst): it carries on after that recording.
-    static var recordingFirstMessage: String { String(localized: "Waiting for your recording") }
-    nonisolated static var overnightMessage: String { String(localized: "Waiting for the charger — finishes overnight") }
+    static var recordingFirstMessage: String { String(localized: "Waiting for you to finish recording") }
+    nonisolated static var overnightMessage: String { String(localized: "Waiting for the charger. I'll finish overnight.") }
     nonisolated private static var thermal: ProcessInfo.ThermalState { ProcessInfo.processInfo.thermalState }
     /// Critical: the only heat that cancels a model run in the middle.
     nonisolated private static var critical: Bool { Heat.cancelsRun(thermal) }
@@ -207,10 +207,10 @@ final class ProcessingPipeline {
     }
 
     /// The note shows this while a tap on it waits its turn.
-    static var tapWaitingMessage: String { String(localized: "Waiting: another note is being written") }
+    static var tapWaitingMessage: String { String(localized: "One moment, I'm writing another note") }
     func hasQueuedTap(_ id: Int64) -> Bool { queued.contains { $0.noteID == id } }
     /// Find reminders cut off because the phone was too warm: it waits for the phone to cool.
-    static var tapTooWarmMessage: String { String(localized: "Too warm right now. It continues when the phone cools.") }
+    static var tapTooWarmMessage: String { String(localized: "The phone's too warm right now. I'll carry on when it cools.") }
     /// Notes whose queued find reminders waits for the phone to cool (cleared when it runs again).
     private(set) var tapTooWarm: Set<Int64> = []
     /// The line a note with a queued tap shows: waiting for the AI (the tap runs once it is ready), for the phone to
@@ -304,7 +304,7 @@ final class ProcessingPipeline {
     /// Read once at launch, before a new run can overwrite the key, and shared by the properties it sets up: their
     /// initial values cannot see each other. A killed run's note moves into the stepped-aside set: restored by
     /// queueWaitingNotes, kept through another kill until its run starts again (startNotesRun takes it out, so it never
-    /// runs twice), quiet behind a recording. Past the limit it stays out and counts as tried; "Generate notes" still runs it.
+    /// runs twice), quiet behind a recording. Past the limit it stays out and counts as tried; "Write my notes" still runs it.
     nonisolated private static let killRestore: WaitingNotes.AfterKill = {
         let d = UserDefaults.standard
         let stored = Set((d.array(forKey: steppedAsideKey) as? [Int64]) ?? [])
@@ -549,7 +549,7 @@ final class ProcessingPipeline {
         TranscriptSidecar.remove(audioPath: audio.path)   // complete and saved to the note
         NotificationCenter.default.post(name: .notesChanged, object: nil)
         if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            stopShort(String(localized: "No speech was detected in the recording."), noSpeech: true)
+            stopShort(String(localized: "I couldn't hear anyone speaking in this recording."), noSpeech: true)
             return id
         }
         transcriptStored(id)
@@ -568,7 +568,7 @@ final class ProcessingPipeline {
         Task { await self.resumeInterrupted() }
     }
 
-    /// "Generate notes" on a note: memory work yields first; other work still running: the tap waits its turn.
+    /// "Write my notes" on a note: memory work yields first; other work still running: the tap waits its turn.
     func regenerate(noteID: Int64) async {
         let asked = personTapped(noteID, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
         defer { personRunEnded(asked: asked) }
@@ -605,7 +605,7 @@ final class ProcessingPipeline {
         var t = note.transcript ?? ""
         if t.isEmpty {
             guard let path = AudioRecorder.existingAudioPath(note.audio_path) else {
-                stopShort(String(localized: "No transcript and the audio is no longer available."), audioGone: true); return
+                stopShort(String(localized: "I have nothing written down for this, and the audio is gone."), audioGone: true); return
             }
             stage = .transcribing(0)
             let done: TranscriptSidecar
@@ -619,7 +619,7 @@ final class ProcessingPipeline {
                 return
             }
             if t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                stopShort(String(localized: "No speech was detected in the recording."), noSpeech: true); return
+                stopShort(String(localized: "I couldn't hear anyone speaking in this recording."), noSpeech: true); return
             }
             await store(done, noteID: noteID, transcript: t)
             TranscriptSidecar.remove(audioPath: path)   // complete and saved to the note
@@ -633,7 +633,7 @@ final class ProcessingPipeline {
 
     // MARK: regenerate one output, or all
 
-    /// A "Regenerate" asked for: one output, or (kind nil) the title and all three outputs.
+    /// A "Write again" asked for: one output, or (kind nil) the title and all three outputs.
     struct Regeneration: Equatable {
         let noteID: Int64
         let kind: OutputKind?
@@ -653,7 +653,7 @@ final class ProcessingPipeline {
     private(set) var regenerateFailed: [Int64: Regeneration] = [:]
     @ObservationIgnored private var regenerateStopped = false
 
-    /// "Regenerate" (one output) or "Regenerate all" (kind nil: title and the three outputs; not reminders and
+    /// "Write again" (one output) or "Write it all again" (kind nil: title and the three outputs; not reminders and
     /// tasks, and the sections are reused, not rewritten). Same source rule, heat rule and backend as the first
     /// time, with sampling, so it gives a new version. The old text stays until everything asked for is written,
     /// then it is replaced at once; after a failure or Stop nothing changes. Returns the replaced text (for Undo)
@@ -1633,7 +1633,7 @@ final class ProcessingPipeline {
         runningTap = QueuedTap(noteID: noteID, kind: .findReminders)   // on disk: a kill keeps it
         defer { runningTap = nil }
         guard let t = note.transcript, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            stopShort(String(localized: "No speech was detected in the recording."), noSpeech: true); return
+            stopShort(String(localized: "I couldn't hear anyone speaking in this recording."), noSpeech: true); return
         }
         do {
             try await loadSelectedModel()
@@ -1867,7 +1867,7 @@ final class ProcessingPipeline {
 
     /// The resume loop stopped with the app not in front and nothing running: notes still waiting their turn will not
     /// start until the app is opened (or the overnight task runs), so their Live Activities end as paused instead of
-    /// staying on "Waiting for the earlier recording to finish".
+    /// staying on "I'll get to this after the earlier recording".
     private func endWaitingActivities() {
         guard !appIsActive, !isWorking else { return }
         for id in interrupted.sorted() where RecordingActivities.shared.isFollowing(noteID: id) && !waitsQuietly(id) {

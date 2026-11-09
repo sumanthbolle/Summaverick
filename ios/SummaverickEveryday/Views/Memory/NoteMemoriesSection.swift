@@ -1,4 +1,4 @@
-// "Remembered" on a note: the memories made from this recording, under the chapters. Each row plays its moment
+// "Things I remember" on a note: the memories made from this recording, under the chapters. Each row plays its moment
 // (▶) and opens the memory's card. Hidden while the note has none.
 import SwiftUI
 
@@ -20,7 +20,7 @@ struct NoteMemoriesSection: View {
         Group {
             if !memories.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Remembered").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("Things I remember").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                         .accessibilityAddTraits(.isHeader)
                     VStack(spacing: 0) {
                         let shown = expanded ? memories : Array(memories.prefix(Self.collapsedCount))
@@ -52,7 +52,7 @@ struct NoteMemoriesSection: View {
                                    onRemoved: { opened = nil })
                         .padding()
                 }
-                .navigationTitle(Text("Remembered"))
+                .navigationTitle(Text("Things I remember"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) { Button("Done") { opened = nil } }

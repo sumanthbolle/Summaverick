@@ -21,7 +21,7 @@ struct SettingsView: View {
                         Label("Profile", systemImage: "person.crop.circle").frame(minHeight: 44)
                     }
                     NavigationLink { LearnedView() } label: {
-                        Label("What Summaverick has learned", systemImage: "brain.head.profile").frame(minHeight: 44)
+                        Label("Things I remember", systemImage: "brain.head.profile").frame(minHeight: 44)
                     }
                 }
 
@@ -30,7 +30,7 @@ struct SettingsView: View {
                         Text("English").tag("en"); Text("Telugu").tag("te"); Text("Hindi").tag("hi")
                         Text("Tamil").tag("ta"); Text("Kannada").tag("kn"); Text("Malayalam").tag("ml")
                     }
-                    Text("Summaverick listens to the recording itself, so Telugu, Hindi and mixed speech all work. Summary, notes and questions are written in the language above.")
+                    Text("I listen to the recording itself, so Telugu, Hindi and mixed speech all work. I write the summary, notes and questions in the language above.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
 
@@ -40,7 +40,7 @@ struct SettingsView: View {
                     Picker("Stop when quiet", selection: $settings.quietStopMinutes) {
                         Text("Off").tag(0); Text("2 min").tag(2); Text("5 min").tag(5); Text("10 min").tag(10)
                     }
-                    Text("A recording stops by itself after this long without voice and keeps everything said. You are told 30 seconds before, and can keep recording.")
+                    Text("I stop recording after this long without voice, and keep everything said. I'll tell you 30 seconds before, and you can keep recording.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
 
@@ -48,7 +48,7 @@ struct SettingsView: View {
                     Picker("Audio retention", selection: $settings.retentionDays) {
                         Text("1 day").tag(1); Text("7 days").tag(7); Text("30 days").tag(30); Text("Forever").tag(0)
                     }
-                    Text("Raw audio is deleted after this period to save space. Transcripts and notes are kept until you delete them.")
+                    Text("Raw audio is deleted after this period to save space. What was said and your notes are kept until you delete them.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
 
@@ -56,7 +56,12 @@ struct SettingsView: View {
                     Toggle("Require Face ID / passcode to open", isOn: $settings.requireUnlock)
                         .disabled(!AppLock.isAvailable)
                     Toggle("Show recording reminder", isOn: Binding(get: { !settings.consentAcknowledged }, set: { settings.consentAcknowledged = !$0 }))
-                    Text("Summaverick has no account, no analytics and no server. The only network use is downloading the AI model.")
+                    Text("Summaverick has no account, no analytics and no server. The only network use is downloading Summaverick's language pack.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+
+                Section("About") {
+                    Text("Summaverick's notes are written by software running on this phone, and it can get things wrong. Please check anything important.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
 
@@ -82,14 +87,14 @@ struct SettingsView: View {
             } message: {
                 Text("All notes and recordings are deleted, and so are your profile, medicines, reminders and everything Summaverick has learned. This cannot be undone.")
             }
-            .alert("Could not delete everything. Try again.", isPresented: $wipeFailed) {
+            .alert("I couldn't delete everything. Try again.", isPresented: $wipeFailed) {
                 Button("Retry", role: .destructive) { wipe() }
                 Button("Cancel", role: .cancel) {}
             }
-            .alert("Summaverick is still working on a recording. Try again when it has finished.", isPresented: $wipeBusy) {
+            .alert("I'm still working on a recording. Try again when I've finished.", isPresented: $wipeBusy) {
                 Button("OK", role: .cancel) {}
             }
-            .confirmationDialog("Remove Summaverick's AI?", isPresented: $confirmRemoveAI, titleVisibility: .visible) {
+            .confirmationDialog("Remove Summaverick's language pack?", isPresented: $confirmRemoveAI, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) {
                     Task {
                         pipeline.memoriesHeld = true   // no memory backfill starts while the AI is removed
@@ -110,7 +115,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var aiSection: some View {
         let status = models.status
-        Section("Summaverick's AI") {
+        Section("Summaverick's language pack") {
             if status == .unsupported {
                 Text(AIStatus.unsupportedMessage).font(.footnote).foregroundStyle(.secondary)
                 if models.hasFiles {   // left from an older version; never used on this phone
@@ -164,6 +169,7 @@ struct SettingsView: View {
             }
             await ReminderScheduler.shared.resync()   // no active reminders left: removes every scheduled one
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+            NotifyCopy.rememberFirstName(of: nil)   // the notifications no longer greet by name
             ChatStore.shared.deleteAll()   // Ask's chats (Application Support/Chats), even when Ask was never opened
             NotificationCenter.default.post(name: .assistantWiped, object: nil)
             NotificationCenter.default.post(name: .assistantChanged, object: nil)

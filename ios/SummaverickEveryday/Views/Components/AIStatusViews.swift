@@ -8,13 +8,13 @@ extension AIStatus {
         switch self {
         case .ready: return String(localized: "Ready")
         case .unsupported: return AIStatus.unsupportedMessage
-        case .downloading(let p, let m?): return String(localized: "Getting Summaverick ready… \(p)% · about \(m) min left")
-        case .downloading(let p, nil): return String(localized: "Getting Summaverick ready… \(p)%")
+        case .downloading(let p, let m?): return String(localized: "Getting ready. One big download and I never need the internet again. \(p)% · about \(m) min left")
+        case .downloading(let p, nil): return String(localized: "Getting ready. One big download and I never need the internet again. \(p)%")
         case .waitingForWiFi: return String(localized: "Waiting for Wi-Fi")
         case .waitingForNetwork: return String(localized: "Waiting for a connection")
-        case .noSpace: return String(localized: "Paused — no space")
-        case .failed: return String(localized: "Download failed")
-        case .notDownloaded: return String(localized: "Not downloaded")
+        case .noSpace: return String(localized: "Paused: I need more space")
+        case .failed: return String(localized: "The download stopped. Please try again.")
+        case .notDownloaded: return String(localized: "Not downloaded yet")
         }
     }
 
@@ -29,7 +29,7 @@ extension AIStatus {
 
     /// Extra sentence under the line, when there is one.
     var detail: String? {
-        if case .noSpace(let gb) = self { return String(localized: "Free up about \(gb) GB to download Summaverick's AI.") }
+        if case .noSpace(let gb) = self { return String(localized: "Free up about \(gb) GB so I can download Summaverick's language pack.") }
         return nil
     }
 
@@ -51,7 +51,7 @@ extension AIStatus {
     }
 
     static var unsupportedMessage: String {
-        String(localized: "This iPhone doesn't have enough memory for Summaverick's AI. You can still record and play back; notes need an iPhone with 6 GB of memory or more.")
+        String(localized: "This iPhone doesn't have enough memory for me to write notes. You can still record and play back; notes need an iPhone with 6 GB of memory or more.")
     }
 }
 
@@ -135,7 +135,7 @@ struct AIGettingReadyPanel: View {
                 Label(AIStatus.unsupportedMessage, systemImage: status.symbol)
                     .font(.body).fixedSize(horizontal: false, vertical: true)
             } else {
-                Label("Summaverick is still getting ready", systemImage: "sparkles").font(.title3.bold())
+                Label("I'm still getting ready", systemImage: "sparkles").font(.title3.bold())
                 Text(status.line).font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let p = status.progress { ProgressView(value: p) }
                 if let d = status.detail {

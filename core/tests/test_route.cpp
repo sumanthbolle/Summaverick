@@ -190,7 +190,7 @@ TEST(due_listing_in_code) {
 
     json none = json::array();
     std::string empty = due_answer(json::array(), json::array(), "2026-11-11", "en", none);
-    CHECK_EQ(empty, std::string("Nothing is due in the next 7 days."));
+    CHECK_EQ(empty, std::string("Nothing is due in the next 7 days. You're all clear."));
     std::string te = due_answer(json::array(), json::array(), "2026-11-11", "te", none);
     CHECK(te.find("7") != std::string::npos && te != empty);
 }

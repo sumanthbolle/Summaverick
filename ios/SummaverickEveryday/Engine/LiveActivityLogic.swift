@@ -46,7 +46,7 @@ enum LiveActivityLogic {
         case after(TimeInterval)
     }
 
-    /// "Notes ready" stays this long on the Lock Screen.
+    /// "Your notes are ready" stays this long on the Lock Screen.
     static let readyStaysFor: TimeInterval = 4 * 3600
     /// Progress within the same stage is sent at most this often.
     static let updateEvery: TimeInterval = 5

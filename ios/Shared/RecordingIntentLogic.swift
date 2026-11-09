@@ -48,12 +48,12 @@ enum RecordingIntentLogic {
 
     static func text(_ line: Line) -> LocalizedStringResource {
         switch line {
-        case .recording: return LocalizedStringResource("Recording")
-        case .alreadyRecording: return LocalizedStringResource("Already recording")
+        case .recording: return LocalizedStringResource("I'm recording.")
+        case .alreadyRecording: return LocalizedStringResource("I'm already recording.")
         case .allowMicrophone: return LocalizedStringResource("Allow the microphone for Summaverick in Settings.")
-        case .couldNotStart: return LocalizedStringResource("Could not start recording.")
-        case .stopped: return LocalizedStringResource("Recording stopped. Your notes are being written.")
-        case .notRecording: return LocalizedStringResource("Nothing is being recorded.")
+        case .couldNotStart: return LocalizedStringResource("I couldn't start recording.")
+        case .stopped: return LocalizedStringResource("Stopped. I'm writing your notes now.")
+        case .notRecording: return LocalizedStringResource("I'm not recording anything.")
         case .consentFirst: return LocalizedStringResource("Open Summaverick to read the recording reminder first.")
         }
     }

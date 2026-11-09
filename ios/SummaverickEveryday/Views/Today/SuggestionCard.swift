@@ -712,7 +712,7 @@ struct SuggestionEditForm: View {
     private func answerSection(_ a: AnswerContext) -> some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Text(a.medicine ? AssistantFormat.medicineAnswerLabel(a.text) : "Summaverick's answer")
+                Text(a.medicine ? AssistantFormat.medicineAnswerLabel(a.text) : "My answer")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                 HStack(alignment: .top, spacing: 10) {
                     RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)

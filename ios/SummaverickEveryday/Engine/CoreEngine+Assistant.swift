@@ -14,8 +14,8 @@ extension CoreEngine {
         case failed(String), badJSON
         var errorDescription: String? {
             switch self {
-            case .failed(let what): return String(localized: "Could not \(what).", comment: "%@ is an action such as \"save the reminder\"")
-            case .badJSON: return String(localized: "Could not read the assistant's reply.")
+            case .failed(let what): return String(localized: "I couldn't \(what).", comment: "%@ is an action such as \"save the reminder\"")
+            case .badJSON: return String(localized: "Something went wrong on my side. Please try again.")
             }
         }
     }
@@ -35,12 +35,17 @@ extension CoreEngine {
 
     // MARK: profile (store context)
 
-    nonisolated func profile() async -> Profile? { await store { self.decode(Profile.self, self.take(sve_profile_get($0))) } }
+    nonisolated func profile() async -> Profile? {
+        let p = await store { self.decode(Profile.self, self.take(sve_profile_get($0))) }
+        if let p { NotifyCopy.rememberFirstName(of: p.name) }
+        return p
+    }
 
     nonisolated func setProfile(_ p: Profile) async throws {
         guard let json = encodeJSON(p), await store({ sve_profile_set($0, json) }) == 0 else {
             throw AssistantError.failed(String(localized: "save the profile"))
         }
+        NotifyCopy.rememberFirstName(of: p.name)
     }
 
     // MARK: medicines (store context)
@@ -69,7 +74,7 @@ extension CoreEngine {
     /// first (yieldMemories) and refuses while a note is being written; a model call still running (Ask, a topic
     /// summary) only reads, or updates a row that is gone by then.
     nonisolated func wipeAssistant() async throws {
-        guard await store({ sve_assistant_wipe($0) }) == 0 else { throw AssistantError.failed(String(localized: "delete the assistant data")) }
+        guard await store({ sve_assistant_wipe($0) }) == 0 else { throw AssistantError.failed(String(localized: "delete your saved details")) }
     }
 
     // MARK: suggestions (store context)
@@ -104,7 +109,7 @@ extension CoreEngine {
     /// so callers can tell "no reminders" from "could not read".
     nonisolated func remindersStrict(activeOnly: Bool = false) async throws -> [Reminder] {
         try await store { c in
-            guard c != nil else { throw AssistantError.failed(String(localized: "read reminders (engine not ready)")) }
+            guard c != nil else { throw AssistantError.failed(String(localized: "read reminders (I'm still starting up)")) }
             guard let json = self.take(sve_reminders_json(c, activeOnly ? 1 : 0)) else {
                 throw AssistantError.failed(String(localized: "read reminders"))
             }
@@ -129,7 +134,7 @@ extension CoreEngine {
     nonisolated func createReminder(_ r: NewReminder) async throws -> Int64 {
         let json = encodeJSON(r)
         return try await store { c in
-            guard c != nil else { throw AssistantError.failed(String(localized: "save the reminder (engine not ready)")) }
+            guard c != nil else { throw AssistantError.failed(String(localized: "save the reminder (I'm still starting up)")) }
             guard let json else { throw AssistantError.badJSON }
             let id = sve_reminder_create(c, json)
             guard id > 0 else { throw AssistantError.failed(String(localized: "save the reminder")) }
@@ -141,7 +146,7 @@ extension CoreEngine {
     /// checks against). Throws when the core cannot answer.
     nonisolated func medicinesNamed(_ text: String) async throws -> [Int64] {
         try await store { c in
-            guard c != nil else { throw AssistantError.failed(String(localized: "read medicines (engine not ready)")) }
+            guard c != nil else { throw AssistantError.failed(String(localized: "read medicines (I'm still starting up)")) }
             guard let json = self.take(sve_medicines_named(c, text)) else { throw AssistantError.failed(String(localized: "read medicines")) }
             guard let ids = self.decode([Int64].self, json) else { throw AssistantError.badJSON }
             return ids
@@ -152,7 +157,7 @@ extension CoreEngine {
     nonisolated func createTask(_ t: NewTask) async throws -> Int64 {
         let json = encodeJSON(t)
         return try await store { c in
-            guard c != nil else { throw AssistantError.failed(String(localized: "save the to-do (engine not ready)")) }
+            guard c != nil else { throw AssistantError.failed(String(localized: "save the to-do (I'm still starting up)")) }
             guard let json else { throw AssistantError.badJSON }
             let id = sve_task_create(c, json)
             guard id > 0 else { throw AssistantError.failed(String(localized: "save the to-do")) }

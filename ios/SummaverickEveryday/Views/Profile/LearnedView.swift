@@ -1,4 +1,4 @@
-// Settings → "What Summaverick has learned" (spec §6.4, §7.4): words and preferences, grouped, each one
+// Settings → "Things I remember" (spec §6.4, §7.4): words and preferences, grouped, each one
 // editable in place and deletable (a visible button as well as a swipe). The person's own edit applies directly.
 // Facts from recordings are memories now: they show on their note's Remembered section and in "To check".
 import SwiftUI
@@ -13,7 +13,7 @@ struct LearnedView: View {
 
     private static let groups = [
         MemoryGroup(kind: "vocab", title: "Words to spell this way",
-              empty: "No words yet. When you fix a word in a recording, it is added here."),
+              empty: "No words yet. When you fix a word in a recording, I add it here."),
         MemoryGroup(kind: "preference", title: "Preferences",
               empty: "No preferences yet. They appear when you say Yes to one on Today."),
     ]
@@ -29,7 +29,7 @@ struct LearnedView: View {
     var body: some View {
         List {
             Section {
-                Text("Summaverick uses these to understand you. Edit or delete anything.")
+                Text("I use these to understand you. Edit or delete anything.")
                     .font(.body).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -43,7 +43,7 @@ struct LearnedView: View {
                 } header: { Text(g.title) }
             }
         }
-        .navigationTitle(Text("What Summaverick has learned"))
+        .navigationTitle(Text("Things I remember"))
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await reload() } }
@@ -55,10 +55,10 @@ struct LearnedView: View {
         } message: { item in
             Text(verbatim: "“\(item.text)”")
         }
-        .alert("Could not save this. Please try again.", isPresented: $errorShown) {
+        .alert("I couldn't save this. Please try again.", isPresented: $errorShown) {
             Button("OK", role: .cancel) {}
         }
-        .alert("Could not delete this. Please try again.", isPresented: $deleteFailed) {
+        .alert("I couldn't delete this. Please try again.", isPresented: $deleteFailed) {
             Button("OK", role: .cancel) {}
         }
         .onChange(of: deleting != nil || errorShown || deleteFailed) { _, open in PresentationGate.shared.set("learned", open) }

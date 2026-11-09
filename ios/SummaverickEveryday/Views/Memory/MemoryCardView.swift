@@ -245,7 +245,7 @@ struct MemoryEditSheet: View {
                 }
                 if failed {
                     Section {
-                        Label("Could not save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
+                        Label("I couldn't save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.red)
                     }
                 }
@@ -305,7 +305,7 @@ struct MemoryCardView: View {
             if let m = memory, !gone, m.review != "wrong" {
                 card(m)
             } else if gone || memory != nil {
-                Text("This memory was removed.").font(.body).foregroundStyle(.secondary)
+                Text("This one was removed from what I remember.").font(.body).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
             } else if readFailed {
@@ -331,7 +331,7 @@ struct MemoryCardView: View {
                 actions(m)
             }
             if failed {
-                Label("Could not save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
+                Label("I couldn't save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -343,8 +343,8 @@ struct MemoryCardView: View {
         .sheet(isPresented: $editing) {
             MemoryEditSheet(memory: m) { text in await run { await CoreEngine.shared.editMemory(m.id, text) } }
         }
-        .confirmationDialog(Text("Delete memory"), isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete memory", role: .destructive) {
+        .confirmationDialog(Text("Forget this"), isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Forget this", role: .destructive) {
                 decideLinked(.delete, m)
             }
             Button("Cancel", role: .cancel) {}
@@ -366,7 +366,7 @@ struct MemoryCardView: View {
             MemoryActionButtons(busy: busy, buttons: [
                 .init(title: "Edit", icon: "pencil", tint: nil) { failed = false; editing = true },
                 .init(title: "Wrong", icon: "xmark", tint: .red) { decideLinked(.wrong, m) },
-                .init(title: "Delete memory", icon: "trash", tint: .red) { confirmDelete = true },
+                .init(title: "Forget this", icon: "trash", tint: .red) { confirmDelete = true },
             ])
         }
     }
@@ -386,7 +386,7 @@ struct MemoryCardView: View {
 
     private var loadFailedLine: some View {
         HStack(spacing: 12) {
-            Label("Could not load this.", systemImage: "exclamationmark.triangle.fill")
+            Label("I couldn't open this.", systemImage: "exclamationmark.triangle.fill")
                 .font(.callout.weight(.medium)).foregroundStyle(.red)
             Spacer(minLength: 0)
             Button("Try again") { Task { await reload() } }

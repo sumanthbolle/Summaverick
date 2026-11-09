@@ -51,7 +51,7 @@ struct NoteDetailView: View {
             case .summary: return "Summary"
             case .notes: return "Notes"
             case .questions: return "Questions"
-            case .transcript: return "Transcript"
+            case .transcript: return "Word for word"
             }
         }
         /// The output this tab shows; nil for the transcript.
@@ -181,7 +181,7 @@ struct NoteDetailView: View {
                         && pipeline.lastFailure[noteID] == nil {
                         Button {
                             Task { await pipeline.regenerate(noteID: noteID) }
-                        } label: { Label("Generate notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
+                        } label: { Label("Write my notes", systemImage: "sparkles").frame(maxWidth: .infinity) }
                         .buttonStyle(.borderedProminent)
                         .disabled(pipeline.isBusy || !(hasTranscript || hasAudio))
                     }
@@ -235,7 +235,7 @@ struct NoteDetailView: View {
                         } label: { Label("Export as Markdown file", systemImage: "doc") }
                     }
                     if showsRegenerateAll {
-                        Button { regenerate(nil) } label: { Label("Regenerate all", systemImage: "arrow.clockwise") }
+                        Button { regenerate(nil) } label: { Label("Write it all again", systemImage: "arrow.clockwise") }
                             .disabled(pipeline.isBusy)
                     }
                     Button(role: .destructive) { confirmDelete = true } label: { Label("Delete note", systemImage: "trash") }
@@ -251,7 +251,7 @@ struct NoteDetailView: View {
         .sheet(item: $fixing) { target in
             FixWordSheet(pieceText: target.text) { word in Task { await saveWord(word) } }
         }
-        .alert("Could not save this. Please try again.", isPresented: errorShown) {
+        .alert("I couldn't save this. Please try again.", isPresented: errorShown) {
             Button("OK", role: .cancel) {}
         }
     }
@@ -279,7 +279,7 @@ struct NoteDetailView: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                Text(isThisNoteBusy ? "Being written…" : (tab == .transcript ? "No transcript." : "Not generated yet."))
+                Text(isThisNoteBusy ? "Writing this now…" : (tab == .transcript ? "Nothing written down yet." : "I haven't written this yet."))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 24)
@@ -296,7 +296,7 @@ struct NoteDetailView: View {
         } else if !isThisNoteBusy, let failed = pipeline.regenerateFailed[noteID] {
             HStack(spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                Text("Could not write this again. Try again.").font(.footnote)
+                Text("I couldn't write this again. Please try once more.").font(.footnote)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button("Try again") { regenerate(failed.kind) }
@@ -316,7 +316,7 @@ struct NoteDetailView: View {
                 HStack(spacing: 12) {
                     if showRegenerate {
                         Button { regenerate(kind) } label: {
-                            Label("Regenerate", systemImage: "arrow.clockwise").frame(minHeight: 44)
+                            Label("Write again", systemImage: "arrow.clockwise").frame(minHeight: 44)
                         }
                         .buttonStyle(.bordered)
                         .disabled(pipeline.isBusy)
@@ -359,7 +359,7 @@ struct NoteDetailView: View {
     /// After Stop, when the work left is long: finish overnight while charging, or keep going now.
     private var overnightOffer: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("This will take a while. Finish overnight while charging?", systemImage: "moon.zzz")
+            Label("This one will take a while. Shall I finish it overnight while the phone charges?", systemImage: "moon.zzz")
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 12) {
@@ -425,9 +425,9 @@ struct NoteDetailView: View {
         guard !w.isEmpty else { return }
         fixing = nil
         let id = await CoreEngine.shared.addVocab(w)
-        guard id > 0 else { errorMessage = String(localized: "Could not save this. Please try again."); return }
+        guard id > 0 else { errorMessage = String(localized: "I couldn't save this. Please try again."); return }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
-        showToast(String(localized: "Saved “\(w)”. Summaverick will remember this word."))
+        showToast(String(localized: "Saved “\(w)”. I'll remember this word."))
     }
 
     private func showToast(_ message: String) {
@@ -556,12 +556,12 @@ struct NoteDetailView: View {
             // Live transcription needs the model, piece after piece: a question would hold it.
             let recording = String(localized: "Recording now. Ask again after you stop.")
             guard !LiveTranscriber.shared.liveRunning else { answer = recording; return }
-            guard models.isReady else { answer = String(localized: "Summaverick is still getting ready"); return }
+            guard models.isReady else { answer = String(localized: "I'm still getting ready"); return }
             guard !Heat.isTooHot(ProcessInfo.processInfo.thermalState) else {
                 answer = String(localized: "The phone is too warm. Try again when it has cooled down."); return
             }
             // The person first: memory work stops for the answer. Other work still running: the busy line.
-            let busy = String(localized: "Summaverick is working on another note. Try again in a moment.")
+            let busy = String(localized: "I'm working on another note. Try again in a moment.")
             guard await pipeline.yieldMemories(), !pipeline.isWorking else { answer = busy; return }
             do {
                 try await models.loadIntoCore()   // the backend for right now (GPU in front)
@@ -700,7 +700,7 @@ private struct FixWordSheet: View {
                         .textInputAutocapitalization(.never)
                         .frame(minHeight: 44)
                 } header: { Text("Write it correctly") } footer: {
-                    Text("Summaverick will remember this word for your next recordings.")
+                    Text("I'll remember this word for your next recordings.")
                 }
             }
             .navigationTitle("Fix a word")

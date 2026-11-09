@@ -57,12 +57,12 @@ enum CoreError: LocalizedError {
     case initFailed, modelLoadFailed(String), generationFailed, notFound, audioModelNotLoaded, transcriptionFailed
     var errorDescription: String? {
         switch self {
-        case .initFailed: return String(localized: "Could not open the notes database.")
-        case .modelLoadFailed(let p): return String(localized: "Could not load the AI model at \(p).")
-        case .generationFailed: return String(localized: "The AI model could not produce an answer.")
+        case .initFailed: return String(localized: "I couldn't open your notes.")
+        case .modelLoadFailed: return String(localized: "I couldn't start up. Please try again.")
+        case .generationFailed: return String(localized: "I couldn't come up with an answer this time.")
         case .notFound: return String(localized: "Note not found.")
-        case .audioModelNotLoaded: return String(localized: "The selected AI model cannot listen to audio.")
-        case .transcriptionFailed: return String(localized: "The AI model could not transcribe the recording.")
+        case .audioModelNotLoaded: return String(localized: "I can't listen to audio right now.")
+        case .transcriptionFailed: return String(localized: "I couldn't write down what was said in this recording.")
         }
     }
 }

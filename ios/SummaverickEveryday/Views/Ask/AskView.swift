@@ -36,15 +36,15 @@ private enum AskNotice: Equatable {
 
     var text: LocalizedStringKey {
         switch self {
-        case .busy: return "Summaverick is working on another note. Try again in a moment."
+        case .busy: return "I'm working on another note. Try again in a moment."
         case .recording: return "Recording now. Ask again after you stop."
-        case .needsModel: return "Summaverick is still getting ready"
+        case .needsModel: return "I'm still getting ready"
         case .tooWarm: return "The phone is too warm. Try again when it has cooled down."
         case .micReady: return "The microphone is ready. Hold the mic button and speak."
         case .holdLonger: return "Hold the mic button while you speak."
         case .notHeard: return "I couldn't hear a question. Please try again."
-        case .transcribeFailed: return "Could not write down your question. Please try again, or type it."
-        case .micFailed: return "Could not start the microphone."
+        case .transcribeFailed: return "I couldn't catch your question. Please try again, or type it."
+        case .micFailed: return "I couldn't start the microphone."
         }
     }
 }
@@ -156,7 +156,7 @@ struct AskView: View {
             .environment(settings)
             .environment(router)
         }
-        .alert("Could not save this. Please try again.", isPresented: errorShown) {
+        .alert("I couldn't save this. Please try again.", isPresented: errorShown) {
             Button("OK", role: .cancel) {}
         }
         .alert("Notifications are off", isPresented: $notificationsOff) {
@@ -221,7 +221,7 @@ struct AskView: View {
             Image(systemName: "bubble.left.and.bubble.right").font(.largeTitle).foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             Text("Ask about anything you recorded.").font(.title3.bold())
-            Text("Answers from your recordings link to the moment they came from. Anything else comes from general knowledge, and says so.")
+            Text("When the answer is in your recordings, I link to the moment it came from. Anything else is from what I know, and I'll say so. I can get things wrong, so check anything important.")
                 .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -258,7 +258,7 @@ struct AskView: View {
                 stoppedView(partial, turn: turn)
             case .failed:
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Could not answer this. Please try again.", systemImage: "exclamationmark.triangle.fill")
+                    Label("I couldn't answer this. Please try again.", systemImage: "exclamationmark.triangle.fill")
                         .font(.body).foregroundStyle(.primary)
                     Button("Try again") { retry(turn) }
                         .buttonStyle(.bordered)
@@ -289,7 +289,7 @@ struct AskView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(Text("Summaverick is writing an answer"))
+            .accessibilityLabel(Text("I'm writing your answer"))
     }
 
     /// Stop was tapped: what was written before it, marked "(stopped)".
@@ -317,7 +317,7 @@ struct AskView: View {
     }
 
     private var generalLabel: some View {
-        Label("General knowledge — not from your recordings", systemImage: "globe")
+        Label("From what I know, not from your recordings", systemImage: "globe")
             .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -898,6 +898,6 @@ private struct TypingIndicator: View {
             .background(compact ? Color.clear : Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
         }
         .accessibilityElement()
-        .accessibilityLabel(Text("Summaverick is writing an answer"))
+        .accessibilityLabel(Text("I'm writing your answer"))
     }
 }

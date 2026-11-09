@@ -838,14 +838,14 @@ std::string due_answer(const json &reminders, const json &tasks, const std::stri
         }
     std::string out;
     if (!due.empty()) {
-        out += te ? "రాబోయే 7 రోజుల్లో చేయాల్సిన పనులు:" : "To-dos due in the next 7 days:";
+        out += te ? "రాబోయే 7 రోజుల్లో మీరు చేయాల్సినవి:" : "Here's what's due in the next 7 days:";
         for (const auto &d : due) out += "\n" + d.second;
     }
     if (!rings.empty()) {
         out += std::string(out.empty() ? "" : "\n\n") + (te ? "రాబోయే 7 రోజుల్లో రిమైండర్‌లు:" : "Reminders in the next 7 days:");
         for (const auto &l : rings) out += "\n" + l;
     }
-    if (out.empty()) out = te ? "రాబోయే 7 రోజుల్లో చేయాల్సింది ఏమీ లేదు." : "Nothing is due in the next 7 days.";
+    if (out.empty()) out = te ? "రాబోయే 7 రోజుల్లో చేయాల్సింది ఏమీ లేదు. మీరు ఫ్రీ!" : "Nothing is due in the next 7 days. You're all clear.";
     return out;
 }
 

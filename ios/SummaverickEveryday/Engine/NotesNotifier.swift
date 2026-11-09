@@ -13,35 +13,58 @@ enum NotesNotifier {
 
     /// The transcript is stored after Stop (the summary and notes follow).
     static func transcriptReady(noteID: Int64, title: String, hold: Hold? = nil) {
-        post(noteID, state: "transcript ready", body: String(localized: "Transcript ready: \(title)"), hold: hold)
+        post(noteID, state: "transcript ready", title: String(localized: "Heard it all"),
+             body: String(localized: "\"\(title)\": writing your notes now."), hold: hold)
     }
 
     /// The title and the short summary are stored (the detailed notes and the questions follow).
     static func summaryReady(noteID: Int64, title: String, hold: Hold? = nil) {
-        post(noteID, state: "summary ready", body: String(localized: "Summary ready: \(title)"), hold: hold)
+        let heading: String, body: String
+        switch NotifyCopy.variant(noteID: noteID, stage: NotifyRule.summary, count: 2) {
+        case 0:
+            heading = NotifyCopy.storedFirstName().map { String(localized: "\($0), the short version is here ☕") }
+                ?? String(localized: "The short version is here ☕")
+            body = String(localized: "\"\(title)\": read it in a minute.")
+        default:
+            heading = String(localized: "Got the gist!")
+            body = String(localized: "\"\(title)\": the full notes are on the way.")
+        }
+        post(noteID, state: "summary ready", title: heading, body: body, hold: hold)
     }
 
     /// The note's detailed notes and questions are written (the memories may still follow).
     static func notesReady(noteID: Int64, title: String, hold: Hold? = nil) {
-        post(noteID, state: "ready", body: String(localized: "Notes ready: \(title)"), hold: hold)
+        let heading: String, body: String
+        switch NotifyCopy.variant(noteID: noteID, stage: NotifyRule.notes, count: 3) {
+        case 0:
+            heading = NotifyCopy.storedFirstName().map { String(localized: "All done, \($0) 🎉") }
+                ?? String(localized: "All done 🎉")
+            body = String(localized: "\"\(title)\": notes and quiz questions are ready.")
+        case 1:
+            heading = String(localized: "Fresh notes, just served 🍽️")
+            body = String(localized: "\"\(title)\" is ready when you are.")
+        default:
+            heading = String(localized: "You can relax now")
+            body = String(localized: "I wrote it all down: \"\(title)\".")
+        }
+        post(noteID, state: "ready", title: heading, body: body, hold: hold)
     }
 
     /// The background work was cut off; the note continues by itself (the overnight task, or when the app is opened).
     static func paused(noteID: Int64, title: String, percent: Int, hold: Hold? = nil) {
-        post(noteID, state: "paused",
-             body: String(localized: "\(title): paused at \(percent)%. It continues by itself.",
-                          comment: "Note title, percent of the work done"),
-             hold: hold)
+        post(noteID, state: "paused at \(percent)%", title: String(localized: "Taking a short break"),
+             body: String(localized: "\"\(title)\" is safe. I'll carry on by myself soon."), hold: hold)
     }
 
     /// The notes run failed for real (not a cut-off); `line` is the failure the note shows.
     static func failed(noteID: Int64, title: String, line: String, hold: Hold? = nil) {
-        post(noteID, state: "failed", body: String(localized: "\(title): notes could not be written") + "\n" + line, hold: hold)
+        post(noteID, state: "failed", title: String(localized: "Sorry, I couldn't write this one"),
+             body: String(localized: "\"\(title)\": \(line)"), hold: hold)
     }
 
     /// hold: background time the caller took synchronously, before any await (right after a cut-off the app may be
     /// suspended at any moment); ended once the request is handed over. Without one, it is taken here.
-    private static func post(_ noteID: Int64, state: String, body: String, hold given: Hold?) {
+    private static func post(_ noteID: Int64, state: String, title: String, body: String, hold given: Hold?) {
         let hold = given ?? Hold()
         guard NotifyRule.shouldNotify(appActive: UIApplication.shared.applicationState == .active) else {
             NSLog("[sve] bg: note %lld %@ with the app in front: no notification", noteID, state)
@@ -49,7 +72,7 @@ enum NotesNotifier {
             return
         }
         let content = UNMutableNotificationContent()
-        content.title = "Summaverick"
+        content.title = title
         content.body = body
         content.sound = .default
         content.userInfo = ["note_id": NSNumber(value: noteID)]
@@ -84,8 +107,8 @@ enum NotesNotifier {
     }
 }
 
-/// Stop when quiet (ruling B11): the one warning before a recording stops by itself ("No voice for a while — stopping
-/// in 30 seconds", with Keep recording), and then the line that says it stopped. One identifier, so the second replaces
+/// Stop when quiet (ruling B11): the one warning before a recording stops by itself ("It's gone quiet. I'll stop recording
+/// in 30 seconds.", with Keep recording), and then the line that says it stopped. One identifier, so the second replaces
 /// the first, and voice coming back or Keep recording withdraws it. The action is answered in ReminderScheduler (the
 /// notification delegate); the app is running anyway, since it records. Same notification permission as reminders.
 @MainActor
@@ -101,9 +124,9 @@ enum QuietNotifier {
         UNUserNotificationCenter.current().setNotificationCategories([c])
     }
 
-    static func warn(_ line: String) { post(line, category: category) }
+    static func warn(_ line: String) { post(title: String(localized: "Still there? 👀"), line, category: category) }
 
-    static func stopped(_ line: String) { post(line, category: nil) }
+    static func stopped(_ line: String) { post(title: "Summaverick", line, category: nil) }
 
     static func withdraw() {
         let c = UNUserNotificationCenter.current()
@@ -111,10 +134,10 @@ enum QuietNotifier {
         c.removeDeliveredNotifications(withIdentifiers: [identifier])
     }
 
-    private static func post(_ body: String, category: String?) {
+    private static func post(title: String, _ body: String, category: String?) {
         let hold = NotesNotifier.Hold()
         let content = UNMutableNotificationContent()
-        content.title = "Summaverick"
+        content.title = title
         content.body = body
         content.sound = .default
         if let category { content.categoryIdentifier = category }

@@ -39,7 +39,7 @@ struct RecordView: View {
             Spacer()
 
             Button { stopAndProcess() } label: {
-                Label("Stop and make notes", systemImage: "stop.fill")
+                Label("Stop and write my notes", systemImage: "stop.fill")
                     .font(.title3.weight(.semibold))
                     .frame(maxWidth: .infinity).padding(.vertical, 16)
             }
@@ -67,7 +67,7 @@ struct RecordView: View {
 
     private var quietWarning: some View {
         VStack(spacing: 8) {
-            Text("No voice for a while — stopping in 30 seconds")
+            Text("It's gone quiet. I'll stop recording in 30 seconds.")
                 .font(.footnote.weight(.medium)).foregroundStyle(.orange)
                 .multilineTextAlignment(.center)
             Button("Keep recording") { controller.keepRecording() }

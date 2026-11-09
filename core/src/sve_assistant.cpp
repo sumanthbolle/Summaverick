@@ -984,10 +984,10 @@ json quiz_result(sve::Store &st, const std::vector<std::string> &asked, const st
     }
     const bool any = sve::quiz_count(notes, names) > 0;
     const bool te = lang == "te";
-    json r = ask_result(any ? (te ? "మీ ఇటీవలి రికార్డింగ్‌ల ప్రశ్నలన్నీ అయిపోయాయి. మళ్లీ మొదటి నుండి అడగనా?"
-                                  : "You have had every question from your recent recordings. Start over?")
-                            : (te ? "మీ ఇటీవలి రికార్డింగ్‌లకు ఇంకా రివిజన్ ప్రశ్నలు లేవు."
-                                  : "Your recent recordings have no revision questions yet."),
+    json r = ask_result(any ? (te ? "మీ ఇటీవలి రికార్డింగ్‌ల ప్రశ్నలన్నీ అయిపోయాయి. భలే! మళ్లీ మొదటి నుండి అడగనా?"
+                                  : "You've done every question from your recent recordings. Nice! Start over?")
+                            : (te ? "మీ ఇటీవలి రికార్డింగ్‌ల నుండి నా దగ్గర ఇంకా ప్రశ్నలు లేవు."
+                                  : "I don't have any questions from your recent recordings yet."),
                         json::array(), true, false);
     r["quiz_done"] = any;
     return r;
@@ -1117,7 +1117,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         if (route.kind == "summary" && !sve::health_gate(q, names)) {
             const json rows = st.note_summaries(route.from, route.to, 200, true);
             if (rows.empty())
-                return result(ask_result(lang == "te" ? "ఆ కాలంలో రికార్డింగ్‌లు లేవు." : "No recordings in that period.",
+                return result(ask_result(lang == "te" ? "ఆ సమయంలో రికార్డింగ్‌లు నా దగ్గర లేవు." : "I don't have any recordings from then.",
                                          json::array(), true, false), "summary");
             json notes = json::array(), sources = json::array();
             std::string titles;
@@ -1129,7 +1129,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
                 sources.push_back({{"note_id", id}, {"start_sec", 0}, {"title", title}});
                 if (!sve::health_gate(title, names)) titles += "\n\xE2\x80\xA2 " + title;
             }
-            const std::string titles_answer = (lang == "te" ? "ఆ కాలంలో రికార్డింగ్‌లు:" : "Recordings in that period:") +
+            const std::string titles_answer = (lang == "te" ? "ఆ సమయంలో రికార్డింగ్‌లు:" : "Recordings from then:") +
                                               (titles.empty() ? " " + std::to_string(rows.size()) : titles);
             bool any = false;
             std::string material = sve::summary_material(notes, names, &any);
@@ -1254,7 +1254,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
         if (r["not_found"] == true) {
             // The not-found sentence is only for when nothing scores: the closest passage, word for word.
             if (r["medicine"] == false && scores)
-                r = ask_result((lang == "te" ? "మీ రికార్డింగ్‌లలో దగ్గరగా ఉన్నది:\n\xE2\x80\x9C" : "The closest in your recordings:\n\xE2\x80\x9C") +
+                r = ask_result((lang == "te" ? "మీ రికార్డింగ్‌లలో నేను విన్నవాటిలో దగ్గరగా ఉన్నది:\n\xE2\x80\x9C" : "The closest I heard in your recordings:\n\xE2\x80\x9C") +
                                    best_text + "\xE2\x80\x9D",
                                json::array({best_source}), false, false);
             else

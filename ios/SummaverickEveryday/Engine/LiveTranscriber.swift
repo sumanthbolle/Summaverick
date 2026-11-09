@@ -143,10 +143,10 @@ final class LiveTranscriber {
     var statusLine: String {
         switch status {
         case .idle, .writing: return String(localized: "Writing as you talk")
-        case .behind(let m): return String(localized: "About \(m) min behind")
-        case .pausedHeat: return String(localized: "Paused while the phone cools down")
-        case .pausedBattery: return String(localized: "Paused: battery low — notes will be written later")
-        case .later: return String(localized: "Notes will be written after you stop")
+        case .behind(let m): return String(localized: "Running about \(m) min behind")
+        case .pausedHeat: return String(localized: "Waiting for the phone to cool down")
+        case .pausedBattery: return String(localized: "Battery's low, so I'll write your notes later")
+        case .later: return String(localized: "I'll write your notes after you stop")
         case .cooling: return String(localized: "Going slower to keep the phone cool")
         }
     }

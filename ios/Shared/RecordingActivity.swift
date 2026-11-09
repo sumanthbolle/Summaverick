@@ -1,5 +1,5 @@
 // The recording's Live Activity: what the app sends and the widget extension shows (compiled into both targets).
-// While recording: the elapsed time. After Stop: the stage line and percent of the note's work, then "Notes ready"
+// While recording: the elapsed time. After Stop: the stage line and percent of the note's work, then "Your notes are ready"
 // with the title, or the paused / failed line. A quiet line (Stop when quiet) is shown under it when there is one.
 // Foundation only apart from the ActivityKit conformance, so the pure rules (LiveActivityLogic) can be checked with
 // swiftc on a Mac.

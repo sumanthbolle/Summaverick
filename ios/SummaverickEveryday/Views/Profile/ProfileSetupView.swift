@@ -49,7 +49,7 @@ struct ProfileSetupView: View {
                     }
                 }
             }
-            .alert("Could not save this. Please try again.", isPresented: $errorShown) {
+            .alert("I couldn't save this. Please try again.", isPresented: $errorShown) {
                 Button("OK", role: .cancel) {}
             }
             .sheet(item: $editing) { e in
@@ -62,7 +62,7 @@ struct ProfileSetupView: View {
                 if !ok { deleteFailed = true }
                 Task { await reloadMedicines() }
             }
-            .alert("Could not delete this. Please try again.", isPresented: $deleteFailed) {
+            .alert("I couldn't delete this. Please try again.", isPresented: $deleteFailed) {
                 Button("OK", role: .cancel) {}
             }
             .toast($toast)
@@ -87,7 +87,7 @@ struct ProfileSetupView: View {
     private var nameStep: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                header("What should Summaverick call you?", "Your name is used in greetings and to understand your recordings.")
+                header("What should I call you?", "I use your name to greet you and to understand your recordings.")
                 TextField("Your name", text: $name)
                     .textContentType(.givenName)
                     .textInputAutocapitalization(.words)
@@ -105,7 +105,7 @@ struct ProfileSetupView: View {
     private var languageStep: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                header("Which language do you prefer?", "Summaverick talks to you in this language where it can. Some messages are in English for now.")
+                header("Which language do you prefer?", "I talk to you in this language where I can. Some messages are in English for now.")
                 VStack(spacing: 10) {
                     ForEach(ProfileLanguage.all, id: \.code) { l in
                         Button { lang = l.code } label: {
@@ -158,7 +158,7 @@ struct ProfileSetupView: View {
     private var medicinesStep: some View {
         Form {
             Section {
-                header("Do you take any medicines?", "Add them here and Summaverick will offer a reminder on Today. Nothing rings until you say Yes.")
+                header("Do you take any medicines?", "Add them here and I'll offer a reminder on Today. Nothing rings until you say Yes.")
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
             }

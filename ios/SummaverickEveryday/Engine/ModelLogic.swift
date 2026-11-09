@@ -396,7 +396,7 @@ enum NotifyRule {
     /// One identifier per note, so a later state replaces the earlier one.
     static func identifier(noteID: Int64) -> String { "notes.\(noteID)" }
 
-    /// "Paused" when work after Stop is cut off; not each time the overnight task is ended during the night (the
+    /// "Taking a short break" when work after Stop is cut off; not each time the overnight task is ended during the night (the
     /// note was already paused and finishes in a later run).
     static func postsPaused(cutOffByOvernightTask: Bool) -> Bool { !cutOffByOvernightTask }
 
@@ -410,8 +410,46 @@ enum NotifyRule {
     /// "Transcript ready" only with a real title: with the placeholder, "Summary ready" follows with the real one.
     static func saysTranscriptReady(title: String) -> Bool { !title.hasPrefix("Recording ") }
 
-    /// What a regenerate finishing in the background says: a summary-only one "Summary ready", any other "Notes ready".
+    /// What a regenerate finishing in the background says: a summary-only one "Summary ready", any other "Your notes are ready".
     static func regenerateStage(summaryOnly: Bool) -> String { summaryOnly ? summary : notes }
+}
+
+/// Which version of a notification's words a note gets, and the first name the notifications greet with.
+enum NotifyCopy {
+    /// UserDefaults key: the profile's first word, written whenever the profile loads or saves, because the notifier
+    /// must not await the core while posting. "Delete everything" clears it.
+    static let firstNameKey = "profile.firstName"
+
+    /// 0 ..< count. The same note and stage always get the same version; different notes spread across them. FNV-1a,
+    /// because Swift's own hash changes on every launch.
+    static func variant(noteID: Int64, stage: String, count: Int) -> Int {
+        guard count > 1 else { return 0 }
+        var h: UInt64 = 14695981039346656037
+        for b in stage.utf8 { h = (h ^ UInt64(b)) &* 1099511628211 }
+        var id = UInt64(bitPattern: noteID)
+        for _ in 0..<8 {
+            h = (h ^ (id & 0xFF)) &* 1099511628211
+            id >>= 8
+        }
+        // Finished like MurmurHash3, so neighbouring ids do not fall into long runs of one version.
+        h = (h ^ (h >> 33)) &* 0xFF51AFD7ED558CCD
+        h = (h ^ (h >> 33)) &* 0xC4CEB9FE1A85EC53
+        return Int((h ^ (h >> 33)) % UInt64(count))
+    }
+
+    /// The first word of a profile name; nil when there is none.
+    static func firstName(of name: String?) -> String? {
+        name?.split(whereSeparator: \.isWhitespace).first.map(String.init)
+    }
+
+    static func rememberFirstName(of name: String?, in defaults: UserDefaults = .standard) {
+        if let first = firstName(of: name) { defaults.set(first, forKey: firstNameKey) }
+        else { defaults.removeObject(forKey: firstNameKey) }
+    }
+
+    static func storedFirstName(in defaults: UserDefaults = .standard) -> String? {
+        firstName(of: defaults.string(forKey: firstNameKey))
+    }
 }
 
 /// The one decision for a notes run (and a tap) that stopped short: a cut-off (the work is kept and continues by
@@ -551,13 +589,13 @@ enum OvernightList {
 
 /// Regenerate, Undo and Try again on a note's screen.
 enum RegenerateRules {
-    /// "Regenerate" under a tab: the tab has text, nothing runs for this note, the AI is ready and the note is not
+    /// "Write again" under a tab: the tab has text, nothing runs for this note, the AI is ready and the note is not
     /// waiting for the charger. (Disabled, not hidden, while another note runs: one model run at a time.)
     static func showsRegenerate(hasText: Bool, noteBusy: Bool, aiReady: Bool, overnight: Bool) -> Bool {
         hasText && !noteBusy && aiReady && !overnight
     }
 
-    /// "Regenerate all" in the note's menu: there is a transcript and at least one output to write again.
+    /// "Write it all again" in the note's menu: there is a transcript and at least one output to write again.
     static func showsRegenerateAll(hasTranscript: Bool, outputs: [Bool], noteBusy: Bool, aiReady: Bool, overnight: Bool) -> Bool {
         hasTranscript && outputs.contains(true) && !noteBusy && aiReady && !overnight
     }

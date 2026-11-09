@@ -881,7 +881,7 @@ static void run_api_route(sve_ctx *ctx, Chat chat) {
            s1.text.find("It is for March") != std::string::npos, "summary: streamed; a medicine sentence left out, the rest goes on");
     ChatSink s2;
     json lastm = chat(ask("What happened last week?"), s2, nullptr);
-    expect(lastm.is_object() && lastm["kind"] == "summary" && lastm["answer"] == "No recordings in that period." && lastm["not_found"] == true,
+    expect(lastm.is_object() && lastm["kind"] == "summary" && lastm["answer"] == "I don't have any recordings from then." && lastm["not_found"] == true,
            "summary: an empty period says so");
 
     // Quiz: stored questions, unasked, never about a medicine; no model.

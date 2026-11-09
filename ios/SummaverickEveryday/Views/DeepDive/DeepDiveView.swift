@@ -72,8 +72,8 @@ struct TopicListView: View {
                     isPeople ? "No people yet" : "No topics yet",
                     systemImage: isPeople ? "person.2" : "tag",
                     description: Text(isPeople
-                        ? "People you talk about appear here after your recordings are processed."
-                        : "Topics appear here after your recordings are processed."))
+                        ? "People you talk about show up here once I've gone through your recordings."
+                        : "Topics show up here once I've gone through your recordings."))
                     .listRowSeparator(.hidden)
             }
             ForEach(topics) { t in

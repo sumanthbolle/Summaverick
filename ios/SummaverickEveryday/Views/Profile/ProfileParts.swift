@@ -262,7 +262,7 @@ struct MedicineForm: View {
                 }
             }
             .onChange(of: when) { _, new in refill(new) }
-            .alert("Could not save this. Please try again.", isPresented: $errorShown) {
+            .alert("I couldn't save this. Please try again.", isPresented: $errorShown) {
                 Button("OK", role: .cancel) {}
             }
             .onAppear(perform: start)

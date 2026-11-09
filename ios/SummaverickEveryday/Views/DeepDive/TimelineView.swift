@@ -14,7 +14,7 @@ struct TimelineView: View {
                 ContentUnavailableView(
                     query.isEmpty ? "No notes yet" : "Nothing found",
                     systemImage: query.isEmpty ? "waveform" : "magnifyingglass",
-                    description: Text(query.isEmpty ? "Tap Record to capture a lecture, a meeting or a thought. Notes are written on this phone and never leave it." : "Try a different word."))
+                    description: Text(query.isEmpty ? "Tap Record for a lecture, a meeting or a thought. Notes are written on this phone and never leave it. I can get things wrong, so check anything important." : "Try a different word."))
                     .listRowSeparator(.hidden)
             }
             ForEach(notes) { n in
@@ -60,7 +60,7 @@ struct NoteRow: View {
                 Spacer()
                 if isActive { ProgressView().controlSize(.small) }
             }
-            Text(note.preview.isEmpty ? "No transcript yet" : note.preview)
+            Text(note.preview.isEmpty ? String(localized: "Nothing written down yet") : note.preview)
                 .font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
             HStack(spacing: 8) {
                 Text(note.createdAt, style: .date)
@@ -96,7 +96,7 @@ struct StatusBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(stage.label).font(.footnote).lineLimit(2)
                 if stage.isWorking {
-                    Text("You can close Summaverick and get on with your day. You'll get a notification when your notes are ready.")
+                    Text("You can close the app and get on with your day. I'll let you know when your notes are ready.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
