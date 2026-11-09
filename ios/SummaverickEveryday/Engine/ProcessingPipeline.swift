@@ -135,6 +135,7 @@ final class ProcessingPipeline {
     private(set) var starting = false
     /// Notes the "AI is ready" pass already ran once, so a silent recording is not re-run every launch.
     @ObservationIgnored private var autoTried: Set<Int64> = Set((UserDefaults.standard.array(forKey: "pipeline.autoTried") as? [Int64]) ?? [])
+    @ObservationIgnored private var autoTriedPruned = false
     private(set) var activeNoteID: Int64?
     /// Last failure message per note, so the note screen can show why nothing was generated.
     private(set) var lastFailure: [Int64: String] = [:]
@@ -279,8 +280,30 @@ final class ProcessingPipeline {
     /// Notes whose run stepped aside for a recording, and notes only waiting their turn behind it (LiveFirst): back in
     /// `interrupted`, quiet while it records (waitsQuietly). Cleared when the note's notes run starts again. Kept across
     /// launches, so a kill during the recording still resumes them (queueWaitingNotes), with no overnight mark.
-    @ObservationIgnored private var steppedAside: Set<Int64> = Set((UserDefaults.standard.array(forKey: ProcessingPipeline.steppedAsideKey) as? [Int64]) ?? []) {
+    /// A notes run saved as running at launch was killed: its note joins them (restoredSteppedAside).
+    @ObservationIgnored private var steppedAside: Set<Int64> = ProcessingPipeline.restoredSteppedAside() {
         didSet { if steppedAside != oldValue { Self.save(steppedAside, Self.steppedAsideKey) } }
+    }
+    nonisolated private static let runningNoteKey = "pipeline.runningNote"
+    /// The notes run in flight, on disk: a kill after the transcript is stored leaves nothing else saying the note was
+    /// running (queueWaitingNotes only finds notes with no transcript). Not a regenerate or find reminders: runningTap.
+    @ObservationIgnored private var runningNote: Int64? {
+        didSet {
+            if let runningNote { UserDefaults.standard.set(NSNumber(value: runningNote), forKey: Self.runningNoteKey) }
+            else { UserDefaults.standard.removeObject(forKey: Self.runningNoteKey) }
+        }
+    }
+    /// The stepped-aside notes saved, plus the note of a run killed last launch. Moved over at launch, before a new run
+    /// can overwrite the key: in that set it is restored by queueWaitingNotes, stays through another kill until its run
+    /// starts again (startNotesRun takes it out, so it never runs twice), and waits quietly behind a recording.
+    nonisolated private static func restoredSteppedAside() -> Set<Int64> {
+        let d = UserDefaults.standard
+        let stored = Set((d.array(forKey: steppedAsideKey) as? [Int64]) ?? [])
+        let running = (d.object(forKey: runningNoteKey) as? NSNumber)?.int64Value
+        let all = WaitingNotes.afterKill(steppedAside: stored, running: running)
+        if all != stored { save(all, steppedAsideKey) }
+        d.removeObject(forKey: runningNoteKey)
+        return all
     }
     /// The saved stepped-aside notes were queued again in this launch (queueWaitingNotes).
     @ObservationIgnored private var steppedAsideRestored = false
@@ -290,7 +313,7 @@ final class ProcessingPipeline {
     @ObservationIgnored private var insightDue: Set<Int64> = Set((UserDefaults.standard.array(forKey: ProcessingPipeline.insightDueKey) as? [Int64]) ?? []) {
         didSet { if insightDue != oldValue { Self.save(insightDue, Self.insightDueKey) } }
     }
-    private static func save(_ ids: Set<Int64>, _ key: String) {
+    nonisolated private static func save(_ ids: Set<Int64>, _ key: String) {
         if ids.isEmpty { UserDefaults.standard.removeObject(forKey: key) } else { UserDefaults.standard.set(ids.sorted(), forKey: key) }
     }
     /// The run in flight stepped aside for a recording (reset when a run starts).
@@ -679,7 +702,11 @@ final class ProcessingPipeline {
             setStreak(id, .regenerate, nil)
             if noteTitles[id] == nil { noteTitles[id] = now.title }
             // Written with the app closed: "ready", as for the first notes (nothing is posted with the app in front).
-            notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
+            if NotifyRule.regenerateStage(summaryOnly: kind == .shortSummary) == NotifyRule.summary {
+                notify(id) { NotesNotifier.summaryReady(noteID: id, title: $0, hold: $1) }
+            } else {
+                notify(id) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
+            }
             stage = .done
             return previous
         }
@@ -898,6 +925,7 @@ final class ProcessingPipeline {
     /// A notes run starts for this note: it may be cut off (and notify) again.
     private func startNotesRun(_ id: Int64) {
         notesRun = true
+        runningNote = id
         pausedPosted.remove(id)
         postedStages[id] = nil
         steppedAside.remove(id)
@@ -978,10 +1006,18 @@ final class ProcessingPipeline {
         queued = TapQueue.enqueue(queued, QueuedTap(noteID: id, kind: .findReminders))
     }
 
-    /// The transcript is stored after Stop (a notes run): "Transcript ready", once for this run.
+    /// The transcript is stored after Stop (a notes run): "Transcript ready", once for this run. Not with the
+    /// placeholder title: "Summary ready" follows with the real one.
     private func transcriptStored(_ id: Int64) {
         setStreak(id, .notes, nil)
-        notifyStage(id, NotifyRule.transcript) { NotesNotifier.transcriptReady(noteID: id, title: $0, hold: $1) }
+        notifyStage(id, NotifyRule.transcript) { title, hold in
+            guard NotifyRule.saysTranscriptReady(title: title) else {
+                NSLog("[sve] bg: note %lld: transcript stored; the title is still the placeholder, no notification", id)
+                hold.end()
+                return
+            }
+            NotesNotifier.transcriptReady(noteID: id, title: title, hold: hold)
+        }
     }
 
     /// A part of the note's notes is ready: posted at most once per stage in this run (NotifyRule.next), under the
@@ -1556,13 +1592,26 @@ final class ProcessingPipeline {
         defer { endBackground() }
         activeNoteID = noteID
         lastFailure[noteID] = nil
-        if Heat.isTooHot(Self.thermal) {   // heat: a cut-off; it runs again by itself once cooler
-            if stopShort(Self.tapTooWarmMessage, heat: true) == .cutOff {
+        let abort = self.abort
+        func yields() -> Bool { LiveFirst.yields(recording: LiveTranscriber.shared.liveRunning, runIsLive: false) }
+        // The heat ladder: eased or minimal rests first (cut short by a cooler phone, an expiry or a recording).
+        let stageBefore = stage
+        if !(await quietHeatGate({ abort.isSet || yields() })) {
+            if yields() {   // a recording started during the rest: it waits, queued, as above
+                NSLog("[sve] note %lld steps aside for the recording", noteID)
+                queued = TapQueue.enqueue(queued, QueuedTap(noteID: noteID, kind: .findReminders))
+                stage = .idle
+            } else if HeatGovernor.shared.level == .paused {   // a cut-off; it runs again by itself once cooler
+                if stopShort(Self.tapTooWarmMessage, heat: true) == .cutOff {
+                    requeueFindReminders(noteID)
+                    tapTooWarm.insert(noteID)
+                }
+            } else if stopShort(Self.cutOffMessage) == .cutOff {   // an expiry during the rest
                 requeueFindReminders(noteID)
-                tapTooWarm.insert(noteID)
             }
             return
         }
+        stage = stageBefore
         tapTooWarm.remove(noteID)
         let engine = CoreEngine.shared
         guard let note = await engine.note(noteID) else { return }   // deleted (before its turn came): nothing to do
@@ -1583,7 +1632,7 @@ final class ProcessingPipeline {
         stage = .extracting
         do {
             // On the backend for right now, retried once on the CPU when the app is closed mid-run (GPU stopped).
-            let n = try await onBackend { try await engine.extract(noteID: noteID, shouldStop: { ContinuedWork.beat(); return false }) }
+            let n = try await onBackend { try await engine.extract(noteID: noteID, shouldStop: { ContinuedWork.beat(); return abort.isSet }) }
             NSLog("[sve] extract added %d suggestions", n)
             setStreak(noteID, .findReminders, nil)
             stage = .done
@@ -1638,6 +1687,8 @@ final class ProcessingPipeline {
         endBackground()
     }
     private func endBackground() {
+        // Ended, not killed: nothing left to restore next launch, unless the note is queued to go on (the queue is not saved).
+        if let id = runningNote, !WaitingNotes.keepsRunningNote(queued: interrupted.contains(id)) { runningNote = nil }
         ContinuedWork.shared.endNote()   // a Stop or tap from here on finds this note's run over
         stoppedWhileNotActive = false   // this run's; a later run is not one stopped from the background
         UIApplication.shared.isIdleTimerDisabled = false
@@ -1834,7 +1885,17 @@ final class ProcessingPipeline {
         guard ModelManager.shared.isReady else { return }
         let engine = CoreEngine.shared
         var candidates: [WaitingNotes.Candidate] = []
-        for n in await engine.notes(limit: 10_000) where n.has_audio && !autoTried.contains(n.id) {
+        let limit: Int32 = 10_000
+        let all = await engine.notes(limit: limit)
+        if !autoTriedPruned {   // once per launch: ids of deleted notes leave the saved list
+            autoTriedPruned = true
+            let pruned = WaitingNotes.prunedTried(autoTried, existing: Set(all.map(\.id)), listComplete: all.count < Int(limit))
+            if pruned != autoTried {
+                autoTried = pruned
+                UserDefaults.standard.set(autoTried.sorted(), forKey: "pipeline.autoTried")
+            }
+        }
+        for n in all where n.has_audio && !autoTried.contains(n.id) {
             guard let note = await engine.note(n.id) else { continue }
             noteTitles[n.id] = note.title
             let path = AudioRecorder.existingAudioPath(note.audio_path)
@@ -1854,7 +1915,7 @@ final class ProcessingPipeline {
         guard !steppedAsideRestored else { return }
         steppedAsideRestored = true
         for id in steppedAside.sorted() where !interrupted.contains(id) {
-            guard !overnight.contains(id), let note = await engine.note(id),
+            guard !overnight.contains(id), let note = await engine.note(id), steppedAside.contains(id),   // its run may have started meanwhile
                   WaitingNotes.needsWork(hasTranscript: !(note.transcript ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                                          outputs: OutputKind.allCases.map { note.output($0) != nil }) else {
                 steppedAside.remove(id)
@@ -2072,6 +2133,9 @@ final class ProcessingPipeline {
         parkRequested.remove(id)
         interrupted.remove(id)
         steppedAside.remove(id)
+        if runningNote == id { runningNote = nil }
+        queued = TapQueue.forgetting(noteID: id, in: queued)
+        ChatStore.shared.forget(noteID: id)   // its quotes, titles and links in Ask's chats
         insightDue.remove(id)
         heatPaused.remove(id)
         lastFailure[id] = nil

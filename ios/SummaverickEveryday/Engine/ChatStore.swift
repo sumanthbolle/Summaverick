@@ -2,6 +2,7 @@
 // (Chats/chats.json), not the notes database. The newest 50 chats are kept. "Delete everything" deletes them.
 import Foundation
 import Observation
+import UIKit
 
 /// One question in a chat and what came back.
 struct ChatTurn: Codable, Identifiable, Equatable {
@@ -64,6 +65,11 @@ final class ChatStore {
     var current: Chat? { currentID.flatMap { id in chats.first { $0.id == id } } }
 
     @ObservationIgnored private var saveScheduled = false
+    /// A change not on disk yet (streamed text waits for streamSaveDue, or for the app leaving the front).
+    @ObservationIgnored private var unsaved = false
+    @ObservationIgnored private var lastSave: TimeInterval?
+    /// Notes deleted in this launch: an answer still being written when its note went is dropped when it arrives.
+    @ObservationIgnored private var forgotten: Set<Int64> = []
     @ObservationIgnored private let writeQueue = DispatchQueue(label: "sve.chats.write", qos: .utility)
 
     static var fileURL: URL {
@@ -74,6 +80,10 @@ final class ChatStore {
     private init() {
         load()
         currentID = chats.first?.id
+        // The singleton lives as long as the app, so the observer is never removed.
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { ChatStore.shared.saveForBackground() }
+        }
     }
 
     // MARK: chats
@@ -93,7 +103,7 @@ final class ChatStore {
     func append(_ question: String) -> UUID {
         let turn = ChatTurn(question: question, state: .waiting)
         if let i = currentIndex {
-            chats[i].turns.append(turn)
+            chats[i].turns = ChatKeep.capped(chats[i].turns + [turn])
             chats[i].updated = Date()
         } else {
             let chat = Chat(turns: [turn])
@@ -109,10 +119,46 @@ final class ChatStore {
     func update(_ turnID: UUID, _ state: ChatTurn.State) {
         guard let c = chats.firstIndex(where: { $0.turns.contains { $0.id == turnID } }),
               let t = chats[c].turns.firstIndex(where: { $0.id == turnID }) else { return }
+        // Answered from a note deleted while it was being written: its words never go in.
+        if case .answered(let a) = state, a.sources.contains(where: { forgotten.contains($0.noteID) }) {
+            chats[c].turns.remove(at: t)
+            if chats[c].turns.isEmpty { chats.remove(at: c) }
+            tidy()
+            saveNow()
+            return
+        }
         chats[c].turns[t].state = state
         chats[c].updated = Date()
-        // Streaming text redraws often: saved with the next settled state (or a moment later).
-        if case .streaming = state { scheduleSave(after: 2) } else { scheduleSave() }
+        // Streaming text redraws often: the whole file is written at most every streamSaveInterval, and when the
+        // turn finishes, or the app leaves the front.
+        if case .streaming = state {
+            unsaved = true
+            if ChatKeep.streamSaveDue(last: lastSave, now: Date().timeIntervalSinceReferenceDate) { saveNow() }
+        } else {
+            scheduleSave()
+        }
+    }
+
+    /// A note deleted: its words leave the chats. Every turn citing it goes, and a chat left with no turns; on disk now.
+    func forget(noteID id: Int64) {
+        forgotten.insert(id)
+        var changed = false
+        for c in chats.indices {
+            let kept = ChatKeep.withoutNote(chats[c].turns, noteID: id, sources: Self.notes(cited:))
+            if kept.count != chats[c].turns.count {
+                chats[c].turns = kept
+                changed = true
+            }
+        }
+        guard changed else { return }
+        chats.removeAll { $0.turns.isEmpty }
+        tidy()
+        saveNow()
+    }
+
+    private static func notes(cited t: ChatTurn) -> [Int64] {
+        if case .answered(let a) = t.state { return a.sources.map(\.noteID) }
+        return []
     }
 
     /// The turns before `turnID` in its chat (all of them when it is not found), for the follow-up's history.
@@ -154,6 +200,7 @@ final class ChatStore {
     func deleteAll() {
         chats = []
         currentID = nil
+        unsaved = false
         let url = Self.fileURL
         writeQueue.async { try? FileManager.default.removeItem(at: url) }
     }
@@ -167,17 +214,27 @@ final class ChatStore {
         if let id = currentID, !chats.contains(where: { $0.id == id }) { currentID = nil }
     }
 
-    private func scheduleSave(after seconds: Double = 0.3) {
+    private func scheduleSave() {
+        unsaved = true
         guard !saveScheduled else { return }
         saveScheduled = true
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(seconds))
+            try? await Task.sleep(for: .seconds(0.3))
             saveScheduled = false
-            save()
+            saveNow()
         }
     }
 
-    private func save() {
+    /// The app left the front: what is not on disk goes now, under background time.
+    private func saveForBackground() {
+        guard unsaved else { return }
+        let hold = NotesNotifier.Hold()
+        saveNow { hold.end() }
+    }
+
+    private func saveNow(then done: (@MainActor @Sendable () -> Void)? = nil) {
+        unsaved = false
+        lastSave = Date().timeIntervalSinceReferenceDate
         let snapshot = chats
         let url = Self.fileURL
         writeQueue.async {
@@ -188,6 +245,7 @@ final class ChatStore {
             } catch {
                 NSLog("[sve] chats save failed: %@", String(describing: error))
             }
+            if let done { Task { @MainActor in done() } }
         }
     }
 
@@ -199,6 +257,7 @@ final class ChatStore {
         }
         // An answer that was being written when the app ended: kept as stopped, or failed with nothing written.
         for c in loaded.indices {
+            loaded[c].turns = ChatKeep.capped(loaded[c].turns)
             for t in loaded[c].turns.indices {
                 switch loaded[c].turns[t].state {
                 case .waiting: loaded[c].turns[t].state = .failed

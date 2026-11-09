@@ -228,6 +228,22 @@ enum WaitingNotes {
     static func needsWork(hasTranscript: Bool, outputs: [Bool]) -> Bool {
         !(hasTranscript && outputs.count == 3 && outputs.allSatisfy { $0 })
     }
+
+    /// At launch: a notes run still saved as running was killed; its note joins the notes restored at launch.
+    static func afterKill(steppedAside: Set<Int64>, running: Int64?) -> Set<Int64> {
+        running.map { steppedAside.union([$0]) } ?? steppedAside
+    }
+
+    /// When a run ends, the saved running note stays only while that note is queued to go on (it was cut off or
+    /// paused, and the queue is not saved): a kill before its turn still resumes it. Otherwise it is cleared.
+    static func keepsRunningNote(queued: Bool) -> Bool { queued }
+
+    /// Tried ids of notes that still exist. An empty list may be a read failure, and a list cut at its limit does
+    /// not show every note: nothing is pruned then.
+    static func prunedTried(_ tried: Set<Int64>, existing: Set<Int64>, listComplete: Bool) -> Set<Int64> {
+        guard listComplete, !existing.isEmpty else { return tried }
+        return tried.intersection(existing)
+    }
 }
 
 /// Where a model run goes. iOS refuses GPU work from the background (even while recording), so
@@ -237,7 +253,8 @@ enum ModelBackend: Equatable {
 
     /// Layers given to the GPU: all of them (Metal), or none.
     var gpuLayers: Int32 { self == .gpu ? 99 : 0 }
-    /// 4 threads on the CPU (measured: 6 is slower on the phone); 0 = the core's own choice for the GPU.
+    /// Decode threads on the CPU: 4 (measured: 6 is slower on the phone); 0 = the core's own choice for the GPU.
+    /// Decode only: prefill and the audio encoder follow sve_threads.h.
     var threads: Int32 { self == .cpu ? 4 : 0 }
 }
 
@@ -365,6 +382,12 @@ enum NotifyRule {
 
     /// One notification per stage per note per run: `posted` holds the stages this run already posted.
     static func next(posted: Set<String>, stage: String) -> Bool { !posted.contains(stage) }
+
+    /// "Transcript ready" only with a real title: with the placeholder, "Summary ready" follows with the real one.
+    static func saysTranscriptReady(title: String) -> Bool { !title.hasPrefix("Recording ") }
+
+    /// What a regenerate finishing in the background says: a summary-only one "Summary ready", any other "Notes ready".
+    static func regenerateStage(summaryOnly: Bool) -> String { summaryOnly ? summary : notes }
 }
 
 /// The one decision for a notes run (and a tap) that stopped short: a cut-off (the work is kept and continues by
@@ -645,6 +668,9 @@ enum TapQueue {
         if output != nil { return q.contains(all) ? q : q + [t] }
         return q.filter { !($0.noteID == t.noteID && isRegenerate($0.kind)) } + [t]
     }
+
+    /// A note deleted: its taps leave the queue.
+    static func forgetting(noteID: Int64, in q: [QueuedTap]) -> [QueuedTap] { q.filter { $0.noteID != noteID } }
 
     /// The tap to run next: the oldest.
     static func next(_ q: [QueuedTap]) -> QueuedTap? { q.first }
@@ -1191,4 +1217,25 @@ enum ChatKeep {
     static func kept<T>(_ chats: [T], updated: (T) -> Date) -> [T] {
         Array(chats.sorted { updated($0) > updated($1) }.prefix(limit))
     }
+
+    /// Turns kept in one chat: the newest.
+    static let turnLimit = 200
+    static func capped<T>(_ turns: [T]) -> [T] { Array(turns.suffix(turnLimit)) }
+
+    /// The file is written at most this often while an answer streams (a finished turn saves at once).
+    static let streamSaveInterval: TimeInterval = 10
+    static func streamSaveDue(last: TimeInterval?, now: TimeInterval) -> Bool {
+        guard let last else { return true }
+        return now - last >= streamSaveInterval
+    }
+
+    /// A note deleted: every turn citing it goes, whole, also a summary that cites other notes too.
+    static func withoutNote<T>(_ turns: [T], noteID: Int64, sources: (T) -> [Int64]) -> [T] {
+        turns.filter { !sources($0).contains(noteID) }
+    }
+}
+
+/// Ask: which questions the core answers in code, with no model (on the store context, during any other work).
+enum AskRoute {
+    static func needsNoModel(_ kind: String) -> Bool { kind == "due" || kind == "quiz" || kind == "medicine" }
 }

@@ -32,11 +32,12 @@ private struct AnswerFormRequest: Identifiable {
 
 /// A short message above the question box.
 private enum AskNotice: Equatable {
-    case busy, needsModel, tooWarm, micReady, holdLonger, notHeard, transcribeFailed, micFailed
+    case busy, recording, needsModel, tooWarm, micReady, holdLonger, notHeard, transcribeFailed, micFailed
 
     var text: LocalizedStringKey {
         switch self {
-        case .busy: return "Busy with a recording — try again in a moment."
+        case .busy: return "Summaverick is working on another note. Try again in a moment."
+        case .recording: return "Recording now. Ask again after you stop."
         case .needsModel: return "Summaverick is still getting ready"
         case .tooWarm: return "The phone is too warm. Try again when it has cooled down."
         case .micReady: return "The microphone is ready. Hold the mic button and speak."
@@ -594,14 +595,14 @@ struct AskView: View {
 
     /// Why a question that needs the model cannot run now; nil when it can.
     private var blocked: AskNotice? {
-        // A recording is being processed: the core is busy with it, so do not queue a question behind it.
+        // Live transcription needs the model, piece after piece: a question would hold it for 30-60 s.
+        if LiveTranscriber.shared.liveRunning { return .recording }
+        // A note is being processed: the core is busy with it, so do not queue a question behind it.
         if pipeline.isBusy { return .busy }
         guard models.isReady else { return .needsModel }
         if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { return .tooWarm }
         return nil
     }
-
-    private func needsNoModel(_ kind: String) -> Bool { kind == "due" || kind == "quiz" }
 
     private func send(_ raw: String, fromField: Bool = true) {
         let q = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -609,7 +610,7 @@ struct AskView: View {
         generating = true   // while the kind is read, nothing else starts
         if fromField { text = "" }   // before the wait, so anything typed during it stays
         Task {
-            let instant = needsNoModel(await CoreEngine.shared.routeKind(q))
+            let instant = AskRoute.needsNoModel(await CoreEngine.shared.routeKind(q))
             if !instant, let why = blocked {
                 notice = why
                 generating = false
@@ -625,7 +626,7 @@ struct AskView: View {
         guard !generating else { return }
         generating = true
         Task {
-            let instant = needsNoModel(await CoreEngine.shared.routeKind(turn.question))
+            let instant = AskRoute.needsNoModel(await CoreEngine.shared.routeKind(turn.question))
             if !instant, let why = blocked {
                 notice = why
                 generating = false
@@ -638,7 +639,7 @@ struct AskView: View {
         }
     }
 
-    /// instant: what is due or a quiz: on the store context, with no model, heat or busy check (answers during a notes run).
+    /// instant: what is due, a quiz or a medicine question: on the store context, with no model, heat or busy check (answers during a notes run).
     private func ask(_ id: UUID, _ q: String, instant: Bool) {
         generating = true
         // The earlier turns of this chat go with it (the core trims them to its token budget).
@@ -655,6 +656,8 @@ struct AskView: View {
                     guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
                     try await loadSelectedModel()   // the backend for right now (GPU in front)
                     guard !pipeline.isWorking else { notice = .busy; chats.update(id, .failed); return }
+                    // A recording started during the waits above: it keeps the model.
+                    guard !LiveTranscriber.shared.liveRunning else { notice = .recording; chats.update(id, .failed); return }
                     try Task.checkCancellation()
                     a = try await CoreEngine.shared.chat(messages: messages, langHint: profileLang,
                                                          onKind: { kind in chats.setKind(kind, turn: id) },
@@ -712,6 +715,7 @@ struct AskView: View {
 
     private func beginVoice() {
         guard !listening, !transcribing, !generating else { return }
+        if LiveTranscriber.shared.liveRunning { notice = .recording; return }
         if pipeline.isBusy { notice = .busy; return }
         guard models.isReady else { notice = .needsModel; return }
         if Heat.isTooHot(ProcessInfo.processInfo.thermalState) { notice = .tooWarm; return }
@@ -750,11 +754,13 @@ struct AskView: View {
                 try? FileManager.default.removeItem(at: url)
                 transcribing = false
             }
+            if LiveTranscriber.shared.liveRunning { notice = .recording; return }
             if pipeline.isBusy { notice = .busy; return }
             guard await pipeline.yieldMemories(), !pipeline.isWorking else { notice = .busy; return }
             do {
                 try await loadSelectedModel()
                 guard !pipeline.isWorking else { notice = .busy; return }
+                guard !LiveTranscriber.shared.liveRunning else { notice = .recording; return }
                 let pieces = try await CoreEngine.shared.transcribeAudioPieces(path: url.path)
                 let heard = pieces.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }.joined(separator: " ")

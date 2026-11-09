@@ -5793,6 +5793,38 @@
           }
         }
       }
+    },
+    "Summaverick is working on another note. Try again in a moment.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick is working on another note. Try again in a moment."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick మరో నోట్ మీద పని చేస్తోంది. కొద్దిసేపటి తర్వాత మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Recording now. Ask again after you stop.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording now. Ask again after you stop."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడు రికార్డ్ అవుతోంది. ఆపిన తర్వాత మళ్ళీ అడగండి."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
