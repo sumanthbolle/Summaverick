@@ -24,7 +24,9 @@ struct ChatTurn: Codable, Identifiable, Equatable {
         switch state {
         case .answered(let a):
             let shown = a.answer.trimmingCharacters(in: .whitespacesAndNewlines)
-            return ChatWindow.Turn(question: question, answer: shown.isEmpty ? nil : shown, medicine: a.medicine,
+            // A quiz turn: what was put to the person is the question; the expected answer stays out of the history.
+            let said = a.kind == "quiz" ? (a.question ?? shown) : shown
+            return ChatWindow.Turn(question: question, answer: said.isEmpty ? nil : said, medicine: a.medicine,
                                    sources: a.sources.map { ChatMessage.SourceRef(title: $0.title, start_sec: $0.startSec) })
         case .stopped(let partial):
             return ChatWindow.Turn(question: question, answer: partial)
@@ -39,6 +41,8 @@ struct Chat: Codable, Identifiable, Equatable {
     var created = Date()
     var updated = Date()
     var turns: [ChatTurn] = []
+    /// Quiz ids already asked in this chat (sent with the next quiz question). nil in files from before quizzes.
+    var quizAsked: [String]?
 
     /// The first question, for the list of earlier chats.
     var title: String { turns.first?.question ?? "" }
@@ -113,6 +117,28 @@ final class ChatStore {
         guard let chat = chats.first(where: { $0.turns.contains { $0.id == turnID } }),
               let i = chat.turns.firstIndex(where: { $0.id == turnID }) else { return current?.turns ?? [] }
         return Array(chat.turns[..<i])
+    }
+
+    // MARK: quiz
+
+    /// The quiz ids already asked in the chat holding the turn.
+    func quizAsked(turn turnID: UUID) -> [String] {
+        chats.first { $0.turns.contains { $0.id == turnID } }?.quizAsked ?? []
+    }
+
+    func markQuizAsked(_ quizID: String, turn turnID: UUID) {
+        guard let c = chats.firstIndex(where: { $0.turns.contains { $0.id == turnID } }) else { return }
+        var asked = chats[c].quizAsked ?? []
+        if !asked.contains(quizID) { asked.append(quizID) }
+        chats[c].quizAsked = asked
+        scheduleSave()
+    }
+
+    /// "Start over": every question can be asked again in the chat holding the turn.
+    func clearQuiz(turn turnID: UUID) {
+        guard let c = chats.firstIndex(where: { $0.turns.contains { $0.id == turnID } }) else { return }
+        chats[c].quizAsked = nil
+        scheduleSave()
     }
 
     /// "Delete everything": every chat, and the file.

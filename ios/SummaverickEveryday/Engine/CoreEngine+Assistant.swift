@@ -205,36 +205,64 @@ extension CoreEngine {
         return a
     }
 
+    /// Stop: what had been released when the answer was stopped.
+    struct ChatStopped: Error {
+        let partial: String
+    }
+
     /// Streamed text passed through the C callback as an opaque pointer (sve_assistant_chat's on_text).
-    final class TextBox {
+    final class TextBox: @unchecked Sendable {   // its state is behind the lock
         private let lock = NSLock()
         private var text = ""
         private var lastDraw: TimeInterval?
+        private var drawScheduled = false
         private let onText: @MainActor (String) -> Void
         let isCancelled: () -> Bool
         init(onText: @escaping @MainActor (String) -> Void, isCancelled: @escaping () -> Bool) {
             self.onText = onText; self.isCancelled = isCancelled
         }
 
-        /// A piece from the core's thread: added to the text; the bubble redraws on the main thread at most once
-        /// per StreamThrottle.interval.
+        /// Everything released so far.
+        var soFar: String {
+            lock.lock()
+            defer { lock.unlock() }
+            return text
+        }
+
+        /// A piece from the core's thread: added to the text. The bubble redraws on the main thread at most once per
+        /// StreamThrottle.interval; a piece that comes too soon is drawn at the end of the interval, not left waiting.
         func add(_ piece: String) {
             let now = ProcessInfo.processInfo.systemUptime
             lock.lock()
             text += piece
-            let draw = StreamThrottle.due(last: lastDraw, now: now)
-            if draw { lastDraw = now }
+            let wait = StreamThrottle.delay(last: lastDraw, now: now)
+            if wait == nil { lastDraw = now }
+            let schedule = wait != nil && !drawScheduled
+            if schedule { drawScheduled = true }
             let snapshot = text
             lock.unlock()
-            if draw { redraw(snapshot) }
+            if let wait {
+                if schedule { scheduleDraw(after: wait) }
+            } else {
+                redraw(snapshot)
+            }
         }
 
         /// The last text, whatever the throttle said.
         func flush() {
-            lock.lock()
-            let snapshot = text
-            lock.unlock()
+            let snapshot = soFar
             if !snapshot.isEmpty { redraw(snapshot) }
+        }
+
+        private func scheduleDraw(after wait: TimeInterval) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [self] in
+                lock.lock()
+                drawScheduled = false
+                lastDraw = ProcessInfo.processInfo.systemUptime
+                let snapshot = text
+                lock.unlock()
+                MainActor.assumeIsolated { onText(snapshot) }
+            }
         }
 
         private func redraw(_ snapshot: String) {
@@ -251,8 +279,8 @@ extension CoreEngine {
     }
 
     /// Ask as a chat (sve_assistant_chat): `messages` end with the question (ChatWindow.messages). onText gets the
-    /// visible answer so far, on the main thread, as it is written (never for medicine answers, which come whole
-    /// in the result). Cancelling the calling task stops it (throws); what onText last got is what was shown.
+    /// visible answer so far, on the main thread, as it is written (never for medicine, due or quiz answers, which
+    /// come whole in the result). Cancelling the calling task stops it: throws ChatStopped with what was released.
     func chat(messages: [ChatMessage], langHint: String? = nil,
               onText: @escaping @MainActor (String) -> Void = { _ in }) async throws -> AskAnswer {
         guard let ctx else { throw CoreError.initFailed }
@@ -263,9 +291,13 @@ extension CoreEngine {
         let puser = Unmanaged.passUnretained(box).toOpaque()
         let out = take(sve_assistant_chat(ctx, json, langHint, CoreEngine.textTrampoline, tuser,
                                           CoreEngine.progressTrampoline, puser))
+        withExtendedLifetime(box) {}
+        guard let out else {
+            if Task.isCancelled { throw ChatStopped(partial: text.soFar) }
+            text.flush()
+            throw CoreError.generationFailed
+        }
         text.flush()
-        withExtendedLifetime((text, box)) {}
-        guard let out else { throw Task.isCancelled ? CancellationError() : CoreError.generationFailed }
         guard let a = decode(AskAnswer.self, out) else { throw AssistantError.badJSON }
         return a
     }

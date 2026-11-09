@@ -58,6 +58,8 @@ struct AskView: View {
     /// Saved medicine ids the core finds in a medicine answer, by turn ([] otherwise); missing = could not tell yet.
     @State private var named: [UUID: [Int64]] = [:]
     @State private var askTask: Task<Void, Never>?
+    /// Quiz turns whose expected answer the person has asked to see.
+    @State private var revealed: Set<UUID> = []
     @State private var text = ""
     @State private var generating = false
     @State private var notice: AskNotice?
@@ -220,7 +222,7 @@ struct AskView: View {
             Image(systemName: "bubble.left.and.bubble.right").font(.largeTitle).foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             Text("Ask about anything you recorded.").font(.title3.bold())
-            Text("Answers come only from your recordings, with a link to the moment they came from.")
+            Text("Answers from your recordings link to the moment they came from. Anything else comes from general knowledge, and says so.")
                 .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -248,7 +250,11 @@ struct AskView: View {
             case .streaming(let partial):
                 if partial.isEmpty { TypingIndicator() } else { streamingView(partial) }
             case .answered(let a):
-                answerView(a, turn: turn.id, named: named[turn.id])
+                if a.kind == "quiz" {
+                    quizCard(a, turn: turn.id)
+                } else {
+                    answerView(a, turn: turn.id, named: named[turn.id])
+                }
             case .stopped(let partial):
                 stoppedView(partial, turn: turn)
             case .failed:
@@ -273,9 +279,12 @@ struct AskView: View {
 
     /// The answer as it is written. Never a medicine answer: those come whole, built in code.
     private func streamingView(_ partial: String) -> some View {
-        Text(verbatim: partial)
-            .font(.body)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(verbatim: partial)
+                .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
+            TypingIndicator(compact: true)   // more is coming: a sentence shows only once it is whole
+        }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
@@ -316,6 +325,55 @@ struct AskView: View {
         .buttonStyle(.bordered)
     }
 
+    /// One revision question from a recording; the expected answer when the person asks, then the link and the next.
+    @ViewBuilder
+    private func quizCard(_ a: AskAnswer, turn: UUID) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Quiz", systemImage: "questionmark.circle")
+                .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            if let q = a.question {
+                Text(verbatim: q)
+                    .font(.body.weight(.medium))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if revealed.contains(turn) {
+                    Text(verbatim: a.answer)
+                        .font(.body)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(a.sources) { src in sourceLink(src) }
+                } else {
+                    Button("Show answer") { revealed.insert(turn) }
+                        .buttonStyle(.bordered)
+                        .frame(minHeight: 44)
+                }
+            } else {
+                Text(verbatim: a.answer)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if turns.last?.id == turn {
+                if a.quizDone {
+                    Button("Start over") {
+                        chats.clearQuiz(turn: turn)
+                        send(String(localized: "Next question"), fromField: false)
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(minHeight: 44)
+                    .disabled(generating || listening || transcribing)
+                } else if a.question != nil {
+                    Button("Next question") { send(String(localized: "Next question"), fromField: false) }
+                        .buttonStyle(.bordered)
+                        .frame(minHeight: 44)
+                        .disabled(generating || listening || transcribing)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+    }
+
     private func answerView(_ a: AskAnswer, turn: UUID, named: [Int64]?) -> some View {
         let shown = a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? notFoundText(a.lang) : a.answer
         let quoted = a.medicine && shown == a.answer
@@ -325,10 +383,19 @@ struct AskView: View {
                     .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if a.kind == "summary" && !a.notFound {
+                Label("Summary of your recordings", systemImage: "text.alignleft")
+                    .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            }
+            if a.kind == "due" && !a.medicine {
+                Label("From your reminders and to-dos", systemImage: "checklist")
+                    .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            }
             if quoted {
                 // Built in the core from saved facts and recorded words: shown exactly, in full.
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(AssistantFormat.medicineAnswerLabel(shown), systemImage: "quote.opening")
+                    Label(a.kind == "due" ? "From your reminders and to-dos" : AssistantFormat.medicineAnswerLabel(shown),
+                          systemImage: "quote.opening")
                         .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                     HStack(alignment: .top, spacing: 10) {
                         RoundedRectangle(cornerRadius: 2).fill(Color.accentColor.opacity(0.6)).frame(width: 4)
@@ -352,7 +419,9 @@ struct AskView: View {
                 }
             }
 
-            if !a.notFound && !a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if !a.notFound && (a.kind == "due" || a.kind == "summary") {
+                copyButton(a.answer)   // already a list, or many points: not one reminder or to-do
+            } else if !a.notFound && !a.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 10) { makeButtons(a, turn: turn, named: named); copyButton(a.answer) }
                     VStack(alignment: .leading, spacing: 8) { makeButtons(a, turn: turn, named: named); copyButton(a.answer) }
@@ -542,7 +611,8 @@ struct AskView: View {
     private func ask(_ id: UUID, _ q: String) {
         generating = true
         // The earlier turns of this chat go with it (the core trims them to its token budget).
-        let messages = ChatWindow.messages(earlier: chats.turns(before: id).map(\.windowTurn), question: q)
+        let messages = ChatWindow.messages(earlier: chats.turns(before: id).map(\.windowTurn), question: q,
+                                           quizAsked: chats.quizAsked(turn: id))
         askTask = Task {
             defer { generating = false; askTask = nil }
             // The person first: memory work stops for the answer. Other work still running: the busy notice.
@@ -557,11 +627,14 @@ struct AskView: View {
                     chats.update(id, .streaming(partial))
                 }
                 named[id] = await namedMedicines(a)
+                if let quizID = a.quizID { chats.markQuizAsked(quizID, turn: id) }
                 chats.update(id, .answered(a))
+            } catch let stopped as CoreEngine.ChatStopped {
+                // Stop: everything already released stays, marked "(stopped)". A late redraw is dropped (isWriting).
+                chats.update(id, .stopped(stopped.partial))
             } catch {
-                if Task.isCancelled {
-                    // Stop: what was written stays, marked "(stopped)".
-                    chats.update(id, .stopped(writtenSoFar(id)))
+                if Task.isCancelled {   // stopped before the core started: nothing was written
+                    chats.update(id, .stopped(""))
                     return
                 }
                 NSLog("[sve] ask failed: %@", String(describing: error))
@@ -579,11 +652,6 @@ struct AskView: View {
         case .waiting, .streaming: return true
         default: return false
         }
-    }
-
-    private func writtenSoFar(_ id: UUID) -> String {
-        if case .streaming(let t) = state(of: id) { return t }
-        return ""
     }
 
     /// The medicine ids of the restored medicine answers of the chat on screen.
@@ -760,16 +828,19 @@ struct AskView: View {
 
 /// Three dots while an answer is being written.
 private struct TypingIndicator: View {
+    /// Small and without its own bubble: under text that is still growing.
+    var compact = false
+
     var body: some View {
         SwiftUI.TimelineView(.periodic(from: .now, by: 0.35)) { ctx in
             let step = Int(ctx.date.timeIntervalSinceReferenceDate / 0.35) % 3
             HStack(spacing: 6) {
                 ForEach(0..<3, id: \.self) { i in
-                    Circle().fill(Color.secondary).frame(width: 9, height: 9).opacity(i == step ? 1 : 0.3)
+                    Circle().fill(Color.secondary).frame(width: compact ? 6 : 9, height: compact ? 6 : 9).opacity(i == step ? 1 : 0.3)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, compact ? 0 : 16).padding(.vertical, compact ? 0 : 14)
+            .background(compact ? Color.clear : Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
         }
         .accessibilityElement()
         .accessibilityLabel(Text("Summaverick is writing an answer"))

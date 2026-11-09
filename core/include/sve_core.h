@@ -346,15 +346,19 @@ char *sve_assistant_ask(sve_ctx *ctx, const char *question, sve_progress_cb cb, 
 
 /* Ask as a chat: messages_json is [{"role":"user"|"assistant","text":"…"}] with the newest (the question, a
  * "user" turn) last. An assistant turn may carry "sources" ([{"title","start_sec"}], kept as text for the model)
- * and "medicine":true (its text is then never handed to the model). Earlier turns go with the question within
- * 1500 tokens, newest first. The answer is written in the question's language (Telugu when Telugu script is at
- * least 30% of its letters, else English); lang_hint ("te"/"en", may be NULL) is used only for a question with no
- * letters, then the profile's. Returns the JSON of sve_assistant_ask plus "kind" ("recordings"|"general"|"medicine"|
- * "summary"|"due"|"quiz"; this version gives "recordings" or "medicine") and "lang". on_text (may be NULL) gets
- * the visible answer as it is written, a sentence at a time, thinking and [S1] labels removed; its pieces join to
- * "answer" when the answer is the model's. Medicine answers (built in code, quoted word for word) and the
- * not-found sentence are never streamed, nor any sentence that mentions a medicine: "answer" is the final text
- * to show. on_text or cb returning non-zero cancels (NULL). NULL also on error or with no model. */
+ * and "medicine":true (its text is then never handed to the model). The last turn may carry "quiz_asked": the quiz
+ * ids already asked in this chat. Earlier turns go with the question within 1500 tokens, newest first. The answer is
+ * written in the question's language (Telugu when Telugu script is at least 30% of its letters, else English);
+ * lang_hint ("te"/"en", may be NULL) is used only for a question with no letters, then the profile's.
+ * Returns the JSON of sve_assistant_ask plus "lang" and "kind", chosen by sve::route_question:
+ * "medicine" (built in code, quoted, never streamed); "due" (reminders and to-dos of 7 days, in code);
+ * "quiz" ("question", "answer" = the expected answer, "source", "quiz_id"; none left: not_found and "quiz_done");
+ * "summary" (stored summaries of the notes of the period, each note a source; empty period: not_found);
+ * "recordings" (retrieval over pieces and stored summaries); "general" (the model's own knowledge, no sources).
+ * on_text (may be NULL) gets the visible answer as it is written, a sentence at a time, thinking and [S1] labels
+ * removed; its pieces join to "answer" when the answer is the model's. No sentence that mentions a medicine is ever
+ * streamed. "answer" is the final text to show. on_text or cb returning non-zero cancels (NULL). NULL also on error,
+ * or with no model when the question needs one. */
 char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *lang_hint,
                          sve_text_cb on_text, void *user, sve_progress_cb cb, void *cbuser);
 

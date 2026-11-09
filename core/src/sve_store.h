@@ -42,6 +42,8 @@ public:
     bool remove(int64_t id);
     std::optional<NoteRow> get(int64_t id);
     std::vector<NoteListRow> list(const std::string &query, int limit);
+    // Notes created in [from, to) (epoch seconds), oldest first, at most limit (Ask's period summaries).
+    std::vector<NoteListRow> notes_between(int64_t from, int64_t to, int limit);
     std::vector<std::pair<int64_t, std::string>> audio_older_than(int days);
 
     // Explicit transaction for multi-row changes (not nested; set_pieces/merge_topics use their own).

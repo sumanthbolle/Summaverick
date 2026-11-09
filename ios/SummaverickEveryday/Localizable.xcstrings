@@ -165,22 +165,6 @@
         }
       }
     },
-    "Answers come only from your recordings, with a link to the moment they came from.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Answers come only from your recordings, with a link to the moment they came from."
-          }
-        },
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "జవాబులు మీ రికార్డింగ్‌ల నుంచే వస్తాయి. అవి ఎక్కడ విన్నాయో ఆ క్షణానికి లింక్ కూడా ఉంటుంది."
-          }
-        }
-      }
-    },
     "Ask": {
       "localizations": {
         "te": {
@@ -5694,6 +5678,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "Earlier chats"
+          }
+        }
+      }
+    },
+    "Show answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show answer"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సమాధానం చూపించు"
+          }
+        }
+      }
+    },
+    "Next question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next question"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తర్వాతి ప్రశ్న"
+          }
+        }
+      }
+    },
+    "Start over": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start over"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మళ్లీ మొదలుపెట్టు"
+          }
+        }
+      }
+    },
+    "Summary of your recordings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summary of your recordings"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌ల సారాంశం"
+          }
+        }
+      }
+    },
+    "From your reminders and to-dos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From your reminders and to-dos"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రిమైండర్‌లు, చేయాల్సిన పనుల నుండి"
+          }
+        }
+      }
+    },
+    "Answers from your recordings link to the moment they came from. Anything else comes from general knowledge, and says so.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answers from your recordings link to the moment they came from. Anything else comes from general knowledge, and says so."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌ల నుండి వచ్చే సమాధానాలు ఆ క్షణానికి లింక్ ఇస్తాయి. మిగతావి సాధారణ జ్ఞానం నుండి వస్తాయి, ఆ విషయం చెబుతాయి."
           }
         }
       }

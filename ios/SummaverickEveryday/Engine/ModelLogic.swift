@@ -1111,6 +1111,8 @@ struct ChatMessage: Codable, Equatable {
     let text: String
     var medicine: Bool? = nil
     var sources: [SourceRef]? = nil
+    /// On the question only: the quiz ids already asked in this chat.
+    var quiz_asked: [String]? = nil
 }
 
 /// Which earlier turns of a chat go with a new question. The core trims them again to its token budget
@@ -1131,7 +1133,8 @@ enum ChatWindow {
     /// The messages for sve_assistant_chat: earlier turns with an answer, newest first while within maxTurns and
     /// maxChars (whole turns), oldest first in the result, then the question. A turn with no answer (it failed,
     /// or was stopped before any word) is left out whole, so a question is never sent without what followed it.
-    static func messages(earlier: [Turn], question: String) -> [ChatMessage] {
+    /// quizAsked goes on the question: the quiz ids already asked in this chat.
+    static func messages(earlier: [Turn], question: String, quizAsked: [String] = []) -> [ChatMessage] {
         var picked: [[ChatMessage]] = []
         var chars = question.count
         for t in earlier.reversed() {
@@ -1145,7 +1148,8 @@ enum ChatWindow {
                            ChatMessage(role: "assistant", text: a, medicine: t.medicine ? true : nil,
                                        sources: t.sources.isEmpty ? nil : t.sources)])
         }
-        return picked.reversed().flatMap { $0 } + [ChatMessage(role: "user", text: question)]
+        return picked.reversed().flatMap { $0 }
+            + [ChatMessage(role: "user", text: question, quiz_asked: quizAsked.isEmpty ? nil : quizAsked)]
     }
 }
 
@@ -1158,6 +1162,22 @@ enum StreamThrottle {
     static func due(last: TimeInterval?, now: TimeInterval) -> Bool {
         guard let last else { return true }
         return now - last >= interval
+    }
+
+    /// nil: redraw now. Otherwise how long until last + interval, when a skipped piece is drawn: every released
+    /// sentence paints promptly even when no other piece follows it.
+    static func delay(last: TimeInterval?, now: TimeInterval) -> TimeInterval? {
+        guard let last, !due(last: last, now: now) else { return nil }
+        return last + interval - now
+    }
+}
+
+/// Stored section titles and points as shown: sections stored by an earlier build may hold "[unclear]" tags.
+enum SectionText {
+    static func clean(_ text: String) -> String {
+        guard text.contains("[unclear]") else { return text }
+        return text.replacingOccurrences(of: "[unclear] ", with: "").replacingOccurrences(of: "[unclear]", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

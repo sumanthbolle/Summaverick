@@ -22,9 +22,10 @@ struct ChaptersView: View {
 
     @ViewBuilder private func chip(_ c: Chapter) -> some View {
         let stamp = AssistantFormat.mmss(c.start_sec)
+        let title = SectionText.clean(c.title)
         let label = HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(verbatim: stamp).font(.callout.monospacedDigit().weight(.semibold))
-            Text(verbatim: c.title).font(.callout).lineLimit(1)
+            Text(verbatim: title).font(.callout).lineLimit(1)
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 44)
@@ -32,7 +33,7 @@ struct ChaptersView: View {
         if let onPlay {
             Button { onPlay(c.start_sec) } label: { label.foregroundStyle(Color.accentColor) }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text(verbatim: "\(stamp) \(c.title)"))
+                .accessibilityLabel(Text(verbatim: "\(stamp) \(title)"))
                 .accessibilityHint(Text("Play from \(stamp)"))
         } else {
             label.foregroundStyle(.secondary)

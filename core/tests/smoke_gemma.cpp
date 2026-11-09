@@ -839,8 +839,9 @@ static void run_api_memories(sve_ctx *ctx) {
 // sources as text, medicine answers left out of it; cancel through on_text; medicine never streamed.
 static std::string g_chat_prompt;
 static const char *g_chat_reply = nullptr;
+static const char *g_classify_reply = nullptr;
 static const char *chat_model(const char *phase, const char *prompt) {
-    if (strcmp(phase, "chat")) return nullptr;
+    if (!strcmp(phase, "classify")) return g_classify_reply;
     g_chat_prompt = prompt;
     return g_chat_reply;
 }
@@ -853,6 +854,93 @@ static int chat_text(const char *p, void *u) {
     s->text += p;
     ++s->pieces;
     return s->stop_after >= 0 && s->pieces >= s->stop_after ? 1 : 0;
+}
+
+// N10: the right source for each kind of question, without a model.
+template <class Chat>
+static void run_api_route(sve_ctx *ctx, Chat chat) {
+    const auto ask = [](const char *t) { return json::array({{{"role", "user"}, {"text", t}}}); };
+    // Period summary: stored summaries of today's notes, each note a source, medicine sentences left out.
+    int64_t a = sve_note_create(ctx, "Budget meeting", "en", nullptr, "We set the budget.", 60);
+    sve_note_set_output(ctx, a, SVE_OUT_SHORT_SUMMARY, "The team set the walnut budget for March.");
+    sve_note_set_output(ctx, a, SVE_OUT_REVISION_QUESTIONS,
+                        "Q1. Which budget was set?\nA1. The walnut budget.\n\nQ2. Which tablet?\nA2. Dolo 650.\n\nQ3. For when?\nA3. March.");
+    g_chat_reply = "- [Budget meeting] The walnut budget was set. Take 5 mg daily.\n- [Budget meeting] It is for March.\n";
+    ChatSink s1;
+    json sum = chat(ask("Highlight this week key discussions to remember"), s1, nullptr);
+    printf("--- summary (no model)\n%s\n", sum.dump(2).c_str());
+    bool cites = false;
+    if (sum.is_object() && sum["sources"].is_array())
+        for (const auto &x : sum["sources"]) cites = cites || (x["note_id"] == a && x["title"] == "Budget meeting");
+    expect(sum.is_object() && sum["kind"] == "summary" && cites && g_chat_prompt.find("The team set the walnut budget") != std::string::npos,
+           "summary: from the stored summaries, cites the note");
+    expect(sum.is_object() && sum["answer"].get<std::string>() == s1.text && s1.text.find("5 mg") == std::string::npos &&
+           s1.text.find("It is for March") != std::string::npos, "summary: streamed; a medicine sentence left out, the rest goes on");
+    ChatSink s2;
+    json lastm = chat(ask("What happened last week?"), s2, nullptr);
+    expect(lastm.is_object() && lastm["kind"] == "summary" && lastm["answer"] == "No recordings in that period." && lastm["not_found"] == true,
+           "summary: an empty period says so");
+
+    // Quiz: stored questions, unasked, never about a medicine; no model.
+    g_chat_prompt.clear();
+    ChatSink s3;
+    json q = chat(ask("Quiz me on my recent recordings"), s3, nullptr);
+    printf("--- quiz (no model)\n%s\n", q.dump(2).c_str());
+    expect(q.is_object() && q["kind"] == "quiz" && q["question"] == "Which budget was set?" && q["answer"] == "The walnut budget." &&
+           q["source"]["note_id"] == a && q["quiz_id"] == std::to_string(a) + ":1" && s3.pieces == 0 && g_chat_prompt.empty(),
+           "quiz: a stored question with its answer and source, no model");
+    json msgs = ask("Next question");
+    msgs[0]["quiz_asked"] = json::array({std::to_string(a) + ":1"});
+    ChatSink s4;
+    json q2 = chat(msgs, s4, nullptr);
+    expect(q2.is_object() && q2["kind"] == "quiz" && q2["question"] == "For when?", "quiz: not one already asked, never a medicine one");
+    msgs[0]["quiz_asked"] = json::array({std::to_string(a) + ":1", std::to_string(a) + ":3"});
+    ChatSink s5;
+    json q3 = chat(msgs, s5, nullptr);
+    expect(q3.is_object() && q3["kind"] == "quiz" && q3["quiz_done"] == true && q3["not_found"] == true, "quiz: all used: says so");
+
+    // Due: from reminders and tasks, no model, even with no model loaded.
+    int64_t tid = sve_task_create(ctx, R"({"text":"Pay the walnut invoice","due_date":"2020-01-01"})");
+    auto *hook = g_sve_model_reply;
+    g_sve_model_reply = nullptr;
+    ChatSink s6;
+    json due = chat(ask("What's due soon?"), s6, nullptr);
+    printf("--- due (no model)\n%s\n", due.dump(2).c_str());
+    expect(tid > 0 && due.is_object() && due["kind"] == "due" && contains(due["answer"], "Pay the walnut invoice") && contains(due["answer"], "overdue") && s6.pieces == 0,
+           "due: listed in code with no model");
+    ChatSink s6b;
+    expect(chat(ask("Which tablets this week?"), s6b, nullptr)["kind"] == "medicine", "medicine word beats a period");
+    ChatSink s6c;
+    // Nothing scores and no model: recordings, the not-found sentence; never general.
+    json nomodel = chat(ask("Who wrote Gitanjali?"), s6c, nullptr);
+    expect(nomodel.is_object() && nomodel["kind"] == "recordings" && nomodel["not_found"] == true, "no model: recordings, not general");
+    g_sve_model_reply = hook;
+
+    // General: nothing scores and the model says G: labelled, no sources; a medicine sentence left out.
+    g_classify_reply = "G";
+    g_chat_reply = "Rabindranath Tagore wrote it. Take 5 mg of rest. He won the Nobel Prize.";
+    ChatSink s7;
+    json gen = chat(ask("Who wrote Gitanjali?"), s7, nullptr);
+    printf("--- general (no model)\n%s\n", gen.dump(2).c_str());
+    expect(gen.is_object() && gen["kind"] == "general" && gen["sources"].empty() && gen["answer"].get<std::string>() == s7.text &&
+           s7.text.find("Tagore") != std::string::npos && s7.text.find("5 mg") == std::string::npos && s7.text.find("Nobel") != std::string::npos,
+           "general: streamed from the model's own knowledge, no sources");
+    ChatSink s8;
+    expect(chat(ask("Which medicine helps with sleep?"), s8, nullptr)["kind"] == "medicine", "medicine is never general, even when the model would say G");
+    // A question that scores never asks the model.
+    g_classify_reply = "G";
+    g_chat_reply = "The walnut budget was set [S1].";
+    ChatSink s9;
+    json rec = chat(ask("What about the walnut budget"), s9, nullptr);
+    expect(rec.is_object() && rec["kind"] == "recordings" && rec["not_found"] == false && !rec["sources"].empty() && rec["sources"][0]["note_id"] == a,
+           "recordings: found through a stored summary (no transcript has those words), with its link");
+    // The model says R: recordings.
+    g_classify_reply = "R";
+    ChatSink s10;
+    json r2 = chat(ask("Who wrote Gitanjali?"), s10, nullptr);
+    expect(r2.is_object() && r2["kind"] == "recordings" && r2["not_found"] == true, "classified R, nothing found: the not-found sentence");
+    g_classify_reply = nullptr;
+    sve_task_set_done(ctx, tid, 1);
 }
 
 static void run_api_chat(sve_ctx *ctx) {
@@ -927,7 +1015,16 @@ static void run_api_chat(sve_ctx *ctx) {
     g_chat_reply = "NOT_FOUND";
     ChatSink s7;
     json f = chat(json::array({q1}), s7);
-    expect(f.is_object() && f["not_found"] == true && s7.pieces == 0 && f["lang"] == "en", "chat: NOT_FOUND is never streamed");
+    expect(f.is_object() && f["not_found"] == false && s7.pieces == 0 && f["lang"] == "en" && contains(f["answer"], "kitchen pipe") &&
+           f["sources"].size() == 1, "chat: NOT_FOUND is never streamed; something scores, so the closest passage word for word");
+
+    // Held at a medicine sentence: generation stops there (the sentence's label is in, a later one is not).
+    g_chat_reply = "The kitchen pipe must be replaced soon [S1]. Take 5 mg after it [S1]. Ravi sends the quote [S2].";
+    ChatSink s7c;
+    json held = chat(json::array({q1}), s7c);
+    expect(held.is_object() && held["medicine"] == true && held["sources"].size() == 1 && s7c.text == "The kitchen pipe must be replaced soon.",
+           "chat: held at the medicine sentence, generation stops there");
+    run_api_route(ctx, chat);
 
     ChatSink s8;
     expect(sve_assistant_chat(ctx, "[]", nullptr, chat_text, &s8, nullptr, nullptr) == nullptr &&

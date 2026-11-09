@@ -259,14 +259,20 @@ struct AskAnswer: Codable, Equatable {
     var kind: String
     /// The language the answer is written in ("te"/"en"); nil when the core does not say.
     var lang: String?
+    /// A quiz (kind "quiz"): the question; `answer` is then the expected answer, shown when asked for.
+    var question: String?
+    var quizID: String?
+    /// Every quiz question has been asked in this chat.
+    var quizDone: Bool
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        question = c.lenient(.question); quizID = c.lenient(.quizID); quizDone = c.flag(.quizDone) ?? false
         answer = c.lenient(.answer) ?? ""; sources = c.lenient(.sources) ?? []
         notFound = c.flag(.notFound) ?? false; medicine = c.flag(.medicine) ?? false
         kind = c.lenient(.kind) ?? (medicine ? "medicine" : "recordings"); lang = c.lenient(.lang)
     }
-    enum CodingKeys: String, CodingKey { case answer, sources, medicine, kind, lang, notFound = "not_found" }
+    enum CodingKeys: String, CodingKey { case answer, sources, medicine, kind, lang, question, notFound = "not_found", quizID = "quiz_id", quizDone = "quiz_done" }
 }
 
 // MARK: - transcript pieces
