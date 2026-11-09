@@ -216,6 +216,7 @@ private struct RootTabBar: View {
                         ZStack {
                             Circle().fill(Brand.record)
                                 .shadow(color: Brand.record.opacity(0.35), radius: 6, y: 2)
+                            // White on the red record fill is intentional (Record is red with a white glyph everywhere).
                             Image(systemName: "mic.fill").font(.title2.weight(.semibold)).foregroundStyle(.white)
                         }
                         .frame(width: 52, height: 52)

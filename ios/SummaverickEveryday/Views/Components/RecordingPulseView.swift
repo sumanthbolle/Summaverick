@@ -8,6 +8,7 @@ struct RecordingPulseView: View {
     var active: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .largeTitle) private var micGlyph: CGFloat = 36
 
     private let ringCount = 4
     private let ringPeriod: Double = 3.2       // seconds for one ring to travel centre → edge
@@ -28,7 +29,7 @@ struct RecordingPulseView: View {
                     let alpha = (1 - phase) * (1 - phase) * 0.7
                     var ring = Path()
                     ring.addEllipse(in: CGRect(x: center.x - r, y: center.y - r, width: 2 * r, height: 2 * r))
-                    ctx.stroke(ring, with: .color(Theme.accent.opacity(alpha)), lineWidth: 1.5 + (1 - CGFloat(phase)) * 1.5)
+                    ctx.stroke(ring, with: .color(Theme.record.opacity(alpha)), lineWidth: 1.5 + (1 - CGFloat(phase)) * 1.5)
                 }
 
                 // 2. particle ring — orbits slowly, each particle bobs on its own rhythm and the whole
@@ -43,7 +44,7 @@ struct RecordingPulseView: View {
                     let d = 2.5 + CGFloat(bob) * 3.0
                     var dot = Path()
                     dot.addEllipse(in: CGRect(x: p.x - d / 2, y: p.y - d / 2, width: d, height: d))
-                    ctx.fill(dot, with: .color(Theme.accent.opacity(0.35 + 0.6 * bob)))
+                    ctx.fill(dot, with: .color(Theme.record.opacity(0.35 + 0.6 * bob)))
                 }
 
                 // 3. inner glow that breathes with the level
@@ -51,7 +52,7 @@ struct RecordingPulseView: View {
                 var glow = Path()
                 glow.addEllipse(in: CGRect(x: center.x - glowR, y: center.y - glowR, width: 2 * glowR, height: 2 * glowR))
                 ctx.fill(glow, with: .radialGradient(
-                    Gradient(colors: [Theme.accent.opacity(0.35 + 0.25 * lvl), Theme.accent.opacity(0)]),
+                    Gradient(colors: [Theme.record.opacity(0.35 + 0.25 * lvl), Theme.record.opacity(0)]),
                     center: center, startRadius: 0, endRadius: glowR))
             }
             .animation(.easeOut(duration: 0.15), value: level)
@@ -62,8 +63,9 @@ struct RecordingPulseView: View {
                 Circle()
                     .fill(Brand.record)
                     .shadow(color: Brand.record.opacity(0.45), radius: 16, y: 6)
+                // White on the red record fill is intentional.
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 36, weight: .semibold))
+                    .font(.system(size: micGlyph, weight: .semibold))
                     .foregroundStyle(.white)
             }
             .frame(width: 104, height: 104)

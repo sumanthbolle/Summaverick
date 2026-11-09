@@ -8,14 +8,19 @@ enum Brand {
 /// The owner's artwork, unchanged, in a black rounded tile so it looks the same on white and on black.
 struct BrandMark: View {
     var size: CGFloat = 28
+    @Environment(\.colorScheme) private var colorScheme
     var body: some View {
+        let tile = RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
         Image("BrandLogo")
             .resizable()
             .interpolation(.high)
             .scaledToFit()
             .frame(width: size, height: size)
+            // Black on purpose in both modes: the owner's tile, so the artwork itself never changes.
             .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+            .clipShape(tile)
+            // In Dark the black tile sits on a black page: a hairline keeps its edge.
+            .overlay { if colorScheme == .dark { tile.stroke(Theme.hairline, lineWidth: 1) } }
             .accessibilityHidden(true)
     }
 }
@@ -61,10 +66,11 @@ struct PillButtonStyle: ButtonStyle {
             .multilineTextAlignment(.center)
             .padding(.horizontal, 14)
             .frame(minHeight: 44)
-            .background(fill, in: Capsule())
+            // Disabled: the fill fades, the label stays at full strength so it can still be read.
+            .background(fill.opacity(isEnabled ? 1 : 0.6), in: Capsule())
             .overlay(Capsule().stroke(filled ? Color.clear : Theme.pillBorder, lineWidth: 1))
             .contentShape(Capsule())
-            .opacity(!isEnabled ? 0.45 : configuration.isPressed ? 0.7 : 1)
+            .opacity(isEnabled && configuration.isPressed ? 0.7 : 1)
     }
 
     private var filled: Bool { kind == .prominent || kind == .positiveFilled }

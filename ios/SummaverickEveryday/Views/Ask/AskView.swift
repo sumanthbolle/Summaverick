@@ -52,6 +52,8 @@ private enum AskNotice: Equatable {
 struct AskView: View {
     @Environment(Router.self) private var router
     @Environment(AppSettings.self) private var settings
+    /// The send and stop glyphs grow with the person's text size.
+    @ScaledMetric(relativeTo: .title) private var sendGlyph: CGFloat = 34
     @State private var pipeline = ProcessingPipeline.shared
     @State private var models = ModelManager.shared
 
@@ -114,15 +116,21 @@ struct AskView: View {
                         }
                     } label: {
                         Image(systemName: "clock.arrow.circlepath").frame(minWidth: 44, minHeight: 44)
+                            .foregroundStyle(generating || chats.chats.isEmpty ? Theme.secondary : Theme.accent)
                     }
                     .accessibilityLabel(Text("Earlier chats"))
-                    .disabled(generating || chats.chats.isEmpty)
+                    .tint(generating || chats.chats.isEmpty ? Theme.secondary : Theme.accent)
+                    // Not .disabled: the system toolbar would dim it below 7:1 in Dark. Unavailable: secondary grey, no taps.
+                    .allowsHitTesting(!(generating || chats.chats.isEmpty))
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button { chats.newChat() } label: {
+                    Button { if !(generating || turns.isEmpty) { chats.newChat() } } label: {
                         Label("New chat", systemImage: "square.and.pencil").frame(minWidth: 44, minHeight: 44)
+                            .foregroundStyle(generating || turns.isEmpty ? Theme.secondary : Theme.accent)
                     }
-                    .disabled(generating || turns.isEmpty)
+                    .tint(generating || turns.isEmpty ? Theme.secondary : Theme.accent)
+                    // Not .disabled: the system toolbar would dim it below 7:1 in Dark. Unavailable: secondary grey, no taps.
+                    .allowsHitTesting(!(generating || turns.isEmpty))
                     Button { router.showSettings = true } label: {
                         Image(systemName: "gearshape").frame(minWidth: 44, minHeight: 44)
                     }
@@ -525,7 +533,7 @@ struct AskView: View {
                     .onChange(of: text) { _, _ in if notice == .busy || notice == .notHeard { notice = nil } }
                 if generating && askTask != nil {   // while the kind is read there is nothing to stop yet
                     Button { askTask?.cancel() } label: {
-                        Image(systemName: "stop.circle.fill").font(.system(size: 34))
+                        Image(systemName: "stop.circle.fill").font(.system(size: sendGlyph))
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
@@ -533,7 +541,7 @@ struct AskView: View {
                     .accessibilityLabel(Text("Stop"))
                 } else {
                     Button { send(text) } label: {
-                        Image(systemName: "arrow.up.circle.fill").font(.system(size: 34))
+                        Image(systemName: "arrow.up.circle.fill").font(.system(size: sendGlyph))
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
@@ -570,13 +578,14 @@ struct AskView: View {
     private var micButton: some View {
         Image(systemName: listening ? "mic.fill" : "mic")
             .font(.title2)
+            // White on the red record fill is intentional: Record is red with a white glyph everywhere.
             .foregroundStyle(listening ? Color.white : Theme.accent)
             .frame(width: 44, height: 44)
             .background(listening ? Brand.record : Theme.chip, in: Circle())
             .scaleEffect(listening ? 1.15 : 1)
             .animation(.easeOut(duration: 0.15), value: listening)
             .contentShape(Circle())
-            .opacity(generating || transcribing ? 0.4 : 1)
+            .opacity(generating || transcribing ? 0.55 : 1)
             .onLongPressGesture(minimumDuration: Self.maxVoiceSeconds, maximumDistance: 80, perform: { endVoice() },
                                 onPressingChanged: { pressing in pressing ? beginVoice() : endVoice() })
             .accessibilityElement()

@@ -45,11 +45,12 @@ final class AppLock {
 }
 
 struct LockScreen: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var lockGlyph: CGFloat = 44
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
             VStack(spacing: 20) {
-                Image(systemName: "lock.fill").font(.system(size: 44)).foregroundStyle(Theme.secondary)
+                Image(systemName: "lock.fill").font(.system(size: lockGlyph)).foregroundStyle(Theme.secondary)
                 Text("Summaverick is locked").font(.title3.weight(.semibold))
                 Button("Unlock") { Task { await AppLock.shared.authenticate() } }
                     .buttonStyle(.pillProminent)
