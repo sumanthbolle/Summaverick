@@ -1382,4 +1382,41 @@ enum SetupFlow {
 
     /// A tap on a language: one that cannot be picked yet leaves the choice as it was.
     static func choose(_ code: String, current: String) -> String { languageSelectable(code) ? code : current }
+
+    /// UserDefaults key: the setup screen the person was on, so leaving the app mid-setup comes back there.
+    static let stepKey = "setup.step"
+    static func resumeStep(stored: String?) -> Step { stored.flatMap(Step.init(rawValue:)) ?? .welcome }
+
+    /// UserDefaults key: "Not now" on Today's "Add your day and your medicines" card.
+    static let dayCardDismissedKey = "today.dayCardDismissed"
+
+    /// Today's profile card. With no profile at all it always shows ("Set up your profile"). Setup saves a profile with
+    /// only a name and language, so the card stays ("Add your day and your medicines") until a routine or a medicine
+    /// is added, or the person says Not now.
+    static func showsDayCard(hasProfile: Bool, hasRoutine: Bool, medicineCount: Int, dismissed: Bool) -> Bool {
+        !hasProfile || (!hasRoutine && medicineCount == 0 && !dismissed)
+    }
+
+    /// The older profile sheet opens by itself only when there is no profile at all.
+    static func offersProfileSheet(hasProfile: Bool) -> Bool { !hasProfile }
+
+    /// "Delete everything" starts again from the welcome, asking for agreement again (consent is cleared with it).
+    static let afterWipe = Progress.setup
+    /// Kept outside the core, cleared by "Delete everything" too.
+    static let keysClearedByWipe = [stepKey, dayCardDismissedKey, "profile.firstName"]
+
+    /// Setup builds a new profile only when the core said there is none; never after a failed read, which would
+    /// overwrite a saved routine.
+    static func mayCreateProfile(_ read: ProfileRead.Kind) -> Bool { read == .none }
+}
+
+/// What reading the profile from the core gave: the core answers "null" when nothing is saved, and no answer at all
+/// (or something that does not decode) when the read failed.
+enum ProfileRead {
+    enum Kind: Equatable { case none, found, failed }
+    static func kind(raw: String?, decodes: Bool) -> Kind {
+        guard let raw else { return .failed }
+        if raw.trimmingCharacters(in: .whitespacesAndNewlines) == "null" { return .none }
+        return decodes ? .found : .failed
+    }
 }

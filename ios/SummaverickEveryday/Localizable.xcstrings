@@ -377,6 +377,17 @@
         }
       }
     },
+    "Add your day and your medicines": {
+      "comment": "Today card when setup saved a name but no routine or medicines",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ దినచర్య, మందులు జోడించండి"
+          }
+        }
+      }
+    },
     "All clear. When I spot something in your recordings, it shows up here.": {
       "localizations": {
         "te": {
@@ -5989,6 +6000,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "మీ దినచర్య"
+          }
+        }
+      }
+    },
+    "Your mealtimes and medicines help me time your reminders.": {
+      "comment": "Today card under \"Add your day and your medicines\"",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ భోజన వేళలు, మందులు తెలిస్తే రిమైండర్లను సరైన సమయానికి పెడతాను."
           }
         }
       }

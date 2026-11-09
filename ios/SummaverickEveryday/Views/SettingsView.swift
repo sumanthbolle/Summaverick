@@ -207,7 +207,14 @@ struct SettingsView: View {
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
             NotificationCenter.default.post(name: .notesChanged, object: nil)
             wiping = false
-            if !ok { wipeFailed = true }
+            if !ok { wipeFailed = true; return }
+            // A fresh start: the first-time setup again, asking for agreement to record again.
+            settings.consentAcknowledged = false
+            for key in SetupFlow.keysClearedByWipe { UserDefaults.standard.removeObject(forKey: key) }
+            UserDefaults.standard.set(SetupFlow.afterWipe.rawValue, forKey: SetupFlow.progressKey)
+            dismiss()
+            try? await Task.sleep(for: .milliseconds(500))   // once Settings has gone, so the welcome can show
+            SetupState.shared.restartAfterWipe()
         }
     }
 }

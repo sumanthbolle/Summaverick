@@ -56,6 +56,8 @@ struct RootView: View {
     @State private var gate = PresentationGate.shared
     @State private var recording = RecordingController.shared
     @Environment(\.scenePhase) private var scenePhase
+    /// The app's resolved scheme (Appearance, or the phone's under System), handed to the setup cover.
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showRecorder = false
     @State private var showConsent = false
     /// The tab bar hides while a keyboard is up, so screens below it keep normal keyboard avoidance.
@@ -81,7 +83,8 @@ struct RootView: View {
             }
             .frame(maxHeight: .infinity)
             .fullScreenCover(isPresented: shows(.setup)) {
-                GuidedSetupView { setup.set(SetupFlow.afterSetup) }.environment(settings)
+                GuidedSetupView(baseScheme: settings.appearance.colorScheme ?? colorScheme) { setup.set(SetupFlow.afterSetup) }
+                    .environment(settings)
             }
             // A view of its own, so this cover and the setup's are never on the same view as the recorder's.
             .background {

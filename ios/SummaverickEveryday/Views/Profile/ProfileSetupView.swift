@@ -19,8 +19,15 @@ struct ProfileSetupView: View {
     @State private var saving = false
     @State private var errorShown = false
     @State private var deleteFailed = false
+    /// The saved profile, read when the sheet opens; saving changes it rather than replacing it.
+    @State private var existing: (kind: ProfileRead.Kind, profile: Profile?)?
 
     private let stepCount = 4
+
+    /// startAtDay: a profile exists (the first-time setup saved the name and language), so start at the day's times.
+    init(startAtDay: Bool = false) {
+        _step = State(initialValue: startAtDay ? 2 : 0)
+    }
 
     var body: some View {
         NavigationStack {
@@ -69,6 +76,15 @@ struct ProfileSetupView: View {
             .toast($toast)
         }
         .interactiveDismissDisabled(saving)
+        .task {
+            let read = await CoreEngine.shared.profileRead()
+            existing = read
+            if let p = read.profile {
+                if name.isEmpty { name = p.name ?? "" }
+                if lang == nil { lang = p.lang }
+                if let r = p.routine { routine = r }
+            }
+        }
         .onAppear { PresentationGate.shared.set("profileSetup", true) }
         .onDisappear { PresentationGate.shared.set("profileSetup", false) }
     }
@@ -220,7 +236,7 @@ struct ProfileSetupView: View {
         }
     }
 
-    /// End of the routine step: save what the person gave. A skipped routine is left out, not defaulted.
+    /// End of the routine step: save what the person gave, into the saved profile. A skipped routine is not defaulted.
     private func saveProfile(withRoutine: Bool) {
         guard !saving else { return }
         saving = true
@@ -228,8 +244,16 @@ struct ProfileSetupView: View {
         var r = routine
         let classes = r.classes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         r.classes = classes.isEmpty ? nil : classes
-        let profile = Profile(name: trimmed.isEmpty ? nil : trimmed, lang: lang, routine: withRoutine ? r : nil)
         Task {
+            // Never build a new profile over one that could not be read: it would lose what is saved.
+            var read = existing
+            if read == nil { read = await CoreEngine.shared.profileRead() }
+            guard let read else { saving = false; errorShown = true; return }
+            guard read.kind != .failed else { saving = false; errorShown = true; return }
+            var profile = read.profile ?? Profile()
+            profile.name = trimmed.isEmpty ? nil : trimmed
+            profile.lang = lang
+            if withRoutine { profile.routine = r }   // skipped: a saved routine stays, none is made up
             do {
                 try await CoreEngine.shared.setProfile(profile)
                 await ProfileActions.changed()

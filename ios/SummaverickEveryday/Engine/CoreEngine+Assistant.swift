@@ -41,6 +41,15 @@ extension CoreEngine {
         return p
     }
 
+    /// The profile, telling "nothing saved" (.none) from a failed read (.failed, profile nil).
+    nonisolated func profileRead() async -> (kind: ProfileRead.Kind, profile: Profile?) {
+        let raw = await store { self.take(sve_profile_get($0)) }
+        let p = decode(Profile.self, raw)
+        let kind = ProfileRead.kind(raw: raw, decodes: p != nil)
+        if let p { NotifyCopy.rememberFirstName(of: p.name) }
+        return (kind, kind == .found ? p : nil)
+    }
+
     nonisolated func setProfile(_ p: Profile) async throws {
         guard let json = encodeJSON(p), await store({ sve_profile_set($0, json) }) == 0 else {
             throw AssistantError.failed(String(localized: "save the profile"))

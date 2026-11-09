@@ -77,6 +77,9 @@ struct TourOverlay: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
+        // Notification routes wait until the tips are done, like for any other presentation.
+        .onAppear { PresentationGate.shared.set("tour", true) }
+        .onDisappear { PresentationGate.shared.set("tour", false) }
     }
 
     private func advance() {

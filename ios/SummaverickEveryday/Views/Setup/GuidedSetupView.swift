@@ -26,6 +26,14 @@ final class SetupState {
     func set(_ p: SetupFlow.Progress) {
         progress = p
         UserDefaults.standard.set(p.rawValue, forKey: SetupFlow.progressKey)
+        if p != .setup { UserDefaults.standard.removeObject(forKey: SetupFlow.stepKey) }
+    }
+
+    /// After "Delete everything": a fresh start from the welcome. The caller has cleared consent and the other keys.
+    func restartAfterWipe() {
+        replaying = false
+        UserDefaults.standard.removeObject(forKey: SetupFlow.stepKey)
+        set(SetupFlow.afterWipe)
     }
 
     /// "Show me around again": the four tips over the real tabs.
@@ -42,6 +50,9 @@ final class SetupState {
 }
 
 struct GuidedSetupView: View {
+    /// The scheme of the app's root (Appearance, or the phone's under System). The welcome is always dark; the other
+    /// steps ask for this one, never nil, so a presentation that was dark for the welcome does not stay dark.
+    let baseScheme: ColorScheme
     let onFinish: () -> Void
 
     @Environment(AppSettings.self) private var settings
@@ -56,8 +67,10 @@ struct GuidedSetupView: View {
     @State private var logoShown = false
     @State private var lifted = false
 
-    init(startAt: SetupFlow.Step = .welcome, languagesOpen: Bool = false, onFinish: @escaping () -> Void) {
-        _step = State(initialValue: startAt)
+    /// startAt: nil resumes at the screen the person was on (kept under SetupFlow.stepKey).
+    init(baseScheme: ColorScheme, startAt: SetupFlow.Step? = nil, languagesOpen: Bool = false, onFinish: @escaping () -> Void) {
+        self.baseScheme = baseScheme
+        _step = State(initialValue: startAt ?? SetupFlow.resumeStep(stored: UserDefaults.standard.string(forKey: SetupFlow.stepKey)))
         _languagesOpen = State(initialValue: languagesOpen)
         self.onFinish = onFinish
     }
@@ -74,13 +87,21 @@ struct GuidedSetupView: View {
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: step)
         // The welcome is black in both modes: its status bar too.
-        .preferredColorScheme(step == .welcome ? .dark : settings.appearance.colorScheme)
+        .preferredColorScheme(step == .welcome ? .dark : baseScheme)
+        .onChange(of: step) { _, s in UserDefaults.standard.set(s.rawValue, forKey: SetupFlow.stepKey) }
         .alert("I couldn't save this. Please try again.", isPresented: $saveFailed) {
             Button("OK", role: .cancel) {}
         }
         .onAppear {
             lang = SetupFlow.initialLanguage(current: settings.notesLanguage, preferred: Locale.preferredLanguages)
             PresentationGate.shared.set("guidedSetup", true)
+        }
+        .task {
+            // Back after leaving mid-setup: the name and language already saved come back.
+            if let p = await CoreEngine.shared.profileRead().profile {
+                if name.isEmpty, let n = p.name { name = n }
+                if let l = p.lang, SetupFlow.languageSelectable(l) { lang = l }
+            }
         }
         .onDisappear { PresentationGate.shared.set("guidedSetup", false) }
     }
@@ -346,7 +367,14 @@ struct GuidedSetupView: View {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let code = lang
         Task {
-            var p = await CoreEngine.shared.profile() ?? Profile()
+            // A new profile only when the core says there is none; a failed read saves nothing.
+            let read = await CoreEngine.shared.profileRead()
+            guard read.profile != nil || SetupFlow.mayCreateProfile(read.kind) else {
+                saving = false
+                saveFailed = true
+                return
+            }
+            var p = read.profile ?? Profile()
             if !trimmed.isEmpty { p.name = trimmed }
             p.lang = code
             do {

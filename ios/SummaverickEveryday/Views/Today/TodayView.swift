@@ -72,6 +72,8 @@ struct TodayView: View {
     @State private var notificationsOff = false
     @State private var now = Date()
     @State private var showSetup = false
+    @State private var medicineCount = 0
+    @AppStorage(SetupFlow.dayCardDismissedKey) private var dayCardDismissed = false
     @AppStorage("ai.unsupportedShown") private var unsupportedShown = false
 
     var body: some View {
@@ -119,7 +121,10 @@ struct TodayView: View {
             .onReceive(NotificationCenter.default.publisher(for: .notesChanged)) { _ in Task { await reload() } }
             .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await reload() } } }
             .onChange(of: notificationsOff || errorMessage != nil) { _, open in PresentationGate.shared.set("today", open) }
-            .sheet(isPresented: $showSetup, onDismiss: { Task { await reload() } }) { ProfileSetupView() }
+            .sheet(isPresented: $showSetup, onDismiss: { Task { await reload() } }) {
+                // With a profile (setup saved the name and language), it starts at the day's times.
+                ProfileSetupView(startAtDay: profile != nil)
+            }
             .onChange(of: lock.isLocked) { _, _ in offerSetupIfNeeded() }
             .onChange(of: SetupState.shared.progress) { _, _ in offerSetupIfNeeded() }
             .alert("Notifications are off", isPresented: $notificationsOff) {
@@ -135,8 +140,12 @@ struct TodayView: View {
 
     private var isFailed: Bool { if case .failed = pipeline.stage { return true } else { return false } }
     private var isPaused: Bool { if case .paused = pipeline.stage { return true } else { return false } }
-    /// No profile saved yet (setup was closed with "Later", or never finished the routine step).
-    private var needsProfile: Bool { profile == nil }
+    /// No profile saved yet, or one without a routine or medicines (setup saves only the name and language) that the
+    /// person has not put off with Not now.
+    private var needsProfile: Bool {
+        SetupFlow.showsDayCard(hasProfile: profile != nil, hasRoutine: profile?.routine != nil,
+                               medicineCount: medicineCount, dismissed: dayCardDismissed)
+    }
     private var errorShown: Binding<Bool> {
         Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
     }
@@ -407,24 +416,39 @@ struct TodayView: View {
     }
 
     private var setupProfileCard: some View {
-        Button { showSetup = true } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "person.crop.circle.badge.plus").font(.largeTitle).foregroundStyle(Theme.accent)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Set up your profile").font(.headline).foregroundStyle(Theme.text)
-                    Text("Your name, your day and your medicines help me time your reminders.")
-                        .font(.subheadline).foregroundStyle(Theme.secondary).multilineTextAlignment(.leading)
+        VStack(alignment: .leading, spacing: 4) {
+            Button { showSetup = true } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle.badge.plus").font(.largeTitle).foregroundStyle(Theme.accent)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if profile == nil {
+                            Text("Set up your profile").font(.headline).foregroundStyle(Theme.text)
+                            Text("Your name, your day and your medicines help me time your reminders.")
+                                .font(.subheadline).foregroundStyle(Theme.secondary).multilineTextAlignment(.leading)
+                        } else {
+                            Text("Add your day and your medicines").font(.headline).foregroundStyle(Theme.text)
+                            Text("Your mealtimes and medicines help me time your reminders.")
+                                .font(.subheadline).foregroundStyle(Theme.secondary).multilineTextAlignment(.leading)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").foregroundStyle(Theme.secondary)
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").foregroundStyle(Theme.secondary)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            if profile != nil {
+                Button("Not now") { dayCardDismissed = true }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.link)
+                    .frame(minHeight: 44)
+                    .padding(.leading, 50)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(16)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: data
@@ -437,6 +461,7 @@ struct TodayView: View {
         let t = await e.tasks(openOnly: true)
         let i = await e.latestInsight()
         let p = await e.profile()
+        let m = await e.medicines()
         let notes = await e.notes()
         // A failed read keeps the cards from before (and so the suggestions they hold stay out of the list).
         queueFailed = q == nil
@@ -447,6 +472,7 @@ struct TodayView: View {
         tasks = t
         insight = i.flatMap { $0.dismissed ? nil : $0 }
         profile = p
+        medicineCount = m.count
         titles = Dictionary(notes.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
         staleIDs.formIntersection(s.map(\.id))
         now = Date()
@@ -459,7 +485,7 @@ struct TodayView: View {
     private func offerSetupIfNeeded() {
         // Never during, or before the decision on, the first-time setup.
         guard SetupState.shared.progress == .done else { return }
-        guard loaded, profile == nil, !ProfileSetupView.shownThisLaunch, !lock.isLocked, !router.showSettings,
+        guard loaded, SetupFlow.offersProfileSheet(hasProfile: profile != nil), !ProfileSetupView.shownThisLaunch, !lock.isLocked, !router.showSettings,
               router.openNote == nil, PresentationGate.shared.open.isEmpty else { return }
         ProfileSetupView.shownThisLaunch = true
         showSetup = true
