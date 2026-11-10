@@ -114,8 +114,9 @@ TEST(prompt_profile_has_routine_and_when_text) {
 
 TEST(a_task_that_says_there_are_none_is_dropped) {
     auto e = parse_extraction(R"({"tasks":[{"text":"No action items were stated in the transcript."},{"text":"None"},
-        {"text":"Call the bank","who":"me"}]})");
+        {"text":"Call the bank","who":"me"},{"text":"None of the forms are filed yet; file them by Friday"},
+        {"text":"No task too small: call the bank"}]})");
     CHECK(e.ok);
-    CHECK_EQ(e.tasks.size(), (size_t)1);
+    CHECK_EQ(e.tasks.size(), (size_t)3);   // real tasks that start like "none" stay
     CHECK_EQ(e.tasks[0]["text"].get<std::string>(), std::string("Call the bank"));
 }

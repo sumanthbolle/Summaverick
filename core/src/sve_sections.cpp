@@ -620,13 +620,13 @@ std::string abbreviation_before(const std::string &t, size_t end) {
     return caps >= 1 && alnum >= 2 && e == end ? a : "";
 }
 
-// The bracket's content reads as an expansion: no digit (ASCII or Telugu), starts with a capital Latin letter or
-// a letter of another script (Telugu), at most 10 words.
+// The bracket's content reads as an expansion: it starts with a capital Latin letter (not a quote, a bracket or
+// another script: a Telugu bracket is most often the term as said, in its own script, as the system prompt asks),
+// has no digit (ASCII or Telugu) and no bracket of its own, and has at most 10 words.
 bool reads_as_expansion(const std::string &c) {
-    if (c.empty()) return false;
+    if (c.empty() || !ascii_upper(c[0])) return false;
+    if (c.find('(') != std::string::npos || c.find(')') != std::string::npos) return false;
     size_t n = 0;
-    const char32_t first = cp_at(c, 0, n);
-    if (!(first < 0x80 ? ascii_upper((char)first) : first > 0x24F)) return false;
     int words = 1;
     for (size_t i = 0; i < c.size(); i += n) {
         const char32_t cp = cp_at(c, i, n);
@@ -670,8 +670,6 @@ std::string lower_trimmed_task(const std::string &line) {
     return ascii_lower(trim_ws(t));
 }
 
-bool starts(const std::string &s, const char *p) { return s.compare(0, std::strlen(p), p) == 0; }
-
 bool is_action_heading(const std::string &l) {
     return is_heading(l) && (ascii_lower(l).find("action item") != std::string::npos ||
                              l.find("\xE0\xB0\x9A\xE0\xB0\xB0\xE0\xB1\x8D\xE0\xB0\xAF") != std::string::npos);  // చర్య
@@ -686,7 +684,12 @@ std::string drop_invented_expansions(const std::string &text, const std::string 
     while (i < text.size()) {
         const size_t open = text.find('(', i);
         if (open == std::string::npos) { out.append(text, i, std::string::npos); break; }
-        const size_t close = text.find(')', open);
+        // The matching ")" on the same line, by depth: "BPSC (Bihar (state) Commission)" is one bracket.
+        size_t close = std::string::npos;
+        for (size_t k = open + 1, depth = 1; k < text.size() && text[k] != '\n'; ++k) {
+            if (text[k] == '(') ++depth;
+            else if (text[k] == ')' && --depth == 0) { close = k; break; }
+        }
         const size_t nl = text.find('\n', open);
         const bool space = open > 0 && text[open - 1] == ' ';
         const size_t abbr_end = space ? open - 1 : open;
@@ -710,18 +713,48 @@ std::string drop_invented_expansions(const std::string &text, const std::string 
 bool says_no_tasks(const std::string &line) {
     const std::string t = lower_trimmed_task(line);
     if (t.empty()) return false;
-    if (t == "none" || t == "n/a" || t == "na" || t == "nil" || starts(t, "none ") || starts(t, "none,")) return true;
-    for (const char *p : {"no action", "no specific action", "no clear action", "no explicit action", "no task",
-                          "no specific task", "no to-do", "no todo", "there are no action", "there were no action",
-                          "there are no task", "there were no task", "there is no action", "there was no action"})
-        if (starts(t, p)) return true;
-    if (starts(t, "nothing"))
-        for (const char *w : {"stated", "mentioned", "assigned", "given", "specified", "noted", "discussed", "said"})
-            if (t.find(w) != std::string::npos) return true;
+    // A task's who and when ("task — who — when", as the prompt asks): a real task, whatever its first words.
+    for (const char *sep : {" \xE2\x80\x94 ", " \xE2\x80\x93 ", " - "})
+        if (t.find(sep) != std::string::npos) return false;
+    std::vector<std::string> w;
+    for (size_t a = 0; a < t.size();) {
+        size_t sp = t.find(' ', a);
+        if (sp == std::string::npos) sp = t.size();
+        std::string word = t.substr(a, sp - a);
+        while (!word.empty() && std::strchr(",;:.!", word.back())) word.pop_back();
+        if (!word.empty()) w.push_back(word);
+        a = sp + 1;
+    }
+    // Short lines only: "No action items were stated in the transcript." is 8 words; a long line is a task.
+    if (w.empty() || w.size() > 10) return false;
+    auto in = [](const std::string &x, std::initializer_list<const char *> set) {
+        for (const char *s : set) if (x == s) return true;
+        return false;
+    };
+    // What may follow "none" or "no tasks": the line only says there are none ("None stated", "No tasks were given").
+    const auto after = {"stated", "mentioned", "given", "listed", "assigned", "specified", "noted", "discussed",
+                        "identified", "said", "were", "was", "are", "is", "have", "has", "in", "for", "from", "yet",
+                        "so", "at", "today"};
+    if (w.size() == 1 && in(w[0], {"none", "n/a", "na", "nil"})) return true;
+    if (w[0] == "none") return in(w[1], after);
+    // "no [specific|clear|explicit] action item(s)/action(s)/task(s)/to-do(s)", optionally after "there are/were".
+    size_t i = 0;
+    if (w[0] == "there" && w.size() > 2 && in(w[1], {"are", "were", "is", "was"})) i = 2;
+    if (w[i] == "no") {
+        size_t k = i + 1;
+        if (k < w.size() && in(w[k], {"specific", "clear", "explicit", "other", "further"})) ++k;
+        if (k < w.size() && w[k] == "action" && k + 1 < w.size() && in(w[k + 1], {"item", "items"})) k += 2;
+        else if (k < w.size() && in(w[k], {"action", "actions", "task", "tasks", "to-do", "to-dos", "todo", "todos",
+                                           "action-items"})) ++k;
+        else return false;
+        return k == w.size() || in(w[k], after);
+    }
+    if (w[0] == "nothing")
+        for (const auto &x : w)
+            if (in(x, {"stated", "mentioned", "assigned", "given", "specified", "noted", "discussed", "said", "listed"}))
+                return true;
     // Telugu: ఏవీ లేవు, ఏమీ లేవు, ఏమీ లేదు ("none", "nothing"), on a short line.
-    int words = 1;
-    for (char c : t) words += c == ' ';
-    if (words <= 8)
+    if (w.size() <= 8)
         for (const char *p : {"\xE0\xB0\x8F\xE0\xB0\xB5\xE0\xB1\x80 \xE0\xB0\xB2\xE0\xB1\x87\xE0\xB0\xB5\xE0\xB1\x81",
                               "\xE0\xB0\x8F\xE0\xB0\xAE\xE0\xB1\x80 \xE0\xB0\xB2\xE0\xB1\x87\xE0\xB0\xB5\xE0\xB1\x81",
                               "\xE0\xB0\x8F\xE0\xB0\xAE\xE0\xB1\x80 \xE0\xB0\xB2\xE0\xB1\x87\xE0\xB0\xA6\xE0\xB1\x81"})

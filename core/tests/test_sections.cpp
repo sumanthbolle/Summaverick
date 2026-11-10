@@ -537,7 +537,8 @@ TEST(true_expansions_and_other_brackets_are_kept) {
     const std::string src = "The Chief Election Commissioner said the CEC will meet on 12 March, for example in Patna.";
     CHECK_EQ(drop_invented_expansions("- CEC (Chief Election Commissioner) will meet.", src),
              std::string("- CEC (Chief Election Commissioner) will meet."));
-    // Most of the content words are there ("chief", "election"; "commissioner" said as "commission"): kept.
+    // Most of the content words are there: "chief" and "election" are said, "commissioner" is not ("commission" is
+    // another word), and 2 of 3 is more than half: kept.
     CHECK_EQ(drop_invented_expansions("CEC (Chief Election Commissioner)", "the chief election commission met"),
              std::string("CEC (Chief Election Commissioner)"));
     // Not expansions: numbers, dates, "e.g." asides, lower-case asides.
@@ -552,11 +553,29 @@ TEST(true_expansions_and_other_brackets_are_kept) {
 }
 
 TEST(invented_expansions_in_telugu_output) {
-    // Telugu notes keep the term as said (in its own script, as the system prompt asks) but not a made-up expansion.
+    // Only a bracket that starts with a Latin capital is checked: a bracket in another script is often the term as
+    // said, in its own script (the system prompt asks for that), and is never stripped.
     CHECK_EQ(drop_invented_expansions("- CAC (సీఏసీ) రాజీనామా గురించి యువత మాట్లాడారు.", kNote19Source),
              std::string("- CAC (సీఏసీ) రాజీనామా గురించి యువత మాట్లాడారు."));
+    CHECK_EQ(drop_invented_expansions("UPSC (యూపీఎస్సీ) పరీక్ష", kNote19Source), std::string("UPSC (యూపీఎస్సీ) పరీక్ష"));
     CHECK_EQ(drop_invented_expansions("- CAC (కేంద్ర సాయుధ పోలీసు దళాలు) రాజీనామా.", kNote19Source),
+             std::string("- CAC (కేంద్ర సాయుధ పోలీసు దళాలు) రాజీనామా."));
+    // A latin expansion in Telugu notes is still checked.
+    CHECK_EQ(drop_invented_expansions("- CAC (Central Armed Police Forces) రాజీనామా.", kNote19Source),
              std::string("- CAC రాజీనామా."));
+}
+
+TEST(brackets_that_start_with_a_quote_or_nest_are_left_alone) {
+    const std::string src = "the RBI and the BPSC exam";
+    CHECK_EQ(drop_invented_expansions("RBI (\xE2\x80\x9Cthe regulator\xE2\x80\x9D) said", src),
+             std::string("RBI (\xE2\x80\x9Cthe regulator\xE2\x80\x9D) said"));
+    CHECK_EQ(drop_invented_expansions("RBI (\"Regulator\") said", src), std::string("RBI (\"Regulator\") said"));
+    // Nested: the whole bracket is one unit; never "BPSC Commission) exam".
+    CHECK_EQ(drop_invented_expansions("BPSC (Bihar (state) Commission) exam", src),
+             std::string("BPSC (Bihar (state) Commission) exam"));
+    // An unbalanced bracket stays as it is.
+    CHECK_EQ(drop_invented_expansions("BPSC (Bihar (state Commission exam", src),
+             std::string("BPSC (Bihar (state Commission exam"));
 }
 
 TEST(empty_action_items_become_none) {
@@ -569,6 +588,10 @@ TEST(empty_action_items_become_none) {
     // A real task stays, and a "none" line next to it goes.
     CHECK_EQ(none_action_items("## Action items\n- [ ] Submit the form — Ravi — Friday\n- [ ] None stated"),
              std::string("## Action items\n- [ ] Submit the form — Ravi — Friday"));
+    CHECK_EQ(none_action_items("## Action items\n- [ ] None of the forms are filed yet; file them — Ravi — Friday"),
+             std::string("## Action items\n- [ ] None of the forms are filed yet; file them — Ravi — Friday"));
+    CHECK_EQ(none_action_items("## Action items\n- [ ] No task too small: call the bank\n- [ ] Call Ravi — me — today"),
+             std::string("## Action items\n- [ ] No task too small: call the bank\n- [ ] Call Ravi — me — today"));
     CHECK_EQ(none_action_items("## Action items\n- [ ] Note down nothing but the dates"),
              std::string("## Action items\n- [ ] Note down nothing but the dates"));
     // Telugu output.
@@ -586,5 +609,13 @@ TEST(says_no_tasks_reads_english_and_telugu) {
     CHECK(!says_no_tasks("Call the bank"));
     CHECK(!says_no_tasks("Nothing to bring but the ID card"));
     CHECK(!says_no_tasks("No later than Friday, submit the form"));
+    // Real tasks that start like "none": a long line, the who/when separator, "none of".
+    CHECK(!says_no_tasks("- [ ] None of the forms are filed yet; file them — Ravi — Friday"));
+    CHECK(!says_no_tasks("No task too small: call the bank"));
+    CHECK(!says_no_tasks("None of the forms are filed yet, file them by Friday"));
+    CHECK(!says_no_tasks("No tasks left — Ravi — Friday"));
+    CHECK(says_no_tasks("None stated."));
+    CHECK(says_no_tasks("None were mentioned in the recording"));
+    CHECK(says_no_tasks("No tasks were given."));
     CHECK(!says_no_tasks(""));
 }
