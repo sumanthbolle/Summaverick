@@ -212,6 +212,7 @@ final class ProcessingPipeline {
     /// GPU work in the background, where a failed reply would mark the section done with no memories.
     @ObservationIgnored private let leftFront = AtomicFlag()
     @ObservationIgnored private var resignObserver: NSObjectProtocol?
+    @ObservationIgnored private var activeObserver: NSObjectProtocol?
     /// Some note may still have sections without memories (unknown at launch): the overnight task is asked for.
     @ObservationIgnored private var memoriesMayBeDue = true
 
@@ -383,6 +384,10 @@ final class ProcessingPipeline {
             guard let self else { hold.end(); return }
             self.continuedWorkExpired(hold: hold)
         }
+        activeObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.appOpened() }
+        }
         let leftFront = self.leftFront
         resignObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in leftFront.set(true) }
@@ -484,7 +489,9 @@ final class ProcessingPipeline {
         if ModelManager.shared.isReady {
             // Keyed on the file name: the note id is not known until the engine is free. A task asked for at Record
             // is kept (TaskAtRecord.workLeftAtBegin); from the background it is the only one that can run.
-            ContinuedWork.shared.begin(key: audio.deletingPathExtension().lastPathComponent, subtitle: Stage.transcribing(0).label)
+            ContinuedWork.shared.begin(key: audio.deletingPathExtension().lastPathComponent, subtitle: Stage.transcribing(0).label,
+                                       stop: true)
+            ContinuedWork.shared.recordingEnded()   // before the note starts: the bar's band ends, the note takes the rest
             if !isWorking {
                 starting = true
                 claimed = true
@@ -493,7 +500,7 @@ final class ProcessingPipeline {
                 stage = .transcribing(0)
             }
         }
-        ContinuedWork.shared.recordingEnded()   // after begin: the recording's task is the note's now
+        ContinuedWork.shared.recordingEnded()   // after begin: the recording's task is the note's now (no-op if done above)
         let asksToOpen = TaskAtRecord.postsOpenAppNotice(stoppedInBackground: !appIsActive,
                                                          taskHeld: ContinuedWork.shared.isHeld,
                                                          workLeft: ModelManager.shared.isReady)
@@ -507,9 +514,18 @@ final class ProcessingPipeline {
     /// Stop came from the background with no background time: the person is told the recording is kept and the
     /// notes are written once the app is opened (NotifyRule.shouldNotify still applies).
     private func askToOpen(_ id: Int64) {
+        // Marked only when it was posted (the app may have come to front before the note was saved).
+        guard NotesNotifier.recordingSaved(noteID: id, hold: NotesNotifier.Hold()) else { return }
         askedToOpen.insert(id)
         NSLog("[sve] bg: no background time: asked the person to open the app")
-        NotesNotifier.recordingSaved(noteID: id, hold: NotesNotifier.Hold())
+    }
+
+    /// The app came to front: "Your recording is saved" has done its job (it goes from Notification Center), and a
+    /// later cut-off of those notes says "Taking a short break" again.
+    private func appOpened() {
+        guard !askedToOpen.isEmpty else { return }
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: askedToOpen.map { NotifyRule.identifier(noteID: $0) })
+        askedToOpen.removeAll()
     }
 
     /// Full run for a fresh recording. Returns the note id as soon as it exists. claimed: recordingStopped
@@ -994,10 +1010,6 @@ final class ProcessingPipeline {
 
     /// A notes run starts for this note: it may be cut off (and notify) again.
     private func startNotesRun(_ id: Int64) {
-        // Opened: "Your recording is saved" has done its job, and a later cut-off says "paused" again.
-        if appIsActive, askedToOpen.remove(id) != nil {
-            UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [NotifyRule.identifier(noteID: id)])
-        }
         notesRun = true
         runningNote = id
         stepCount = nil

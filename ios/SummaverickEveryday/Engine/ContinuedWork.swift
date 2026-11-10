@@ -32,10 +32,15 @@ final class ContinuedWork {
         /// setTaskCompleted exactly once, from whichever side gets here first. Always as success
         /// (TaskLifecycle.reportsSuccess): iOS shows "Failed" for success false, and work left is only paused. Paused
         /// first says so on the lock screen ("Taking a short break" / PauseWords.paused), with the progress where it was.
-        func complete(_ c: TaskLifecycle.Completion) {
+        /// whileRecording: iOS ended it during the recording, which goes on: its own lines (TaskAtRecord.stillRecording…).
+        func complete(_ c: TaskLifecycle.Completion, whileRecording: Bool = false) {
             guard completed.setOnce(), let t = task as? BGTask else { return }
             if c == .paused, #available(iOS 26, *), let p = t as? BGContinuedProcessingTask {
-                p.updateTitle(String(localized: "Taking a short break"), subtitle: PauseWords.paused)
+                if whileRecording {
+                    p.updateTitle(TaskAtRecord.stillRecordingTitle, subtitle: TaskAtRecord.stillRecordingSubtitle)
+                } else {
+                    p.updateTitle(String(localized: "Taking a short break"), subtitle: PauseWords.paused)
+                }
             }
             t.setTaskCompleted(success: TaskLifecycle.reportsSuccess(c))
         }
@@ -133,11 +138,22 @@ final class ContinuedWork {
     /// a held task is kept whatever its state.
     /// A task held for the recording has work left (TaskAtRecord.workLeftAtBegin): the Stop keeps it. A request made
     /// at Record that iOS never started is asked for again at a Stop in front (TaskAtRecord.asksAgainAtStop).
-    func begin(key: String, subtitle: String) {
+    /// stop: called at Stop (only there is a Record request that never started asked for again, and only there a
+    /// background call with nothing held counts as refused, TaskAtRecord.refusesAtStop).
+    func begin(key: String, subtitle: String, stop: Bool = false) {
         guard #available(iOS 26, *) else { return }
         self.subtitle = subtitle
         let inFront = UIApplication.shared.applicationState == .active
-        if wanted, TaskAtRecord.asksAgainAtStop(appActive: inFront, asked: askedAtRecord, held: held != nil) {
+        if stop, TaskAtRecord.refusesAtStop(appActive: inFront, held: held != nil) {
+            // iOS accepts a request made in the background and never starts it (note 24): none is made, and the run
+            // is cut off when the plain background time ends (backgroundTimeEnded: overnight list, overnight task).
+            if wanted, let askedID { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: askedID) }
+            wanted = false
+            refused = true
+            NSLog("[sve] bg: Stop in the background with no task held: none asked for")
+            return
+        }
+        if wanted, TaskAtRecord.asksAgainAtStop(stop: stop, appActive: inFront, asked: askedAtRecord, held: held != nil) {
             NSLog("[sve] bg: the task asked for at Record never started; asked for again")
             if let askedID { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: askedID) }
             wanted = false
@@ -180,8 +196,15 @@ final class ContinuedWork {
         recording = true
         recordingOnExpiry.set(true)
         subtitle = Self.recordingSubtitle
-        progress.startRecording()
+        syncBand()
         apply()
+    }
+
+    /// The recording band moves only while a recording holds the task and no note runs in it (TaskAtRecord.bandMoves):
+    /// a note in flight keeps its own share of the bar, and the band takes over again when it ends.
+    private func syncBand() {
+        if TaskAtRecord.bandMoves(recording: recording, noteRunning: noteRunning) { progress.startRecording() }
+        else { progress.endRecording() }
     }
 
     /// The recording ended (Stop, after begin; or cancelled; or nothing follows). The task is then finished by the
@@ -190,6 +213,7 @@ final class ContinuedWork {
         guard recording else { return }
         recording = false
         recordingOnExpiry.set(false)
+        syncBand()
     }
 
     @available(iOS 26, *)
@@ -206,6 +230,7 @@ final class ContinuedWork {
             askedAtRecord = atRecord
             askedID = id
             NSLog("[sve] bg: continued processing asked for (%@)", id)
+            syncBand()   // a new request during the recording keeps the band
         } catch {
             refused = true
             NSLog("[sve] bg: continued processing not available: %@", String(describing: error))
@@ -236,15 +261,18 @@ final class ContinuedWork {
     /// A note run starts: the first in the task uses its first 1000 units, a later one adds its own 1000, so the
     /// progress never goes back.
     func startNote() {
-        progress.startNote()
-        if recording { progress.startRecording() }   // still recording: the heartbeats keep moving the bar, never done
+        progress.startNote()   // the recording band (if any) ends here: the note takes the rest of the bar
         noteRunning = true
+        syncBand()
         Self.clock.stamp()
         apply()
     }
 
     /// The note run ended (the pipeline is about to finish the task, or to start the next note in it).
-    func endNote() { noteRunning = false }
+    func endNote() {
+        noteRunning = false
+        syncBand()   // still recording: the band moves the bar again, never to done
+    }
 
     /// On the note's own units, never past 990: a note at its end is not pushed along, the task is finished.
     private func pulse() {
@@ -284,7 +312,8 @@ final class ContinuedWork {
             // failed, while notes are left (note 22 showed "failed at 50%" here); done when only memories or the
             // insight were running.
             let w = ContinuedWork.shared
-            h.complete(TaskAtRecord.expiryCompletion(recording: w.recordingOnExpiry.isSet, workLeft: w.workLeftOnExpiry.isSet))
+            let rec = w.recordingOnExpiry.isSet
+            h.complete(TaskAtRecord.expiryCompletion(recording: rec, workLeft: w.workLeftOnExpiry.isSet), whileRecording: rec)
             // Before the hop as well: without it the app may be suspended before the "paused" notice starts.
             let hold = NotesNotifier.Hold()
             Task { @MainActor in ContinuedWork.shared.expired(h, hold: hold) }

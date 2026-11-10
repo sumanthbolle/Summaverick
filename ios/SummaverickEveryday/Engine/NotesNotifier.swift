@@ -63,7 +63,9 @@ enum NotesNotifier {
 
     /// Right after a Stop from the background with no background time (TaskAtRecord.postsOpenAppNotice): the
     /// recording is kept and nothing is written until the app is opened. Tapping opens the note.
-    static func recordingSaved(noteID: Int64, hold: Hold? = nil) {
+    /// False when nothing was posted (the app is in front).
+    @discardableResult
+    static func recordingSaved(noteID: Int64, hold: Hold? = nil) -> Bool {
         post(noteID, state: "saved, open the app", title: String(localized: "Your recording is saved"),
              body: String(localized: "Open Summaverick and I'll write your notes. It takes a few minutes."), hold: hold)
     }
@@ -76,13 +78,15 @@ enum NotesNotifier {
 
     /// hold: background time the caller took synchronously, before any await (right after a cut-off the app may be
     /// suspended at any moment); ended once the request is handed over. Without one, it is taken here.
+    /// False when nothing is posted (the app is in front).
+    @discardableResult
     private static func post(_ noteID: Int64, state: String, title: String, subtitle: String? = nil, body: String,
-                             hold given: Hold?) {
+                             hold given: Hold?) -> Bool {
         let hold = given ?? Hold()
         guard NotifyRule.shouldNotify(appActive: UIApplication.shared.applicationState == .active) else {
             NSLog("[sve] bg: note %lld %@ with the app in front: no notification", noteID, state)
             hold.end()
-            return
+            return false
         }
         let content = UNMutableNotificationContent()
         content.title = title
@@ -100,6 +104,7 @@ enum NotesNotifier {
             }
             hold.end()
         }
+        return true
     }
 
     /// A short background-time assertion, taken when made and ended exactly once (after the post, or when iOS takes

@@ -6591,6 +6591,40 @@
           }
         }
       }
+    },
+    "Still recording": {
+      "comment": "Lock-screen title when iOS ends the background time while a recording goes on",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still recording"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా రికార్డ్ చేస్తున్నాను"
+          }
+        }
+      }
+    },
+    "I'll write your notes when you stop.": {
+      "comment": "Lock-screen line under \"Still recording\"",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I'll write your notes when you stop."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు ఆపగానే మీ నోట్స్ రాస్తాను."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

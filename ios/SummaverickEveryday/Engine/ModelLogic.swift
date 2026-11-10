@@ -859,13 +859,28 @@ enum TaskAtRecord {
 
     /// Asked at Record but never started (iOS may accept a request and never run it): at a Stop in front it is asked
     /// for again.
-    static func asksAgainAtStop(appActive: Bool, asked: Bool, held: Bool) -> Bool { appActive && asked && !held }
+    /// Only at Stop: a person's tap during the recording keeps the request (asking again resets the bar).
+    static func asksAgainAtStop(stop: Bool = true, appActive: Bool, asked: Bool, held: Bool) -> Bool {
+        stop && appActive && asked && !held
+    }
 
     /// Right after Stop: with no task held (Record itself came from the background, or iOS ended or refused the task)
     /// the app is suspended soon and nothing is written until it is opened, so the person is told so, once.
     static func postsOpenAppNotice(stoppedInBackground: Bool, taskHeld: Bool, workLeft: Bool) -> Bool {
         stoppedInBackground && !taskHeld && workLeft
     }
+
+    /// The task's last lines when iOS ends it while the recording goes on (the recording itself carries on; the notes
+    /// follow Stop): not "Taking a short break", which reads as if the recording stopped.
+    static var stillRecordingTitle: String { String(localized: "Still recording") }
+    static var stillRecordingSubtitle: String { String(localized: "I'll write your notes when you stop.") }
+
+    /// At Stop with the app not in front and no task held: nothing is asked (iOS accepts it and never starts it) and
+    /// the Stop counts as refused, so the plain background time's end cuts the run off (overnight list, overnight task).
+    static func refusesAtStop(appActive: Bool, held: Bool) -> Bool { !appActive && !held }
+
+    /// The recording band moves only while a recording holds the task and no note run is in flight in it.
+    static func bandMoves(recording: Bool, noteRunning: Bool) -> Bool { recording && !noteRunning }
 
     /// An expiry while recording is a pause (the notes are still to come), never done.
     static func expiryCompletion(recording: Bool, workLeft: Bool) -> TaskLifecycle.Completion {
@@ -1009,8 +1024,23 @@ struct TaskProgress: Equatable {
     /// What the lock screen shows, 0...1.
     var fraction: Double { totalUnits > 0 ? Double(completedUnits) / Double(totalUnits) : 0 }
 
-    /// A recording starts in this task (asked for at Record, or joining a task already held).
+    /// A recording starts in this task (asked for at Record, or joining a task already held), or goes on after a
+    /// note run in it ended. Only while no note runs (ContinuedWork): a running note's bar is not squeezed.
     mutating func startRecording() { recording = true }
+
+    /// The recording band ends (Stop, cancel, or a note run starts): the first note takes the rest of the bar from
+    /// where the recording left it, so heartbeats from here on move the note, not the band.
+    mutating func endRecording() {
+        guard recording else { return }
+        recording = false
+        if !noteStarted { rebaseAfterRecording() }
+    }
+
+    private mutating func rebaseAfterRecording() {
+        noteBase = completedUnits
+        noteSpan = totalUnits - completedUnits
+        noteFraction = 0
+    }
 
     /// A note run starts in the task: the first one uses the task's first 1000 units (after a recording: the rest of
     /// the bar from where the recording left it), a later one adds its own 1000.
@@ -1020,9 +1050,10 @@ struct TaskProgress: Equatable {
             noteBase = totalUnits - Self.noteUnits
             noteSpan = Self.noteUnits
         } else if recording {
-            noteBase = completedUnits
-            noteSpan = totalUnits - completedUnits
+            rebaseAfterRecording()
         }
+        // Not recording (endRecording, or no recording): a first note keeps the base it has (0, or where the
+        // recording left the bar).
         recording = false
         noteStarted = true
         noteFraction = 0
