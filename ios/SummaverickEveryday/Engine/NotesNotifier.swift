@@ -92,7 +92,12 @@ enum NotesNotifier {
         content.title = title
         if let subtitle { content.subtitle = subtitle }
         content.body = body
-        content.sound = .default
+        if QuietHours.isQuietNow() {   // night: arrives silently, still on the lock screen and in the list
+            content.sound = nil
+            content.interruptionLevel = .passive
+        } else {
+            content.sound = .default
+        }
         content.userInfo = ["note_id": NSNumber(value: noteID)]
         let request = UNNotificationRequest(identifier: NotifyRule.identifier(noteID: noteID), content: content, trigger: nil)
         Task {
@@ -158,7 +163,12 @@ enum QuietNotifier {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        if QuietHours.isQuietNow() {   // night: arrives silently, still on the lock screen and in the list
+            content.sound = nil
+            content.interruptionLevel = .passive
+        } else {
+            content.sound = .default
+        }
         if let category { content.categoryIdentifier = category }
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         Task {

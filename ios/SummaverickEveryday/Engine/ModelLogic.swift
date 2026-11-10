@@ -410,6 +410,43 @@ enum NotesProgress {
     }
 }
 
+/// Night quiet for notes notifications (owner, 2026-11-11): between bedtime and wake-up (the profile's times, else
+/// 22:00–07:00) a notes notice arrives silently. Medicine and reminder alerts keep their sound.
+enum QuietHours {
+    static let defaultBed = 22 * 60, defaultWake = 7 * 60
+
+    /// "HH:MM" → minutes after midnight; nil when it is not a time.
+    static func minutes(_ hhmm: String?) -> Int? {
+        guard let s = hhmm else { return nil }
+        let p = s.split(separator: ":")
+        guard p.count == 2, let h = Int(p[0]), let m = Int(p[1]), (0..<24).contains(h), (0..<60).contains(m) else { return nil }
+        return h * 60 + m
+    }
+
+    /// Whether `minute` (after midnight) falls in [bed, wake), wrapping past midnight. Equal times: never quiet.
+    static func isQuiet(minute: Int, bed: Int?, wake: Int?) -> Bool {
+        let b = bed ?? defaultBed, w = wake ?? defaultWake
+        if b == w { return false }
+        return b < w ? (minute >= b && minute < w) : (minute >= b || minute < w)
+    }
+
+    static func isQuiet(_ date: Date, bed: Int?, wake: Int?, calendar: Calendar = .current) -> Bool {
+        let c = calendar.dateComponents([.hour, .minute], from: date)
+        return isQuiet(minute: (c.hour ?? 0) * 60 + (c.minute ?? 0), bed: bed, wake: wake)
+    }
+
+    /// The profile's times, kept for notices posted without waiting for the store.
+    static let bedKey = "quiet.bed", wakeKey = "quiet.wake"
+    static func remember(bed: String?, wake: String?, defaults: UserDefaults = .standard) {
+        if let b = minutes(bed) { defaults.set(b, forKey: bedKey) } else { defaults.removeObject(forKey: bedKey) }
+        if let w = minutes(wake) { defaults.set(w, forKey: wakeKey) } else { defaults.removeObject(forKey: wakeKey) }
+    }
+    static func isQuietNow(defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
+        let b = defaults.object(forKey: bedKey) as? Int, w = defaults.object(forKey: wakeKey) as? Int
+        return isQuiet(now, bed: b, wake: w)
+    }
+}
+
 /// Notes notifications (NotesNotifier): ready, paused, failed. One per state change, never per percent.
 enum NotifyRule {
     /// In front the app already shows the note: nothing is posted.

@@ -68,6 +68,8 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
 
     /// Rebuilds all `sve.rem.` requests from the active reminders. Safe to call often.
     func resync() async {
+        // Night quiet for notes notices follows the profile's bedtime and wake-up (QuietHours).
+        if let r = await CoreEngine.shared.profile()?.routine { QuietHours.remember(bed: r.bed, wake: r.wake) }
         if syncing { dirty = true; return }
         syncing = true
         defer { syncing = false }
