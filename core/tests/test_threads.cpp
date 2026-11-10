@@ -30,3 +30,15 @@ TEST(runtime_threads_resolve) {
     ThreadPair z = resolve_threads(6, 0, 0);   // 0 decode: the load-time default
     CHECK_EQ(z.decode, 4); CHECK_EQ(z.batch, 6);
 }
+
+// sve_set_audio_threads: the encoder follows the prefill's threads (0 => the model's batch threads now); it is
+// loaded again only when the count differs from what it was loaded with.
+TEST(audio_threads_follow_batch) {
+    CHECK_EQ(audio_threads(0, 6), 6);
+    CHECK_EQ(audio_threads(0, 2), 2);
+    CHECK_EQ(audio_threads(2, 6), 2);    // asked for: kept
+    CHECK_EQ(audio_threads(-1, 6), 6);
+    CHECK_EQ(audio_threads(0, 0), 1);    // never 0
+    CHECK(audio_threads_need_reload(6, 2));
+    CHECK(!audio_threads_need_reload(2, 2));
+}

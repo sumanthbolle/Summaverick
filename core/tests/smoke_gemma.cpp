@@ -1317,6 +1317,9 @@ static void run_api_chat(sve_ctx *ctx) {
 static int run_api(sve_ctx *ctx) {
     // Runtime CPU threads (the heat ladder): nothing to set without a model.
     expect(sve_set_threads(ctx, 2, 2) == -1 && sve_set_threads(nullptr, 2, 2) == -1, "set threads with no model: -1");
+    // The audio encoder's threads: nothing to load again without a model and projector.
+    expect(sve_set_audio_threads(ctx, 2) == -1 && sve_set_audio_threads(nullptr, 2) == -1 && sve_set_audio_threads(ctx, 0) == -1,
+           "set audio threads with no model: -1");
 
     sve_profile_set(ctx, R"({"name":"Lakshmi","lang":"en","routine":{"breakfast":"08:00","dinner":"20:00"}})");
     json prof = take(sve_profile_get(ctx));

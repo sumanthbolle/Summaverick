@@ -69,7 +69,7 @@ int  sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads,
 void sve_unload_llm(sve_ctx *ctx);
 /* CPU threads for the next model calls (the heat ladder eases them off): n_decode for generation, n_batch for
  * prefill. 0 => the load-time rule (decode up to 4 cores; batch up to 8, never fewer than decode). The audio
- * encoder keeps the threads it was loaded with (mtmd has no runtime setter; ~6% of a piece). 0, or -1 with no model. */
+ * encoder keeps its threads until sve_set_audio_threads. 0, or -1 with no model. */
 int  sve_set_threads(sve_ctx *ctx, int n_decode, int n_batch);
 int  sve_llm_loaded(const sve_ctx *ctx);
 /* 1 when a run on the GPU failed since the model was loaded: load it again before the next run (the Metal state stays broken). */
@@ -110,6 +110,11 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang);
 int  sve_load_audio(sve_ctx *ctx, const char *mmproj_path);
 void sve_unload_audio(sve_ctx *ctx);
 int  sve_audio_loaded(const sve_ctx *ctx);
+/* CPU threads of the audio encoder for the next pieces: n, or the model's prefill threads now when n is 0.
+ * mtmd has no runtime setter, so the projector is loaded again (same file) only when the count differs; the
+ * time it takes is logged. Call between runs, never during one. 0 ok; -1 with no model or no projector loaded;
+ * -2 when the reload failed (the projector is then loaded again with its old threads, else unloaded). */
+int  sve_set_audio_threads(sve_ctx *ctx, int n);
 
 /* Transcribes a 16 kHz mono 16‑bit WAV with the loaded model, in ~28 s pieces. Handles mixed
  * languages (e.g. Telugu with English terms): each word is written in the script it was spoken in.

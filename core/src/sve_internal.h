@@ -86,6 +86,8 @@ struct sve_ctx {
     std::unique_ptr<sve::Llm> llm;
 #ifdef SVE_WITH_MTMD
     mtmd_context *mtmd = nullptr; // audio projector; belongs to llm->model, freed before it
+    std::string mmproj_path;      // the projector's file, to load it again with other threads
+    int audio_threads = 0;        // the encoder's CPU threads since its load
 #endif
 #ifdef SVE_WITH_WHISPER
     whisper_context *whisper = nullptr;

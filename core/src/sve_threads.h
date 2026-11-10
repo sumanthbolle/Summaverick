@@ -21,4 +21,11 @@ inline ThreadPair resolve_threads(int hw, int n_decode, int n_batch) {
     return {d, n_batch > 0 ? n_batch : batch_threads(hw, d)};
 }
 
+// sve_set_audio_threads: the audio encoder follows the prefill's threads. n 0 (or less) => the model's batch
+// threads now; never 0.
+inline int audio_threads(int requested, int batch) { return std::max(1, requested > 0 ? requested : batch); }
+
+// mtmd has no runtime thread setter: the encoder is loaded again only when the count changes.
+inline bool audio_threads_need_reload(int loaded, int wanted) { return loaded != wanted; }
+
 } // namespace sve

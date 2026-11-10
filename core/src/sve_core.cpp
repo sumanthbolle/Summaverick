@@ -334,31 +334,56 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang_c
 
 // ---------------------------------------------------------------- audio understanding (Gemma 4 via mtmd)
 #ifdef SVE_WITH_MTMD
-int sve_load_audio(sve_ctx *ctx, const char *mmproj_path) {
-    if (!ctx || !ctx->llm || !mmproj_path) return -1;
+// Loads the projector from `path` with `n_threads` encoder threads (any projector loaded is freed first).
+static int load_projector(sve_ctx *ctx, const std::string &path, int n_threads) {
     sve_unload_audio(ctx);
     mtmd_context_params mp = mtmd_context_params_default();
     // Same backend as the model: a CPU-only load (n_gpu_layers 0) keeps the encoder off the GPU too,
     // so transcription keeps running while the phone is locked (iOS refuses background GPU work).
     mp.use_gpu = ctx->llm->n_gpu_layers > 0;
     mp.print_timings = false;
-    // The audio encoder is a short compute-bound burst per piece: it gets the prefill's threads (more
-    // than decoding). Mac CPU: encode 1.04 s -> 0.59 s per 28 s piece, transcripts identical
-    // (docs/superpowers/2026-11-09-piece-speed.md).
-    mp.n_threads = ctx->llm->n_threads_batch;
+    mp.n_threads = n_threads;
     mp.warmup = false;
-    ctx->mtmd = mtmd_init_from_file(mmproj_path, ctx->llm->model, mp);
-    if (!ctx->mtmd) { sve_logf(2, "failed to load audio projector %s", mmproj_path); return -2; }
+    ctx->mtmd = mtmd_init_from_file(path.c_str(), ctx->llm->model, mp);
+    if (!ctx->mtmd) { sve_logf(2, "failed to load audio projector %s", path.c_str()); return -2; }
     if (!mtmd_support_audio(ctx->mtmd)) {
-        sve_logf(2, "projector %s has no audio encoder", mmproj_path);
+        sve_logf(2, "projector %s has no audio encoder", path.c_str());
         sve_unload_audio(ctx);
         return -3;
     }
+    ctx->mmproj_path = path;
+    ctx->audio_threads = n_threads;
     return 0;
 }
 
+int sve_load_audio(sve_ctx *ctx, const char *mmproj_path) {
+    if (!ctx || !ctx->llm || !mmproj_path) return -1;
+    // The audio encoder is a short compute-bound burst per piece: it gets the prefill's threads (more
+    // than decoding). Mac CPU: encode 1.04 s -> 0.59 s per 28 s piece, transcripts identical
+    // (docs/superpowers/2026-11-09-piece-speed.md). sve_set_audio_threads changes them later.
+    return load_projector(ctx, mmproj_path, sve::audio_threads(0, ctx->llm->n_threads_batch));
+}
+
+int sve_set_audio_threads(sve_ctx *ctx, int n) {
+    if (!ctx || !ctx->llm || !ctx->mtmd) return -1;
+    const int want = sve::audio_threads(n, ctx->llm->n_threads_batch);
+    if (!sve::audio_threads_need_reload(ctx->audio_threads, want)) return 0;
+    const int old = ctx->audio_threads;
+    const std::string path = ctx->mmproj_path;
+    const auto t0 = std::chrono::steady_clock::now();
+    const int rc = load_projector(ctx, path, want);
+    const long ms = (long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+    if (rc == 0) {
+        sve_logf(0, "audio threads %d (reload %ld ms)", want, ms);
+        return 0;
+    }
+    sve_logf(2, "audio threads %d: reload failed after %ld ms; loading it again with %d", want, ms, old);
+    load_projector(ctx, path, old);
+    return -2;
+}
+
 void sve_unload_audio(sve_ctx *ctx) {
-    if (ctx && ctx->mtmd) { mtmd_free(ctx->mtmd); ctx->mtmd = nullptr; }
+    if (ctx && ctx->mtmd) { mtmd_free(ctx->mtmd); ctx->mtmd = nullptr; ctx->audio_threads = 0; }
 }
 
 int sve_audio_loaded(const sve_ctx *ctx) { return ctx && ctx->mtmd ? 1 : 0; }
@@ -666,6 +691,7 @@ char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progre
 int sve_load_audio(sve_ctx *, const char *) { return -1; }
 void sve_unload_audio(sve_ctx *) {}
 int sve_audio_loaded(const sve_ctx *) { return 0; }
+int sve_set_audio_threads(sve_ctx *, int) { return -1; }
 char *sve_transcribe_audio(sve_ctx *, const char *, sve_progress_cb, void *) { return nullptr; }
 char *sve_transcribe_audio_pieces(sve_ctx *, const char *, sve_progress_cb, void *) { return nullptr; }
 char *sve_transcribe_next_piece(sve_ctx *, const char *, int64_t, int, const char *, sve_progress_cb, void *) { return nullptr; }
