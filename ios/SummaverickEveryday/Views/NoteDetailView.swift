@@ -14,6 +14,8 @@ struct NoteDetailView: View {
     @State private var loaded = false
     @State private var pieces: [TranscriptPiece] = []
     @State private var chapters: [Chapter] = []
+    /// Parts of the notes and of the questions that failed 3 times ("I couldn't write part %d. Try again").
+    @State private var partsLeft: [NoteSteps.Kind: [Int]] = [:]
     @State private var tab: Tab
     @State private var title = ""
     @State private var question = ""
@@ -177,6 +179,8 @@ struct NoteDetailView: View {
 
                     content
 
+                    missingParts
+
                     regenerateControls
 
                     // Hidden while the failure banner offers "Try again" (same action).
@@ -288,6 +292,28 @@ struct NoteDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 24)
             }
+        }
+    }
+
+    /// Under the notes or the questions: a line for each part that could not be written. Try again writes only
+    /// those parts and puts the text together again.
+    @ViewBuilder private var missingParts: some View {
+        if !isThisNoteBusy, pipeline.regenerateFailed[noteID] == nil, let kind = tab.kind.flatMap(NoteSteps.Kind.init),
+           let parts = partsLeft[kind], !parts.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(parts, id: \.self) { part in
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.cautionIcon)
+                        Button(ProcessingPipeline.partLeftLine(part)) { Task { await pipeline.tryAgain(noteID: noteID) } }
+                            .font(.footnote.weight(.semibold))
+                            .frame(minHeight: 44, alignment: .leading)
+                            .disabled(pipeline.isBusy || !models.isReady)
+                        Spacer()
+                    }
+                }
+            }
+            .padding(.horizontal).padding(.vertical, 8)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 8))
         }
     }
 
@@ -528,6 +554,8 @@ struct NoteDetailView: View {
         let ps = await CoreEngine.shared.pieces(noteID)
         chapters = await CoreEngine.shared.chapters(noteID)
         extracted = await CoreEngine.shared.noteExtracted(noteID)
+        partsLeft = [.notes: await ProcessingPipeline.partsLeft(noteID: noteID, kind: .notes),
+                     .questions: await ProcessingPipeline.partsLeft(noteID: noteID, kind: .questions)]
         note = n
         pieces = ps
         loaded = true

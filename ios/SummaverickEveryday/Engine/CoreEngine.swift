@@ -301,3 +301,15 @@ actor CoreStore {
 
     func run<T>(_ body: (OpaquePointer?) throws -> T) rethrows -> T { try body(ctx) }
 }
+
+extension NoteSteps.Kind {
+    /// The note output this part kind belongs to.
+    var outputKind: OutputKind { self == .notes ? .detailedNotes : .revisionQuestions }
+    init?(_ kind: OutputKind) {
+        switch kind {
+        case .detailedNotes: self = .notes
+        case .revisionQuestions: self = .questions
+        default: return nil
+        }
+    }
+}

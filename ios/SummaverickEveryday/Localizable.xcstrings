@@ -6625,6 +6625,56 @@
           }
         }
       }
+    },
+    "(not written yet)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(not written yet)"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(ఇంకా రాయలేదు)"
+          }
+        }
+      }
+    },
+    "I couldn't write part %lld. Try again": {
+      "comment": "Part number of a recording whose notes could not be written",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I couldn't write part %lld. Try again"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldవ భాగం రాయలేకపోయాను. మళ్లీ ప్రయత్నించండి"
+          }
+        }
+      }
+    },
+    "Part %lld of %lld": {
+      "comment": "Part number, total parts of a recording",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Part %lld of %lld"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld భాగాల్లో %1$lldవ భాగం"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

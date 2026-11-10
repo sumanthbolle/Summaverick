@@ -426,6 +426,44 @@ extension CoreEngine {
         return take(sve_generate_from_sections(ctx, noteID, kind.cKind, lang, CoreEngine.progressTrampoline, user))
     }
 
+    /// One part of a note's detailed notes or questions (one section), written and stored by the core. Throws when
+    /// nothing was stored: a cancel (shouldStop), no model, the note or its sections gone or changed, or a failed
+    /// try (the core counts it; sectionOutputsState says how many and why).
+    func sectionOutput(noteID: Int64, idx: Int, kind: NoteSteps.Kind, lang: String, shouldStop: @escaping () -> Bool = { false },
+                       onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> String {
+        guard let ctx else { throw CoreError.initFailed }
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let out = take(sve_section_output(ctx, noteID, Int32(idx), kind.outputKind.cKind, lang,
+                                                CoreEngine.progressTrampoline, user)) else {
+            throw CoreError.generationFailed
+        }
+        return out
+    }
+
+    /// Every part of the note (each section's notes and questions): done, tries and the last reason, in lang.
+    /// nil on error; empty when the note has no sections.
+    nonisolated func sectionOutputsState(noteID: Int64, lang: String) async -> [NoteSteps.StepState]? {
+        await store { self.decode([NoteSteps.StepState].self, self.take(sve_section_outputs_state($0, noteID, lang))) }
+    }
+
+    /// The note's detailed notes or questions put together from its stored parts (no model). Every part written:
+    /// the whole text. Parts missing: with `placeholder` under a missing part's heading, when given; nil without it.
+    /// nil too when no part is written.
+    nonisolated func assembleOutput(noteID: Int64, kind: NoteSteps.Kind, lang: String, placeholder: String? = nil) async -> String? {
+        await store {
+            if let whole = self.take(sve_assemble_output($0, noteID, kind.outputKind.cKind, lang)) { return whole }
+            guard let placeholder else { return nil }
+            return self.take(sve_assemble_output_with_gaps($0, noteID, kind.outputKind.cKind, lang, placeholder))
+        }
+    }
+
+    /// Deletes stored parts and their try counts: kind nil both kinds, idx nil every part. The sections stay.
+    @discardableResult
+    nonisolated func clearSectionOutputs(noteID: Int64, kind: NoteSteps.Kind?, idx: Int? = nil) async -> Bool {
+        await store { sve_section_outputs_clear($0, noteID, Int32(kind?.rawValue ?? -1), Int32(idx ?? -1)) >= 0 }
+    }
+
     /// A title from the section titles; nil when there are no sections or no model.
     func titleFromSections(noteID: Int64, lang: String) -> String? {
         guard let ctx else { return nil }

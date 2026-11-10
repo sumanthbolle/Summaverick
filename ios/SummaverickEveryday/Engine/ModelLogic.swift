@@ -1749,7 +1749,39 @@ enum NoteSteps {
     }
 
     /// Parts that gave up, as 1-based part numbers in section order, for "I couldn't write part %d. Try again".
-    static func gaveUpParts(_ state: [StepState]) -> [Int] {
-        Array(Set(state.filter(gaveUp).map { $0.idx + 1 })).sorted()
+    /// kind nil: either kind.
+    static func gaveUpParts(_ state: [StepState], kind: Kind? = nil) -> [Int] {
+        Array(Set(state.filter { gaveUp($0) && (kind == nil || $0.kind == kind) }.map { $0.idx + 1 })).sorted()
+    }
+
+    /// The part steps of one kind (a regenerate of the notes or of the questions writes only those).
+    static func parts(_ steps: [Step], kind: Kind) -> [Step] {
+        steps.filter { if case .part(_, let k) = $0 { return k == kind }; return false }
+    }
+
+    /// All steps a note has, for the progress: the summary, two per section, two assembles.
+    static func total(sections: Int, summary: Bool) -> Int { (summary ? 1 : 0) + 2 * max(0, sections) + 2 }
+
+    /// The section summaries (titles and topics) read as written in the other language than `lang`: Telugu letters
+    /// in most of their letters for "en", none at all for "te". Their titles are the part headings, so after a
+    /// language switch they are written again. Pure: decided from the stored text, nothing else is kept.
+    static func summariesInOtherLanguage(_ texts: [String], lang: String) -> Bool {
+        var telugu = 0, letters = 0
+        for t in texts {
+            for u in t.unicodeScalars where u.properties.isAlphabetic {
+                letters += 1
+                if (0x0C00...0x0C7F).contains(u.value) { telugu += 1 }
+            }
+        }
+        guard letters > 0 else { return false }
+        if lang == "te" { return telugu == 0 }
+        return Double(telugu) / Double(letters) > 0.5
+    }
+
+    /// Whether the sections are written again before the parts: the summaries read as the other language, and either
+    /// parts were written in the other language (a switch) or no part is written in this one yet (so a run whose
+    /// parts are under way never redoes its sections).
+    static func rewritesSections(summaryTexts: [String], lang: String, doneHere: Int, doneInOther: Int) -> Bool {
+        summariesInOtherLanguage(summaryTexts, lang: lang) && (doneInOther > 0 || doneHere == 0)
     }
 }
