@@ -36,9 +36,9 @@ struct Llm {
     bool embeddings = false;  // loaded as an embedding model (meaning search): embed() only, never complete()
 
     // embeddings: an embedding model (EmbeddingGemma), CPU only whatever n_gpu_layers says (no GPU device, no op
-    // offload), the model's own pooling, one sequence per batch (n_batch = n_ubatch = n_ctx).
+    // offload), the model's own pooling, one sequence per batch (n_batch n_ctx, n_ubatch 512); batch threads = decode threads.
     bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings = false);
-    // The pooled vector of text (its first n_ctx tokens), as the model gives it (not normalised). False on error.
+    // The pooled vector of text (its first n_ubatch tokens), as the model gives it (not normalised). False on error.
     bool embed(const std::string &text, std::vector<float> &out);
     std::vector<llama_token> tokenize(const std::string &text, bool add_special, bool parse_special) const;
     int count_tokens(const std::string &text) const;

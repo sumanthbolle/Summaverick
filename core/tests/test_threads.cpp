@@ -42,3 +42,14 @@ TEST(audio_threads_follow_batch) {
     CHECK(audio_threads_need_reload(6, 2));
     CHECK(!audio_threads_need_reload(2, 2));
 }
+
+// The embedder (sve_load_embedder) is a background CPU model next to Gemma: its batch threads are its decode threads.
+TEST(embed_threads_batch_equals_decode) {
+    ThreadPair t = embed_threads(6, 4);
+    CHECK_EQ(t.decode, 4);
+    CHECK_EQ(t.batch, 4);
+    ThreadPair a = embed_threads(6, 0);  // auto: up to 4, same for both
+    CHECK_EQ(a.decode, 4);
+    CHECK_EQ(a.batch, 4);
+    CHECK_EQ(embed_threads(2, 0).batch, 2);
+}

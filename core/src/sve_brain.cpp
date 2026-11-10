@@ -549,15 +549,19 @@ int sve_embed_pending(sve_ctx *ctx, int limit, sve_progress_cb cb, void *user) {
         if (!ctx->embed) return -1;
         json rows = ctx->store->embed_pending(ctx->embed_model, limit);
         const int total = (int)rows.size();
-        int done = 0;
+        int done = 0, failed = 0;
         for (int i = 0; i < total; i++) {
             if (cb && cb("embed", i, total, user)) return -2;
             const json &r = rows[i];
-            std::vector<float> v = embed_text(ctx, sve::kEmbedDocPrompt, jstr(r, "text"));
-            if (v.empty()) continue;  // logged by embed; tried again on a later run
-            if (ctx->store->set_embedding(jstr(r, "kind"), jint(r, "ref", 0), v, ctx->embed_model)) done++;
+            const std::string text = jstr(r, "text");
+            std::vector<float> v = embed_text(ctx, sve::kEmbedDocPrompt, text);
+            if (v.empty()) { failed++; continue; }  // logged by embed
+            // Refused when the text changed meanwhile: still pending, embedded again next time.
+            if (ctx->store->set_embedding(jstr(r, "kind"), jint(r, "ref", 0), v, ctx->embed_model, text)) done++;
         }
         if (cb && cb("embed", total, total, user)) return -2;
+        // Every item of a batch failed to embed: the embedder is broken, so a loop until 0 would never end.
+        if (total > 0 && failed == total) return -1;
         return done;
     });
 }

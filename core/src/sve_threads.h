@@ -15,6 +15,13 @@ inline int batch_threads(int hw, int n_threads) { return std::max(n_threads, std
 
 struct ThreadPair { int decode; int batch; };
 
+// The embedder (sve_load_embedder): a background CPU model next to Gemma, so its prefill uses no more cores than
+// asked for: batch threads = decode threads (n 0 => up to 4).
+inline ThreadPair embed_threads(int hw, int n) {
+    int d = decode_threads(hw, n);
+    return {d, d};
+}
+
 // sve_set_threads: n_decode 0 => the load-time default; n_batch 0 => batch_threads for that decode count.
 inline ThreadPair resolve_threads(int hw, int n_decode, int n_batch) {
     int d = decode_threads(hw, n_decode);

@@ -196,8 +196,12 @@ public:
 
     // Meaning-search vectors (Task 11). kind "piece" (ref = transcript_pieces rowid) or "memory" (ref = memories.id).
     // A vector goes with its piece (note delete, new pieces, clear_transcript) or memory, when a memory's text
-    // changes, and with wipe_assistant. set refuses (false) a ref that does not exist.
-    bool set_embedding(const std::string &kind, int64_t ref, const std::vector<float> &vec, const std::string &model);
+    // changes, and with wipe_assistant. set refuses (false) a ref that does not exist or whose text is no longer
+    // `text` (the one embedded): edited meanwhile, or a re-inserted piece that reuses the rowid.
+    // Refs are implicit rowids (transcript_pieces has no INTEGER PRIMARY KEY): never VACUUM this file, which may
+    // renumber them.
+    bool set_embedding(const std::string &kind, int64_t ref, const std::vector<float> &vec, const std::string &model,
+                       const std::string &text);
     // (ref, vector) of this model: every piece's, or the current memories' (as search_memory_items).
     std::vector<std::pair<int64_t, std::vector<float>>> embeddings(const std::string &kind, const std::string &model);
     int64_t embedding_count(const std::string &model);  // index size, both kinds

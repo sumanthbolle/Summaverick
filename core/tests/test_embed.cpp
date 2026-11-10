@@ -124,8 +124,8 @@ TEST(embeddings_deleted_with_memory) {
         int64_t m = s.add_memory_item({{"type", "fact"}, {"text", "The locker code is in the blue diary"}, {"origin", "chat"}});
         int64_t keep = s.add_memory_item({{"type", "fact"}, {"text", "Ravi lives in Guntur"}, {"origin", "chat"}});
         CHECK(m > 0 && keep > 0);
-        CHECK(s.set_embedding("memory", m, vec(1), "m"));
-        CHECK(s.set_embedding("memory", keep, vec(0, 1), "m"));
+        CHECK(s.set_embedding("memory", m, vec(1), "m", "The locker code is in the blue diary"));
+        CHECK(s.set_embedding("memory", keep, vec(0, 1), "m", "Ravi lives in Guntur"));
         CHECK_EQ(s.embeddings("memory", "m").size(), (size_t)2);
         CHECK(s.delete_memory_item(m));
         auto left = s.embeddings("memory", "m");
@@ -137,7 +137,7 @@ TEST(embeddings_deleted_with_memory) {
         for (const auto &r : s.embed_pending("m", 100)) pending = pending || (r["kind"] == "memory" && r["ref"] == keep);
         CHECK(pending);
         // No vector for a memory that does not exist.
-        CHECK(!s.set_embedding("memory", 99999, vec(1), "m"));
+        CHECK(!s.set_embedding("memory", 99999, vec(1), "m", "x"));
         CHECK(s.embeddings("memory", "m").empty());
     }
     drop_db(p);
@@ -150,7 +150,8 @@ TEST(embeddings_deleted_with_pieces_note_and_wipe) {
         int64_t a = note_with_pieces(s, "A"), b = note_with_pieces(s, "B");
         int64_t a0 = piece_ref(s, a, 0), a1 = piece_ref(s, a, 1), b0 = piece_ref(s, b, 0), b1 = piece_ref(s, b, 1);
         CHECK(a0 > 0 && a1 > 0 && b0 > 0 && b1 > 0);
-        for (int64_t r : {a0, a1, b0, b1}) CHECK(s.set_embedding("piece", r, vec(1), "m"));
+        CHECK(s.set_embedding("piece", a0, vec(1), "m", "first piece") && s.set_embedding("piece", a1, vec(1), "m", "second piece"));
+        CHECK(s.set_embedding("piece", b0, vec(1), "m", "first piece") && s.set_embedding("piece", b1, vec(1), "m", "second piece"));
         CHECK_EQ(s.embeddings("piece", "m").size(), (size_t)4);
         CHECK(s.embed_pending("m", 100).empty());
         // Another model's vectors do not count.
@@ -170,15 +171,15 @@ TEST(embeddings_deleted_with_pieces_note_and_wipe) {
         // Note delete.
         int64_t c = note_with_pieces(s, "C");
         int64_t c0 = piece_ref(s, c, 0);
-        CHECK(s.set_embedding("piece", c0, vec(1), "m"));
+        CHECK(s.set_embedding("piece", c0, vec(1), "m", "first piece"));
         CHECK(s.remove(c));
         CHECK(s.embeddings("piece", "m").empty());
 
         // Wipe.
         int64_t d = note_with_pieces(s, "D");
-        CHECK(s.set_embedding("piece", piece_ref(s, d, 0), vec(1), "m"));
+        CHECK(s.set_embedding("piece", piece_ref(s, d, 0), vec(1), "m", "first piece"));
         int64_t mem = s.add_memory_item({{"type", "fact"}, {"text", "x"}, {"origin", "chat"}});
-        CHECK(s.set_embedding("memory", mem, vec(1), "m"));
+        CHECK(s.set_embedding("memory", mem, vec(1), "m", "x"));
         CHECK(s.wipe_assistant());
         CHECK(s.embeddings("piece", "m").empty());
         CHECK(s.embeddings("memory", "m").empty());
@@ -204,8 +205,8 @@ TEST(embed_pending_newest_notes_first_and_current_memories_only) {
         for (const auto &r : rows) if (r["kind"] == "memory") CHECK(r["ref"] != wrong && r["ref"] != queued);
         CHECK_EQ(s.embed_pending("m", 2).size(), (size_t)2);
         // The current memories with vectors only.
-        CHECK(s.set_embedding("memory", wrong, vec(1), "m"));
-        CHECK(s.set_embedding("memory", good, vec(1), "m"));
+        CHECK(s.set_embedding("memory", wrong, vec(1), "m", "wrong one"));
+        CHECK(s.set_embedding("memory", good, vec(1), "m", "good one"));
         auto e = s.embeddings("memory", "m");
         CHECK(e.size() == 1 && e[0].first == good);
         CHECK(s.embedding_count("m") == 2);
@@ -228,6 +229,31 @@ TEST(piece_refs_by_fts_and_rowid) {
         int64_t m = s.add_memory_item({{"type", "fact"}, {"text", "Ravi lives in Guntur"}, {"origin", "chat"}});
         json mh = s.search_memory_refs("guntur", 10);
         CHECK(mh.size() == 1 && mh[0] == m);
+    }
+    drop_db(p);
+}
+
+TEST(embedding_refused_when_text_changed_meanwhile) {
+    std::string p = tmp_db();
+    {
+        Store s(p);
+        int64_t m = s.add_memory_item({{"type", "fact"}, {"text", "Ravi lives in Guntur"}, {"origin", "chat"}});
+        int64_t n = note_with_pieces(s, "A");
+        json pending = s.embed_pending("m", 100);
+        CHECK_EQ(pending.size(), (size_t)3);
+        // Meanwhile (another connection): the memory is edited and the note's pieces are written again; the new
+        // piece reuses the old rowid.
+        CHECK(s.update_memory_item(m, {{"text", "Ravi lives in Vijayawada"}}));
+        s.set_pieces(n, json::array({{{"start_sec", 0}, {"text", "new words"}}, {{"start_sec", 30}, {"text", "more"}}}));
+        for (const auto &r : pending)
+            CHECK(!s.set_embedding(r["kind"].get<std::string>(), r["ref"].get<int64_t>(), vec(1), "m", r["text"].get<std::string>()));
+        CHECK(s.embeddings("piece", "m").empty());
+        CHECK(s.embeddings("memory", "m").empty());
+        CHECK_EQ(s.embed_pending("m", 100).size(), (size_t)3);  // still pending, with the new text
+        // With the text as it is now, it is stored.
+        for (const auto &r : s.embed_pending("m", 100))
+            CHECK(s.set_embedding(r["kind"].get<std::string>(), r["ref"].get<int64_t>(), vec(1), "m", r["text"].get<std::string>()));
+        CHECK(s.embed_pending("m", 100).empty());
     }
     drop_db(p);
 }

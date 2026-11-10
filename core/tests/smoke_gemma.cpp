@@ -1773,7 +1773,8 @@ static bool embed_all(sve_ctx *ctx, double &sec_per_item, int &count) {
     auto t0 = std::chrono::steady_clock::now();
     for (;;) {
         int n = sve_embed_pending(ctx, 64, nullptr, nullptr);
-        if (n < 0) { fprintf(stderr, "sve_embed_pending failed (%d)\n", n); return false; }
+        // -1: no embedder, an error, or a batch where nothing could be embedded (broken embedder): stop.
+        if (n < 0) { fprintf(stderr, "sve_embed_pending failed (%d); stopped\n", n); return false; }
         if (n == 0) break;
         count += n;
         printf("embedded %d\n", count);
@@ -1845,7 +1846,8 @@ static int run_meaning(sve_ctx *ctx, const char *mode, const char *db) {
     }
     std::ofstream out(getenv("SVE_RESULTS"));
     const char *slash = strrchr(emb, '/');
-    out << json({{"meta", {{"embedder", slash ? slash + 1 : emb}, {"where", "mac"}, {"embed_sec_per_item", spp},
+    const char *qsha = getenv("SVE_QUESTIONS_SHA256");  // meaning_gate.py run sets it
+    out << json({{"meta", {{"embedder", slash ? slash + 1 : emb}, {"where", "mac"}, {"questions_sha256", qsha ? qsha : ""}, {"embed_sec_per_item", spp},
                            {"embedded", count}, {"vectors", vectors}, {"index_bytes", index_bytes},
                            {"peak_rss_mb", peak_rss_mb()}, {"with_gemma", getenv("SVE_GEMMA") != nullptr}}}})
                .dump()

@@ -447,8 +447,9 @@ int   sve_load_embedder(sve_ctx *ctx, const char *gguf_path, int n_threads);
 void  sve_unload_embedder(sve_ctx *ctx);
 int   sve_embedder_loaded(const sve_ctx *ctx);
 /* Embeds up to limit pieces (notes that still have their transcript, newest notes first) and then current memories
- * that have no vector of this model. Returns how many were stored (0 when none is left or all failed), -1 with no
- * embedder or on error, -2 when cb (phase "embed", may be NULL) returned non-zero. */
+ * that have no vector of this model. Returns how many were stored (0 when none is left; an item whose text changed
+ * meanwhile is not stored and stays pending), -1 with no embedder, on error, or when no item of a non-empty batch
+ * could be embedded (stop calling), -2 when cb (phase "embed", may be NULL) returned non-zero. */
 int   sve_embed_pending(sve_ctx *ctx, int limit, sve_progress_cb cb, void *user);
 /* Search for Ask: [{"kind":"piece","note_id","start_sec","score"} | {"kind":"memory","memory_id","score"}], best
  * first, at most limit (10 when limit <= 0). The keyword search (top 20 pieces and top 20 current memories, the

@@ -35,7 +35,8 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     if (train > 0 && n_ctx > train) n_ctx = train;
 
     // Decoding (memory-bound) up to 4 cores; prefill and the audio encoder up to 8 (sve_threads.h).
-    ThreadPair th = resolve_threads((int)std::thread::hardware_concurrency(), n_threads_req, 0);
+    const int hw = (int)std::thread::hardware_concurrency();
+    ThreadPair th = embeddings ? embed_threads(hw, n_threads_req) : resolve_threads(hw, n_threads_req, 0);
     n_threads = th.decode;
     n_threads_batch = th.batch;
 
@@ -47,9 +48,11 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     cp.n_threads_batch = n_threads_batch;
     cp.no_perf = true;
     if (embeddings) {
-        // A whole passage in one ubatch (the embedding model's attention is not causal); pooling from the model.
+        // Pooling from the model. The attention is not causal, so a passage must fit one ubatch: embed() keeps the
+        // first n_ubatch tokens (512, far more than a piece; it caps the compute buffer next to Gemma).
         cp.embeddings = true;
-        cp.n_batch = cp.n_ubatch = (uint32_t)n_ctx;
+        cp.n_batch = (uint32_t)n_ctx;
+        cp.n_ubatch = std::min<uint32_t>(512, (uint32_t)n_ctx);
         cp.n_seq_max = 1;
         cp.op_offload = false;
     }
@@ -70,7 +73,8 @@ bool Llm::embed(const std::string &text, std::vector<float> &out) {
     if (!embeddings || !ctx) return false;
     std::vector<llama_token> toks = tokenize(text, true, false);
     if (toks.empty()) return false;
-    if ((int)toks.size() > n_ctx) toks.resize(n_ctx);
+    const size_t cap = std::min<size_t>((size_t)n_ctx, (size_t)llama_n_ubatch(ctx));
+    if (toks.size() > cap) toks.resize(cap);
     if (llama_memory_t mem = llama_get_memory(ctx)) llama_memory_clear(mem, true);
     llama_batch batch = llama_batch_init((int32_t)toks.size(), 0, 1);
     for (size_t i = 0; i < toks.size(); i++) {

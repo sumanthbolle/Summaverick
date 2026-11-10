@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS insights (
     note_id INTEGER REFERENCES notes(id) ON DELETE CASCADE,
     dismissed INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
 );
--- Meaning-search vectors (EmbeddingGemma, Task 11): a transcript piece (ref = its rowid) or a memory (ref = its id),
+-- Meaning-search vectors (EmbeddingGemma, Task 11): a transcript piece (ref = its implicit rowid; never VACUUM) or a memory (ref = its id),
 -- kEmbedDims floats as bytes, and the model that made it. They go with their piece or memory, and when a memory's
 -- text changes (it is embedded again).
 CREATE TABLE IF NOT EXISTS embeddings (
@@ -1387,11 +1387,14 @@ bool Store::wipe_assistant() {
 // Memories that may reach a prompt (as search_memory_items): not wrong, superseded, queued or a medicine's.
 static const char *kCurrentMemory = "m.review<>'wrong' AND m.origin<>'medicine' AND m.superseded_by IS NULL AND m.queue=0";
 
-bool Store::set_embedding(const std::string &kind, int64_t ref, const std::vector<float> &vec, const std::string &model) {
+bool Store::set_embedding(const std::string &kind, int64_t ref, const std::vector<float> &vec, const std::string &model,
+                          const std::string &text) {
     if (vec.empty() || (kind != "piece" && kind != "memory")) { err_ = "bad embedding"; return false; }
-    // Only for a piece or memory that still exists (it may be deleted while its vector is made).
+    // Only for a piece or memory that still exists with the text that was embedded (it may be deleted, edited or
+    // written again under the same rowid while its vector is made).
     const std::string sql = std::string("INSERT OR REPLACE INTO embeddings(kind,ref,vec,model) SELECT ?,?,?,? WHERE EXISTS (") +
-                            (kind == "piece" ? "SELECT 1 FROM transcript_pieces WHERE rowid=?" : "SELECT 1 FROM memories WHERE id=?") + ")";
+                            (kind == "piece" ? "SELECT 1 FROM transcript_pieces WHERE rowid=? AND text=?"
+                                               : "SELECT 1 FROM memories WHERE id=? AND text=?") + ")";
     sqlite3_stmt *st = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) { err_ = sqlite3_errmsg(db_); return false; }
     const std::string blob = vector_blob(vec);
@@ -1400,6 +1403,7 @@ bool Store::set_embedding(const std::string &kind, int64_t ref, const std::vecto
     sqlite3_bind_blob(st, 3, blob.data(), (int)blob.size(), SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 4, model.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_int64(st, 5, ref);
+    sqlite3_bind_text(st, 6, text.c_str(), (int)text.size(), SQLITE_TRANSIENT);
     int rc = sqlite3_step(st);
     sqlite3_finalize(st);
     if (rc != SQLITE_DONE) { err_ = sqlite3_errmsg(db_); return false; }
