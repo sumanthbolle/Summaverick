@@ -129,6 +129,10 @@ std::string drop_invented_expansions(const std::string &text, const std::string 
 // ("- ", "* ", "[ ]") in front is allowed. Never a line with the who/when separator (" — "), nor "None of the forms…"
 // or "No task too small: …": after "none" / "no tasks" only words such as stated, mentioned, were may follow.
 bool says_no_tasks(const std::string &line);
+// A notes line (trimmed) that is a heading: it starts with "#".
+bool is_notes_heading(const std::string &line);
+// A heading (trimmed line) of the action items: "## Action items" (any case), or a Telugu heading with "చర్య".
+bool is_action_heading(const std::string &line);
 // Under the "## Action items" heading (or a Telugu heading with "చర్య"), checkbox lines that say there are none
 // (says_no_tasks) become one plain "None"; with a real task there they are dropped. Other headings are untouched.
 std::string none_action_items(const std::string &text);

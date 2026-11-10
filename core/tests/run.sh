@@ -6,7 +6,7 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
 SRCS=()
-for n in sve_store sve_medcheck sve_textmatch sve_extract sve_context sve_learn sve_suggest sve_audio sve_sections sve_health sve_memory sve_brainmap sve_consolidate sve_chat; do
+for n in sve_store sve_medcheck sve_textmatch sve_extract sve_context sve_learn sve_suggest sve_audio sve_sections sve_health sve_memory sve_brainmap sve_consolidate sve_chat sve_assemble; do
     [ -f "$ROOT/core/src/$n.cpp" ] && SRCS+=("$ROOT/core/src/$n.cpp")
 done
 

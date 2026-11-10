@@ -70,6 +70,24 @@ public:
     json sections(int64_t note_id);
     bool clear_transcript(int64_t note_id);
 
+    // Section outputs (engine v2): one section's detailed notes (kind 1) or revision questions (kind 2), in lang,
+    // for the section's piece range [first_piece, last_piece). set refuses (false) a deleted note and a range that
+    // is not the section's now (re-planned while it was written); text "" is a part with no speech. set_sections
+    // drops rows whose range changed; clear_transcript, note delete and wipe_assistant drop all.
+    bool set_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
+                            int64_t last_piece, const std::string &text);
+    json section_outputs(int64_t note_id);  // [{idx,kind,lang,first_piece,last_piece,text}], every stored row
+    // The texts of every section in order, when each has a row of this kind and lang for its current range;
+    // null when any is missing (or there are no sections).
+    json current_section_outputs(int64_t note_id, int kind, const std::string &lang);
+    // [{"idx","kind","done":bool,"attempts"}] for every section x kinds 1 and 2, by idx then kind.
+    json section_outputs_state(int64_t note_id, const std::string &lang);
+    // step_attempts: bump before a try (false for a deleted note), undo after a cancel, error after a failure.
+    bool bump_step_attempt(int64_t note_id, int idx, int kind);
+    bool undo_step_attempt(int64_t note_id, int idx, int kind);
+    bool set_step_error(int64_t note_id, int idx, int kind, const std::string &error);
+    json step_attempts(int64_t note_id);    // [{idx,kind,attempts,last_error}]
+
     int64_t add_suggestion(const json &s);
     json suggestions(const std::string &status);
     bool set_suggestion_status(int64_t id, const std::string &status);

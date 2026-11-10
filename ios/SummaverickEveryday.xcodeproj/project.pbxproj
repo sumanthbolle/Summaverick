@@ -145,6 +145,10 @@
 			isa = PBXBuildFile;
 			fileRef = DAD9D4F5BE940D31ED604618;
 		};
+		8C85B5FFFB6330BA125F9177 = {
+			isa = PBXBuildFile;
+			fileRef = AD68489E0874E658C08E370A;
+		};
 		8D4A6C6E4B479FCA91F91BA9 = {
 			isa = PBXBuildFile;
 			fileRef = DCE021A147EA4FBC88B74354;
@@ -454,6 +458,13 @@
 			includeInIndex = 0;
 			path = SummaverickEveryday.app;
 			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		21B1E44867FA3470B2C4DD71 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_assemble.h;
+			path = ../core/src/sve_assemble.h;
+			sourceTree = SOURCE_ROOT;
 		};
 		29A1CD6197C4EBF318C20726 = {
 			isa = PBXFileReference;
@@ -866,6 +877,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_textmatch.h;
 			path = ../core/src/sve_textmatch.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		AD68489E0874E658C08E370A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_assemble.cpp;
+			path = ../core/src/sve_assemble.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
 		ADEEFA19D57BA7D03687B2E4 = {
@@ -1301,6 +1319,8 @@
 		DA3EB179D6EE613492F299B1 = {
 			isa = PBXGroup;
 			children = (
+				AD68489E0874E658C08E370A,
+				21B1E44867FA3470B2C4DD71,
 				0A726C07BA65E563FB374790,
 				A134B997A05BEC16D4B96325,
 				BB44682AB82F093499931FDE,
@@ -1528,6 +1548,7 @@
 				1D93FAC83E0C239CDE7EBB43,
 				908F929CC6113FA25B46EE92,
 				DD6F72C30ED5F9B5F7BCA8E3,
+				8C85B5FFFB6330BA125F9177,
 				E3B6ED99E22E4B0C0EC884D9,
 				CCABCA4B3E738FCE0399D402,
 				11C62DBEE92DAE5BAA003ED9,

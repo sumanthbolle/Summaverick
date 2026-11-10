@@ -55,6 +55,20 @@ CREATE TABLE IF NOT EXISTS sections (
     start_sec INTEGER NOT NULL, end_sec INTEGER NOT NULL, summary_json TEXT,
     PRIMARY KEY(note_id, idx)
 );
+-- One section's detailed notes (kind 1) or revision questions (kind 2), written part by part (engine v2). A row
+-- counts only while its lang and piece range match the section's; set_sections drops rows whose range changed.
+CREATE TABLE IF NOT EXISTS section_outputs (
+    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    idx INTEGER NOT NULL, kind INTEGER NOT NULL, lang TEXT NOT NULL,
+    first_piece INTEGER NOT NULL, last_piece INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER NOT NULL,
+    PRIMARY KEY(note_id, idx, kind)
+);
+-- How often a section output was tried (a cancel does not count), and why the last try failed.
+CREATE TABLE IF NOT EXISTS step_attempts (
+    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    idx INTEGER NOT NULL, kind INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
+    PRIMARY KEY(note_id, idx, kind)
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS pieces_fts USING fts5(
     text, content='transcript_pieces', content_rowid='rowid', tokenize='unicode61 remove_diacritics 0'
 );
@@ -1151,6 +1165,8 @@ bool Store::dismiss_insight(int64_t id) {
 bool Store::set_sections(int64_t note_id, const json &sections) {
     if (!sections.is_array()) { err_ = "sections must be an array"; return false; }
     if (!begin()) return false;
+    // Attempts of a section whose piece range changes start again (its outputs are redone below).
+    json old = query_rows("SELECT idx,first_piece,last_piece FROM sections WHERE note_id=?", {note_id});
     bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id});
     for (const auto &s : sections) {
         if (!ok) break;
@@ -1159,6 +1175,18 @@ bool Store::set_sections(int64_t note_id, const json &sections) {
                   jget(s, "start_sec", 0), jget(s, "end_sec", 0),
                   s.contains("summary") ? json(s["summary"].dump()) : json(nullptr)});
     }
+    for (const auto &o : old) {
+        if (!ok) break;
+        if (query_rows("SELECT 1 FROM sections WHERE note_id=? AND idx=? AND first_piece=? AND last_piece=?",
+                       {note_id, o["idx"], o["first_piece"], o["last_piece"]}).empty())
+            ok = run("DELETE FROM step_attempts WHERE note_id=? AND idx=?", {note_id, o["idx"]});
+    }
+    // Outputs written for a range that is no longer a section's are redone, never reused.
+    ok = ok && run("DELETE FROM section_outputs WHERE note_id=? AND NOT EXISTS (SELECT 1 FROM sections s WHERE "
+                   "s.note_id=section_outputs.note_id AND s.idx=section_outputs.idx AND "
+                   "s.first_piece=section_outputs.first_piece AND s.last_piece=section_outputs.last_piece)", {note_id});
+    ok = ok && run("DELETE FROM step_attempts WHERE note_id=? AND idx NOT IN (SELECT idx FROM sections WHERE note_id=?)",
+                   {note_id, note_id});
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
 }
@@ -1183,11 +1211,79 @@ json Store::sections(int64_t note_id) {
 bool Store::clear_transcript(int64_t note_id) {
     if (!begin()) return false;
     bool ok = run("DELETE FROM sections WHERE note_id=?", {note_id}) &&
+              run("DELETE FROM section_outputs WHERE note_id=?", {note_id}) &&
+              run("DELETE FROM step_attempts WHERE note_id=?", {note_id}) &&
               run("DELETE FROM memory_progress WHERE note_id=?", {note_id}) &&
               run("DELETE FROM memory_sources WHERE note_id=?", {note_id});  // single-source memories go too
     ok = ok && set_text_column(note_id, "transcript", nullptr);
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
+}
+
+// section outputs (engine v2) -------------------------------------------------
+
+bool Store::set_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
+                               int64_t last_piece, const std::string &text) {
+    // Only for the section as it is now: a deleted note, or sections re-planned while the part was written, refuse it.
+    if (!run("INSERT INTO section_outputs(note_id,idx,kind,lang,first_piece,last_piece,text,created_at) "
+             "SELECT ?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM sections WHERE note_id=? AND idx=? AND first_piece=? "
+             "AND last_piece=?) ON CONFLICT(note_id,idx,kind) DO UPDATE SET lang=excluded.lang, "
+             "first_piece=excluded.first_piece, last_piece=excluded.last_piece, text=excluded.text, "
+             "created_at=excluded.created_at",
+             {note_id, idx, kind, lang, first_piece, last_piece, text, now_j(), note_id, idx, first_piece, last_piece}))
+        return false;
+    if (sqlite3_changes(db_) == 0) { err_ = "no such section"; return false; }
+    return true;
+}
+
+json Store::section_outputs(int64_t note_id) {
+    return query_rows("SELECT idx,kind,lang,first_piece,last_piece,text FROM section_outputs WHERE note_id=? "
+                      "ORDER BY idx,kind", {note_id});
+}
+
+json Store::current_section_outputs(int64_t note_id, int kind, const std::string &lang) {
+    json rows = query_rows(
+        "SELECT o.text AS text FROM sections s LEFT JOIN section_outputs o ON o.note_id=s.note_id AND o.idx=s.idx "
+        "AND o.kind=? AND o.lang=? AND o.first_piece=s.first_piece AND o.last_piece=s.last_piece "
+        "WHERE s.note_id=? ORDER BY s.idx", {kind, lang, note_id});
+    if (rows.empty()) return nullptr;
+    json out = json::array();
+    for (const auto &r : rows) {
+        if (!r["text"].is_string()) return nullptr;
+        out.push_back(r["text"]);
+    }
+    return out;
+}
+
+json Store::section_outputs_state(int64_t note_id, const std::string &lang) {
+    json rows = query_rows(
+        "SELECT s.idx AS idx, k.kind AS kind, (o.note_id IS NOT NULL) AS done, COALESCE(a.attempts,0) AS attempts "
+        "FROM sections s CROSS JOIN (SELECT 1 AS kind UNION ALL SELECT 2) k "
+        "LEFT JOIN section_outputs o ON o.note_id=s.note_id AND o.idx=s.idx AND o.kind=k.kind AND o.lang=? "
+        "AND o.first_piece=s.first_piece AND o.last_piece=s.last_piece "
+        "LEFT JOIN step_attempts a ON a.note_id=s.note_id AND a.idx=s.idx AND a.kind=k.kind "
+        "WHERE s.note_id=? ORDER BY s.idx, k.kind", {lang, note_id});
+    for (auto &r : rows) r["done"] = r["done"] == true || r["done"] == 1;  // "done" is a flag column already
+    return rows;
+}
+
+bool Store::bump_step_attempt(int64_t note_id, int idx, int kind) {
+    return run("INSERT INTO step_attempts(note_id,idx,kind,attempts) VALUES(?,?,?,1) "
+               "ON CONFLICT(note_id,idx,kind) DO UPDATE SET attempts=attempts+1", {note_id, idx, kind});
+}
+
+bool Store::undo_step_attempt(int64_t note_id, int idx, int kind) {
+    return run("UPDATE step_attempts SET attempts=MAX(attempts-1,0) WHERE note_id=? AND idx=? AND kind=?",
+               {note_id, idx, kind}) && sqlite3_changes(db_) > 0;
+}
+
+bool Store::set_step_error(int64_t note_id, int idx, int kind, const std::string &error) {
+    return run("UPDATE step_attempts SET last_error=? WHERE note_id=? AND idx=? AND kind=?", {error, note_id, idx, kind}) &&
+           sqlite3_changes(db_) > 0;
+}
+
+json Store::step_attempts(int64_t note_id) {
+    return query_rows("SELECT idx,kind,attempts,last_error FROM step_attempts WHERE note_id=? ORDER BY idx,kind", {note_id});
 }
 
 bool Store::mark_extracted(int64_t note_id) {
@@ -1207,7 +1303,8 @@ bool Store::wipe_assistant() {
     // Children before parents, so no foreign key blocks a delete; the FTS triggers clean the indexes.
     static const char *kTables[] = {"person_questions", "memory_entities", "memory_sources", "memory_progress", "memories",
                                     "suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
-                                    "medicines", "decisions", "insights", "sections", "transcript_pieces"};
+                                    "medicines", "decisions", "insights", "section_outputs", "step_attempts", "sections",
+                                    "transcript_pieces"};
     if (!begin()) return false;
     bool ok = true;
     for (const char *t : kTables) ok = ok && run((std::string("DELETE FROM ") + t).c_str(), {});

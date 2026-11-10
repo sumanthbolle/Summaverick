@@ -204,6 +204,25 @@ char *sve_section_summarize(sve_ctx *ctx, const char *pieces_json, const char *l
  * cancel/failure (callers check their own cancel flag first). */
 char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang,
                                  sve_progress_cb cb, void *user);
+/* Detailed notes (SVE_OUT_DETAILED_NOTES) or revision questions (SVE_OUT_REVISION_QUESTIONS) of ONE section of a note,
+ * written from that section's pieces with its summary as a guide ("This is part i of n of the recording."), so a
+ * long recording's notes are made a part at a time and a stopped run keeps the parts it finished. Sampled first,
+ * one greedy retry. Output capped at 360 tokens (notes) / 200 (questions), then the same checks as sve_generate.
+ * The result is stored for the section's current piece range and lang (sve_section_outputs_state) and returned;
+ * a section with no speech stores and returns "". The try is counted before the model runs (a cancel takes it
+ * back); a failure records its reason. NULL on cancel, with no model, for a note or section that is gone, other
+ * kinds, or when the store refuses the result (the note was deleted or its sections re-planned meanwhile):
+ * nothing is stored then. */
+char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang,
+                         sve_progress_cb cb, void *user);
+/* [{"idx":0,"kind":1,"done":true,"attempts":1},…]: every section x {1 notes, 2 questions}, by idx then kind. done
+ * only when the stored part's lang, first_piece and last_piece match the section now. "[]" when no sections;
+ * NULL on error. */
+char *sve_section_outputs_state(sve_ctx *ctx, int64_t note_id, const char *lang);
+/* The note's detailed notes (a "## <section title>" per part, one merged "## Action items") or revision questions
+ * (numbered across parts, near-duplicates dropped, at most 12, every part represented) from its stored parts in
+ * lang. Pure, no model. NULL when any part is missing (or no sections, or another kind); "" when every part is empty. */
+char *sve_assemble_output(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang);
 /* Title from the section titles (same cleanup as sve_suggest_title). NULL when no sections or no model. */
 char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang);
 /* Chapters [{"title","start_sec"}]: consecutive sections on the same topic merged. Pure, no model; "[]" when none. */

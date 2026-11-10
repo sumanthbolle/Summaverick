@@ -7,6 +7,7 @@
 #include "sve_context.h"
 #include "sve_audio.h"
 #include "sve_sections.h"
+#include "sve_assemble.h"
 #include "sve_budget.h"
 #include "sve_threads.h"
 
@@ -242,6 +243,122 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
     } catch (const std::exception &e) {
         sve_logf(2, "generate from sections failed: %s", e.what());
         return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+static bool section_kind(sve_output_kind kind, sve::SectionOutputKind &out) {
+    if (kind == SVE_OUT_DETAILED_NOTES) { out = sve::SectionOutputKind::Notes; return true; }
+    if (kind == SVE_OUT_REVISION_QUESTIONS) { out = sve::SectionOutputKind::Questions; return true; }
+    return false;
+}
+
+char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang_c,
+                         sve_progress_cb cb, void *user) {
+    try {
+        sve::SectionOutputKind sk;
+        if (!ctx || !ctx->llm || !section_kind(kind, sk)) return nullptr;
+        if (!ctx->store->get(note_id)) return nullptr;  // the note is gone
+        const sve::json secs = ctx->store->sections(note_id);
+        sve::json sec;
+        for (const auto &s : secs)
+            if (s.value("idx", -1) == idx) sec = s;
+        if (!sec.is_object()) return nullptr;
+        const std::string lang = lang_c ? lang_c : "en";
+        const int64_t first = sec.value("first_piece", (int64_t)0), last = sec.value("last_piece", (int64_t)0);
+        const int k = (int)kind;
+        sve::Store &st = *ctx->store;
+        // The section's own pieces, unclear ones marked (as sve_generate's material).
+        sve::json pieces = sve::json::array();
+        for (const auto &p : st.pieces(note_id)) {
+            const int64_t pi = p.value("idx", (int64_t)-1);
+            if (pi >= first && pi < last) pieces.push_back(p);
+        }
+        const std::string text = sve::notes_material(pieces);
+        if (!st.bump_step_attempt(note_id, idx, k)) return nullptr;  // counted before the model runs
+        if (strip_thinking(text).empty()) {  // silence or music: an empty part, done
+            if (!st.set_section_output(note_id, idx, k, lang, first, last, "")) return nullptr;
+            return dup_str("");
+        }
+        sve::Llm &llm = *ctx->llm;
+        const std::string guide = sve::sections_text(sve::json::array({sec}));
+        const std::string sys = notes_system(ctx, lang, text);
+        const int max_out = sve::section_output_max_out(sk);
+        // A part normally fits as it is; one that does not is reduced first, as in sve_generate.
+        const int budget = sve::notes_budget(llm.n_ctx, llm.count_tokens(sys));
+        struct Watch { sve_progress_cb cb; void *user; bool cancelled; } w{cb, user, false};
+        auto watch = [](const char *ph, int d, int t, void *u) -> int {
+            Watch *x = static_cast<Watch *>(u);
+            if (x->cb && x->cb(ph, d, t, x->user)) x->cancelled = true;
+            return x->cancelled ? 1 : 0;
+        };
+        auto cancelled = [&]() -> char * { st.undo_step_attempt(note_id, idx, k); return nullptr; };
+        std::string material;
+        bool from_bullets = false;
+        if (!reduce_to_fit(llm, sys, text, budget, material, from_bullets, watch, &w)) {
+            if (w.cancelled) return cancelled();
+            st.set_step_error(note_id, idx, k, "the part could not be shortened to fit");
+            return nullptr;
+        }
+        const int total = (int)secs.size();
+        int part = 1;
+        for (const auto &s : secs) { if (s.value("idx", -1) == idx) break; ++part; }
+        const std::string userp = sve::section_output_prompt(sk, material, guide, part, total, from_bullets);
+        const std::string prefix = sk == sve::SectionOutputKind::Notes ? "## Topic" : "";
+        const std::string prompt = llm.apply_template(sys, userp);
+        const char *phase = sk == sve::SectionOutputKind::Notes ? "section_notes" : "section_questions";
+        std::string error = "no reply";
+        for (int attempt = 0; attempt < 2; ++attempt) {  // sampled, then greedy
+            std::string out;
+            if (!llm.complete(prompt, max_out, out, watch, &w, phase, attempt, 2, attempt == 1)) {
+                if (w.cancelled) return cancelled();
+                error = llm.decode_failed ? "the run failed on the GPU" : "the run failed";
+                sve_logf(1, "section %d output attempt %d failed", idx, attempt + 1);
+                continue;
+            }
+            // Checked against the part's own words and its summary.
+            const std::string done = finish_output(llm, out, prefix, max_out, text + "\n" + guide);
+            if (sve::strip_unclear_tags(done).find_first_not_of(" \t\r\n") == std::string::npos ||
+                done == prefix) {
+                error = "empty reply";
+                sve_logf(1, "section %d output attempt %d was empty", idx, attempt + 1);
+                continue;
+            }
+            if (!st.set_section_output(note_id, idx, k, lang, first, last, done)) {
+                sve_logf(1, "section %d output not stored (note deleted or sections re-planned)", idx);
+                return nullptr;
+            }
+            return dup_str(done);
+        }
+        st.set_step_error(note_id, idx, k, error);
+        return nullptr;
+    } catch (const std::exception &e) {
+        sve_logf(2, "section output failed: %s", e.what());
+        if (ctx && ctx->store) ctx->store->set_step_error(note_id, idx, (int)kind, e.what());
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char *sve_section_outputs_state(sve_ctx *ctx, int64_t note_id, const char *lang_c) {
+    try {
+        if (!ctx) return nullptr;
+        return dup_str(ctx->store->section_outputs_state(note_id, lang_c ? lang_c : "en").dump());
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+char *sve_assemble_output(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c) {
+    try {
+        sve::SectionOutputKind sk;
+        if (!ctx || !section_kind(kind, sk)) return nullptr;
+        const sve::json texts = ctx->store->current_section_outputs(note_id, (int)kind, lang_c ? lang_c : "en");
+        if (!texts.is_array()) return nullptr;  // a part is missing
+        if (sk == sve::SectionOutputKind::Questions) return dup_str(sve::assemble_questions(texts));
+        return dup_str(sve::assemble_notes(ctx->store->sections(note_id), texts));
     } catch (...) {
         return nullptr;
     }

@@ -670,12 +670,14 @@ std::string lower_trimmed_task(const std::string &line) {
     return ascii_lower(trim_ws(t));
 }
 
+}  // namespace
+
+bool is_notes_heading(const std::string &l) { return is_heading(l); }
+
 bool is_action_heading(const std::string &l) {
     return is_heading(l) && (ascii_lower(l).find("action item") != std::string::npos ||
                              l.find("\xE0\xB0\x9A\xE0\xB0\xB0\xE0\xB1\x8D\xE0\xB0\xAF") != std::string::npos);  // చర్య
 }
-
-}  // namespace
 
 std::string drop_invented_expansions(const std::string &text, const std::string &source) {
     std::string out;
