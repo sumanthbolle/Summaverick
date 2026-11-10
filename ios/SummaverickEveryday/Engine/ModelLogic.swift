@@ -1681,3 +1681,75 @@ enum ProfileRead {
         return decodes ? .found : .failed
     }
 }
+
+// MARK: - Notes in small saved steps (processing engine v2, Task 2)
+
+/// The steps that write a note's outputs, derived from what is stored (sve_section_outputs_state): the short
+/// summary, then each section's notes and questions, then the two assembled outputs. A step that is done has its
+/// result row, so a cut-off (expiry, GPU refused in the background) costs only the step that was running.
+enum NoteSteps {
+    /// A per-section output, numbered as the core's sve_output_kind (1 detailed notes, 2 revision questions).
+    enum Kind: Int, Equatable, Codable { case notes = 1, questions = 2 }
+
+    enum Step: Equatable {
+        case summary
+        case part(idx: Int, kind: Kind)
+        case assemble(Kind)
+    }
+
+    /// One row of sve_section_outputs_state: attempts and last_error are for the note's language.
+    struct StepState: Equatable, Decodable {
+        var idx: Int
+        var kind: Kind
+        var done: Bool
+        var attempts: Int
+        var lastError: String?
+
+        init(idx: Int, kind: Kind, done: Bool, attempts: Int = 0, lastError: String? = nil) {
+            self.idx = idx; self.kind = kind; self.done = done; self.attempts = attempts; self.lastError = lastError
+        }
+
+        enum CodingKeys: String, CodingKey { case idx, kind, done, attempts, lastError = "last_error" }
+    }
+
+    /// Real failures before a part is left for the person ("I couldn't write part %d. Try again").
+    static let maxAttempts = 3
+
+    /// The core's last_error for a GPU run stopped in the background: a cut-off, never a real failure.
+    static let cutOffErrors: Set<String> = ["the run failed on the GPU"]
+
+    /// The order: the summary (when missing), each section in order with notes then questions (only the parts not
+    /// done and not given up), then the two assemble steps (no model call).
+    static func plan(sections: Int, state: [StepState], hasSummary: Bool) -> [Step] {
+        var steps: [Step] = hasSummary ? [] : [.summary]
+        for idx in 0..<max(0, sections) {
+            for kind in [Kind.notes, .questions] {
+                let s = state.first { $0.idx == idx && $0.kind == kind }
+                if s?.done == true { continue }
+                if let s, gaveUp(s) { continue }
+                steps.append(.part(idx: idx, kind: kind))
+            }
+        }
+        steps.append(.assemble(.notes))
+        steps.append(.assemble(.questions))
+        return steps
+    }
+
+    /// 0…1 for ContinuedWork: never goes down as done goes up, 1 only when every step is done.
+    static func progress(done: Int, total: Int) -> Double {
+        guard total > 0 else { return 1 }
+        return min(1, max(0, Double(done) / Double(total)))
+    }
+
+    /// The part failed for a real reason `maxAttempts` times. A cut-off (no error kept, or the GPU refused in the
+    /// background) never counts, however many times it happened.
+    static func gaveUp(_ s: StepState) -> Bool {
+        guard !s.done, s.attempts >= maxAttempts, let e = s.lastError, !e.isEmpty else { return false }
+        return !cutOffErrors.contains(e)
+    }
+
+    /// Parts that gave up, as 1-based part numbers in section order, for "I couldn't write part %d. Try again".
+    static func gaveUpParts(_ state: [StepState]) -> [Int] {
+        Array(Set(state.filter(gaveUp).map { $0.idx + 1 })).sorted()
+    }
+}
