@@ -69,6 +69,16 @@ TEST(match_person_case_endings_never_merge_other_names) {
     CHECK(match_person("రవిని", "Ravi") == PersonMatch::maybe);  // ని may be the name's own: ask
 }
 
+TEST(match_person_ki_is_clear_only_after_an_i_or_e_sound) {
+    CHECK(match_person("Vasu", "వాసుకి") != PersonMatch::same);
+    CHECK(match_person("వాసు", "వాసుకి") != PersonMatch::same);
+    CHECK(match_person("Jana", "జానకి") != PersonMatch::same);
+    CHECK(match_person("Ravi", "రవికి") == PersonMatch::same);
+    CHECK(match_person("Vani", "వాణికి") == PersonMatch::same);
+    CHECK(match_person("Janaki", "జానకి") == PersonMatch::same);
+    CHECK(match_person("Ramu", "రాముకి") == PersonMatch::maybe);  // accepted: asked, not merged
+}
+
 TEST(match_person_honorific_only_asks_at_most) {
     CHECK(match_person("Sir", "Sir") == PersonMatch::maybe);
     CHECK(match_person("Sir", "sir") == PersonMatch::maybe);
@@ -98,6 +108,10 @@ TEST(person_key_strips_honorifics_and_endings) {
     CHECK_EQ(person_key("రవి గారు"), std::string("ravi"));
     CHECK_EQ(person_key("Mrs Lakshmi"), std::string("laksmi"));
     CHECK_EQ(person_key("Sir"), std::string("sir"));  // all honorific: kept as the name
+    // An unclear ending stays in the key: nobody can group రజని with Raja by key.
+    CHECK_EQ(person_key("రజని"), std::string("rajani"));
+    CHECK_EQ(person_key("వాసుకి"), std::string("vasuki"));
+    CHECK_EQ(person_key("జానకి"), std::string("janaki"));
 }
 
 TEST(same_person_prompt_names_both) {

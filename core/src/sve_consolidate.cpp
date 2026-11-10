@@ -135,8 +135,17 @@ struct NameParts {
     std::set<std::string> only;   // those honorifics, canonical (సార్ and Sir are both "sir")
 };
 
-// Endings that also end ordinary names; a match that needs one removed is never "same".
-bool ambiguous_ending(const std::string &e) { return e == "ని" || e == "ను" || e == "ది" || e == "దే" || e == "కే"; }
+// Endings that also end ordinary names; a match that needs one removed is never "same". కి is clear only after a
+// stem ending in ి ీ ె ే (రవికి, వాణికి); after anything else it may be the name's own (వాసుకి, జానకి).
+bool ambiguous_ending(const std::string &e, const std::string &stem) {
+    if (e == "ని" || e == "ను" || e == "ది" || e == "దే" || e == "కే") return true;
+    if (e == "కి") {
+        uint32_t last = 0;
+        for (size_t i = 0; i < stem.size();) next_cp(stem, i, last);
+        return !(last == 0x0C3F || last == 0x0C40 || last == 0x0C46 || last == 0x0C47);
+    }
+    return false;
+}
 
 std::vector<std::string> latin_words(const std::vector<std::string> &raw) {
     std::vector<std::string> out;
@@ -180,7 +189,7 @@ NameParts name_parts(const std::string &name) {
             p.stripped = {latin_words(sk), hon};
             if (const char *h = honorific(e)) p.stripped.honorifics.insert(h);
             p.has_strip = true;
-            p.ambiguous = ambiguous_ending(e);
+            p.ambiguous = ambiguous_ending(e, stem);
             break;
         }
     }
@@ -408,7 +417,10 @@ std::string transliterate_te(const std::string &in) {
     return person_norm(o);
 }
 
-std::string person_key(const std::string &name) { return join(name_parts(name).stripped.words); }
+std::string person_key(const std::string &name) {
+    const NameParts p = name_parts(name);
+    return join(p.has_strip && !p.ambiguous ? p.stripped.words : p.full.words);
+}
 
 PersonMatch match_person(const std::string &a, const std::string &b) {
     const NameParts pa = name_parts(a), pb = name_parts(b);

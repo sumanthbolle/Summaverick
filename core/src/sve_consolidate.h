@@ -22,12 +22,14 @@ std::string transliterate_te(const std::string &s);
 std::string person_norm(const std::string &latin_word);
 
 // nfc_clean, then the honorifics (dr, dr., mr, mrs, ms, sir, madam, garu, గారు, అన్న, అక్క) and the last
-// Telugu word's case ending dropped, then transliterate_te and person_norm per word, joined by spaces.
+// Telugu word's case ending dropped, then transliterate_te and person_norm per word, joined by spaces. Only a clear
+// ending is dropped (see match_person): an ending that may be the name's own stays in the key (రజని, వాసుకి).
 std::string person_key(const std::string &name);
 
 enum class PersonMatch { same, maybe, different };
 // same: the normalised names are equal, or their keys are, with the same honorifics, where removing a case ending
-// counts only for clear endings (కి, కు, తో, లో, గారు ...). Removing ని, ను, ది, దే or కే (రజని is not Raja), a name
+// counts only for clear endings (కు, తో, లో, గారు ..., and కి after ి ీ ె ే). Removing ని, ను, ది, దే, కే or another
+// కి (రజని is not Raja, జానకి is not Jana), a name
 // of honorifics only, a word subset or one letter apart (keys of 4+ letters): maybe. Else different.
 PersonMatch match_person(const std::string &a, const std::string &b);
 
