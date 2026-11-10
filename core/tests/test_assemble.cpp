@@ -335,3 +335,69 @@ TEST(wipe_assistant_clears_section_outputs) {
     CHECK(st.section_outputs(id).empty());
     CHECK(st.step_attempts(id).empty());
 }
+
+TEST(assemble_notes_with_gaps_marks_a_missing_part) {
+    json secs = json::array({sec(0, 0, 10, "Collector's role"), sec(1, 10, 20, "Elections"), sec(2, 20, 30, "")});
+    const std::string ph = "This part is still being written.";
+    const std::string out = assemble_notes(secs, json::array({kPart1, nullptr, nullptr}), &ph);
+    const size_t a = out.find("## Collector's role"), b = out.find("## Elections"), c = out.find("## Part 3");
+    CHECK(a != std::string::npos && b != std::string::npos && c != std::string::npos);
+    CHECK(a < b && b < c);
+    CHECK(out.find("## Elections\n\n" + ph) != std::string::npos);
+    CHECK(out.find("## Part 3\n\n" + ph) != std::string::npos);
+    CHECK(out.find("Read Article 243") != std::string::npos);
+    // Without a placeholder a missing part is just left out, as before.
+    CHECK(assemble_notes(secs, json::array({kPart1, nullptr, nullptr})).find("Elections") == std::string::npos);
+    // A missing part may have had tasks: never "None".
+    const std::string none = assemble_notes(json::array({sec(0, 0, 10, "A"), sec(1, 10, 20, "B")}),
+                                            json::array({"## Key points\n- one\n\n## Action items\nNone", nullptr}), &ph);
+    CHECK(none.find("## Action items") == std::string::npos);
+}
+
+TEST(assemble_questions_missing_part_contributes_none) {
+    const std::string out = assemble_questions(json::array({"Q1. What is a ward?\nA1. A part of a town.", nullptr}));
+    CHECK(out == "Q1. What is a ward?\nA1. A part of a town.");
+}
+
+TEST(current_section_outputs_with_gaps) {
+    Store st(":memory:");
+    int64_t id = st.create("t", "en", nullptr, "x", 600);
+    CHECK(st.set_sections(id, json::array({sec(0, 0, 10, "A"), sec(1, 10, 20, "B")})));
+    CHECK(st.current_section_outputs(id, 1, "en", true).is_null());  // no part done
+    CHECK(st.set_section_output(id, 1, 1, "en", 10, 20, "## Key points\n- two"));
+    CHECK(st.current_section_outputs(id, 1, "en").is_null());
+    CHECK(st.current_section_outputs(id, 1, "en", true) == json::array({nullptr, "## Key points\n- two"}));
+}
+
+TEST(section_outputs_state_has_last_error) {
+    Store st(":memory:");
+    int64_t id = st.create("t", "en", nullptr, "x", 600);
+    CHECK(st.set_sections(id, json::array({sec(0, 0, 10, "A")})));
+    CHECK(st.bump_step_attempt(id, 0, 2, "en"));
+    CHECK(st.set_step_error(id, 0, 2, "no reply"));
+    json s = st.section_outputs_state(id, "en");
+    CHECK(state_row(s, 0, 2)["last_error"] == "no reply");
+    CHECK(state_row(s, 0, 1)["last_error"].is_null());
+    // An error of tries in another language is not this one's.
+    CHECK(state_row(st.section_outputs_state(id, "te"), 0, 2)["last_error"].is_null());
+}
+
+TEST(section_outputs_clear_by_kind_and_part) {
+    Store st(":memory:");
+    int64_t id = st.create("t", "en", nullptr, "x", 600);
+    CHECK(st.set_sections(id, json::array({sec(0, 0, 10, "A"), sec(1, 10, 20, "B")})));
+    for (int idx : {0, 1})
+        for (int kind : {1, 2}) {
+            CHECK(st.bump_step_attempt(id, idx, kind, "en"));
+            CHECK(st.set_section_output(id, idx, kind, "en", idx * 10, idx * 10 + 10, "text"));
+        }
+    CHECK_EQ(st.clear_section_outputs(id, 2, 1), 2);  // part 1's questions: its output and its attempts
+    CHECK_EQ(st.section_outputs(id).size(), (size_t)3);
+    CHECK_EQ(st.step_attempts(id).size(), (size_t)3);
+    CHECK_EQ(st.clear_section_outputs(id, 1, -1), 4);  // every part's notes
+    CHECK_EQ(st.section_outputs(id).size(), (size_t)1);
+    CHECK_EQ(st.clear_section_outputs(id, -1, -1), 2);
+    CHECK(st.section_outputs(id).empty() && st.step_attempts(id).empty());
+    CHECK_EQ(st.clear_section_outputs(id, -1, -1), 0);
+    CHECK(st.sections(id).size() == 2);  // the sections themselves stay
+}

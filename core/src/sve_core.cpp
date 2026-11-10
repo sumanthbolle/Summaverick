@@ -375,6 +375,30 @@ char *sve_assemble_output(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, c
     }
 }
 
+char *sve_assemble_output_with_gaps(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c,
+                                    const char *placeholder) {
+    try {
+        sve::SectionOutputKind sk;
+        if (!ctx || !section_kind(kind, sk)) return nullptr;
+        const sve::json texts = ctx->store->current_section_outputs(note_id, (int)kind, lang_c ? lang_c : "en", true);
+        if (!texts.is_array()) return nullptr;  // no part done
+        if (sk == sve::SectionOutputKind::Questions) return dup_str(sve::assemble_questions(texts));
+        const std::string ph = placeholder ? placeholder : "";
+        return dup_str(sve::assemble_notes(ctx->store->sections(note_id), texts, &ph));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+int sve_section_outputs_clear(sve_ctx *ctx, int64_t note_id, int kind, int idx) {
+    try {
+        if (!ctx) return -1;
+        return ctx->store->clear_section_outputs(note_id, kind, idx);
+    } catch (...) {
+        return -1;
+    }
+}
+
 char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang_c) {
     try {
         if (!ctx || !ctx->llm) return nullptr;

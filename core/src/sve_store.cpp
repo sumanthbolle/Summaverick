@@ -1288,29 +1288,32 @@ json Store::section_outputs(int64_t note_id) {
                       "ORDER BY idx,kind", {note_id});
 }
 
-json Store::current_section_outputs(int64_t note_id, int kind, const std::string &lang) {
+json Store::current_section_outputs(int64_t note_id, int kind, const std::string &lang, bool with_gaps) {
     json rows = query_rows(
         "SELECT o.text AS text FROM sections s LEFT JOIN section_outputs o ON o.note_id=s.note_id AND o.idx=s.idx "
         "AND o.kind=? AND o.lang=? AND o.first_piece=s.first_piece AND o.last_piece=s.last_piece "
         "WHERE s.note_id=? ORDER BY s.idx", {kind, lang, note_id});
     if (rows.empty()) return nullptr;
     json out = json::array();
+    bool any = false;
     for (const auto &r : rows) {
-        if (!r["text"].is_string()) return nullptr;
-        out.push_back(r["text"]);
+        if (!r["text"].is_string() && !with_gaps) return nullptr;
+        any = any || r["text"].is_string();
+        out.push_back(r["text"].is_string() ? r["text"] : json(nullptr));
     }
-    return out;
+    return any ? out : json(nullptr);
 }
 
 json Store::section_outputs_state(int64_t note_id, const std::string &lang) {
     json rows = query_rows(
         "SELECT s.idx AS idx, k.kind AS kind, (o.note_id IS NOT NULL) AS done, "
-        "COALESCE(CASE WHEN a.lang IS ? THEN a.attempts END,0) AS attempts "
+        "COALESCE(CASE WHEN a.lang IS ? THEN a.attempts END,0) AS attempts, "
+        "CASE WHEN a.lang IS ? THEN a.last_error END AS last_error "
         "FROM sections s CROSS JOIN (SELECT 1 AS kind UNION ALL SELECT 2) k "
         "LEFT JOIN section_outputs o ON o.note_id=s.note_id AND o.idx=s.idx AND o.kind=k.kind AND o.lang=? "
         "AND o.first_piece=s.first_piece AND o.last_piece=s.last_piece "
         "LEFT JOIN step_attempts a ON a.note_id=s.note_id AND a.idx=s.idx AND a.kind=k.kind "
-        "WHERE s.note_id=? ORDER BY s.idx, k.kind", {lang, lang, note_id});
+        "WHERE s.note_id=? ORDER BY s.idx, k.kind", {lang, lang, lang, note_id});
     for (auto &r : rows) r["done"] = r["done"] == true || r["done"] == 1;  // "done" is a flag column already
     return rows;
 }
@@ -1336,6 +1339,19 @@ bool Store::set_step_error(int64_t note_id, int idx, int kind, const std::string
 
 json Store::step_attempts(int64_t note_id) {
     return query_rows("SELECT idx,kind,attempts,last_error,lang FROM step_attempts WHERE note_id=? ORDER BY idx,kind", {note_id});
+}
+
+int Store::clear_section_outputs(int64_t note_id, int kind, int idx) {
+    if (!begin()) return -1;
+    int n = 0;
+    bool ok = true;
+    for (const char *t : {"section_outputs", "step_attempts"}) {
+        ok = ok && run((std::string("DELETE FROM ") + t + " WHERE note_id=? AND (?=-1 OR kind=?) AND (?=-1 OR idx=?)").c_str(),
+                       {note_id, kind, kind, idx, idx});
+        if (ok) n += sqlite3_changes(db_);
+    }
+    if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return -1; }
+    return exec("COMMIT") ? n : -1;
 }
 
 bool Store::mark_extracted(int64_t note_id) {

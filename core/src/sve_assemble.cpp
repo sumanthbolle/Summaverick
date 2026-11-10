@@ -181,7 +181,7 @@ std::string section_output_prompt(SectionOutputKind kind, const std::string &mat
                                                     : revision_questions_prompt(material, from_bullets));
 }
 
-std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json &outputs) {
+std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json &outputs, const std::string *placeholder) {
     std::string body;
     std::vector<std::string> tasks;
     std::set<std::string> task_keys;
@@ -189,7 +189,22 @@ std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json 
     // at its cap before it, or the heading left out) may have had tasks nobody saw.
     bool all_said_none = true, any_part = false;
     const size_t n = sections.is_array() ? sections.size() : 0;
+    auto title_of = [&](size_t i) {
+        std::string title;
+        const auto &s = sections[i];
+        if (s.is_object() && s.contains("summary") && s["summary"].is_object() && s["summary"].contains("title") &&
+            s["summary"]["title"].is_string())
+            title = trim(strip_unclear_tags(s["summary"]["title"].get<std::string>()));
+        return title.empty() ? "Part " + std::to_string(i + 1) : title;
+    };
     for (size_t i = 0; i < n; ++i) {
+        const bool missing = !outputs.is_array() || i >= outputs.size() || outputs[i].is_null();
+        if (missing && placeholder) {
+            // Not written yet: its heading and the placeholder. It may have had tasks, so never "None".
+            all_said_none = false;
+            body += "## " + title_of(i) + "\n\n" + *placeholder + "\n\n";
+            continue;
+        }
         const std::string text = strip_unclear_tags(str_at(outputs, i));
         if (trim(text).empty()) continue;
         any_part = true;
@@ -210,13 +225,7 @@ std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json 
         }
         if (!part_said_none) all_said_none = false;
         if (part.empty()) continue;
-        std::string title;
-        const auto &s = sections[i];
-        if (s.is_object() && s.contains("summary") && s["summary"].is_object() && s["summary"].contains("title") &&
-            s["summary"]["title"].is_string())
-            title = trim(strip_unclear_tags(s["summary"]["title"].get<std::string>()));
-        if (title.empty()) title = "Part " + std::to_string(i + 1);
-        body += "## " + title + "\n\n" + part;
+        body += "## " + title_of(i) + "\n\n" + part;
     }
     if (!tasks.empty()) {
         body += "## Action items\n";

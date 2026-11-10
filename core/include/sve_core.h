@@ -216,14 +216,22 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
  * deleted or its sections re-planned meanwhile): nothing is stored then. */
 char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang,
                          sve_progress_cb cb, void *user);
-/* [{"idx":0,"kind":1,"done":true,"attempts":1},…]: every section x {1 notes, 2 questions}, by idx then kind. done
- * only when the stored part's lang, first_piece and last_piece match the section now. "[]" when no sections;
- * NULL on error. */
+/* [{"idx":0,"kind":1,"done":true,"attempts":1,"last_error":null},…]: every section x {1 notes, 2 questions}, by idx
+ * then kind. done only when the stored part's lang, first_piece and last_piece match the section now. attempts and
+ * last_error (why the last try failed, or null) count only tries in lang. "[]" when no sections; NULL on error. */
 char *sve_section_outputs_state(sve_ctx *ctx, int64_t note_id, const char *lang);
 /* The note's detailed notes (a "## <section title>" per part, one merged "## Action items") or revision questions
  * (numbered across parts, near-duplicates dropped, at most 12, every part represented) from its stored parts in
  * lang. Pure, no model. NULL when any part is missing (or no sections, or another kind); "" when every part is empty. */
 char *sve_assemble_output(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang);
+/* As sve_assemble_output, while parts are still missing: in the notes a missing part gets its "## <section title>"
+ * with placeholder under it (and the action items never say "None"); in the questions it adds none. NULL only when
+ * no part at all is done (or no sections, or another kind). placeholder NULL = "". */
+char *sve_assemble_output_with_gaps(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang,
+                                    const char *placeholder);
+/* Deletes the stored parts and their try counts of a note: kind 1 notes, 2 questions or -1 all kinds; idx a part or
+ * -1 all parts. The sections stay. Returns the rows deleted (parts plus try rows), -1 on error. */
+int   sve_section_outputs_clear(sve_ctx *ctx, int64_t note_id, int kind, int idx);
 /* Title from the section titles (same cleanup as sve_suggest_title). NULL when no sections or no model. */
 char *sve_title_from_sections(sve_ctx *ctx, int64_t note_id, const char *lang);
 /* Chapters [{"title","start_sec"}]: consecutive sections on the same topic merged. Pure, no model; "[]" when none. */

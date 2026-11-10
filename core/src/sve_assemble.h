@@ -31,12 +31,15 @@ std::string section_output_prompt(SectionOutputKind kind, const std::string &mat
 //   (a part without one, e.g. cut at its cap, may have had tasks); otherwise, with no task, it is left out.
 // - Then [unclear] tags are removed and none_action_items runs over the whole (each part already went through
 //   the notes checks, against its own material, when it was written).
-std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json &outputs);
+// - placeholder (optional): a part whose output is null (not written yet) gets its "## <section title>" and the
+//   placeholder under it, and the action items never say "None"; without one a null part is like an empty one.
+std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json &outputs,
+                           const std::string *placeholder = nullptr);
 
 // The revision questions of a recording from its parts (one string per section, "Q1. …\nA1. …" each).
 // Questions are taken round-robin across the parts (every part is represented when capped), a near-duplicate of
 // one already taken (Jaccard >= 0.7 on match_tokens of the question) is dropped, a question with no answer too,
-// at most `max`. Numbered Q1…Qn / A1…An, a blank line between them.
+// at most `max`. Numbered Q1…Qn / A1…An, a blank line between them. A null part (not written yet) gives none.
 // How many whole questions (with an answer) assemble_questions finds in one part's reply. Labels may be "Q1.",
 // "Q 1)", "**Q1.**", "### Q1:", or a bare "1." in a reply without Q labels; answers "A1.", "A.", "Answer:".
 int count_questions(const std::string &reply);
