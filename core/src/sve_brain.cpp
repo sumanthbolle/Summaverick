@@ -7,6 +7,7 @@
 #include "sve_extract.h"
 #include "sve_medcheck.h"
 #include "sve_brainmap.h"
+#include "sve_consolidate.h"
 #include "sve_memory.h"
 #include "sve_prompts.h"
 #include "sve_sections.h"  // memory_prompt, complete_memory_items
@@ -94,18 +95,6 @@ std::string self_name(sve::Store &st) {
     return j.is_object() ? lower(jstr(j, "name")) : "";
 }
 
-// A person topic for a spoken name, by the extraction's rules: at most 80 bytes, never the person
-// themselves, an existing person of the same name (any case) reused, linked to the note. 0 for none.
-int64_t person_topic(sve::Store &st, int64_t note_id, std::string name, const std::string &self) {
-    name = sve::trim_copy(name);
-    if (name.empty() || name.size() > 80 || sve::is_pronoun(name) || (!self.empty() && lower(name) == self)) return 0;
-    for (const auto &t : st.topics("person"))
-        if (lower(jstr(t, "name")) == lower(name)) name = jstr(t, "name");
-    int64_t tid = st.upsert_topic("person", name);
-    if (tid <= 0 || !st.link_topic(note_id, tid)) return -1;
-    return tid;
-}
-
 // A pending reminder or task card of the same note and moment whose quote and the memory's share their
 // words: the shorter quote's tokens are a run in the longer's. 0 for none.
 int64_t matching_suggestion(sve::Store &st, int64_t note_id, int64_t start_sec, const std::string &quote) {
@@ -139,12 +128,74 @@ bool refresh_importance(sve::Store &st, int64_t id) {
 
 json null_if_empty(const std::string &s) { return s.empty() ? json(nullptr) : json(s); }
 
-// Writes one grounded memory with its source, people, topic and card links. -1 on failure (the caller
-// rolls back).
-int64_t store_memory(sve::Store &st, int64_t note_id, const json &g, int double_check, const std::string &self) {
+// What consolidation did with one section's memories, for the log.
+struct Tally {
+    int added = 0, same = 0, updated = 0, conflicts = 0;
+};
+
+// The names a grounded memory relies on: who, to_whom, then the checked names as written.
+std::vector<std::string> memory_names(const json &g) {
+    std::vector<std::string> out = {jstr(g, "who"), jstr(g, "to_whom")};
+    for (const auto &c : jarr(g, "checked")) {
+        if (jstr(c, "kind") != "name") continue;
+        std::string name = jstr(c, "as_written");
+        out.push_back(name.empty() ? jstr(c, "text") : name);
+    }
+    return out;
+}
+
+// Writes one grounded memory with its source, people, topic and card links, consolidated with the memories
+// already known (sve_consolidate): the same memory again only gains this source, a later version supersedes the
+// older one, a contradiction queues both. Each name becomes a known person only when it is clearly the same;
+// a name that may be someone known becomes a new person and a question. The id of the row the source went to;
+// -1 on failure (the caller rolls back).
+int64_t store_memory(sve::Store &st, int64_t note_id, json g, int double_check, const std::string &self,
+                     const sve::PersonAnswers &answers, Tally &tally) {
     const json src = jarr(g, "sources").empty() ? json::object() : jarr(g, "sources")[0];
     const int64_t start = jint(src, "start_sec", 0);
     const std::string quote = jstr(src, "quote"), text = jstr(g, "text");
+
+    // People first: who / to_whom by role; the other names it relies on as "mentioned".
+    std::vector<std::pair<int64_t, std::string>> links;
+    json people = json::array();
+    auto add_link = [&](int64_t tid, const char *role) {
+        for (const auto &l : links) if (l.first == tid && (l.second == role || std::string(role) == "mentioned")) return;
+        links.push_back({tid, role});
+        people.push_back({{"id", tid}, {"role", role}});
+    };
+    for (const char *role : {"who", "to_whom"}) {
+        int64_t tid = sve::resolve_person(st, note_id, jstr(g, role), self, text, answers);
+        if (tid < 0) return -1;
+        if (tid > 0) add_link(tid, role);
+    }
+    const std::vector<std::string> names = memory_names(g);
+    for (size_t i = 2; i < names.size(); ++i) {
+        int64_t tid = sve::resolve_person(st, note_id, names[i], self, text, answers);
+        if (tid < 0) return -1;
+        if (tid > 0) add_link(tid, "mentioned");
+    }
+    // The note's topic the memory names, else the note's first topic.
+    json topics = st.note_topics(note_id, "topic");
+    int64_t topic = 0;
+    for (const auto &t : topics)
+        if (sve::name_in(jstr(t, "name"), text) || sve::name_in(jstr(t, "name"), quote)) { topic = jint(t, "id", 0); break; }
+    if (!topic && !topics.empty()) topic = jint(topics[0], "id", 0);
+
+    // The memory it repeats, updates or contradicts, among current memories of its type (no embeddings yet).
+    json newer = {{"type", jstr(g, "type")}, {"text", text}, {"checked", jarr(g, "checked")},
+                  {"said_date", jstr(g, "said_date")}, {"people", people},
+                  {"topics", topic > 0 ? json::array({{{"id", topic}}}) : json::array()}};
+    const sve::Placement place =
+        sve::place_memory(newer, st.memory_items_with_topics({{"types", json::array({jstr(g, "type")})}}), -1);
+    if (place.pair == sve::Pair::same) {
+        if (!sve::merge_same_memory(st, place.older, note_id, start, quote, src.contains("conf") ? src["conf"] : json(nullptr),
+                                    (int64_t)time(nullptr)))
+            return -1;
+        ++tally.same;
+        return refresh_importance(st, place.older) ? place.older : -1;
+    }
+    if (place.pair == sve::Pair::contradiction) g["conflict_with"] = place.older;
+
     json row = {{"type", jstr(g, "type")}, {"text", text}, {"who", null_if_empty(jstr(g, "who"))},
                 {"to_whom", null_if_empty(jstr(g, "to_whom"))}, {"due_text", null_if_empty(jstr(g, "due_text"))},
                 {"due_date", null_if_empty(jstr(g, "due_date"))}, {"said_date", null_if_empty(jstr(g, "said_date"))},
@@ -157,30 +208,13 @@ int64_t store_memory(sve::Store &st, int64_t note_id, const json &g, int double_
     std::optional<double> conf;
     if (src.contains("conf") && src["conf"].is_number()) conf = src["conf"].get<double>();
     if (!st.add_memory_source(id, note_id, start, quote, conf)) return -1;
-
-    // who / to_whom by role; the other names it relies on as "mentioned".
-    std::vector<int64_t> roled;
-    for (const char *role : {"who", "to_whom"}) {
-        int64_t tid = person_topic(st, note_id, jstr(g, role), self);
-        if (tid < 0 || (tid > 0 && !st.link_memory_entity(id, tid, role))) return -1;
-        if (tid > 0) roled.push_back(tid);
-    }
-    for (const auto &c : jarr(g, "checked")) {
-        if (jstr(c, "kind") != "name") continue;
-        std::string name = jstr(c, "as_written");
-        if (name.empty()) name = jstr(c, "text");
-        int64_t tid = person_topic(st, note_id, name, self);
-        if (tid < 0) return -1;
-        if (tid > 0 && std::find(roled.begin(), roled.end(), tid) == roled.end() && !st.link_memory_entity(id, tid, "mentioned"))
-            return -1;
-    }
-    // The note's topic the memory names, else the note's first topic.
-    json topics = st.note_topics(note_id, "topic");
-    int64_t topic = 0;
-    for (const auto &t : topics)
-        if (sve::name_in(jstr(t, "name"), text) || sve::name_in(jstr(t, "name"), quote)) { topic = jint(t, "id", 0); break; }
-    if (!topic && !topics.empty()) topic = jint(topics[0], "id", 0);
+    for (const auto &l : links)
+        if (!st.link_memory_entity(id, l.first, l.second)) return -1;
     if (topic > 0 && !st.link_memory_entity(id, topic, "topic")) return -1;
+    if (!sve::apply_placement(st, place, id)) return -1;
+    if (place.pair == sve::Pair::update) ++tally.updated;
+    else if (place.pair == sve::Pair::contradiction) ++tally.conflicts;
+    else ++tally.added;
 
     return refresh_importance(st, id) ? id : -1;
 }
@@ -277,12 +311,43 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
             keep.push_back({g.row, dc});
         }
 
+        // Names that may be someone already known: the model's same-person check, before anything is written.
+        // Its answer only decides whether to ask the person; nobody is merged without them.
         const std::string self = self_name(st);
+        sve::PersonAnswers answers;
+        {
+            std::vector<std::string> names;
+            std::map<std::string, std::string> said_about;  // name -> the first memory text naming them
+            for (const auto &k : keep)
+                for (const auto &n : memory_names(k.first)) {
+                    const std::string t = sve::trim_copy(n);
+                    if (t.empty() || (!self.empty() && lower(t) == self)) continue;
+                    names.push_back(t);
+                    said_about.emplace(t, jstr(k.first, "text"));
+                }
+            const auto checks = sve::person_checks(names, st.topics("person"));
+            for (size_t i = 0; i < checks.size(); ++i) {
+                const std::string &name = checks[i].first;
+                const int64_t tid = jint(checks[i].second, "id", 0);
+                const std::string prompt = sve::same_person_prompt(jstr(checks[i].second, "name"), st.person_context(tid), name,
+                                                                   said_about[name]);
+                std::string out;
+                Watch w{cb, user, false};
+                if (model_reply(ctx, "person_check", sve::kSamePersonSystem, prompt, kYesNoMaxOut, (int)i, (int)checks.size(), out, w))
+                    answers[{name, tid}] = sve::parse_yes_no(sve::strip_thinking(out));
+                else if (w.cancelled)
+                    return -2;
+                // No answer (no model, or the call failed): unclear, so the person is asked.
+            }
+        }
+
         if (!st.begin()) return -1;
         int stored = 0;
+        Tally tally;
+        const size_t questions_before = st.person_questions().size();
         try {
             for (const auto &k : keep) {
-                if (store_memory(st, note_id, k.first, k.second, self) <= 0) { st.rollback(); return -1; }
+                if (store_memory(st, note_id, k.first, k.second, self, answers, tally) <= 0) { st.rollback(); return -1; }
                 ++stored;
             }
             // Fails for a note deleted meanwhile (foreign key): nothing is kept for it.
@@ -291,6 +356,10 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
             st.rollback();
             throw;
         }
+        const size_t questions_after = st.person_questions().size();
+        sve_logf(1, "memories: section %d of note %lld: %d new, %d same again, %d updated, %d conflicts, %zu person questions",
+                 section_idx, (long long)note_id, tally.added, tally.same, tally.updated, tally.conflicts,
+                 questions_after > questions_before ? questions_after - questions_before : 0);
         if (cb) cb("final", 1, 1, user);
         return stored;
     });
@@ -324,7 +393,7 @@ char *sve_memories_json(sve_ctx *ctx, const char *filter_json) {
 }
 
 char *sve_memory_get(sve_ctx *ctx, int64_t id) {
-    return guard<char *>("sve_memory_get", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->memory_item(id)) : nullptr; });
+    return guard<char *>("sve_memory_get", nullptr, [&]() -> char * { return ctx ? dump(sve::with_change(ctx->store->memory_item(id))) : nullptr; });
 }
 
 char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id) {
@@ -396,7 +465,8 @@ char *sve_review_queue_json(sve_ctx *ctx) {
     return guard<char *>("sve_review_queue_json", nullptr, [&]() -> char * {
         if (!ctx) return nullptr;
         sve::Store &st = *ctx->store;
-        json rows = st.memory_items({{"queue", 1}, {"reviews", json::array({"new"})}});
+        // Queued rows of any review but wrong: a kept memory a later recording contradicts waits here too.
+        json rows = st.memory_items({{"queue", 1}});
         // Newest recording first (its own creation time), then in the order said.
         std::map<int64_t, int64_t> created;
         using Key = std::tuple<int64_t, int64_t, int64_t, int64_t>;  // note created_at, note id, -start_sec, id
@@ -422,4 +492,12 @@ char *sve_review_queue_json(sve_ctx *ctx) {
         }
         return dump(out);
     });
+}
+
+char *sve_person_questions_json(sve_ctx *ctx) {
+    return guard<char *>("sve_person_questions_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->person_questions()) : nullptr; });
+}
+
+int sve_person_question_answer(sve_ctx *ctx, int64_t id, int same) {
+    return guard("sve_person_question_answer", -1, [&] { return ctx && ctx->store->answer_person_question(id, same != 0) ? 0 : -1; });
 }

@@ -311,8 +311,13 @@ int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
  * whole items), each candidate checked against the section's own words (sve_memory), double-checked
  * by the model where needed (a "no" drops it; only a "yes" lets it skip the review queue), stored with its
  * quote as source, linked to people and the note's topic, and to a pending reminder/task card of the same
- * note and quote. Marks the section done; a section already done returns 0 and changes nothing.
- * Returns the number of memories stored; -1 for no such note or section, bad input, or no model (for a section
+ * note and quote. Consolidated with the memories already known (sve_consolidate.h): the same memory said
+ * again only gains this quote as a source, a later version supersedes the older one ("change" in
+ * sve_memory_get), a contradiction is stored with conflict_with and queues both. A name that is clearly a known
+ * person links to them; a name that only may be (checked by the model, phase "person_check") becomes a new
+ * person plus a question (sve_person_questions_json) unless the model says no: people are never merged silently.
+ * Marks the section done; a section already done returns 0 and changes nothing.
+ * Returns the number of memories stored (a repeat counts once, as the row it joined); -1 for no such note or section, bad input, or no model (for a section
  * with words); -2 on cancel (nothing stored, the section stays due); -3 when the memory model call itself fails
  * (not a cancel: nothing stored, the section stays due). A reply that comes back but is empty or unusable marks
  * the section done with 0. The notes and section summaries are not touched: the section summary prompt and its
@@ -325,7 +330,9 @@ char *sve_notes_needing_memories(sve_ctx *ctx, int limit);
 /* Memory rows. filter_json (NULL = {}): {"note_id","types":[],"reviews":[],"queue":0|1,"include_wrong",
  * "include_superseded","limit"}. Newest first; wrong and superseded rows only when asked for. */
 char *sve_memories_json(sve_ctx *ctx, const char *filter_json);
-/* One memory row plus "history" (the versions it replaced), or "null". */
+/* One memory row plus "history" (the versions it replaced), or "null". With history it also has
+ * "change": {"was","now","said"}, the checked words that changed from the version it replaced directly and
+ * the date the new one was said (absent when no number or date changed). */
 char *sve_memory_get(sve_ctx *ctx, int64_t id);
 /* The person's review: state "kept" or "wrong". Both take it out of the review queue. 0 ok, -1 error. */
 int   sve_memory_review(sve_ctx *ctx, int64_t id, const char *state);
@@ -343,12 +350,20 @@ int   sve_memory_touch(sve_ctx *ctx, int64_t id);
 /* Deletes a memory (not a medicine's: delete the medicine). 0 ok, -1 error. */
 int   sve_memory_remove(sve_ctx *ctx, int64_t id);
 int   sve_memory_set_done(sve_ctx *ctx, int64_t id, int done);
-/* Memories waiting for the person (queue 1, review "new"), newest recording first, each with "suggestion":
+/* Memories waiting for the person (queue 1, any review but "wrong": a kept memory a later recording
+ * contradicts waits again; "conflict_with" names the other row), newest recording first, each with "suggestion":
  * the linked pending suggestion object, or null. */
 char *sve_review_queue_json(sve_ctx *ctx);
+/* "Is this the same person?": pending questions about a new name that may be someone already known, oldest
+ * first: [{"id","a":{"id","name","context"},"b":{"id","name","context"}}] (a is the known person, b the new
+ * one; context is what was said about them, may be ""). NULL on error. */
+char *sve_person_questions_json(sve_ctx *ctx);
+/* The person's answer. same != 0 merges b into a (a keeps its name; notes, memories and other questions move
+ * to a); 0 keeps them apart and the pair is not asked again. 0 ok, -1 error (no such pending question). */
+int   sve_person_question_answer(sve_ctx *ctx, int64_t id, int same);
 
 /* Deletes everything the assistant stored, in one transaction: the profile, medicines, memory (vocabulary,
- * preferences, facts), reminders, tasks, topics and their note links, suggestions, decisions, insights,
+ * preferences, facts), reminders, tasks, topics and their note links, person questions, suggestions, decisions, insights,
  * transcript pieces, and the settings keys the assistant created ("profile", "insight.last_date", "extracted.<id>").
  * Notes and other settings are kept; the host deletes notes and cancels scheduled notifications.
  * Returns 0, or -1 on error (nothing deleted). */

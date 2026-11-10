@@ -157,6 +157,10 @@
 			isa = PBXBuildFile;
 			fileRef = 393C976A09F0C61C5B20B9DE;
 		};
+		8FE69873EC9B753B9C62DD98 = {
+			isa = PBXBuildFile;
+			fileRef = 4AC8F8DF35A4A27C32F64762;
+		};
 		908F929CC6113FA25B46EE92 = {
 			isa = PBXBuildFile;
 			fileRef = 8108122AC683F0C05267E8CD;
@@ -563,6 +567,13 @@
 			path = SummaverickEveryday/Views/Profile/LearnedView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		4AC8F8DF35A4A27C32F64762 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_consolidate.cpp;
+			path = ../core/src/sve_consolidate.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
 		4AF174E3AE529342FF2A9846 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -722,6 +733,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = MemoryReviewCard.swift;
 			path = SummaverickEveryday/Views/Memory/MemoryReviewCard.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		7D622FF8905A1014A0F26E0A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_consolidate.h;
+			path = ../core/src/sve_consolidate.h;
 			sourceTree = SOURCE_ROOT;
 		};
 		8108122AC683F0C05267E8CD = {
@@ -1292,6 +1310,8 @@
 				68019339B3FB26EF022BB32A,
 				D84ADCB93009100271D599EA,
 				ED74DFB438437AA10CDB5F3C,
+				4AC8F8DF35A4A27C32F64762,
+				7D622FF8905A1014A0F26E0A,
 				9E2ACA831A68C5FC7568EFA9,
 				E6FD595D542BBAD86BA1B59B,
 				3C94D64FE92A566816D76B43,
@@ -1513,6 +1533,7 @@
 				11C62DBEE92DAE5BAA003ED9,
 				9693178312F307734DAC8F40,
 				2DE36113806377CB352E5A8E,
+				8FE69873EC9B753B9C62DD98,
 				1D9397B49E2B55EDE5DC3560,
 				66567DD2A6C40F6BC6CB1C24,
 				7CD85F6783D894B9047A2C67,
