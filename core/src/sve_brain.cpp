@@ -6,6 +6,7 @@
 #include "sve_context.h"
 #include "sve_extract.h"
 #include "sve_medcheck.h"
+#include "sve_brainmap.h"
 #include "sve_memory.h"
 #include "sve_prompts.h"
 #include "sve_sections.h"  // memory_prompt, complete_memory_items
@@ -324,6 +325,31 @@ char *sve_memories_json(sve_ctx *ctx, const char *filter_json) {
 
 char *sve_memory_get(sve_ctx *ctx, int64_t id) {
     return guard<char *>("sve_memory_get", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->memory_item(id)) : nullptr; });
+}
+
+char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id) {
+    return guard<char *>("sve_brain_map_json", nullptr, [&]() -> char * {
+        if (!ctx) return nullptr;
+        sve::Store &st = *ctx->store;
+        json f = {{"queue", 0}};
+        if (note_id > 0) f["note_id"] = note_id;
+        // Meaning pairs come with embeddings (not built yet): none for now.
+        return dump(sve::build_brain_map(st.memory_items_with_topics(f), st.topics("person"), st.topics("topic"), json::array(), note_id));
+    });
+}
+
+char *sve_topic_memories_json(sve_ctx *ctx, int64_t topic_id) {
+    return guard<char *>("sve_topic_memories_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->topic_memories(topic_id)) : nullptr; });
+}
+
+int sve_memory_touch(sve_ctx *ctx, int64_t id) {
+    return guard("sve_memory_touch", -1, [&] {
+        if (!ctx) return -1;
+        json row = ctx->store->memory_item(id);
+        if (!row.is_object()) return -1;
+        json f = {{"last_used", (int64_t)time(nullptr)}};
+        return ctx->store->update_memory_item(id, f) && refresh_importance(*ctx->store, id) ? 0 : -1;
+    });
 }
 
 int sve_memory_review(sve_ctx *ctx, int64_t id, const char *state) {

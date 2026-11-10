@@ -112,6 +112,10 @@ public:
     // filter: note_id, types [], reviews [], queue 0/1, include_wrong (false), include_superseded (false),
     // limit. Newest first. Listing "wrong" in reviews includes wrong rows.
     json memory_items(const json &filter);
+    // memory_items plus "topics":[{id,name}] (non-person topics the memory is linked to), for the map.
+    json memory_items_with_topics(const json &filter);
+    // Memories linked to a person or topic (any role), not wrong, superseded or queued, by importance.
+    json topic_memories(int64_t topic_id);
     json memory_item(int64_t id);  // null when missing; adds "history" (rows it superseded, newest first)
     bool update_memory_item(int64_t id, const json &fields);  // whitelisted columns only
     bool delete_memory_item(int64_t id);

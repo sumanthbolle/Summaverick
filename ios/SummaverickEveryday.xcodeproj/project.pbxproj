@@ -165,6 +165,10 @@
 			isa = PBXBuildFile;
 			fileRef = D58A3AD4F6AD27CF4A2AB3D8;
 		};
+		9693178312F307734DAC8F40 = {
+			isa = PBXBuildFile;
+			fileRef = 41993960BC863990F7951208;
+		};
 		98CC0908F97C13DBC19A09B5 = {
 			isa = PBXBuildFile;
 			fileRef = 7098A4559C0419D83AAB1B2A;
@@ -515,6 +519,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = AudioRecorder.swift;
 			path = SummaverickEveryday/Audio/AudioRecorder.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		41993960BC863990F7951208 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_brainmap.cpp;
+			path = ../core/src/sve_brainmap.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
 		428A09CCDB67F6F77A72F81A = {
@@ -879,6 +890,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_audio.h;
 			path = ../core/src/sve_audio.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		BF13700FB4F0D5393BB27A22 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_brainmap.h;
+			path = ../core/src/sve_brainmap.h;
 			sourceTree = SOURCE_ROOT;
 		};
 		C0100A508E690127735ED8DF = {
@@ -1269,6 +1287,8 @@
 				A134B997A05BEC16D4B96325,
 				BB44682AB82F093499931FDE,
 				491BB1ADB53C5E2A1F0AF6C8,
+				41993960BC863990F7951208,
+				BF13700FB4F0D5393BB27A22,
 				68019339B3FB26EF022BB32A,
 				D84ADCB93009100271D599EA,
 				ED74DFB438437AA10CDB5F3C,
@@ -1491,6 +1511,7 @@
 				E3B6ED99E22E4B0C0EC884D9,
 				CCABCA4B3E738FCE0399D402,
 				11C62DBEE92DAE5BAA003ED9,
+				9693178312F307734DAC8F40,
 				2DE36113806377CB352E5A8E,
 				1D9397B49E2B55EDE5DC3560,
 				66567DD2A6C40F6BC6CB1C24,

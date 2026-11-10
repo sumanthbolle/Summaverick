@@ -749,7 +749,7 @@ static const char *kMemoryCols =
     "m.review AS review, m.queue AS queue, m.health AS health, m.done AS done, m.importance AS importance, "
     "m.origin AS origin, m.medicine_id AS medicine_id, m.suggestion_id AS suggestion_id, "
     "m.superseded_by AS superseded_by, m.conflict_with AS conflict_with, m.first_seen AS first_seen, "
-    "m.last_seen AS last_seen";
+    "m.last_seen AS last_seen, m.last_used AS last_used";
 
 // Columns update_memory_item may change; id, origin, first_seen and created_at are fixed at insert.
 static const char *kMemoryEditable[] = {"type", "text", "who", "to_whom", "due_date", "due_text", "said_date", "checked",
@@ -834,6 +834,27 @@ json Store::memory_items(const json &filter) {
     binds.push_back(limit.is_number_integer() ? limit : json(-1));
     json out = json::array();
     for (auto &r : query_rows(sql.c_str(), binds)) out.push_back(memory_full(r));
+    return out;
+}
+
+json Store::memory_items_with_topics(const json &filter) {
+    json rows = memory_items(filter);
+    for (auto &r : rows)
+        r["topics"] = query_rows("SELECT DISTINCT t.id AS id, t.name AS name FROM memory_entities e JOIN topics t ON t.id=e.topic_id "
+                                 "WHERE e.memory_id=? AND t.kind<>'person' ORDER BY t.id", {r["id"]});
+    return rows;
+}
+
+json Store::topic_memories(int64_t topic_id) {
+    json rows = memory_items({{"queue", 0}});
+    json out = json::array();
+    for (auto &r : rows) {
+        auto ids = query_rows("SELECT 1 FROM memory_entities WHERE memory_id=? AND topic_id=? LIMIT 1", {r["id"], topic_id});
+        if (!ids.empty()) out.push_back(r);
+    }
+    std::stable_sort(out.begin(), out.end(), [](const json &a, const json &b) {
+        return a.value("importance", 0.0) > b.value("importance", 0.0);
+    });
     return out;
 }
 

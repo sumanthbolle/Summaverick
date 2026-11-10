@@ -332,6 +332,13 @@ int   sve_memory_review(sve_ctx *ctx, int64_t id, const char *state);
 /* The person's own words for a memory, applied directly: review becomes "corrected", out of the queue.
  * Medicine memories are changed by saving the medicine instead (-1). 0 ok, -1 error. */
 int   sve_memory_edit(sve_ctx *ctx, int64_t id, const char *text);
+/* The mind map as JSON (see sve_brainmap.h): {"center","list","branches","links"}. note_id 0 = all recordings,
+ * else only that recording's memories. Only kept or corrected, unqueued, current memories. NULL on error. */
+char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id);
+/* Memories under a person or topic ("Who is this?" for a person), by importance, same rows as sve_memories_json. */
+char *sve_topic_memories_json(sve_ctx *ctx, int64_t topic_id);
+/* Marks a memory as used just now (last_used), which raises its importance. 0 ok, -1 error. */
+int   sve_memory_touch(sve_ctx *ctx, int64_t id);
 /* Deletes a memory (not a medicine's: delete the medicine). 0 ok, -1 error. */
 int   sve_memory_remove(sve_ctx *ctx, int64_t id);
 int   sve_memory_set_done(sve_ctx *ctx, int64_t id, int done);

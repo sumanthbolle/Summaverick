@@ -1,5 +1,6 @@
 #include "check.h"
 #include "sve_brainmap.h"
+#include "sve_store.h"
 
 using namespace sve;
 
@@ -107,4 +108,32 @@ TEST(map_people_topics_counts_and_links) {
     bool person_link = false;
     for (const auto &l : m["links"]) if (l["kind"] == "person") person_link = true;
     CHECK(!person_link);  // only one shown memory (the promise) carries Ravi
+}
+
+TEST(store_topic_memories_and_map_rows) {
+    sve::Store st(":memory:");
+    CHECK(st.ok());
+    int64_t note = st.create("n", "en", nullptr, "x", 1);
+    int64_t person = st.upsert_topic("person", "Ravi"), topic = st.upsert_topic("topic", "Budget");
+    int64_t a = st.add_memory_item({{"type", "promise"}, {"text", "Send report"}, {"review", "kept"}, {"importance", 1.0}});
+    int64_t b = st.add_memory_item({{"type", "fact"}, {"text", "Budget is 5 lakh"}, {"review", "kept"}, {"importance", 2.0}});
+    int64_t q = st.add_memory_item({{"type", "fact"}, {"text", "Queued"}, {"review", "kept"}, {"queue", 1}});
+    for (int64_t m : {a, b, q}) CHECK(st.add_memory_source(m, note, 0, "quote", std::nullopt));
+    for (int64_t m : {a, b, q}) CHECK(st.link_memory_entity(m, person, "mentioned"));
+    CHECK(st.link_memory_entity(b, topic, "topic"));
+    json under = st.topic_memories(person);
+    CHECK_EQ(under.size(), (size_t)2);  // queued one left out
+    CHECK_EQ(under[0]["id"].get<int64_t>(), b);  // by importance
+    CHECK_EQ(st.topic_memories(topic).size(), (size_t)1);
+    json rows = st.memory_items_with_topics({{"queue", 0}});
+    json map = build_brain_map(rows, st.topics("person"), st.topics("topic"), json::array(), 0);
+    bool saw_ravi = false, saw_budget = false;
+    for (const auto &br : map["branches"])
+        for (const auto &it : br["items"]) {
+            if (it["label"] == "Ravi") { saw_ravi = true; CHECK_EQ(it["count"].get<int>(), 2); }
+            if (it["label"] == "Budget") saw_budget = true;
+        }
+    CHECK(saw_ravi && saw_budget);
+    CHECK(st.update_memory_item(a, {{"last_used", 12345}}));
+    CHECK_EQ(st.memory_item(a)["last_used"].get<int>(), 12345);
 }
