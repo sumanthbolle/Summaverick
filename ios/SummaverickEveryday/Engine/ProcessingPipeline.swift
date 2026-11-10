@@ -1133,6 +1133,8 @@ final class ProcessingPipeline {
     /// Takes the background time now, before any await, then posts with the note's title: the one known from this
     /// launch at once, else read from the core.
     private func notify(_ id: Int64, _ post: @escaping (String, NotesNotifier.Hold) -> Void) {
+        // This notice replaces "Your recording is saved" (one identifier per note): opening the app must not remove it.
+        askedToOpen.remove(id)
         let hold = NotesNotifier.Hold()
         if let title = noteTitles[id] { post(title, hold); return }
         Task { post(await CoreEngine.shared.note(id)?.title ?? "", hold) }

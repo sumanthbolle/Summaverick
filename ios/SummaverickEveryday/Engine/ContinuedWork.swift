@@ -144,7 +144,8 @@ final class ContinuedWork {
         guard #available(iOS 26, *) else { return }
         self.subtitle = subtitle
         let inFront = UIApplication.shared.applicationState == .active
-        if stop, TaskAtRecord.refusesAtStop(appActive: inFront, held: held != nil) {
+        // Inactive counts as in front here, as at Record (a Stop from Control Center over the open app asks).
+        if stop, TaskAtRecord.refusesAtStop(appActive: UIApplication.shared.applicationState != .background, held: held != nil) {
             // iOS accepts a request made in the background and never starts it (note 24): none is made, and the run
             // is cut off when the plain background time ends (backgroundTimeEnded: overnight list, overnight task).
             if wanted, let askedID { BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: askedID) }

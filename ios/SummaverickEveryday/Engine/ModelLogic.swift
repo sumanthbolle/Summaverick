@@ -1026,7 +1026,16 @@ struct TaskProgress: Equatable {
 
     /// A recording starts in this task (asked for at Record, or joining a task already held), or goes on after a
     /// note run in it ended. Only while no note runs (ContinuedWork): a running note's bar is not squeezed.
-    mutating func startRecording() { recording = true }
+    /// After a note in this task (its bar near 99%): the band gets a fresh 1000 units first, and the next note
+    /// takes the rest from where the band leaves it, so the bar never creeps to 100% and then drops at Stop.
+    mutating func startRecording() {
+        guard !recording else { return }
+        if noteStarted {
+            totalUnits += Self.noteUnits
+            noteStarted = false   // the next note rebases onto what the band leaves (endRecording, startNote)
+        }
+        recording = true
+    }
 
     /// The recording band ends (Stop, cancel, or a note run starts): the first note takes the rest of the bar from
     /// where the recording left it, so heartbeats from here on move the note, not the band.
