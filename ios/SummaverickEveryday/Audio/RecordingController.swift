@@ -83,6 +83,10 @@ final class RecordingController {
         UnfinishedRecordings.add(url.path)
         watchForQuiet()
         let recorder = self.recorder
+        // Background time for the notes after Stop is asked for now, while the app is in front (a Stop from the lock
+        // screen or a shortcut cannot get it). Keyed like the Stop's request: the recording's file name.
+        ContinuedWork.shared.recordingStarted(key: url.deletingPathExtension().lastPathComponent,
+                                              aiReady: ModelManager.shared.isReady)
         LiveTranscriber.shared.recordingStarted(audio: url) { recorder.elapsed }
         RecordingActivities.shared.recordingStarted(audioPath: url.path, startedAt: Date().addingTimeInterval(-recorder.elapsed))
         RecordControlState.recordingChanged(true)
@@ -135,6 +139,7 @@ final class RecordingController {
         RecordControlState.recordingChanged(false)
         RecordingActivities.shared.update(audioPath: url.path, .cancelled, line: "", percent: 0)
         UnfinishedRecordings.remove(url.path)
+        ContinuedWork.shared.recordingEnded()   // the pipeline finishes the task once nothing is left (recordingCancelled)
         // Drop the piece in flight first, so nothing is written next to the deleted recording.
         Task {
             await LiveTranscriber.shared.cancel(audioPath: url.path)

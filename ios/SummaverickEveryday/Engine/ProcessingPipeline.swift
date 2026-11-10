@@ -14,6 +14,7 @@ import AVFoundation
 import Foundation
 import Observation
 import UIKit
+import UserNotifications
 
 @MainActor
 @Observable
@@ -481,7 +482,8 @@ final class ProcessingPipeline {
         stoppedWhileNotActive = !appIsActive   // a Stop from the Live Activity or a shortcut (backgroundTimeEnded)
         var claimed = false
         if ModelManager.shared.isReady {
-            // Keyed on the file name: the note id is not known until the engine is free.
+            // Keyed on the file name: the note id is not known until the engine is free. A task asked for at Record
+            // is kept (TaskAtRecord.workLeftAtBegin); from the background it is the only one that can run.
             ContinuedWork.shared.begin(key: audio.deletingPathExtension().lastPathComponent, subtitle: Stage.transcribing(0).label)
             if !isWorking {
                 starting = true
@@ -491,13 +493,29 @@ final class ProcessingPipeline {
                 stage = .transcribing(0)
             }
         }
-        Task { await self.process(audio: audio, duration: duration, claimed: claimed) }
+        ContinuedWork.shared.recordingEnded()   // after begin: the recording's task is the note's now
+        let asksToOpen = TaskAtRecord.postsOpenAppNotice(stoppedInBackground: !appIsActive,
+                                                         taskHeld: ContinuedWork.shared.isHeld,
+                                                         workLeft: ModelManager.shared.isReady)
+        Task { await self.process(audio: audio, duration: duration, claimed: claimed, asksToOpen: asksToOpen) }
+    }
+
+    /// Notes told "open the app" right after their Stop (TaskAtRecord.postsOpenAppNotice): the cut-off that follows
+    /// when the plain background time ends does not post "paused" over it. Cleared when a run starts in front.
+    @ObservationIgnored private var askedToOpen: Set<Int64> = []
+
+    /// Stop came from the background with no background time: the person is told the recording is kept and the
+    /// notes are written once the app is opened (NotifyRule.shouldNotify still applies).
+    private func askToOpen(_ id: Int64) {
+        askedToOpen.insert(id)
+        NSLog("[sve] bg: no background time: asked the person to open the app")
+        NotesNotifier.recordingSaved(noteID: id, hold: NotesNotifier.Hold())
     }
 
     /// Full run for a fresh recording. Returns the note id as soon as it exists. claimed: recordingStopped
     /// already holds the busy claim and the background time for this run.
     @discardableResult
-    func process(audio: URL, duration: Int64, claimed: Bool = false) async -> Int64? {
+    func process(audio: URL, duration: Int64, claimed: Bool = false, asksToOpen: Bool = false) async -> Int64? {
         var ownsBackground = claimed
         defer {
             handingOver.remove(audio.path)
@@ -517,6 +535,7 @@ final class ProcessingPipeline {
             NSLog("[sve] bg: the note for %@ was not saved; the next launch saves it", audio.lastPathComponent)
             if claimed { stage = .idle }
             RecordingActivities.shared.update(audioPath: audio.path, .cutOff, line: Self.cutOffMessage, percent: 0)
+            if !claimed { Task { self.finishContinuedWork() } }   // nothing runs for it: the task asked at Record ends
             return nil
         }
         UnfinishedRecordings.remove(audio.path)   // the note has it now
@@ -529,6 +548,7 @@ final class ProcessingPipeline {
             startNotesRun(id)
         }
         defer { if claimed { notesRun = false } }
+        if asksToOpen { askToOpen(id) }
         noteTitles[id] = title
         lastFailure[id] = nil
         memoriesMayBeDue = true
@@ -539,6 +559,7 @@ final class ProcessingPipeline {
         // Not downloaded yet: the note waits and is processed when the AI is ready (processWaitingNotes).
         guard ModelManager.shared.isReady else {
             RecordingActivities.shared.update(noteID: id, .waitingForAI, line: Self.waitingMessage, percent: 0)
+            if !claimed { Task { self.finishContinuedWork() } }   // nothing follows: the task asked at Record ends
             return id
         }
         if !claimed {
@@ -590,7 +611,8 @@ final class ProcessingPipeline {
     /// A recording was cancelled (no Stop, so no run of its own follows): the runs that stepped aside for it carry on.
     /// With the app not in front, the overnight task is asked for too, so nothing waits until the next open.
     func recordingCancelled() {
-        guard !(interrupted.isEmpty && queued.isEmpty && insightDue.isEmpty) else { return }
+        // Nothing waits: the task asked for at Record ends now (a run in flight ends it when it is done).
+        guard !(interrupted.isEmpty && queued.isEmpty && insightDue.isEmpty) else { finishContinuedWork(); return }
         if !appIsActive { OvernightWork.shared.schedule() }
         guard !isWorking, !resuming else { return }
         Task { await self.resumeInterrupted() }
@@ -972,6 +994,10 @@ final class ProcessingPipeline {
 
     /// A notes run starts for this note: it may be cut off (and notify) again.
     private func startNotesRun(_ id: Int64) {
+        // Opened: "Your recording is saved" has done its job, and a later cut-off says "paused" again.
+        if appIsActive, askedToOpen.remove(id) != nil {
+            UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [NotifyRule.identifier(noteID: id)])
+        }
         notesRun = true
         runningNote = id
         stepCount = nil
@@ -1000,6 +1026,7 @@ final class ProcessingPipeline {
         NSLog("[sve] bg: note %lld cut off at %ld%%; it finishes by itself in the overnight task", id, percent)
         OvernightWork.shared.schedule()
         guard NotifyRule.postsPaused(cutOffByOvernightTask: overnightOwnsRun.isSet), pausedPosted.insert(id).inserted else { return }
+        guard !askedToOpen.contains(id) else { return }   // "Your recording is saved" already says what happens next
         notify(id) { NotesNotifier.paused(noteID: id, title: $0, percent: percent, hold: $1) }
     }
 

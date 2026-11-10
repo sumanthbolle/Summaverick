@@ -61,6 +61,13 @@ enum NotesNotifier {
              body: String(localized: "\"\(title)\" is safe. I'll carry on by myself soon."), hold: hold)
     }
 
+    /// Right after a Stop from the background with no background time (TaskAtRecord.postsOpenAppNotice): the
+    /// recording is kept and nothing is written until the app is opened. Tapping opens the note.
+    static func recordingSaved(noteID: Int64, hold: Hold? = nil) {
+        post(noteID, state: "saved, open the app", title: String(localized: "Your recording is saved"),
+             body: String(localized: "Open Summaverick and I'll write your notes. It takes a few minutes."), hold: hold)
+    }
+
     /// The notes run failed for real (not a cut-off); `line` is the failure the note shows.
     static func failed(noteID: Int64, title: String, line: String, hold: Hold? = nil) {
         post(noteID, state: "failed", title: String(localized: "Sorry, I couldn't write this one"),

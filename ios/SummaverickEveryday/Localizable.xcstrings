@@ -6540,6 +6540,57 @@
         }
       },
       "comment": "Last line of the shared notes file"
+    },
+    "Writing down what you say": {
+      "comment": "Lock-screen progress line while a recording runs, under \"Writing your notes\"",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Writing down what you say"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు చెప్పేది రాసుకుంటున్నాను"
+          }
+        }
+      }
+    },
+    "Your recording is saved": {
+      "comment": "Notification title: stopped from the lock screen with no background time; the notes wait until the app is opened",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your recording is saved"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్ భద్రంగా ఉంది"
+          }
+        }
+      }
+    },
+    "Open Summaverick and I'll write your notes. It takes a few minutes.": {
+      "comment": "Notification body under \"Your recording is saved\"",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Summaverick and I'll write your notes. It takes a few minutes."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick తెరవండి, నేను మీ నోట్స్ రాస్తాను. కొన్ని నిమిషాలు పడుతుంది."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
