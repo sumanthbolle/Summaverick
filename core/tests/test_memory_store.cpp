@@ -664,3 +664,41 @@ TEST(medicines_saved_before_memories_get_one_at_open) {
     }
     drop_db(p);
 }
+
+TEST(person_question_answer_merges_topics) {
+    Store s(":memory:");
+    int64_t n1 = s.create("One", "en", nullptr, "tx", 10), n2 = s.create("Two", "en", nullptr, "tx", 10);
+    int64_t dr = s.upsert_topic("person", "Dr. Rao"), rao = s.upsert_topic("person", "Rao"), sita = s.upsert_topic("person", "Sita");
+    s.link_topic(n1, dr);
+    s.link_topic(n2, rao);
+    int64_t m1 = item(s, "Dr. Rao checked the knee"), m2 = item(s, "Rao fixes the tap");
+    s.link_memory_entity(m1, dr, "who");
+    s.link_memory_entity(m2, rao, "who");
+    int64_t q = s.add_person_question(dr, rao, "checked the knee", "fixes the tap");
+    CHECK(q > 0);
+    CHECK_EQ(s.add_person_question(rao, dr, "x", "y"), q);  // one question per pair, either order
+    int64_t q2 = s.add_person_question(rao, sita, "", "");   // follows Rao into Dr. Rao
+    json pending = s.person_questions();
+    CHECK_EQ(pending.size(), (size_t)2);
+    CHECK(pending[0]["id"] == q);
+    CHECK(pending[0]["a"]["name"] == "Dr. Rao" && pending[0]["b"]["name"] == "Rao");
+    CHECK(pending[0]["a"]["context"] == "checked the knee");
+
+    CHECK(s.answer_person_question(q, true));
+    CHECK(s.memory_item(m2)["people"][0]["id"] == dr);
+    CHECK_EQ(s.topics("person").size(), (size_t)2);  // Rao is gone, Dr. Rao keeps its name
+    for (const auto &t : s.topics("person")) CHECK(t["name"] != "Rao");
+    CHECK_EQ(s.topic_notes(dr).size(), (size_t)2);
+    pending = s.person_questions();
+    CHECK_EQ(pending.size(), (size_t)1);
+    if (!pending.empty()) { CHECK(pending[0]["id"] == q2); CHECK(pending[0]["a"]["id"] == dr); }
+    CHECK(!s.answer_person_question(q, true));  // answered already
+
+    CHECK(s.answer_person_question(q2, false));
+    CHECK(s.person_questions().empty());
+    CHECK_EQ(s.topics("person").size(), (size_t)2);
+    CHECK_EQ(s.add_person_question(dr, sita, "", ""), q2);  // answered "different": not asked again
+    CHECK(s.person_questions().empty());
+    CHECK(s.wipe_assistant());
+    CHECK(s.person_questions().empty());
+}

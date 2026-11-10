@@ -175,6 +175,15 @@ CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE OF text ON memories BEGIN
   INSERT INTO memories_fts(memories_fts,rowid,text) VALUES ('delete',old.id,old.text);
   INSERT INTO memories_fts(rowid,text) VALUES (new.id,new.text);
 END;
+-- A name that may be someone already known: asked, never merged silently (Task 9).
+CREATE TABLE IF NOT EXISTS person_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    a_topic INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    b_topic INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    a_context TEXT, b_context TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','same','different')),
+    created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS decisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, field TEXT NOT NULL,
     from_value TEXT, to_value TEXT, created_at INTEGER NOT NULL
@@ -696,19 +705,77 @@ bool Store::rename_topic(int64_t id, const std::string &name) {
     return run("UPDATE topics SET name=? WHERE id=?", {name, id}) && sqlite3_changes(db_) > 0;
 }
 
+bool Store::merge_topics_body(int64_t from, int64_t into) {
+    return run("INSERT OR IGNORE INTO note_topics(note_id,topic_id) SELECT note_id,? FROM note_topics WHERE topic_id=?", {into, from}) &&
+           // Memory links move too: deleting `from` would otherwise cascade them away.
+           run("INSERT OR IGNORE INTO memory_entities(memory_id,topic_id,role) SELECT memory_id,?,role FROM memory_entities "
+               "WHERE topic_id=?", {into, from}) &&
+           // Questions about `from` are now about `into`; a pending one about the two of them is answered by this.
+           run("UPDATE person_questions SET a_topic=? WHERE a_topic=?", {into, from}) &&
+           run("UPDATE person_questions SET b_topic=? WHERE b_topic=?", {into, from}) &&
+           run("DELETE FROM person_questions WHERE a_topic=b_topic AND status='pending'", {}) &&
+           // Two pending questions that became the same pair: the older one stays.
+           run("DELETE FROM person_questions WHERE status='pending' AND EXISTS (SELECT 1 FROM person_questions o "
+               "WHERE o.id<person_questions.id AND ((o.a_topic=person_questions.a_topic AND o.b_topic=person_questions.b_topic) "
+               "OR (o.a_topic=person_questions.b_topic AND o.b_topic=person_questions.a_topic)))", {}) &&
+           run("DELETE FROM topics WHERE id=?", {from}) &&
+           run("UPDATE topics SET summary_stale=1 WHERE id=?", {into});
+}
+
 bool Store::merge_topics(int64_t from, int64_t into) {
     if (from == into) return false;
     if (query_rows("SELECT id FROM topics WHERE id=?", {from}).empty() ||
         query_rows("SELECT id FROM topics WHERE id=?", {into}).empty()) return false;
     if (!begin()) return false;
-    bool ok = run("INSERT OR IGNORE INTO note_topics(note_id,topic_id) SELECT note_id,? FROM note_topics WHERE topic_id=?", {into, from}) &&
-              // Memory links move too: deleting `from` would otherwise cascade them away.
-              run("INSERT OR IGNORE INTO memory_entities(memory_id,topic_id,role) SELECT memory_id,?,role FROM memory_entities "
-                  "WHERE topic_id=?", {into, from}) &&
-              run("DELETE FROM topics WHERE id=?", {from}) &&
-              run("UPDATE topics SET summary_stale=1 WHERE id=?", {into});
+    if (!merge_topics_body(from, into)) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
+    return exec("COMMIT");
+}
+
+// person questions -----------------------------------------------------------
+
+int64_t Store::add_person_question(int64_t a, int64_t b, const std::string &a_context, const std::string &b_context) {
+    if (a == b) { err_ = "a person is not asked about themselves"; return -1; }
+    json r = query_rows("SELECT id FROM person_questions WHERE (a_topic=?1 AND b_topic=?2) OR (a_topic=?2 AND b_topic=?1) "
+                        "ORDER BY id LIMIT 1", {a, b});
+    if (!r.empty()) return r[0]["id"].get<int64_t>();
+    int64_t id = -1;
+    bool ok = run("INSERT INTO person_questions(a_topic,b_topic,a_context,b_context,created_at) VALUES(?,?,?,?,?)",
+                  {a, b, a_context, b_context, now_j()}, &id);
+    return ok ? id : -1;
+}
+
+json Store::person_questions() {
+    json out = json::array();
+    for (auto &r : query_rows("SELECT q.id AS id, a.id AS a_id, a.name AS a_name, q.a_context AS a_context, b.id AS b_id, "
+                              "b.name AS b_name, q.b_context AS b_context FROM person_questions q "
+                              "JOIN topics a ON a.id=q.a_topic JOIN topics b ON b.id=q.b_topic "
+                              "WHERE q.status='pending' ORDER BY q.id", {})) {
+        auto ctx = [](const json &v) { return v.is_string() ? v : json(""); };
+        out.push_back({{"id", r["id"]},
+                       {"a", {{"id", r["a_id"]}, {"name", r["a_name"]}, {"context", ctx(r["a_context"])}}},
+                       {"b", {{"id", r["b_id"]}, {"name", r["b_name"]}, {"context", ctx(r["b_context"])}}}});
+    }
+    return out;
+}
+
+bool Store::answer_person_question(int64_t id, bool same) {
+    json r = query_rows("SELECT a_topic, b_topic FROM person_questions WHERE id=? AND status='pending'", {id});
+    if (r.empty()) { err_ = "no such pending question"; return false; }
+    const int64_t a = r[0]["a_topic"].get<int64_t>(), b = r[0]["b_topic"].get<int64_t>();
+    if (!begin()) return false;
+    bool ok = run("UPDATE person_questions SET status=? WHERE id=?", {same ? "same" : "different", id}) &&
+              (!same || merge_topics_body(b, a));
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
+}
+
+std::string Store::person_context(int64_t topic_id) {
+    json r = query_rows("SELECT m.text AS t FROM memory_entities e JOIN memories m ON m.id=e.memory_id WHERE e.topic_id=? "
+                        "AND m.review<>'wrong' AND m.superseded_by IS NULL ORDER BY m.last_seen DESC, m.id DESC LIMIT 1", {topic_id});
+    if (!r.empty() && r[0]["t"].is_string()) return r[0]["t"].get<std::string>();
+    r = query_rows("SELECT n.title AS t FROM note_topics nt JOIN notes n ON n.id=nt.note_id WHERE nt.topic_id=? "
+                   "ORDER BY n.created_at DESC, n.id DESC LIMIT 1", {topic_id});
+    return !r.empty() && r[0]["t"].is_string() ? r[0]["t"].get<std::string>() : "";
 }
 
 // memory ---------------------------------------------------------------------
@@ -1138,7 +1205,7 @@ static const char *kAssistantSettings[] = {"profile", "insight.last_date"};
 
 bool Store::wipe_assistant() {
     // Children before parents, so no foreign key blocks a delete; the FTS triggers clean the indexes.
-    static const char *kTables[] = {"memory_entities", "memory_sources", "memory_progress", "memories",
+    static const char *kTables[] = {"person_questions", "memory_entities", "memory_sources", "memory_progress", "memories",
                                     "suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
                                     "medicines", "decisions", "insights", "sections", "transcript_pieces"};
     if (!begin()) return false;

@@ -91,7 +91,18 @@ public:
     json note_topics(int64_t note_id, const std::string &kind);  // [{id,kind,name}] in the order they were linked
     bool set_topic_summary(int64_t id, const std::string &summary);
     bool rename_topic(int64_t id, const std::string &name);
+    // Moves `from`'s note and memory links and its person questions to `into` (keeps into's name), deletes `from`.
     bool merge_topics(int64_t from, int64_t into);
+
+    // "Is this the same person?" (Task 9). add returns the existing question of the pair (either order, any
+    // status), so an answered pair is never asked again. person_questions: pending only, oldest first,
+    // [{"id","a":{"id","name","context"},"b":{...}}]. answer: same merges b into a (a keeps its name), else
+    // the pair is kept apart; false when the question is not pending.
+    int64_t add_person_question(int64_t a_topic, int64_t b_topic, const std::string &a_context, const std::string &b_context);
+    json person_questions();
+    bool answer_person_question(int64_t id, bool same);
+    // A line that says who a person is: their newest current memory's text, else their newest note's title.
+    std::string person_context(int64_t topic_id);
 
     // Old learned-memory table: preferences and vocabulary (facts moved to `memories` at migration).
     int64_t add_memory(const std::string &kind, const std::string &text, std::optional<int64_t> note_id);
@@ -159,7 +170,7 @@ public:
     bool was_extracted(int64_t note_id);
 
     // Deletes everything the assistant stored, in one transaction: profile and other assistant settings,
-    // medicines, memory, memories (with sources, links, progress), reminders, tasks, topics and links,
+    // medicines, memory, memories (with sources, links, progress), reminders, tasks, topics and links, person questions,
     // suggestions, decisions, insights, transcript pieces. Notes and other settings are kept (the host deletes notes). Not nested in begin().
     bool wipe_assistant();
 
@@ -172,6 +183,7 @@ private:
     bool move_old_facts();
     void sync_medicine_memories();
     json memory_full(json row);  // adds sources and people to a memories row
+    bool merge_topics_body(int64_t from, int64_t into);  // no transaction of its own
     bool exec(const char *sql);
     json query_rows(const char *sql, const std::vector<json> &binds);
     bool run(const char *sql, const std::vector<json> &binds, int64_t *last_id = nullptr);
