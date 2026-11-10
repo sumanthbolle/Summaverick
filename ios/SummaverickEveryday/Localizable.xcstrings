@@ -2302,6 +2302,16 @@
         }
       }
     },
+    "I'll let you know as each part is ready.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రతి భాగం రెడీ అయినప్పుడు చెబుతాను."
+          }
+        }
+      }
+    },
     "I'll remember this word for your next recordings.": {
       "localizations": {
         "en": {

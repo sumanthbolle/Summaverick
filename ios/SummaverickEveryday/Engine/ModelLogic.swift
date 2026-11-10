@@ -411,6 +411,9 @@ enum NotifyRule {
     /// Counting ("1 of 3 ready", StepCount) it is posted with the placeholder too, so the count starts at 1.
     static func saysTranscriptReady(title: String, counting: Bool = false) -> Bool { counting || !title.hasPrefix("Recording ") }
 
+    /// "Heard it all" names the note only with a real title; with the placeholder its body says what comes next.
+    static func transcriptBodyNamesNote(title: String) -> Bool { !title.hasPrefix("Recording ") }
+
     /// What a regenerate finishing in the background says: a summary-only one "Summary ready", any other "Your notes are ready".
     static func regenerateStage(summaryOnly: Bool) -> String { summaryOnly ? summary : notes }
 }
@@ -455,16 +458,28 @@ enum NotifyCopy {
 
 /// "1 of 3 ready" (owner, 2026-11-10: "so it will give an impression something is already working"). The parts of a
 /// notes run, in order: the transcript (stored after Stop), the summary (title and short summary), the notes
-/// (detailed notes and revision questions: one stored part with one "ready" notification, NotifyRule.notes). The
-/// total is what this run writes; with one part there is no counter. A "Write again" replaces its text only once
-/// everything asked for is written, so it has one ready moment and no counter either (it never counts).
+/// (detailed notes and revision questions: one stored part with one "ready" notification, NotifyRule.notes). A notes
+/// run counts all three (notesRun): parts stored by an earlier run count as ready from the start, so a resumed note
+/// goes on from "1 of 3" to "2 of 3" and never starts again at "1 of 2". With one part there is no counter. A "Write
+/// again" replaces its text only once everything asked for is written, so it has one ready moment and no counter.
 struct StepCount: Equatable {
     enum Part: String, Equatable { case transcript, summary, notes }
 
     let parts: [Part]
     private(set) var ready: [Part] = []
 
-    init(parts: [Part]) { self.parts = parts }
+    init(parts: [Part], alreadyStored: [Part] = []) {
+        self.parts = parts
+        ready = parts.filter(alreadyStored.contains)
+    }
+
+    /// A notes run (a new recording, or resuming one): all three parts; those it does not write are stored already.
+    /// outputsToWrite: per OutputKind (short summary, detailed notes, questions), as WaitingNotes.outputsToWrite.
+    static func notesRun(writesTranscript: Bool, outputsToWrite: [Bool]) -> StepCount {
+        let writes = parts(writesTranscript: writesTranscript, outputsToWrite: outputsToWrite)
+        let all: [Part] = [.transcript, .summary, .notes]
+        return StepCount(parts: all, alreadyStored: all.filter { !writes.contains($0) })
+    }
 
     /// outputsToWrite: per OutputKind (short summary, detailed notes, questions), as WaitingNotes.outputsToWrite.
     static func parts(writesTranscript: Bool, outputsToWrite: [Bool]) -> [Part] {
@@ -494,7 +509,7 @@ struct StepCount: Equatable {
         guard counts else { return nil }
         let n = min(max(1, step), total), t = total
         if n == t { return String(localized: "\(n) of \(t) ready. Your notes are done.") }
-        let next = parts.firstIndex(of: part).flatMap { i in i + 1 < parts.count ? parts[i + 1] : nil }
+        let next = parts.first { !ready.contains($0) && $0 != part }   // the next part still to write
         switch (part, next) {
         case (.transcript, .summary): return String(localized: "\(n) of \(t) ready: what was said. Writing your summary…")
         case (.transcript, .notes): return String(localized: "\(n) of \(t) ready: what was said. Writing your notes…")
@@ -776,6 +791,12 @@ enum TaskLifecycle {
     /// owner saw "failed at 50%" for note 22, which was only cut off and finished by itself). Paused first changes
     /// the task's lines to the paused wording (PauseWords.paused).
     static func reportsSuccess(_ c: Completion) -> Bool { true }
+
+    /// How an expiry ends the task: paused while notes are left (the run in flight is cut off, expiryCutsOff, or
+    /// another note or tap waits); done when only memories or the insight were running, or nothing was.
+    static func expiryCompletion(working: Bool, memoriesOnly: Bool, notesStored: Bool, otherWorkWaiting: Bool) -> Completion {
+        expiryCutsOff(working: working, memoriesOnly: memoriesOnly, notesStored: notesStored) || otherWorkWaiting ? .paused : .done
+    }
 
     /// The task expired (or the background time ran out without one): the run in flight is cut off (resumed later,
     /// "paused" posted) only while it still has notes to write. Memories, and the insight after a note's notes are

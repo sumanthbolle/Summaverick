@@ -14,8 +14,12 @@ enum NotesNotifier {
 
     /// The transcript is stored after Stop (the summary and notes follow).
     static func transcriptReady(noteID: Int64, title: String, step: String? = nil, hold: Hold? = nil) {
-        post(noteID, state: "transcript ready", title: String(localized: "Heard it all"), subtitle: step,
-             body: String(localized: "\"\(title)\": writing your notes now."), hold: hold)
+        // With the placeholder title ("Recording 10 Nov, 14:05") the body does not name the note: the subtitle says
+        // which part is ready and what comes next.
+        let body = NotifyRule.transcriptBodyNamesNote(title: title)
+            ? String(localized: "\"\(title)\": writing your notes now.")
+            : String(localized: "I'll let you know as each part is ready.")
+        post(noteID, state: "transcript ready", title: String(localized: "Heard it all"), subtitle: step, body: body, hold: hold)
     }
 
     /// The title and the short summary are stored (the detailed notes and the questions follow).

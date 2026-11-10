@@ -85,6 +85,7 @@ final class ProcessingPipeline {
 
     private(set) var stage: Stage = .idle {
         didSet {
+            refreshExpiryOutcome()
             if stage.isWorking { ContinuedWork.shared.update(subtitle: progressLine) }
             guard case .failed(let msg) = stage, let id = activeNoteID else { followStage(); return }
             // Only stopShort sets .failed, and only for a real failure (FailureKind): an interruption is a cut-off
@@ -121,7 +122,7 @@ final class ProcessingPipeline {
     }
     /// Notes whose processing was cut off (app in the background, phone too hot) or that waited for
     /// the AI to download; resumed one at a time while the app is active.
-    private(set) var interrupted: Set<Int64> = []
+    private(set) var interrupted: Set<Int64> = [] { didSet { refreshExpiryOutcome() } }
     private var wentToBackground = false
     /// The last Stop came with the app not in front (Live Activity, shortcut, control).
     @ObservationIgnored private var stoppedWhileNotActive = false
@@ -133,7 +134,7 @@ final class ProcessingPipeline {
     private var appIsActive: Bool { UIApplication.shared.applicationState == .active }
     /// Claimed synchronously by regenerate / findReminders before their first await, so two runs
     /// can never start at once.
-    private(set) var starting = false
+    private(set) var starting = false { didSet { refreshExpiryOutcome() } }
     /// Notes the "AI is ready" pass already ran once, so a silent recording is not re-run every launch.
     @ObservationIgnored private var autoTried: Set<Int64> = ProcessingPipeline.killRestore.tried
     @ObservationIgnored private var autoTriedPruned = false
@@ -147,6 +148,14 @@ final class ProcessingPipeline {
     private(set) var stepCount: StepCount?
     /// While writing down what was said: seconds done and the recording's length, for "14 of 56 parts".
     private(set) var transcribing: (done: Double, duration: Double)?
+
+    /// What an expiry would leave, for the continued-processing task's expiration handler (it runs on any thread and
+    /// cannot ask): paused while notes are left, done when only memories or the insight run.
+    private func refreshExpiryOutcome() {
+        let c = TaskLifecycle.expiryCompletion(working: isWorking, memoriesOnly: memoryWork, notesStored: notesStored,
+                                               otherWorkWaiting: !interrupted.isEmpty || !queued.isEmpty || regenerating != nil)
+        ContinuedWork.shared.workLeftOnExpiry.set(c == .paused)
+    }
 
     /// The progress line of the run in flight (note screen, Live Activity, lock screen): the stage, with "14 of 56
     /// parts" while writing down what was said and "1 of 3 ready" once a part of a notes run is stored.
@@ -184,7 +193,7 @@ final class ProcessingPipeline {
     /// The run in flight was paused by the heat gate (the ladder at paused; reset when a run starts).
     @ObservationIgnored private var runPausedForHeat = false
     /// True while the only work is memories (after a note's notes, or a backfill): it yields to the person.
-    private(set) var memoryWork = false
+    private(set) var memoryWork = false { didSet { refreshExpiryOutcome() } }
     /// Set by the person's action (any thread reads it): the memory section in flight is cancelled, the run stops.
     @ObservationIgnored private let memoryStop = AtomicFlag()
     /// Notes whose memory model call failed (-3) in this launch: backfills (in front and overnight) skip them, so one
@@ -192,7 +201,7 @@ final class ProcessingPipeline {
     @ObservationIgnored private var memoryFailed: Set<Int64> = []
     /// Taps made while another note's work ran (Regenerate, Generate notes, Try again, Find reminders), oldest first:
     /// each runs by itself in its turn, from the resume loop, before cut-off notes. The note shows the waiting line.
-    private(set) var queued: [QueuedTap] = ProcessingPipeline.loadQueuedTaps() { didSet { saveQueuedTaps() } }
+    private(set) var queued: [QueuedTap] = ProcessingPipeline.loadQueuedTaps() { didSet { saveQueuedTaps(); refreshExpiryOutcome() } }
     /// The tap running now (a regenerate or find reminders, tapped or from the queue), kept with the queue on disk:
     /// the app killed meanwhile runs it again next launch.
     @ObservationIgnored private var runningTap: QueuedTap? { didSet { saveQueuedTaps() } }
@@ -263,7 +272,7 @@ final class ProcessingPipeline {
     /// such a run is enrolled after a cut-off and notifies ready, paused and failed.
     @ObservationIgnored private var notesRun = false
     /// The run in flight has stored its note's notes (only the memories and the insight are left).
-    @ObservationIgnored private var notesStored = false
+    @ObservationIgnored private var notesStored = false { didSet { refreshExpiryOutcome() } }
     /// Notes whose "paused" notification was posted for the cut-off of their current run (posted once).
     @ObservationIgnored private var pausedPosted: Set<Int64> = []
     /// The parts (NotifyRule.transcript, .summary, .notes) whose "ready" this note's current run already posted.
@@ -548,7 +557,7 @@ final class ProcessingPipeline {
         defer { if !interrupted.contains(id) { markAutoTried(id) } }
         defer { settleOvernight(id) }
         offerOvernightIfLong(id, audio: audio, duration: duration)
-        stepCount = StepCount(parts: StepCount.parts(writesTranscript: true, outputsToWrite: OutputKind.allCases.map { _ in true }))
+        stepCount = StepCount.notesRun(writesTranscript: true, outputsToWrite: OutputKind.allCases.map { _ in true })
         if !(await heatGate(id)) { return id }
 
         // 1. transcript
@@ -618,8 +627,8 @@ final class ProcessingPipeline {
         activeNoteID = noteID
         lastFailure[noteID] = nil
         startNotesRun(noteID)
-        stepCount = StepCount(parts: StepCount.parts(writesTranscript: (note.transcript ?? "").isEmpty,
-                                                     outputsToWrite: WaitingNotes.outputsToWrite(stored: OutputKind.allCases.map { note.output($0) })))
+        stepCount = StepCount.notesRun(writesTranscript: (note.transcript ?? "").isEmpty,
+                                       outputsToWrite: WaitingNotes.outputsToWrite(stored: OutputKind.allCases.map { note.output($0) }))
         defer { notesRun = false }
         if !(await heatGate(noteID)) { return }
 
@@ -669,7 +678,7 @@ final class ProcessingPipeline {
     }
 
     /// The regenerate running now (its note shows the progress and Stop under the text).
-    private(set) var regenerating: Regeneration?
+    private(set) var regenerating: Regeneration? { didSet { refreshExpiryOutcome() } }
     /// The last regenerate of a note that failed for real: the note shows "Try again". One interrupted (expiry, heat,
     /// the GPU stopped in the background) is queued again instead (TapQueue.requeuesRegenerate).
     private(set) var regenerateFailed: [Int64: Regeneration] = [:]

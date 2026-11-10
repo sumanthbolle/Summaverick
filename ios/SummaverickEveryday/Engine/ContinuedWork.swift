@@ -37,6 +37,9 @@ final class ContinuedWork {
         }
     }
     private var held: Held?
+    /// What an expiry would leave (TaskLifecycle.expiryCompletion), kept current by the pipeline: read by the
+    /// expiration handler on whatever thread it runs. Set: notes are left, so the task ends as paused.
+    nonisolated let workLeftOnExpiry: AtomicFlag = { let f = AtomicFlag(); f.set(true); return f }()
     private var wanted = false            // submitted (or running) and work is not done yet
     private var progress = TaskProgress()   // each note run its own 1000 units; never goes back in one task
     private var noteRunning = false         // a note run (startNote) has not ended (endNote) yet
@@ -204,8 +207,9 @@ final class ContinuedWork {
         held = h
         t.expirationHandler = {
             // Completed right here, on whatever thread this runs: the app may be suspended before a hop. Paused, not
-            // failed: the note is kept and finishes by itself (note 22 showed "failed at 50%" here).
-            h.complete(.paused)
+            // failed, while notes are left (note 22 showed "failed at 50%" here); done when only memories or the
+            // insight were running.
+            h.complete(ContinuedWork.shared.workLeftOnExpiry.isSet ? .paused : .done)
             // Before the hop as well: without it the app may be suspended before the "paused" notice starts.
             let hold = NotesNotifier.Hold()
             Task { @MainActor in ContinuedWork.shared.expired(h, hold: hold) }
