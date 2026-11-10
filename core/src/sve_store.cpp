@@ -61,12 +61,15 @@ CREATE TABLE IF NOT EXISTS section_outputs (
     note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
     idx INTEGER NOT NULL, kind INTEGER NOT NULL, lang TEXT NOT NULL,
     first_piece INTEGER NOT NULL, last_piece INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER NOT NULL,
+    cut INTEGER NOT NULL DEFAULT 0,  -- the reply reached its token cap (headings after the cut are missing)
     PRIMARY KEY(note_id, idx, kind)
 );
--- How often a section output was tried (a cancel does not count), and why the last try failed.
+-- How often a section output was tried in `lang` (a cancel does not count; another lang starts again at 1), and
+-- why the last try failed.
 CREATE TABLE IF NOT EXISTS step_attempts (
     note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
     idx INTEGER NOT NULL, kind INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
+    lang TEXT,
     PRIMARY KEY(note_id, idx, kind)
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS pieces_fts USING fts5(
@@ -237,9 +240,30 @@ bool Store::set_wal() {
 // connections creating a new file at once can deadlock on the lock upgrade, which SQLite answers with an
 // immediate SQLITE_BUSY (no busy wait); then the schema is run again holding the write lock from the start.
 bool Store::create_schema() {
-    if (exec(kSchema)) return true;
-    if ((sqlite3_errcode(db_) & 0xff) != SQLITE_BUSY || !begin()) return false;
-    if (!exec(kSchema)) { std::string e = err_; rollback(); err_ = e; return false; }
+    if (!exec(kSchema)) {
+        if ((sqlite3_errcode(db_) & 0xff) != SQLITE_BUSY || !begin()) return false;
+        if (!exec(kSchema)) { std::string e = err_; rollback(); err_ = e; return false; }
+        if (!commit()) return false;
+    }
+    return add_missing_columns();
+}
+
+// Columns added to tables after they first shipped in a build: section_outputs.cut, step_attempts.lang. Writes
+// only when one is missing; re-checked inside the IMMEDIATE transaction, as another connection may add it first.
+bool Store::add_missing_columns() {
+    static const char *kCols[][3] = {{"section_outputs", "cut", "ALTER TABLE section_outputs ADD COLUMN cut INTEGER NOT NULL DEFAULT 0"},
+                                     {"step_attempts", "lang", "ALTER TABLE step_attempts ADD COLUMN lang TEXT"}};
+    auto missing = [&](const char *t, const char *c) {
+        return query_rows((std::string("SELECT 1 FROM pragma_table_info('") + t + "') WHERE name=?").c_str(), {c}).empty();
+    };
+    bool any = false;
+    for (const auto &c : kCols) any = any || missing(c[0], c[1]);
+    if (!any) return true;
+    if (!begin()) return false;
+    bool ok = true;
+    for (const auto &c : kCols)
+        if (ok && missing(c[0], c[1])) ok = exec(c[2]);
+    if (!ok) { std::string e = err_; rollback(); err_ = e; return false; }
     return commit();
 }
 
@@ -488,7 +512,7 @@ static void bind_json(sqlite3_stmt *st, int i, const json &v) {
 }
 
 static bool is_flag_col(const std::string &n) {
-    return n == "done" || n == "active" || n == "from_deleted" || n == "dismissed";
+    return n == "done" || n == "active" || n == "from_deleted" || n == "dismissed" || n == "cut";
 }
 static bool is_json_col(const std::string &n) {
     return n == "times" || n == "check_fields" || n == "payload" || n == "checked";
@@ -1223,21 +1247,22 @@ bool Store::clear_transcript(int64_t note_id) {
 // section outputs (engine v2) -------------------------------------------------
 
 bool Store::set_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
-                               int64_t last_piece, const std::string &text) {
+                               int64_t last_piece, const std::string &text, bool cut) {
     // Only for the section as it is now: a deleted note, or sections re-planned while the part was written, refuse it.
-    if (!run("INSERT INTO section_outputs(note_id,idx,kind,lang,first_piece,last_piece,text,created_at) "
-             "SELECT ?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM sections WHERE note_id=? AND idx=? AND first_piece=? "
+    if (!run("INSERT INTO section_outputs(note_id,idx,kind,lang,first_piece,last_piece,text,created_at,cut) "
+             "SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM sections WHERE note_id=? AND idx=? AND first_piece=? "
              "AND last_piece=?) ON CONFLICT(note_id,idx,kind) DO UPDATE SET lang=excluded.lang, "
              "first_piece=excluded.first_piece, last_piece=excluded.last_piece, text=excluded.text, "
-             "created_at=excluded.created_at",
-             {note_id, idx, kind, lang, first_piece, last_piece, text, now_j(), note_id, idx, first_piece, last_piece}))
+             "created_at=excluded.created_at, cut=excluded.cut",
+             {note_id, idx, kind, lang, first_piece, last_piece, text, now_j(), cut ? 1 : 0, note_id, idx, first_piece,
+              last_piece}))
         return false;
     if (sqlite3_changes(db_) == 0) { err_ = "no such section"; return false; }
     return true;
 }
 
 json Store::section_outputs(int64_t note_id) {
-    return query_rows("SELECT idx,kind,lang,first_piece,last_piece,text FROM section_outputs WHERE note_id=? "
+    return query_rows("SELECT idx,kind,lang,first_piece,last_piece,text,cut FROM section_outputs WHERE note_id=? "
                       "ORDER BY idx,kind", {note_id});
 }
 
@@ -1257,19 +1282,24 @@ json Store::current_section_outputs(int64_t note_id, int kind, const std::string
 
 json Store::section_outputs_state(int64_t note_id, const std::string &lang) {
     json rows = query_rows(
-        "SELECT s.idx AS idx, k.kind AS kind, (o.note_id IS NOT NULL) AS done, COALESCE(a.attempts,0) AS attempts "
+        "SELECT s.idx AS idx, k.kind AS kind, (o.note_id IS NOT NULL) AS done, "
+        "COALESCE(CASE WHEN a.lang IS ? THEN a.attempts END,0) AS attempts "
         "FROM sections s CROSS JOIN (SELECT 1 AS kind UNION ALL SELECT 2) k "
         "LEFT JOIN section_outputs o ON o.note_id=s.note_id AND o.idx=s.idx AND o.kind=k.kind AND o.lang=? "
         "AND o.first_piece=s.first_piece AND o.last_piece=s.last_piece "
         "LEFT JOIN step_attempts a ON a.note_id=s.note_id AND a.idx=s.idx AND a.kind=k.kind "
-        "WHERE s.note_id=? ORDER BY s.idx, k.kind", {lang, note_id});
+        "WHERE s.note_id=? ORDER BY s.idx, k.kind", {lang, lang, note_id});
     for (auto &r : rows) r["done"] = r["done"] == true || r["done"] == 1;  // "done" is a flag column already
     return rows;
 }
 
-bool Store::bump_step_attempt(int64_t note_id, int idx, int kind) {
-    return run("INSERT INTO step_attempts(note_id,idx,kind,attempts) VALUES(?,?,?,1) "
-               "ON CONFLICT(note_id,idx,kind) DO UPDATE SET attempts=attempts+1", {note_id, idx, kind});
+bool Store::bump_step_attempt(int64_t note_id, int idx, int kind, const std::string &lang) {
+    // Tries in another language are not tries of this one: the count and the error start again.
+    return run("INSERT INTO step_attempts(note_id,idx,kind,attempts,lang) VALUES(?,?,?,1,?) "
+               "ON CONFLICT(note_id,idx,kind) DO UPDATE SET "
+               "attempts=CASE WHEN lang IS excluded.lang THEN attempts+1 ELSE 1 END, "
+               "last_error=CASE WHEN lang IS excluded.lang THEN last_error ELSE NULL END, lang=excluded.lang",
+               {note_id, idx, kind, lang});
 }
 
 bool Store::undo_step_attempt(int64_t note_id, int idx, int kind) {
@@ -1283,7 +1313,7 @@ bool Store::set_step_error(int64_t note_id, int idx, int kind, const std::string
 }
 
 json Store::step_attempts(int64_t note_id) {
-    return query_rows("SELECT idx,kind,attempts,last_error FROM step_attempts WHERE note_id=? ORDER BY idx,kind", {note_id});
+    return query_rows("SELECT idx,kind,attempts,last_error,lang FROM step_attempts WHERE note_id=? ORDER BY idx,kind", {note_id});
 }
 
 bool Store::mark_extracted(int64_t note_id) {

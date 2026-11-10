@@ -207,12 +207,13 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
 /* Detailed notes (SVE_OUT_DETAILED_NOTES) or revision questions (SVE_OUT_REVISION_QUESTIONS) of ONE section of a note,
  * written from that section's pieces with its summary as a guide ("This is part i of n of the recording."), so a
  * long recording's notes are made a part at a time and a stopped run keeps the parts it finished. Sampled first,
- * one greedy retry. Output capped at 360 tokens (notes) / 200 (questions), then the same checks as sve_generate.
+ * one greedy retry. Output capped at 440 tokens (notes) / 300 (questions), then the same checks as sve_generate;
+ * a reply with no readable question is a failure (retried, not stored). A reply cut at the cap is stored marked cut.
  * The result is stored for the section's current piece range and lang (sve_section_outputs_state) and returned;
  * a section with no speech stores and returns "". The try is counted before the model runs (a cancel takes it
- * back); a failure records its reason. NULL on cancel, with no model, for a note or section that is gone, other
- * kinds, or when the store refuses the result (the note was deleted or its sections re-planned meanwhile):
- * nothing is stored then. */
+ * back; tries in another lang start the count again); a failure records its reason. NULL on cancel, with no
+ * model, for a note or section that is gone, other kinds, or when the store refuses the result (the note was
+ * deleted or its sections re-planned meanwhile): nothing is stored then. */
 char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang,
                          sve_progress_cb cb, void *user);
 /* [{"idx":0,"kind":1,"done":true,"attempts":1},…]: every section x {1 notes, 2 questions}, by idx then kind. done

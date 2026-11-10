@@ -3,6 +3,7 @@
 #include "sve_sections.h"
 #include "sve_textmatch.h"
 
+#include <cctype>
 #include <set>
 #include <vector>
 
@@ -48,7 +49,23 @@ std::vector<Block> blocks_of(const std::string &text) {
     std::vector<Block> out(1);
     for (const auto &raw : lines_of(text)) {
         const std::string l = trim(raw);
-        if (is_notes_heading(l)) { out.push_back({l, {}}); continue; }
+        if (is_notes_heading(l)) {
+            // "## Topic The Collector's role" (the model went on after the prompt's last heading on its line):
+            // the heading is "## Topic", the rest is its content.
+            size_t n = 0;
+            while (n < l.size() && l[n] == '#') ++n;
+            const std::string name = trim(l.substr(n));
+            std::string low = name.substr(0, 5);
+            for (auto &c : low) c = (char)std::tolower((unsigned char)c);
+            if (low == "topic" && name.size() > 5 && (name[5] == ' ' || name[5] == ':')) {
+                const std::string rest = trim(name.substr(6));
+                out.push_back({l.substr(0, n) + " " + name.substr(0, 5), {}});
+                if (!rest.empty()) out.back().lines.push_back(rest);
+                continue;
+            }
+            out.push_back({l, {}});
+            continue;
+        }
         if (!l.empty()) out.back().lines.push_back(raw.substr(0, raw.find_last_not_of(" \t\r") + 1));
     }
     return out;
@@ -70,28 +87,70 @@ std::string demoted(const std::string &heading) {
 
 struct QA { std::string q, a; };
 
-// "Q3. text" / "A3) text" / "Q3: text" -> the text; false when the line is no such label.
-bool label(const std::string &line, char c, std::string &rest) {
-    if (line.size() < 3 || line[0] != c || line[1] < '0' || line[1] > '9') return false;
-    size_t i = 1;
-    while (i < line.size() && line[i] >= '0' && line[i] <= '9') ++i;
-    if (i >= line.size() || (line[i] != '.' && line[i] != ')' && line[i] != ':')) return false;
-    rest = trim(line.substr(i + 1));
+bool is_digit(char c) { return c >= '0' && c <= '9'; }
+bool is_label_end(char c) { return c == '.' || c == ')' || c == ':'; }
+
+// The text after a label, without the bold marks around it ("**Q1.** What…?" -> "What…?").
+std::string after_label(const std::string &line, size_t i) {
+    std::string r = trim(line.substr(i));
+    while (!r.empty() && r.front() == '*') r = trim(r.substr(1));
+    while (!r.empty() && r.back() == '*') r = trim(r.substr(0, r.size() - 1));
+    return r;
+}
+
+// A line without the list and heading marks in front ("**", "#", "- " is not stripped: it is no label).
+std::string unmarked(const std::string &raw) {
+    const std::string l = trim(raw);
+    const size_t a = l.find_first_not_of("*#_ \t");
+    return a == std::string::npos ? "" : l.substr(a);
+}
+
+// A question label: "Q1." / "Q 1)" / "Q1:" (any case), or a bare "1." / "1)" when `bare`. Sets rest.
+bool q_label(const std::string &l, bool bare, std::string &rest) {
+    size_t i = 0;
+    const bool q = !l.empty() && (l[0] == 'Q' || l[0] == 'q');
+    if (q) { i = 1; while (i < l.size() && l[i] == ' ') ++i; }
+    else if (!bare) return false;
+    const size_t d = i;
+    while (i < l.size() && is_digit(l[i])) ++i;
+    if (i == d || i >= l.size() || !is_label_end(l[i]) || (!q && l[i] == ':')) return false;
+    rest = after_label(l, i + 1);
+    return true;
+}
+
+// An answer label: "A1." / "A 1)" / "A." / "A:" / "Answer:" / "Ans 1." Sets rest.
+bool a_label(const std::string &l, std::string &rest) {
+    size_t i = 0;
+    if (l.compare(0, 6, "Answer") == 0) i = 6;
+    else if (l.compare(0, 3, "Ans") == 0) i = 3;
+    else if (!l.empty() && l[0] == 'A') i = 1;
+    else return false;
+    while (i < l.size() && l[i] == ' ') ++i;
+    while (i < l.size() && is_digit(l[i])) ++i;
+    if (i >= l.size() || !is_label_end(l[i])) return false;
+    rest = after_label(l, i + 1);
     return true;
 }
 
 std::vector<QA> questions_of(const std::string &text) {
+    const std::vector<std::string> lines = lines_of(text);
+    // A bare "1." starts a question only in a reply without any "Q1." label (else it is a list in an answer).
+    bool bare = true;
+    for (const auto &raw : lines) {
+        std::string rest;
+        if (q_label(unmarked(raw), false, rest)) { bare = false; break; }
+    }
     std::vector<QA> out;
     bool in_answer = false;
-    for (const auto &raw : lines_of(text)) {
-        const std::string l = trim(raw);
+    for (const auto &raw : lines) {
+        const std::string l = unmarked(raw);
         std::string rest;
-        if (label(l, 'Q', rest)) { out.push_back({rest, ""}); in_answer = false; continue; }
+        if (q_label(l, bare && (out.empty() || in_answer), rest)) { out.push_back({rest, ""}); in_answer = false; continue; }
         if (out.empty()) continue;
-        if (label(l, 'A', rest)) { out.back().a = rest; in_answer = true; continue; }
+        if (!in_answer && a_label(l, rest)) { out.back().a = rest; in_answer = true; continue; }
         if (l.empty()) continue;
         std::string &field = in_answer ? out.back().a : out.back().q;
-        field += (field.empty() ? "" : " ") + l;
+        field += (field.empty() ? "" : " ") + trim(raw);
     }
     std::vector<QA> kept;
     for (auto &x : out)
@@ -108,7 +167,9 @@ double jaccard(const std::set<std::string> &a, const std::set<std::string> &b) {
 
 }  // namespace
 
-int section_output_max_out(SectionOutputKind kind) { return kind == SectionOutputKind::Notes ? 360 : 200; }
+int section_output_max_out(SectionOutputKind kind) { return kind == SectionOutputKind::Notes ? 440 : 300; }
+
+int count_questions(const std::string &reply) { return (int)questions_of(strip_unclear_tags(reply)).size(); }
 
 std::string section_output_prompt(SectionOutputKind kind, const std::string &material, const std::string &guide,
                                   int part, int total, bool from_bullets) {
@@ -124,16 +185,20 @@ std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json 
     std::string body;
     std::vector<std::string> tasks;
     std::set<std::string> task_keys;
-    bool said_none = false;
+    // "None" only when every non-empty part has an action items heading that says so: a part without one (cut
+    // at its cap before it, or the heading left out) may have had tasks nobody saw.
+    bool all_said_none = true, any_part = false;
     const size_t n = sections.is_array() ? sections.size() : 0;
     for (size_t i = 0; i < n; ++i) {
         const std::string text = strip_unclear_tags(str_at(outputs, i));
         if (trim(text).empty()) continue;
+        any_part = true;
+        bool part_said_none = false;
         std::string part;
         for (const auto &b : blocks_of(text)) {
             if (is_action_heading(b.heading)) {
                 for (const auto &l : b.lines) {
-                    if (says_no_tasks(l)) { said_none = true; continue; }
+                    if (says_no_tasks(l)) { part_said_none = true; continue; }
                     if (task_keys.insert(token_key(l)).second) tasks.push_back(trim(l));
                 }
                 continue;
@@ -143,6 +208,7 @@ std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json 
             for (const auto &l : b.lines) part += l + "\n";
             part += "\n";
         }
+        if (!part_said_none) all_said_none = false;
         if (part.empty()) continue;
         std::string title;
         const auto &s = sections[i];
@@ -155,7 +221,7 @@ std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json 
     if (!tasks.empty()) {
         body += "## Action items\n";
         for (const auto &t : tasks) body += t + "\n";
-    } else if (said_none && !body.empty()) {
+    } else if (any_part && all_said_none && !body.empty()) {
         body += "## Action items\nNone\n";
     }
     return trim(none_action_items(body));

@@ -75,18 +75,21 @@ public:
     // is not the section's now (re-planned while it was written); text "" is a part with no speech. set_sections
     // drops rows whose range changed; clear_transcript, note delete and wipe_assistant drop all.
     bool set_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
-                            int64_t last_piece, const std::string &text);
-    json section_outputs(int64_t note_id);  // [{idx,kind,lang,first_piece,last_piece,text}], every stored row
+                            int64_t last_piece, const std::string &text, bool cut = false);
+    // [{idx,kind,lang,first_piece,last_piece,text,cut}], every stored row; cut: the reply reached its token cap.
+    json section_outputs(int64_t note_id);
     // The texts of every section in order, when each has a row of this kind and lang for its current range;
     // null when any is missing (or there are no sections).
     json current_section_outputs(int64_t note_id, int kind, const std::string &lang);
-    // [{"idx","kind","done":bool,"attempts"}] for every section x kinds 1 and 2, by idx then kind.
+    // [{"idx","kind","done":bool,"attempts"}] for every section x kinds 1 and 2, by idx then kind; attempts are
+    // those made in lang (0 when the last tries were in another language).
     json section_outputs_state(int64_t note_id, const std::string &lang);
-    // step_attempts: bump before a try (false for a deleted note), undo after a cancel, error after a failure.
-    bool bump_step_attempt(int64_t note_id, int idx, int kind);
+    // step_attempts: bump before a try (false for a deleted note; a try in another lang than the stored one starts
+    // the count again at 1 and clears the error), undo after a cancel, error after a failure.
+    bool bump_step_attempt(int64_t note_id, int idx, int kind, const std::string &lang);
     bool undo_step_attempt(int64_t note_id, int idx, int kind);
     bool set_step_error(int64_t note_id, int idx, int kind, const std::string &error);
-    json step_attempts(int64_t note_id);    // [{idx,kind,attempts,last_error}]
+    json step_attempts(int64_t note_id);    // [{idx,kind,attempts,last_error,lang}]
 
     int64_t add_suggestion(const json &s);
     json suggestions(const std::string &status);
@@ -197,6 +200,7 @@ private:
     // 1 -> 2: facts written to the old table at version 1 move too).
     bool set_wal();
     bool create_schema();
+    bool add_missing_columns();
     bool migrate();
     bool move_old_facts();
     void sync_medicine_memories();

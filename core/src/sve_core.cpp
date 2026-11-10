@@ -276,7 +276,7 @@ char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind
             if (pi >= first && pi < last) pieces.push_back(p);
         }
         const std::string text = sve::notes_material(pieces);
-        if (!st.bump_step_attempt(note_id, idx, k)) return nullptr;  // counted before the model runs
+        if (!st.bump_step_attempt(note_id, idx, k, lang)) return nullptr;  // counted before the model runs
         if (strip_thinking(text).empty()) {  // silence or music: an empty part, done
             if (!st.set_section_output(note_id, idx, k, lang, first, last, "")) return nullptr;
             return dup_str("");
@@ -293,6 +293,9 @@ char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind
             if (x->cb && x->cb(ph, d, t, x->user)) x->cancelled = true;
             return x->cancelled ? 1 : 0;
         };
+        // A cancel (the host's background time is up) takes this call's count back, so it is never a "real" failure.
+        // That holds even when the sampled try already failed and the greedy retry was cancelled: the failed try is
+        // not counted either, and the step is simply tried again later (with both tries again).
         auto cancelled = [&]() -> char * { st.undo_step_attempt(note_id, idx, k); return nullptr; };
         std::string material;
         bool from_bullets = false;
@@ -325,7 +328,15 @@ char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind
                 sve_logf(1, "section %d output attempt %d was empty", idx, attempt + 1);
                 continue;
             }
-            if (!st.set_section_output(note_id, idx, k, lang, first, last, done)) {
+            // Questions that assemble_questions cannot read would give an empty part: not stored, tried again.
+            if (sk == sve::SectionOutputKind::Questions && sve::count_questions(done) == 0) {
+                error = "no questions in the reply";
+                sve_logf(1, "section %d questions attempt %d had no question", idx, attempt + 1);
+                continue;
+            }
+            // cut: the reply reached its cap, so headings after the cut (Action items) may be missing; the
+            // assembly then never says "None" for the action items.
+            if (!st.set_section_output(note_id, idx, k, lang, first, last, done, llm.last_cut)) {
                 sve_logf(1, "section %d output not stored (note deleted or sections re-planned)", idx);
                 return nullptr;
             }
