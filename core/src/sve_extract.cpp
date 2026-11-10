@@ -1,5 +1,9 @@
 #include "sve_extract.h"
 
+#include <algorithm>
+
+#include "sve_sections.h"
+
 namespace sve {
 
 using nlohmann::json;
@@ -117,6 +121,11 @@ Extracted parse_extraction(const std::string &model_output) {
         if (!first_object(model_output, j)) return e;
         e.reminders = arr_of(j, "reminders", true);
         e.tasks = arr_of(j, "tasks", true);
+        // "No action items were stated" is never a task (owner, note 19).
+        e.tasks.erase(std::remove_if(e.tasks.begin(), e.tasks.end(), [](const json &t) {
+            auto it = t.find("text");
+            return it != t.end() && it->is_string() && says_no_tasks(it->get<std::string>());
+        }), e.tasks.end());
         e.profile = arr_of(j, "profile", true);
         e.vocab = arr_of(j, "vocab", false);
         e.facts = arr_of(j, "facts", true);

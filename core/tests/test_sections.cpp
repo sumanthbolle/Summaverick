@@ -513,3 +513,78 @@ TEST(said_text_leaves_out_unclear_lines) {
     CHECK_EQ(said_text(""), std::string());
     CHECK(!term_said("AI bubble", said_text("Clear IPO.\n[unclear] AI bubble talk")));
 }
+
+// --- invented expansions and empty action items (owner, note 19) ------------------------------
+
+static const char *kNote19Source =
+    "BPSC లో చాలా మంది aspirants ఉన్నారు. సీఏసీ resignation గురించి youth మాట్లాడుతున్నారు. employment కూడా.";
+
+TEST(invented_expansions_are_removed) {
+    // The exact lines from note 19: the transcript says BPSC and సీఏసీ, never the words in brackets.
+    CHECK_EQ(drop_invented_expansions(
+                 "- An aspiration ... drives many aspirants of BPSC (Bihar Public Service Commission).", kNote19Source),
+             std::string("- An aspiration ... drives many aspirants of BPSC."));
+    CHECK_EQ(drop_invented_expansions(
+                 "- ... youth concerns like CAC (Central Armed Police Forces) resignation and employment ...", kNote19Source),
+             std::string("- ... youth concerns like CAC resignation and employment ..."));
+    // S&P and digits count as an abbreviation too.
+    CHECK_EQ(drop_invented_expansions("The S&P (Standard and Poor's) fell.", "the S&P fell"),
+             std::string("The S&P fell."));
+    CHECK_EQ(drop_invented_expansions("Form G2 (General Two) is due.", "form G2 is due"), std::string("Form G2 is due."));
+}
+
+TEST(true_expansions_and_other_brackets_are_kept) {
+    const std::string src = "The Chief Election Commissioner said the CEC will meet on 12 March, for example in Patna.";
+    CHECK_EQ(drop_invented_expansions("- CEC (Chief Election Commissioner) will meet.", src),
+             std::string("- CEC (Chief Election Commissioner) will meet."));
+    // Most of the content words are there ("chief", "election"; "commissioner" said as "commission"): kept.
+    CHECK_EQ(drop_invented_expansions("CEC (Chief Election Commissioner)", "the chief election commission met"),
+             std::string("CEC (Chief Election Commissioner)"));
+    // Not expansions: numbers, dates, "e.g." asides, lower-case asides.
+    CHECK_EQ(drop_invented_expansions("CEC (2019) and BPSC (12 March) and UPSC (e.g. Prelims) and RBI (see above)", src),
+             std::string("CEC (2019) and BPSC (12 March) and UPSC (e.g. Prelims) and RBI (see above)"));
+    // A bracket after a word that is not an abbreviation stays.
+    CHECK_EQ(drop_invented_expansions("Patna (Bihar Capital City) is big.", src), std::string("Patna (Bihar Capital City) is big."));
+    // One capital letter is not an abbreviation.
+    CHECK_EQ(drop_invented_expansions("Plan A (Quick Wins) works.", src), std::string("Plan A (Quick Wins) works."));
+    CHECK_EQ(drop_invented_expansions("", src), std::string());
+    CHECK_EQ(drop_invented_expansions("BPSC (Bihar", src), std::string("BPSC (Bihar"));  // no closing bracket
+}
+
+TEST(invented_expansions_in_telugu_output) {
+    // Telugu notes keep the term as said (in its own script, as the system prompt asks) but not a made-up expansion.
+    CHECK_EQ(drop_invented_expansions("- CAC (సీఏసీ) రాజీనామా గురించి యువత మాట్లాడారు.", kNote19Source),
+             std::string("- CAC (సీఏసీ) రాజీనామా గురించి యువత మాట్లాడారు."));
+    CHECK_EQ(drop_invented_expansions("- CAC (కేంద్ర సాయుధ పోలీసు దళాలు) రాజీనామా.", kNote19Source),
+             std::string("- CAC రాజీనామా."));
+}
+
+TEST(empty_action_items_become_none) {
+    // The exact lines from note 19.
+    CHECK_EQ(none_action_items("## Action items\n- [ ] No action items were stated in the transcript.\n\n## Dates"),
+             std::string("## Action items\nNone\n\n## Dates"));
+    CHECK_EQ(none_action_items("## Action items\n- [ ] None\n- [ ] Nothing was stated.\n## Open questions\n- [ ] No tasks."),
+             std::string("## Action items\nNone\n## Open questions\n- [ ] No tasks."));   // only under Action items
+    CHECK_EQ(none_action_items("## Action items\n- [ ] No tasks mentioned"), std::string("## Action items\nNone"));
+    // A real task stays, and a "none" line next to it goes.
+    CHECK_EQ(none_action_items("## Action items\n- [ ] Submit the form — Ravi — Friday\n- [ ] None stated"),
+             std::string("## Action items\n- [ ] Submit the form — Ravi — Friday"));
+    CHECK_EQ(none_action_items("## Action items\n- [ ] Note down nothing but the dates"),
+             std::string("## Action items\n- [ ] Note down nothing but the dates"));
+    // Telugu output.
+    CHECK_EQ(none_action_items("## Action items\n- [ ] ఏవీ లేవు."), std::string("## Action items\nNone"));
+    CHECK_EQ(none_action_items("## చర్యలు\n- [ ] చర్య అంశాలు ఏమీ లేవు"), std::string("## చర్యలు\nNone"));
+    CHECK_EQ(none_action_items(""), std::string());
+}
+
+TEST(says_no_tasks_reads_english_and_telugu) {
+    CHECK(says_no_tasks("No action items were stated in the transcript."));
+    CHECK(says_no_tasks("none"));
+    CHECK(says_no_tasks("N/A"));
+    CHECK(says_no_tasks("Nothing specific was mentioned."));
+    CHECK(says_no_tasks("ఏవీ లేవు"));
+    CHECK(!says_no_tasks("Call the bank"));
+    CHECK(!says_no_tasks("Nothing to bring but the ID card"));
+    CHECK(!says_no_tasks("No later than Friday, submit the form"));
+    CHECK(!says_no_tasks(""));
+}

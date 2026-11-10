@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 using nlohmann::json;
 
@@ -596,6 +597,172 @@ bool is_question(const std::string &l) {
 }
 
 }  // namespace
+
+// ---- owner, note 19: invented expansions, empty action items ----
+
+namespace {
+
+bool ascii_upper(char c) { return c >= 'A' && c <= 'Z'; }
+bool ascii_digit(char c) { return c >= '0' && c <= '9'; }
+bool ascii_alnum(char c) { return ascii_upper(c) || ascii_digit(c) || (c >= 'a' && c <= 'z'); }
+
+// The abbreviation ending right before byte `end` (exclusive), or "" when there is none.
+std::string abbreviation_before(const std::string &t, size_t end) {
+    size_t b = end;
+    while (b > 0 && (ascii_upper(t[b - 1]) || ascii_digit(t[b - 1]) || t[b - 1] == '&')) --b;
+    if (b > 0 && (ascii_alnum(t[b - 1]) || t[b - 1] == '\'' || t[b - 1] == '-')) return "";  // inside a word: "Plan" + "A"? no
+    while (b < end && t[b] == '&') ++b;
+    size_t e = end;
+    while (e > b && t[e - 1] == '&') --e;
+    const std::string a = t.substr(b, e - b);
+    int caps = 0, alnum = 0;
+    for (char c : a) { caps += ascii_upper(c); alnum += ascii_upper(c) || ascii_digit(c); }
+    return caps >= 1 && alnum >= 2 && e == end ? a : "";
+}
+
+// The bracket's content reads as an expansion: no digit (ASCII or Telugu), starts with a capital Latin letter or
+// a letter of another script (Telugu), at most 10 words.
+bool reads_as_expansion(const std::string &c) {
+    if (c.empty()) return false;
+    size_t n = 0;
+    const char32_t first = cp_at(c, 0, n);
+    if (!(first < 0x80 ? ascii_upper((char)first) : first > 0x24F)) return false;
+    int words = 1;
+    for (size_t i = 0; i < c.size(); i += n) {
+        const char32_t cp = cp_at(c, i, n);
+        if ((cp >= '0' && cp <= '9') || (cp >= 0x0C66 && cp <= 0x0C6F)) return false;
+        if (cp == ' ') ++words;
+    }
+    return words <= 10;
+}
+
+bool said_in(const std::string &content, const std::string &source) {
+    const std::string lc = ascii_lower(content), ls = ascii_lower(source);
+    if (ls.find(lc) != std::string::npos) return true;
+    static const char *const kSmall[] = {"of", "the", "and", "for", "in", "on", "a", "an", "to", "at", "by", "&"};
+    int words = 0, said = 0;
+    size_t a = 0;
+    while (a < lc.size()) {
+        size_t sp = lc.find_first_of(" \t,;/", a);
+        std::string w = lc.substr(a, sp == std::string::npos ? std::string::npos : sp - a);
+        a = sp == std::string::npos ? lc.size() : sp + 1;
+        while (!w.empty() && std::strchr(".,;:!?\"'()-", w.back())) w.pop_back();
+        while (!w.empty() && std::strchr(".,;:!?\"'()-", w.front())) w.erase(0, 1);
+        if (w.size() > 2 && w.compare(w.size() - 2, 2, "'s") == 0) w.resize(w.size() - 2);
+        if (w.empty() || std::find_if(std::begin(kSmall), std::end(kSmall), [&](const char *s) { return w == s; }) != std::end(kSmall))
+            continue;
+        ++words;
+        said += term_said(w, source) ? 1 : 0;
+    }
+    return words > 0 && said * 2 > words;
+}
+
+std::string lower_trimmed_task(const std::string &line) {
+    std::string t = trim_ws(line);
+    for (bool more = true; more;) {
+        more = false;
+        for (const char *m : {"- ", "* ", "[ ]", "[x]", "[X]", "-", "*"}) {
+            const size_t n = std::strlen(m);
+            if (t.compare(0, n, m) == 0) { t = trim_ws(t.substr(n)); more = true; break; }
+        }
+    }
+    while (!t.empty() && std::strchr(".!;:", t.back())) t.pop_back();
+    return ascii_lower(trim_ws(t));
+}
+
+bool starts(const std::string &s, const char *p) { return s.compare(0, std::strlen(p), p) == 0; }
+
+bool is_action_heading(const std::string &l) {
+    return is_heading(l) && (ascii_lower(l).find("action item") != std::string::npos ||
+                             l.find("\xE0\xB0\x9A\xE0\xB0\xB0\xE0\xB1\x8D\xE0\xB0\xAF") != std::string::npos);  // చర్య
+}
+
+}  // namespace
+
+std::string drop_invented_expansions(const std::string &text, const std::string &source) {
+    std::string out;
+    out.reserve(text.size());
+    size_t i = 0;
+    while (i < text.size()) {
+        const size_t open = text.find('(', i);
+        if (open == std::string::npos) { out.append(text, i, std::string::npos); break; }
+        const size_t close = text.find(')', open);
+        const size_t nl = text.find('\n', open);
+        const bool space = open > 0 && text[open - 1] == ' ';
+        const size_t abbr_end = space ? open - 1 : open;
+        if (close == std::string::npos || (nl != std::string::npos && nl < close) || abbr_end < i ||
+            abbreviation_before(text, abbr_end).empty()) {
+            out.append(text, i, open + 1 - i);
+            i = open + 1;
+            continue;
+        }
+        const std::string content = trim_ws(text.substr(open + 1, close - open - 1));
+        if (!reads_as_expansion(content) || said_in(content, source)) {
+            out.append(text, i, close + 1 - i);
+        } else {
+            out.append(text, i, abbr_end - i);   // the abbreviation stays; the space and the bracket go
+        }
+        i = close + 1;
+    }
+    return out;
+}
+
+bool says_no_tasks(const std::string &line) {
+    const std::string t = lower_trimmed_task(line);
+    if (t.empty()) return false;
+    if (t == "none" || t == "n/a" || t == "na" || t == "nil" || starts(t, "none ") || starts(t, "none,")) return true;
+    for (const char *p : {"no action", "no specific action", "no clear action", "no explicit action", "no task",
+                          "no specific task", "no to-do", "no todo", "there are no action", "there were no action",
+                          "there are no task", "there were no task", "there is no action", "there was no action"})
+        if (starts(t, p)) return true;
+    if (starts(t, "nothing"))
+        for (const char *w : {"stated", "mentioned", "assigned", "given", "specified", "noted", "discussed", "said"})
+            if (t.find(w) != std::string::npos) return true;
+    // Telugu: ఏవీ లేవు, ఏమీ లేవు, ఏమీ లేదు ("none", "nothing"), on a short line.
+    int words = 1;
+    for (char c : t) words += c == ' ';
+    if (words <= 8)
+        for (const char *p : {"\xE0\xB0\x8F\xE0\xB0\xB5\xE0\xB1\x80 \xE0\xB0\xB2\xE0\xB1\x87\xE0\xB0\xB5\xE0\xB1\x81",
+                              "\xE0\xB0\x8F\xE0\xB0\xAE\xE0\xB1\x80 \xE0\xB0\xB2\xE0\xB1\x87\xE0\xB0\xB5\xE0\xB1\x81",
+                              "\xE0\xB0\x8F\xE0\xB0\xAE\xE0\xB1\x80 \xE0\xB0\xB2\xE0\xB1\x87\xE0\xB0\xA6\xE0\xB1\x81"})
+            if (t.find(p) != std::string::npos) return true;
+    return false;
+}
+
+std::string none_action_items(const std::string &text) {
+    std::vector<std::string> lines;
+    for (size_t a = 0;;) {
+        const size_t nl = text.find('\n', a);
+        lines.push_back(text.substr(a, nl == std::string::npos ? std::string::npos : nl - a));
+        if (nl == std::string::npos) break;
+        a = nl + 1;
+    }
+    std::vector<bool> keep(lines.size(), true);
+    for (size_t h = 0; h < lines.size(); ++h) {
+        if (!is_action_heading(trim_ws(lines[h]))) continue;
+        size_t end = h + 1;
+        while (end < lines.size() && !is_heading(trim_ws(lines[end]))) ++end;
+        bool real = false;
+        std::vector<size_t> none;
+        for (size_t k = h + 1; k < end; ++k) {
+            if (trim_ws(lines[k]).empty()) continue;
+            if (says_no_tasks(lines[k])) none.push_back(k); else real = true;
+        }
+        for (size_t n = 0; n < none.size(); ++n) {
+            if (n == 0 && !real) lines[none[n]] = "None";
+            else keep[none[n]] = false;
+        }
+        h = end - 1;
+    }
+    std::string out;
+    bool first = true;
+    for (size_t k = 0; k < lines.size(); ++k) {
+        if (!keep[k]) continue;
+        out += (first ? "" : "\n") + lines[k];
+        first = false;
+    }
+    return out;
+}
 
 std::string trim_cut_reply(const std::string &reply) {
     const std::string whole = trim_ws(reply);

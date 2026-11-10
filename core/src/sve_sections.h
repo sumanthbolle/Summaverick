@@ -114,4 +114,19 @@ std::string sections_text(const nlohmann::json &sections);
 // question whose answer was dropped go too. When nothing whole is left, the text is returned trimmed as it is.
 std::string trim_cut_reply(const std::string &reply);
 
+// Owner, note 19: "BPSC (Bihar Public Service Commission)" and "CAC (Central Armed Police Forces)" were written though
+// the transcript says only "BPSC" and "సీఏసీ". An abbreviation (2+ capital letters or digits with at least one
+// capital, "&" allowed: BPSC, CEC, S&P, G2) followed by " (Words …)" whose words `source` (the material the output
+// was written from) does not say loses the bracket and the space before it. Kept: the whole bracket said in
+// source (case-insensitive), or more than half of its content words said (term_said; "of", "and", "the"… do not
+// count), and brackets that are no expansion: with a digit, starting in lower case ("e.g.", "see above"), or after a
+// word that is no abbreviation. Every notes output (summary, notes, questions) passes through it.
+std::string drop_invented_expansions(const std::string &text, const std::string &source);
+// A task line that only says there are none: "No action items were stated…", "None", "No tasks…", "Nothing … stated",
+// "N/A", or Telugu "ఏవీ లేవు" / "ఏమీ లేవు". A list marker ("- ", "* ", "[ ]") in front is allowed.
+bool says_no_tasks(const std::string &line);
+// Under the "## Action items" heading (or a Telugu heading with "చర్య"), checkbox lines that say there are none
+// (says_no_tasks) become one plain "None"; with a real task there they are dropped. Other headings are untouched.
+std::string none_action_items(const std::string &text);
+
 }  // namespace sve

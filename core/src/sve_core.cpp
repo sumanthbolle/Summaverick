@@ -125,8 +125,10 @@ static std::string notes_system(sve_ctx *ctx, const std::string &lang, const std
 
 // The end of a notes output (sve_generate, sve_generate_from_sections): the first heading put back if the model
 // continued from it, [unclear] tags removed, and a reply cut at the token cap trimmed to its last whole sentence or
-// bullet (N7 rev 1).
-static std::string finish_output(const sve::Llm &llm, std::string out, const std::string &prefix, int max_out) {
+// bullet (N7 rev 1). Then the two checks of the owner's note 19: an abbreviation's expansion that `source` (what the
+// output was written from) never says is removed, and an action item that says there are none becomes "None".
+static std::string finish_output(const sve::Llm &llm, std::string out, const std::string &prefix, int max_out,
+                                 const std::string &source) {
     // The material's [unclear] tags (also those carried over in reduce_to_fit's chunk bullets) are never shown.
     out = strip_thinking(sve::strip_unclear_tags(out));
     // The prompt ended with the first heading/label; put it back if the model continued from it.
@@ -137,7 +139,7 @@ static std::string finish_output(const sve::Llm &llm, std::string out, const std
                  out.size(), t.size());
         out = t;
     }
-    return out;
+    return sve::none_action_items(sve::drop_invented_expansions(out, source));
 }
 
 int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang_c) {
@@ -183,7 +185,7 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
     std::string prompt = llm.apply_template(sys, userp);
     std::string out;
     if (!llm.complete(prompt, max_out, out, cb, user, "final", 0, 1)) return nullptr;
-    return dup_str(finish_output(llm, out, prefix, max_out));
+    return dup_str(finish_output(llm, out, prefix, max_out, text));
 }
 
 char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c,
@@ -233,7 +235,10 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
         }
         std::string out;
         if (!llm.complete(llm.apply_template(sys, userp), max_out, out, cb, user, "final", 0, 1)) return nullptr;
-        return dup_str(finish_output(llm, out, prefix, max_out));
+        // Checked against the note's transcript and the sections it was written from.
+        std::string source = sve::sections_text(secs);
+        if (auto n = ctx->store->get(note_id); n && n->transcript) source += "\n" + *n->transcript;
+        return dup_str(finish_output(llm, out, prefix, max_out, source));
     } catch (const std::exception &e) {
         sve_logf(2, "generate from sections failed: %s", e.what());
         return nullptr;
