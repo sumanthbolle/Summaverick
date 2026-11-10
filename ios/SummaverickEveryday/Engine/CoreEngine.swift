@@ -264,7 +264,10 @@ actor CoreEngine {
         await store { _ = sve_note_set_output($0, id, kind.cKind, text) }
     }
     nonisolated func setTitle(_ id: Int64, _ title: String) async { await store { _ = sve_note_set_title($0, id, title) } }
-    nonisolated func deleteNote(_ id: Int64) async { await store { _ = sve_note_delete($0, id) } }
+    nonisolated func deleteNote(_ id: Int64) async {
+        await store { _ = sve_note_delete($0, id) }
+        ProcessingPipeline.forgetNoteMarks(id)   // the pipeline's small per-note marks go with it
+    }
     nonisolated func clearAudio(_ id: Int64) async { await store { _ = sve_note_clear_audio($0, id) } }
     nonisolated func setAudioPath(_ id: Int64, _ path: String) async -> Bool { await store { sve_note_set_audio_path($0, id, path) == 0 } }
     nonisolated func clearTranscript(_ id: Int64) async { await store { _ = sve_note_clear_transcript($0, id) } }
