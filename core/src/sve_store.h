@@ -89,8 +89,9 @@ public:
     // the count again at 1 and clears the error), undo after a cancel, error after a failure.
     bool bump_step_attempt(int64_t note_id, int idx, int kind, const std::string &lang);
     bool undo_step_attempt(int64_t note_id, int idx, int kind);
-    bool set_step_error(int64_t note_id, int idx, int kind, const std::string &error);
-    json step_attempts(int64_t note_id);    // [{idx,kind,attempts,last_error,lang}]
+    // Records why a try failed; real (the default) also counts it in failures. A GPU refusal is not real.
+    bool set_step_error(int64_t note_id, int idx, int kind, const std::string &error, bool real = true);
+    json step_attempts(int64_t note_id);    // [{idx,kind,attempts,last_error,lang,failures}]
     // Deletes the section_outputs and step_attempts rows of the note matching kind and idx (-1 = any). Rows deleted,
     // -1 on error. The sections stay.
     int clear_section_outputs(int64_t note_id, int kind, int idx);

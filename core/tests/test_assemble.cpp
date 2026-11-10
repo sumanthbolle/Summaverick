@@ -283,6 +283,8 @@ TEST(section_outputs_columns_added_to_an_older_file) {
     CHECK(st.bump_step_attempt(id, 0, 1, "te"));
     CHECK(st.set_section_output(id, 0, 1, "te", 0, 10, "notes", true));
     CHECK(st.section_outputs(id)[0]["cut"] == true);
+    CHECK(st.set_step_error(id, 0, 1, "empty reply"));  // the failures column was added too
+    CHECK(state_row(st.section_outputs_state(id, "te"), 0, 1)["failures"] == 1);
     std::remove(path.c_str());
     std::remove((path + "-wal").c_str());
     std::remove((path + "-shm").c_str());
@@ -300,6 +302,33 @@ TEST(step_attempts_count_and_error) {
     CHECK(a[0]["attempts"] == 2 && a[0]["last_error"] == "no reply");
     CHECK(st.undo_step_attempt(id, 0, 2));  // a cancel does not count
     CHECK(st.step_attempts(id)[0]["attempts"] == 1);
+}
+
+TEST(step_failures_count_only_real_failures) {
+    // A kill leaves its try counted but records no failure; a GPU refusal records its reason but is no failure.
+    Store st(":memory:");
+    int64_t id = st.create("t", "en", nullptr, "x", 600);
+    CHECK(st.set_sections(id, json::array({sec(0, 0, 10, "A")})));
+    CHECK(st.bump_step_attempt(id, 0, 1, "en"));  // killed: no error recorded
+    CHECK(st.bump_step_attempt(id, 0, 1, "en"));  // killed again
+    CHECK(st.bump_step_attempt(id, 0, 1, "en"));
+    CHECK(st.set_step_error(id, 0, 1, "empty reply"));  // one real failure
+    json r = state_row(st.section_outputs_state(id, "en"), 0, 1);
+    CHECK(r["attempts"] == 3 && r["failures"] == 1 && r["last_error"] == "empty reply");
+    CHECK(st.bump_step_attempt(id, 0, 1, "en"));
+    CHECK(st.set_step_error(id, 0, 1, "the run failed on the GPU", false));
+    r = state_row(st.section_outputs_state(id, "en"), 0, 1);
+    CHECK(r["attempts"] == 4 && r["failures"] == 1 && r["last_error"] == "the run failed on the GPU");
+    CHECK(st.bump_step_attempt(id, 0, 1, "en"));
+    CHECK(st.set_step_error(id, 0, 1, "no reply"));
+    CHECK(st.bump_step_attempt(id, 0, 1, "en"));
+    CHECK(st.set_step_error(id, 0, 1, "no reply"));
+    CHECK(state_row(st.section_outputs_state(id, "en"), 0, 1)["failures"] == 3);
+    CHECK(state_row(st.section_outputs_state(id, "te"), 0, 1)["failures"] == 0);  // only tries in lang
+    CHECK(st.bump_step_attempt(id, 0, 1, "te"));  // another lang starts again
+    CHECK(st.step_attempts(id)[0]["failures"] == 0);
+    CHECK(st.clear_section_outputs(id, 1, 0) > 0);
+    CHECK(state_row(st.section_outputs_state(id, "te"), 0, 1)["failures"] == 0);
 }
 
 TEST(section_outputs_deleted_with_note) {

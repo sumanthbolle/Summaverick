@@ -216,9 +216,11 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
  * deleted or its sections re-planned meanwhile): nothing is stored then. */
 char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang,
                          sve_progress_cb cb, void *user);
-/* [{"idx":0,"kind":1,"done":true,"attempts":1,"last_error":null},…]: every section x {1 notes, 2 questions}, by idx
- * then kind. done only when the stored part's lang, first_piece and last_piece match the section now. attempts and
- * last_error (why the last try failed, or null) count only tries in lang. "[]" when no sections; NULL on error. */
+/* [{"idx":0,"kind":1,"done":true,"attempts":1,"last_error":null,"failures":0},…]: every section x {1 notes,
+ * 2 questions}, by idx then kind. done only when the stored part's lang, first_piece and last_piece match the section
+ * now. attempts (tries started, a kill included), failures (tries that failed for a real reason: not a cancel, a
+ * kill or a GPU refusal) and last_error (why the last try failed, or null) count only tries in lang. "[]" when no
+ * sections; NULL on error. */
 char *sve_section_outputs_state(sve_ctx *ctx, int64_t note_id, const char *lang);
 /* The note's detailed notes (a "## <section title>" per part, one merged "## Action items") or revision questions
  * (numbered across parts, near-duplicates dropped, at most 12, every part represented) from its stored parts in

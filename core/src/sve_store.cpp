@@ -65,12 +65,12 @@ CREATE TABLE IF NOT EXISTS section_outputs (
     cut INTEGER NOT NULL DEFAULT 0,  -- the reply reached its token cap (headings after the cut are missing)
     PRIMARY KEY(note_id, idx, kind)
 );
--- How often a section output was tried in `lang` (a cancel does not count; another lang starts again at 1), and
--- why the last try failed.
+-- How often a section output was tried in `lang` (a cancel does not count; another lang starts again at 1), how
+-- many of those tries failed for a real reason (a kill or a GPU refusal is not one), and why the last try failed.
 CREATE TABLE IF NOT EXISTS step_attempts (
     note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
     idx INTEGER NOT NULL, kind INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
-    lang TEXT,
+    lang TEXT, failures INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(note_id, idx, kind)
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS pieces_fts USING fts5(
@@ -268,11 +268,14 @@ bool Store::create_schema() {
     return add_missing_columns();
 }
 
-// Columns added to tables after they first shipped in a build: section_outputs.cut, step_attempts.lang. Writes
+// Columns added to tables after they first shipped in a build: section_outputs.cut, step_attempts.lang and
+// step_attempts.failures. Writes
 // only when one is missing; re-checked inside the IMMEDIATE transaction, as another connection may add it first.
 bool Store::add_missing_columns() {
     static const char *kCols[][3] = {{"section_outputs", "cut", "ALTER TABLE section_outputs ADD COLUMN cut INTEGER NOT NULL DEFAULT 0"},
-                                     {"step_attempts", "lang", "ALTER TABLE step_attempts ADD COLUMN lang TEXT"}};
+                                     {"step_attempts", "lang", "ALTER TABLE step_attempts ADD COLUMN lang TEXT"},
+                                     {"step_attempts", "failures",
+                                      "ALTER TABLE step_attempts ADD COLUMN failures INTEGER NOT NULL DEFAULT 0"}};
     auto missing = [&](const char *t, const char *c) {
         return query_rows((std::string("SELECT 1 FROM pragma_table_info('") + t + "') WHERE name=?").c_str(), {c}).empty();
     };
@@ -1308,12 +1311,13 @@ json Store::section_outputs_state(int64_t note_id, const std::string &lang) {
     json rows = query_rows(
         "SELECT s.idx AS idx, k.kind AS kind, (o.note_id IS NOT NULL) AS done, "
         "COALESCE(CASE WHEN a.lang IS ? THEN a.attempts END,0) AS attempts, "
-        "CASE WHEN a.lang IS ? THEN a.last_error END AS last_error "
+        "CASE WHEN a.lang IS ? THEN a.last_error END AS last_error, "
+        "COALESCE(CASE WHEN a.lang IS ? THEN a.failures END,0) AS failures "
         "FROM sections s CROSS JOIN (SELECT 1 AS kind UNION ALL SELECT 2) k "
         "LEFT JOIN section_outputs o ON o.note_id=s.note_id AND o.idx=s.idx AND o.kind=k.kind AND o.lang=? "
         "AND o.first_piece=s.first_piece AND o.last_piece=s.last_piece "
         "LEFT JOIN step_attempts a ON a.note_id=s.note_id AND a.idx=s.idx AND a.kind=k.kind "
-        "WHERE s.note_id=? ORDER BY s.idx, k.kind", {lang, lang, lang, note_id});
+        "WHERE s.note_id=? ORDER BY s.idx, k.kind", {lang, lang, lang, lang, note_id});
     for (auto &r : rows) r["done"] = r["done"] == true || r["done"] == 1;  // "done" is a flag column already
     return rows;
 }
@@ -1323,7 +1327,8 @@ bool Store::bump_step_attempt(int64_t note_id, int idx, int kind, const std::str
     return run("INSERT INTO step_attempts(note_id,idx,kind,attempts,lang) VALUES(?,?,?,1,?) "
                "ON CONFLICT(note_id,idx,kind) DO UPDATE SET "
                "attempts=CASE WHEN lang IS excluded.lang THEN attempts+1 ELSE 1 END, "
-               "last_error=CASE WHEN lang IS excluded.lang THEN last_error ELSE NULL END, lang=excluded.lang",
+               "last_error=CASE WHEN lang IS excluded.lang THEN last_error ELSE NULL END, "
+               "failures=CASE WHEN lang IS excluded.lang THEN failures ELSE 0 END, lang=excluded.lang",
                {note_id, idx, kind, lang});
 }
 
@@ -1332,13 +1337,15 @@ bool Store::undo_step_attempt(int64_t note_id, int idx, int kind) {
                {note_id, idx, kind}) && sqlite3_changes(db_) > 0;
 }
 
-bool Store::set_step_error(int64_t note_id, int idx, int kind, const std::string &error) {
-    return run("UPDATE step_attempts SET last_error=? WHERE note_id=? AND idx=? AND kind=?", {error, note_id, idx, kind}) &&
+bool Store::set_step_error(int64_t note_id, int idx, int kind, const std::string &error, bool real) {
+    return run("UPDATE step_attempts SET last_error=?, failures=failures+? WHERE note_id=? AND idx=? AND kind=?",
+               {error, real ? 1 : 0, note_id, idx, kind}) &&
            sqlite3_changes(db_) > 0;
 }
 
 json Store::step_attempts(int64_t note_id) {
-    return query_rows("SELECT idx,kind,attempts,last_error,lang FROM step_attempts WHERE note_id=? ORDER BY idx,kind", {note_id});
+    return query_rows("SELECT idx,kind,attempts,last_error,lang,failures FROM step_attempts WHERE note_id=? ORDER BY idx,kind",
+                      {note_id});
 }
 
 int Store::clear_section_outputs(int64_t note_id, int kind, int idx) {

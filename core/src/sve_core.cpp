@@ -342,7 +342,8 @@ char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind
             }
             return dup_str(done);
         }
-        st.set_step_error(note_id, idx, k, error);
+        // A GPU refused in the background is a cut-off, not a real failure: its reason is kept, not counted.
+        st.set_step_error(note_id, idx, k, error, error != "the run failed on the GPU");
         return nullptr;
     } catch (const std::exception &e) {
         sve_logf(2, "section output failed: %s", e.what());
