@@ -190,9 +190,24 @@ public:
     bool mark_extracted(int64_t note_id);
     bool was_extracted(int64_t note_id);
 
+    // Meaning-search vectors (Task 11). kind "piece" (ref = transcript_pieces rowid) or "memory" (ref = memories.id).
+    // A vector goes with its piece (note delete, new pieces, clear_transcript) or memory, when a memory's text
+    // changes, and with wipe_assistant. set refuses (false) a ref that does not exist.
+    bool set_embedding(const std::string &kind, int64_t ref, const std::vector<float> &vec, const std::string &model);
+    // (ref, vector) of this model: every piece's, or the current memories' (as search_memory_items).
+    std::vector<std::pair<int64_t, std::vector<float>>> embeddings(const std::string &kind, const std::string &model);
+    int64_t embedding_count(const std::string &model);  // index size, both kinds
+    // Up to limit rows with no vector of this model: [{kind:"piece",ref,note_id,idx,text}] of notes that still have
+    // their transcript, newest notes first, then [{kind:"memory",ref,text}] of current memories, newest first.
+    json embed_pending(const std::string &model, int limit);
+    // Keyword search as search_pieces / search_memory_items, by reference: [{ref,note_id,start_sec}] and [id,…].
+    json search_piece_refs(const std::string &q, int limit);
+    json search_memory_refs(const std::string &q, int limit);
+    json piece_refs(const std::vector<int64_t> &refs);  // [{ref,note_id,start_sec}] in that order; missing ones left out
+
     // Deletes everything the assistant stored, in one transaction: profile and other assistant settings,
     // medicines, memory, memories (with sources, links, progress), reminders, tasks, topics and links, person questions,
-    // suggestions, decisions, insights, transcript pieces. Notes and other settings are kept (the host deletes notes). Not nested in begin().
+    // suggestions, decisions, insights, transcript pieces, meaning vectors. Notes and other settings are kept (the host deletes notes). Not nested in begin().
     bool wipe_assistant();
 
 private:

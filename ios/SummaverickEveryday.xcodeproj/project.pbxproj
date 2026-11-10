@@ -109,6 +109,10 @@
 			isa = PBXBuildFile;
 			fileRef = 85C6DEF5C197B0C18C2FC34D;
 		};
+		5F2B5F64B097A11CAB54B85B = {
+			isa = PBXBuildFile;
+			fileRef = BB1E4AFCC74F3BEAC626FF50;
+		};
 		66567DD2A6C40F6BC6CB1C24 = {
 			isa = PBXBuildFile;
 			fileRef = 3C94D64FE92A566816D76B43;
@@ -921,6 +925,13 @@
 			path = SummaverickEveryday/Engine/OvernightWork.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		BB1E4AFCC74F3BEAC626FF50 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_embed.cpp;
+			path = ../core/src/sve_embed.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
 		BB44682AB82F093499931FDE = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -1073,6 +1084,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_llm.h;
 			path = ../core/src/sve_llm.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		F553EEBE59EAE5FCD3D4B7D8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_embed.h;
+			path = ../core/src/sve_embed.h;
 			sourceTree = SOURCE_ROOT;
 		};
 		F66379AE26FB07E2A8BA2BDA = {
@@ -1335,6 +1353,8 @@
 				9E2ACA831A68C5FC7568EFA9,
 				E6FD595D542BBAD86BA1B59B,
 				3C94D64FE92A566816D76B43,
+				BB1E4AFCC74F3BEAC626FF50,
+				F553EEBE59EAE5FCD3D4B7D8,
 				10A99A9004D029F7A08C362A,
 				EE7D0A38215CFAEEF0A0E2BE,
 				B785295E08BF51AAC35D02B4,
@@ -1557,6 +1577,7 @@
 				8FE69873EC9B753B9C62DD98,
 				1D9397B49E2B55EDE5DC3560,
 				66567DD2A6C40F6BC6CB1C24,
+				5F2B5F64B097A11CAB54B85B,
 				7CD85F6783D894B9047A2C67,
 				AD33A465D5C223FBF7C16E07,
 				07C4BA787A10CB869B855E1D,

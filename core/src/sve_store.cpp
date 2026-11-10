@@ -1,5 +1,6 @@
 #include "sve_store.h"
 #include "sve_memory.h"  // memory_importance
+#include "sve_embed.h"   // vector_blob
 #include <sqlite3.h>
 #include <ctime>
 #include <cstring>
@@ -210,6 +211,25 @@ CREATE TABLE IF NOT EXISTS insights (
     note_id INTEGER REFERENCES notes(id) ON DELETE CASCADE,
     dismissed INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
 );
+-- Meaning-search vectors (EmbeddingGemma, Task 11): a transcript piece (ref = its rowid) or a memory (ref = its id),
+-- kEmbedDims floats as bytes, and the model that made it. They go with their piece or memory, and when a memory's
+-- text changes (it is embedded again).
+CREATE TABLE IF NOT EXISTS embeddings (
+    kind TEXT NOT NULL CHECK(kind IN ('piece','memory')), ref INTEGER NOT NULL, vec BLOB NOT NULL,
+    model TEXT NOT NULL, PRIMARY KEY(kind, ref)
+);
+CREATE TRIGGER IF NOT EXISTS pieces_ad_embed AFTER DELETE ON transcript_pieces BEGIN
+  DELETE FROM embeddings WHERE kind='piece' AND ref=old.rowid;
+END;
+CREATE TRIGGER IF NOT EXISTS pieces_au_embed AFTER UPDATE OF text ON transcript_pieces BEGIN
+  DELETE FROM embeddings WHERE kind='piece' AND ref=old.rowid;
+END;
+CREATE TRIGGER IF NOT EXISTS memories_ad_embed AFTER DELETE ON memories BEGIN
+  DELETE FROM embeddings WHERE kind='memory' AND ref=old.id;
+END;
+CREATE TRIGGER IF NOT EXISTS memories_au_embed AFTER UPDATE OF text ON memories BEGIN
+  DELETE FROM embeddings WHERE kind='memory' AND ref=old.id;
+END;
 )SQL";
 
 Store::Store(const std::string &path) {
@@ -1238,6 +1258,8 @@ bool Store::clear_transcript(int64_t note_id) {
               run("DELETE FROM section_outputs WHERE note_id=?", {note_id}) &&
               run("DELETE FROM step_attempts WHERE note_id=?", {note_id}) &&
               run("DELETE FROM memory_progress WHERE note_id=?", {note_id}) &&
+              run("DELETE FROM embeddings WHERE kind='piece' AND ref IN (SELECT rowid FROM transcript_pieces WHERE note_id=?)",
+                  {note_id}) &&
               run("DELETE FROM memory_sources WHERE note_id=?", {note_id});  // single-source memories go too
     ok = ok && set_text_column(note_id, "transcript", nullptr);
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
@@ -1331,7 +1353,7 @@ static const char *kAssistantSettings[] = {"profile", "insight.last_date"};
 
 bool Store::wipe_assistant() {
     // Children before parents, so no foreign key blocks a delete; the FTS triggers clean the indexes.
-    static const char *kTables[] = {"person_questions", "memory_entities", "memory_sources", "memory_progress", "memories",
+    static const char *kTables[] = {"embeddings", "person_questions", "memory_entities", "memory_sources", "memory_progress", "memories",
                                     "suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
                                     "medicines", "decisions", "insights", "section_outputs", "step_attempts", "sections",
                                     "transcript_pieces"};
@@ -1342,6 +1364,104 @@ bool Store::wipe_assistant() {
     ok = ok && run("DELETE FROM settings WHERE key LIKE 'extracted.%'", {});
     if (!ok) { std::string e = err_; exec("ROLLBACK"); err_ = e; return false; }
     return exec("COMMIT");
+}
+
+// meaning-search vectors ---------------------------------------------------
+
+// Memories that may reach a prompt (as search_memory_items): not wrong, superseded, queued or a medicine's.
+static const char *kCurrentMemory = "m.review<>'wrong' AND m.origin<>'medicine' AND m.superseded_by IS NULL AND m.queue=0";
+
+bool Store::set_embedding(const std::string &kind, int64_t ref, const std::vector<float> &vec, const std::string &model) {
+    if (vec.empty() || (kind != "piece" && kind != "memory")) { err_ = "bad embedding"; return false; }
+    // Only for a piece or memory that still exists (it may be deleted while its vector is made).
+    const std::string sql = std::string("INSERT OR REPLACE INTO embeddings(kind,ref,vec,model) SELECT ?,?,?,? WHERE EXISTS (") +
+                            (kind == "piece" ? "SELECT 1 FROM transcript_pieces WHERE rowid=?" : "SELECT 1 FROM memories WHERE id=?") + ")";
+    sqlite3_stmt *st = nullptr;
+    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) { err_ = sqlite3_errmsg(db_); return false; }
+    const std::string blob = vector_blob(vec);
+    sqlite3_bind_text(st, 1, kind.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(st, 2, ref);
+    sqlite3_bind_blob(st, 3, blob.data(), (int)blob.size(), SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 4, model.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(st, 5, ref);
+    int rc = sqlite3_step(st);
+    sqlite3_finalize(st);
+    if (rc != SQLITE_DONE) { err_ = sqlite3_errmsg(db_); return false; }
+    return sqlite3_changes(db_) > 0;
+}
+
+std::vector<std::pair<int64_t, std::vector<float>>> Store::embeddings(const std::string &kind, const std::string &model) {
+    std::vector<std::pair<int64_t, std::vector<float>>> out;
+    const char *sql = kind == "memory"
+        ? "SELECT e.ref, e.vec FROM embeddings e JOIN memories m ON m.id=e.ref WHERE e.kind='memory' AND e.model=? AND "
+          "m.review<>'wrong' AND m.origin<>'medicine' AND m.superseded_by IS NULL AND m.queue=0 ORDER BY e.ref"
+        : "SELECT e.ref, e.vec FROM embeddings e JOIN transcript_pieces p ON p.rowid=e.ref WHERE e.kind='piece' AND e.model=? "
+          "ORDER BY e.ref";
+    if (kind != "piece" && kind != "memory") return out;
+    sqlite3_stmt *st = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &st, nullptr) != SQLITE_OK) { err_ = sqlite3_errmsg(db_); return out; }
+    sqlite3_bind_text(st, 1, model.c_str(), -1, SQLITE_TRANSIENT);
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        const void *b = sqlite3_column_blob(st, 1);
+        int n = sqlite3_column_bytes(st, 1);
+        std::vector<float> v = blob_vector(b && n > 0 ? std::string((const char *)b, (size_t)n) : std::string());
+        if (!v.empty()) out.push_back({sqlite3_column_int64(st, 0), std::move(v)});
+    }
+    sqlite3_finalize(st);
+    return out;
+}
+
+int64_t Store::embedding_count(const std::string &model) {
+    json r = query_rows("SELECT COUNT(*) AS n FROM embeddings WHERE model=?", {model});
+    return r.empty() ? 0 : r[0].value("n", (int64_t)0);
+}
+
+json Store::embed_pending(const std::string &model, int limit) {
+    json out = json::array();
+    if (limit <= 0) return out;
+    // Pieces of notes that still have their transcript, newest notes first; a cleared transcript is not embedded again.
+    json pieces = query_rows(
+        "SELECT p.rowid AS ref, p.note_id AS note_id, p.idx AS idx, p.text AS text FROM transcript_pieces p "
+        "JOIN notes n ON n.id=p.note_id WHERE n.transcript IS NOT NULL AND trim(p.text)<>'' AND NOT EXISTS "
+        "(SELECT 1 FROM embeddings e WHERE e.kind='piece' AND e.ref=p.rowid AND e.model=?) "
+        "ORDER BY n.created_at DESC, n.id DESC, p.idx ASC LIMIT ?", {model, limit});
+    for (auto &r : pieces) { r["kind"] = "piece"; out.push_back(std::move(r)); }
+    int left = limit - (int)out.size();
+    if (left <= 0) return out;
+    json mems = query_rows((std::string("SELECT m.id AS ref, m.text AS text FROM memories m WHERE ") + kCurrentMemory +
+                            " AND trim(m.text)<>'' AND NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.kind='memory' AND "
+                            "e.ref=m.id AND e.model=?) ORDER BY m.last_seen DESC, m.id DESC LIMIT ?").c_str(),
+                           {model, left});
+    for (auto &r : mems) { r["kind"] = "memory"; out.push_back(std::move(r)); }
+    return out;
+}
+
+json Store::search_piece_refs(const std::string &q, int limit) {
+    std::string fq = to_fts(q);
+    if (fq.empty()) return json::array();
+    return query_rows(
+        "SELECT p.rowid AS ref, p.note_id AS note_id, p.start_sec AS start_sec FROM pieces_fts f "
+        "JOIN transcript_pieces p ON p.rowid=f.rowid WHERE pieces_fts MATCH ? ORDER BY bm25(pieces_fts) LIMIT ?", {fq, limit});
+}
+
+json Store::piece_refs(const std::vector<int64_t> &refs) {
+    json out = json::array();
+    for (int64_t r : refs) {
+        json row = query_rows("SELECT rowid AS ref, note_id, start_sec FROM transcript_pieces WHERE rowid=?", {r});
+        if (!row.empty()) out.push_back(row[0]);
+    }
+    return out;
+}
+
+json Store::search_memory_refs(const std::string &q, int limit) {
+    json out = json::array();
+    std::string fq = to_fts(q);
+    if (fq.empty()) return out;
+    for (const auto &r : query_rows((std::string("SELECT m.id AS id FROM memories_fts f JOIN memories m ON m.id=f.rowid "
+                                                 "WHERE memories_fts MATCH ? AND ") + kCurrentMemory +
+                                     " ORDER BY bm25(memories_fts) LIMIT ?").c_str(), {fq, limit}))
+        out.push_back(r["id"]);
+    return out;
 }
 
 std::string json_escape(const std::string &s) {
