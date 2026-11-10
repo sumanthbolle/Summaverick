@@ -178,16 +178,19 @@ enum HeatLadder {
     static func showsCooling(_ l: Level) -> Bool { l == .eased || l == .minimal }
 }
 
-/// CPU threads for a CPU run: the heat ladder's, capped while the app is not in front. iPhone 16e, locked
+/// CPU threads for a CPU run: the heat ladder's, capped while the app is in the background. iPhone 16e, locked
 /// (BGContinuedProcessingTask), heat ladder full (4 decode / 6 batch): a piece took 145-250 s against 28 s in front;
 /// at 2 and 2 it took 20-27 s. In the background iOS gives the app few (efficiency) cores, and more threads than
 /// cores wait on each other. The audio encoder follows the batch count.
 enum ThreadChoice {
     static let backgroundCap = 2
 
-    /// Not active is background: locked, the app switched away, launched for overnight work, or a call or
-    /// Control Center over it (a brief spell costs nothing: the count is only read when a piece or run starts).
-    static func inBackground(isActive: Bool) -> Bool { !isActive }
+    /// UIApplication.State, Foundation-only (HeatGovernor maps it).
+    enum AppState { case active, inactive, background }
+
+    /// Only background caps: locked, the app switched away, launched for overnight work. Inactive (Control
+    /// Center, the app switcher, Face ID, a call, launch) counts as in front, as ModelManager.loadIntoCore does.
+    static func inBackground(_ state: AppState) -> Bool { state == .background }
 
     /// decode, batch (batch 0: the core's own rule, up to 8 cores, so it counts as above the cap).
     static func threads(level: HeatLadder.Level, inBackground: Bool) -> (decode: Int, batch: Int) {

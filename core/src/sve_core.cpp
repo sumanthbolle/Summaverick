@@ -378,7 +378,8 @@ int sve_set_audio_threads(sve_ctx *ctx, int n) {
         return 0;
     }
     sve_logf(2, "audio threads %d: reload failed after %ld ms; loading it again with %d", want, ms, old);
-    load_projector(ctx, path, old);
+    if (load_projector(ctx, path, old) != 0)
+        sve_logf(2, "audio threads %d: the retry failed too; the audio projector is unloaded (the next load loads it)", old);
     return -2;
 }
 

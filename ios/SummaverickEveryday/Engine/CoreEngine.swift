@@ -155,7 +155,7 @@ actor CoreEngine {
     private var cpuThreads: (decode: Int32, batch: Int32)?
 
     /// Every model run (and every live piece) passes through loadModel first: on the CPU it takes the threads
-    /// HeatGovernor wants (the heat ladder's, capped behind the app's back: ThreadChoice), and only when they
+    /// HeatGovernor wants (the heat ladder's, capped in the background: ThreadChoice), and only when they
     /// changed; the audio encoder follows the batch count (the core loads it again only when that differs).
     /// A run already going keeps its threads to its end. GPU runs keep the GPU and only rest.
     private func applyHeatThreads() {

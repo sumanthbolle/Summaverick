@@ -13,7 +13,7 @@ extension Notification.Name {
     static let heatLevelChanged = Notification.Name("sve.heatLevelChanged")
 }
 
-/// CPU threads wanted (ThreadChoice: the heat ladder's, capped while the app is not in front), readable on any
+/// CPU threads wanted (ThreadChoice: the heat ladder's, capped while the app is in the background), readable on any
 /// thread: CoreEngine applies them, and the audio encoder's, before each CPU run and each piece.
 final class HeatThreads: @unchecked Sendable {
     private let lock = NSLock()
@@ -29,7 +29,7 @@ final class HeatThreads: @unchecked Sendable {
         self.level = level
         lock.unlock()
     }
-    /// The app went behind or came back to front; logged when it changes.
+    /// The app went to the background or came back; logged when it changes.
     func setInBackground(_ value: Bool) {
         lock.lock()
         let changed = inBackground != value
@@ -79,9 +79,9 @@ final class HeatGovernor {
                 MainActor.assumeIsolated { _ = HeatGovernor.shared.level }
             })
         }
-        // In front or not (ThreadChoice): the next piece or run takes the count.
-        // Not willResignActive: the state still reads active then, and the next level read would undo it.
+        // In the background or not (ThreadChoice: inactive counts as in front): the next piece or run takes the count.
         for (name, behind) in [(UIApplication.didEnterBackgroundNotification, true),
+                               (UIApplication.willEnterForegroundNotification, false),
                                (UIApplication.didBecomeActiveNotification, false)] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
                 HeatGovernor.threads.setInBackground(behind)
@@ -90,10 +90,16 @@ final class HeatGovernor {
         Self.readAppState()
     }
 
-    /// Whether the app is in front, for the CPU threads. Also read with every level (work reads the level before
+    /// Whether the app is in the background, for the CPU threads. Also read with every level (work reads the level before
     /// each piece, section and output), so a launch straight into the background (overnight work) is capped too.
     static func readAppState() {
-        threads.setInBackground(ThreadChoice.inBackground(isActive: UIApplication.shared.applicationState == .active))
+        let state: ThreadChoice.AppState
+        switch UIApplication.shared.applicationState {
+        case .active: state = .active
+        case .background: state = .background
+        default: state = .inactive
+        }
+        threads.setInBackground(ThreadChoice.inBackground(state))
     }
 
     /// The level now (samples the inputs first).
