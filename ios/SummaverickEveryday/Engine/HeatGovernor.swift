@@ -13,15 +13,37 @@ extension Notification.Name {
     static let heatLevelChanged = Notification.Name("sve.heatLevelChanged")
 }
 
-/// CPU threads the heat ladder wants, readable on any thread: CoreEngine applies them before each CPU run.
+/// CPU threads wanted (ThreadChoice: the heat ladder's, capped while the app is not in front), readable on any
+/// thread: CoreEngine applies them, and the audio encoder's, before each CPU run and each piece.
 final class HeatThreads: @unchecked Sendable {
     private let lock = NSLock()
-    private var value: (decode: Int32, batch: Int32) = (Int32(HeatLadder.cpuThreads(.full)), Int32(HeatLadder.batchThreads(.full)))
-    var wanted: (decode: Int32, batch: Int32) { lock.lock(); defer { lock.unlock() }; return value }
+    private var level: HeatLadder.Level = .full
+    private var inBackground = false
+    var wanted: (decode: Int32, batch: Int32) {
+        lock.lock(); defer { lock.unlock() }
+        let t = ThreadChoice.threads(level: level, inBackground: inBackground)
+        return (Int32(t.decode), Int32(t.batch))
+    }
     func set(_ level: HeatLadder.Level) {
         lock.lock()
-        value = (Int32(HeatLadder.cpuThreads(level)), Int32(HeatLadder.batchThreads(level)))
+        self.level = level
         lock.unlock()
+    }
+    /// The app went behind or came back to front; logged when it changes.
+    func setInBackground(_ value: Bool) {
+        lock.lock()
+        let changed = inBackground != value
+        inBackground = value
+        let level = self.level
+        lock.unlock()
+        guard changed else { return }
+        if value {
+            NSLog("[sve] threads: background cap %d/%d", ThreadChoice.backgroundCap, ThreadChoice.backgroundCap)
+        } else {
+            let t = ThreadChoice.threads(level: level, inBackground: false)
+            NSLog("[sve] threads: in front, cap off (heat %@: %d decode, %d batch; 0: the core's rule)", level.name,
+                  Int32(t.decode), Int32(t.batch))
+        }
     }
 }
 
@@ -57,10 +79,26 @@ final class HeatGovernor {
                 MainActor.assumeIsolated { _ = HeatGovernor.shared.level }
             })
         }
+        // In front or not (ThreadChoice): the next piece or run takes the count.
+        // Not willResignActive: the state still reads active then, and the next level read would undo it.
+        for (name, behind) in [(UIApplication.didEnterBackgroundNotification, true),
+                               (UIApplication.didBecomeActiveNotification, false)] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                HeatGovernor.threads.setInBackground(behind)
+            })
+        }
+        Self.readAppState()
+    }
+
+    /// Whether the app is in front, for the CPU threads. Also read with every level (work reads the level before
+    /// each piece, section and output), so a launch straight into the background (overnight work) is capped too.
+    static func readAppState() {
+        threads.setInBackground(ThreadChoice.inBackground(isActive: UIApplication.shared.applicationState == .active))
     }
 
     /// The level now (samples the inputs first).
     var level: HeatLadder.Level {
+        Self.readAppState()
         let thermal = ProcessInfo.processInfo.thermalState
         let memoryMB = Self.availableMemoryMB   // logged only (R-N6-b)
         let (battery, charging) = readBattery()

@@ -21,6 +21,8 @@ struct SummaverickEverydayApp: App {
         ContinuedWork.register()
         // Finishes long recordings overnight while charging: a fixed identifier, registered before launch ends.
         OvernightWork.register()
+        // Knows from launch whether the app is in front (CPU threads are capped behind it, ThreadChoice).
+        _ = HeatGovernor.shared
         // Reconnect to (or start) the AI download as early as possible.
         ModelManager.shared.activate()
         // The navigation bar's colour, on every screen and sheet.

@@ -143,10 +143,10 @@ actor CoreEngine {
         loadedModelPath = path
         loadedBackend = backend
         NSLog("[sve] model loaded on the %@", backend == .gpu ? "GPU" : "CPU")
+        applyHeatThreads()   // before the projector: it loads with the batch threads, so it needs no second load
         if let mmprojPath, sve_load_audio(ctx, mmprojPath) != 0 {
             throw CoreError.modelLoadFailed(mmprojPath)
         }
-        applyHeatThreads()   // after the projector: the audio encoder keeps its load-time threads
         // The heat ladder's memory input is log-only until measured on the phone (R-N6-b).
         NSLog("[sve] heat: memory after load %d MB", Int32(clamping: HeatGovernor.availableMemoryMB))
     }
@@ -154,15 +154,19 @@ actor CoreEngine {
     /// CPU threads set on the loaded CPU model since its load; nil: the load-time ones (the heat ladder's full).
     private var cpuThreads: (decode: Int32, batch: Int32)?
 
-    /// Every model run passes through loadModel first: on the CPU it takes the heat ladder's threads
-    /// (HeatGovernor), and only when they changed. GPU runs keep the GPU and only rest.
+    /// Every model run (and every live piece) passes through loadModel first: on the CPU it takes the threads
+    /// HeatGovernor wants (the heat ladder's, capped behind the app's back: ThreadChoice), and only when they
+    /// changed; the audio encoder follows the batch count (the core loads it again only when that differs).
+    /// A run already going keeps its threads to its end. GPU runs keep the GPU and only rest.
     private func applyHeatThreads() {
         guard loadedBackend == .cpu, let ctx, sve_llm_loaded(ctx) != 0 else { return }
         let want = HeatGovernor.threads.wanted
-        guard want != (cpuThreads ?? (ModelBackend.cpu.threads, 0)) else { return }
-        if sve_set_threads(ctx, want.decode, want.batch) == 0 {
+        if want != (cpuThreads ?? (ModelBackend.cpu.threads, 0)), sve_set_threads(ctx, want.decode, want.batch) == 0 {
             cpuThreads = want
-            NSLog("[sve] heat: CPU threads %d decode, %d batch (0: the core's rule)", want.decode, want.batch)
+            NSLog("[sve] threads: CPU %d decode, %d batch (0: the core's rule)", want.decode, want.batch)
+        }
+        if sve_audio_loaded(ctx) != 0, sve_set_audio_threads(ctx, 0) != 0 {
+            NSLog("[sve] threads: the audio encoder could not take the new count")
         }
     }
 
