@@ -188,8 +188,10 @@ int64_t store_memory(sve::Store &st, int64_t note_id, json g, int double_check, 
     const sve::Placement place =
         sve::place_memory(newer, st.memory_items_with_topics({{"types", json::array({jstr(g, "type")})}}), -1);
     if (place.pair == sve::Pair::same) {
+        std::vector<std::pair<int64_t, std::string>> all = links;
+        if (topic > 0) all.push_back({topic, "topic"});
         if (!sve::merge_same_memory(st, place.older, note_id, start, quote, src.contains("conf") ? src["conf"] : json(nullptr),
-                                    (int64_t)time(nullptr)))
+                                    (int64_t)time(nullptr), all))
             return -1;
         ++tally.same;
         return refresh_importance(st, place.older) ? place.older : -1;

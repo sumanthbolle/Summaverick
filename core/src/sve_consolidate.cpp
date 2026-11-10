@@ -120,19 +120,49 @@ const char *honorific(const std::string &t) {
     return nullptr;
 }
 
-struct NameParts {
-    std::vector<std::string> words;  // name words in the shared Latin form
+// One reading of a name: its words in the shared Latin form and its honorifics.
+struct NameForm {
+    std::vector<std::string> words;
     std::set<std::string> honorifics;
 };
+
+struct NameParts {
+    NameForm full;              // the words as written (honorific words dropped)
+    NameForm stripped;          // the last Telugu word without its case ending; equals full when it has none
+    bool has_strip = false;
+    bool ambiguous = false;     // the ending (ని, ను, ది, దే, కే) may be part of the name: రజని is not రజ + ని
+    bool honorific_only = false;  // nothing but honorifics ("Sir", "సార్")
+    std::set<std::string> only;   // those honorifics, canonical (సార్ and Sir are both "sir")
+};
+
+// Endings that also end ordinary names; a match that needs one removed is never "same".
+bool ambiguous_ending(const std::string &e) { return e == "ని" || e == "ను" || e == "ది" || e == "దే" || e == "కే"; }
+
+std::vector<std::string> latin_words(const std::vector<std::string> &raw) {
+    std::vector<std::string> out;
+    for (const auto &t : raw) {
+        std::string k = transliterate_te(t);
+        if (!k.empty()) out.push_back(k);
+    }
+    return out;
+}
 
 NameParts name_parts(const std::string &name) {
     NameParts p;
     std::vector<std::string> raw = med_tokens(nfc_clean(name), false), kept;
+    std::set<std::string> hon;
     for (const auto &t : raw) {
-        if (const char *h = honorific(t)) p.honorifics.insert(h);
+        if (const char *h = honorific(t)) hon.insert(h);
         else kept.push_back(t);
     }
-    if (kept.empty()) { kept = raw; p.honorifics.clear(); }  // all honorific ("Sir"): the words are the name
+    if (kept.empty()) {  // all honorific ("Sir"): the words are the name, but it names nobody in particular
+        kept = raw;
+        p.only = hon;
+        hon.clear();
+        p.honorific_only = !raw.empty();
+    }
+    p.full = {latin_words(kept), hon};
+    p.stripped = p.full;
     if (!kept.empty() && has_telugu(kept.back())) {
         // The last word's case ending (longest first); a short name that only looks like one keeps it.
         static const std::vector<std::string> endings = [] {
@@ -140,19 +170,19 @@ NameParts name_parts(const std::string &name) {
             std::stable_sort(e.begin(), e.end(), [](const std::string &a, const std::string &b) { return a.size() > b.size(); });
             return e;
         }();
-        std::string &w = kept.back();
+        const std::string &w = kept.back();
         for (const auto &e : endings) {
             if (w.size() <= e.size() || w.compare(w.size() - e.size(), e.size(), e) != 0) continue;
             const std::string stem = w.substr(0, w.size() - e.size());
             if (telugu_syllables(stem) < 2) continue;
-            if (const char *h = honorific(e)) p.honorifics.insert(h);
-            w = stem;
+            std::vector<std::string> sk = kept;
+            sk.back() = stem;
+            p.stripped = {latin_words(sk), hon};
+            if (const char *h = honorific(e)) p.stripped.honorifics.insert(h);
+            p.has_strip = true;
+            p.ambiguous = ambiguous_ending(e);
             break;
         }
-    }
-    for (const auto &t : kept) {
-        std::string k = transliterate_te(t);
-        if (!k.empty()) p.words.push_back(k);
     }
     return p;
 }
@@ -338,6 +368,11 @@ std::string person_norm(const std::string &in) {
         }
         o += c;
     }
+    // The nasal fold can make a new double ("Ramna" -> "ranna"): collapse once more.
+    s.swap(o);
+    o.clear();
+    for (char c : s)
+        if (o.empty() || o.back() != c || !letter(c)) o += c;
     return o;
 }
 
@@ -373,16 +408,37 @@ std::string transliterate_te(const std::string &in) {
     return person_norm(o);
 }
 
-std::string person_key(const std::string &name) { return join(name_parts(name).words); }
+std::string person_key(const std::string &name) { return join(name_parts(name).stripped.words); }
 
 PersonMatch match_person(const std::string &a, const std::string &b) {
     const NameParts pa = name_parts(a), pb = name_parts(b);
-    const std::string ka = join(pa.words), kb = join(pb.words);
-    if (ka.empty() || kb.empty()) return PersonMatch::different;
-    if (raw_norm(a) == raw_norm(b)) return PersonMatch::same;
-    if (ka == kb && pa.honorifics == pb.honorifics) return PersonMatch::same;
-    if (subset(pa.words, pb.words) || subset(pb.words, pa.words)) return PersonMatch::maybe;
-    if (edit_distance(ka, kb) <= 1 && std::min(letters(ka), letters(kb)) >= 4) return PersonMatch::maybe;
+    if (pa.full.words.empty() || pb.full.words.empty()) return PersonMatch::different;
+    // Every reading of each name: as written, and without a case ending (flagged when that ending is ambiguous).
+    struct Reading { const NameForm *f; bool risky; };
+    std::vector<Reading> ra = {{&pa.full, false}}, rb = {{&pb.full, false}};
+    if (pa.has_strip) ra.push_back({&pa.stripped, pa.ambiguous});
+    if (pb.has_strip) rb.push_back({&pb.stripped, pb.ambiguous});
+    // A name of honorifics only ("Sir") may be anyone: at most a question.
+    const bool cap = pa.honorific_only || pb.honorific_only;
+    bool maybe = false;
+    if (pa.honorific_only && pb.honorific_only)
+        for (const auto &h : pa.only) if (pb.only.count(h)) maybe = true;
+    if (raw_norm(a) == raw_norm(b)) {
+        if (!cap) return PersonMatch::same;
+        maybe = true;
+    }
+    for (const auto &x : ra)
+        for (const auto &y : rb) {
+            const std::string kx = join(x.f->words), ky = join(y.f->words);
+            if (kx.empty() || ky.empty()) continue;
+            if (kx == ky && x.f->honorifics == y.f->honorifics) {
+                if (!cap && !x.risky && !y.risky) return PersonMatch::same;
+                maybe = true;
+            }
+            if (subset(x.f->words, y.f->words) || subset(y.f->words, x.f->words)) maybe = true;
+            else if (edit_distance(kx, ky) <= 1 && std::min(letters(kx), letters(ky)) >= 4) maybe = true;
+        }
+    if (maybe) return PersonMatch::maybe;
     return PersonMatch::different;
 }
 
@@ -468,12 +524,14 @@ bool apply_placement(Store &st, const Placement &p, int64_t new_id) {
 }
 
 bool merge_same_memory(Store &st, int64_t older, int64_t note_id, int64_t start_sec, const std::string &quote,
-                       const json &conf, int64_t now) {
+                       const json &conf, int64_t now, const std::vector<std::pair<int64_t, std::string>> &links) {
     json row = st.memory_item(older);
     if (!row.is_object()) return false;
     std::optional<double> c;
     if (conf.is_number()) c = conf.get<double>();
     if (!st.add_memory_source(older, note_id, start_sec, quote, c)) return false;
+    for (const auto &l : links)  // the same link twice is not an error (link_memory_entity ignores it)
+        if (l.first > 0 && !st.link_memory_entity(older, l.first, l.second)) return false;
     return st.update_memory_item(older, {{"last_seen", std::max<int64_t>(jint(row, "last_seen", 0), now)}});
 }
 

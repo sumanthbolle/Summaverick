@@ -26,6 +26,9 @@ std::string person_norm(const std::string &latin_word);
 std::string person_key(const std::string &name);
 
 enum class PersonMatch { same, maybe, different };
+// same: the normalised names are equal, or their keys are, with the same honorifics, where removing a case ending
+// counts only for clear endings (కి, కు, తో, లో, గారు ...). Removing ని, ను, ది, దే or కే (రజని is not Raja), a name
+// of honorifics only, a word subset or one letter apart (keys of 4+ letters): maybe. Else different.
 PersonMatch match_person(const std::string &a, const std::string &b);
 
 // The model's same-person check, answered with parse_yes_no.
@@ -56,11 +59,12 @@ struct Placement {
 Placement place_memory(const json &newer, const json &current, double cosine = -1);
 
 // After the new row is stored as new_id: update supersedes the older one (or the new one, newer_is_older);
-// contradiction queues both. A "same" placement adds the source to the older row instead
-// (merge_same_memory) and stores no new row.
+// contradiction queues both. A "same" placement adds the source, and the new mention's people and topic
+// links, to the older row instead (merge_same_memory) and stores no new row.
 bool apply_placement(Store &st, const Placement &p, int64_t new_id);
 bool merge_same_memory(Store &st, int64_t older, int64_t note_id, int64_t start_sec, const std::string &quote,
-                       const json &conf /* number or null */, int64_t now);
+                       const json &conf /* number or null */, int64_t now,
+                       const std::vector<std::pair<int64_t, std::string>> &links = {} /* (topic id, role) */);
 
 // Model answers for names that may be someone known: (name, existing topic id) -> 1 yes, 0 no, -1 unclear.
 // A pair with no answer (no model) counts as unclear.

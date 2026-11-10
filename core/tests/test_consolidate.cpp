@@ -53,6 +53,35 @@ TEST(match_person_more_spellings) {
     CHECK(match_person("", "Ravi") == PersonMatch::different);
 }
 
+TEST(match_person_case_endings_never_merge_other_names) {
+    // A ని/ను/ది/దే/కే ending may be part of the name: removing it can only give "maybe".
+    CHECK(match_person("Raja", "రజని") != PersonMatch::same);
+    CHECK(match_person("రాజా", "రజని") != PersonMatch::same);
+    CHECK(match_person("Rajani", "రజని") == PersonMatch::same);
+    CHECK(match_person("Janaki", "జానకి") == PersonMatch::same);
+    CHECK(match_person("Mohini", "మోహిని") == PersonMatch::same);
+    CHECK(match_person("Padmini", "పద్మిని") == PersonMatch::same);
+    CHECK(match_person("Padma", "పద్మిని") != PersonMatch::same);
+    CHECK(match_person("Saroja", "సరోజిని") != PersonMatch::same);
+    CHECK(match_person("Kamini", "కామిని") == PersonMatch::same);
+    CHECK(match_person("రవికి", "Ravi") == PersonMatch::same);   // కి is a clear ending
+    CHECK(match_person("రవితో", "రవి") == PersonMatch::same);
+    CHECK(match_person("రవిని", "Ravi") == PersonMatch::maybe);  // ని may be the name's own: ask
+}
+
+TEST(match_person_honorific_only_asks_at_most) {
+    CHECK(match_person("Sir", "Sir") == PersonMatch::maybe);
+    CHECK(match_person("Sir", "sir") == PersonMatch::maybe);
+    CHECK(match_person("Madam", "మేడం") == PersonMatch::maybe);
+    CHECK(match_person("సార్", "Sir") == PersonMatch::maybe);
+    CHECK(match_person("Sir", "Ravi") == PersonMatch::different);
+}
+
+TEST(person_norm_collapses_after_nasal_fold) {
+    CHECK_EQ(person_key("Ramna"), person_key("Ranna"));
+    CHECK_EQ(person_key("Ranna"), std::string("rana"));
+}
+
 TEST(transliterate_te_table) {
     CHECK_EQ(transliterate_te("రవి"), std::string("ravi"));
     CHECK_EQ(transliterate_te("లక్ష్మి"), std::string("laksmi"));
@@ -256,7 +285,14 @@ TEST(merge_same_memory_adds_source_and_last_seen) {
     int64_t n1 = s.create("a", "en", nullptr, "t", 1), n2 = s.create("b", "en", nullptr, "t", 1);
     int64_t m = s.add_memory_item({{"type", "fact"}, {"text", "Ravi paid 500"}, {"first_seen", 100}, {"last_seen", 100}});
     s.add_memory_source(m, n1, 0, "paid 500", std::nullopt);
-    CHECK(merge_same_memory(s, m, n2, 12, "Ravi paid 500", json(nullptr), 5000));
+    int64_t ravi = s.upsert_topic("person", "Ravi"), sita = s.upsert_topic("person", "Sita"), gate = s.upsert_topic("topic", "Gate");
+    s.link_memory_entity(m, ravi, "who");
+    // The new mention's people and topic join the older row; links it already has are not doubled.
+    CHECK(merge_same_memory(s, m, n2, 12, "Ravi paid 500", json(nullptr), 5000,
+                            {{ravi, "who"}, {sita, "mentioned"}, {gate, "topic"}}));
+    CHECK_EQ(s.memory_item(m)["people"].size(), (size_t)2);
+    CHECK_EQ(s.topic_memories(gate).size(), (size_t)0);  // not on the map (review new), but linked:
+    CHECK_EQ(s.memory_items_with_topics(json::object())[0]["topics"].size(), (size_t)1);
     json r = s.memory_item(m);
     CHECK_EQ(r["sources"].size(), (size_t)2);
     CHECK(r["last_seen"] == 5000);
