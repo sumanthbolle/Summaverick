@@ -33,7 +33,13 @@ struct Llm {
     bool last_cut = false;  // the last generate stopped at max_new_tokens, before an end-of-generation token
 
     ~Llm();
-    bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers);
+    bool embeddings = false;  // loaded as an embedding model (meaning search): embed() only, never complete()
+
+    // embeddings: an embedding model (EmbeddingGemma), CPU only whatever n_gpu_layers says (no GPU device, no op
+    // offload), the model's own pooling, one sequence per batch (n_batch = n_ubatch = n_ctx).
+    bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings = false);
+    // The pooled vector of text (its first n_ctx tokens), as the model gives it (not normalised). False on error.
+    bool embed(const std::string &text, std::vector<float> &out);
     std::vector<llama_token> tokenize(const std::string &text, bool add_special, bool parse_special) const;
     int count_tokens(const std::string &text) const;
     // Wrap (system,user) in the model's chat template. Falls back to a ChatML-style layout.

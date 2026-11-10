@@ -84,6 +84,10 @@ struct sve_ctx {
     // of them were heard a second time; logged and cleared at its "end" (N7: the phone check measures the share).
     std::map<std::string, std::pair<int, int>> hearings;
     std::unique_ptr<sve::Llm> llm;
+    // Meaning search (sve_load_embedder): a second, CPU-only model next to llm, and the tag its vectors are stored
+    // under (file name and dimensions), so vectors of another model are never compared with its own.
+    std::unique_ptr<sve::Llm> embed;
+    std::string embed_model;
 #ifdef SVE_WITH_MTMD
     mtmd_context *mtmd = nullptr; // audio projector; belongs to llm->model, freed before it
     std::string mmproj_path;      // the projector's file, to load it again with other threads

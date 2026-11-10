@@ -20,6 +20,7 @@
 #include "sve_chat.h"     // the health line, api mode
 #include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
 #include <sqlite3.h>
+#include <sys/resource.h>  // embed/gate modes: peak resident memory
 #include <map>
 #include "third_party/nlohmann/json.hpp"
 #include <cerrno>
@@ -1744,13 +1745,131 @@ static int run_memories(sve_ctx *ctx, const char *db_path) {
     return 0;
 }
 
+// ---------------------------------------------------------------- meaning search (Task 11)
+
+// Pieces (note_id, start_sec) of sve_search_json, at most n, in its order.
+static json search_pieces_of(sve_ctx *ctx, const std::string &q, size_t n) {
+    json out = json::array();
+    char *s = sve_search_json(ctx, q.c_str(), 60);
+    json hits = s ? json::parse(s, nullptr, false) : json::array();
+    sve_free_string(s);
+    if (!hits.is_array()) return out;
+    for (const auto &h : hits) {
+        if (out.size() >= n) break;
+        if (h.value("kind", "") == "piece") out.push_back({h["note_id"], h["start_sec"]});
+    }
+    return out;
+}
+
+static double peak_rss_mb() {
+    struct rusage ru;
+    getrusage(RUSAGE_SELF, &ru);
+    return ru.ru_maxrss / (1024.0 * 1024.0);  // bytes on macOS
+}
+
+// Embeds every pending piece and memory (CPU, 4 threads); fills the time per item and the count.
+static bool embed_all(sve_ctx *ctx, double &sec_per_item, int &count) {
+    count = 0;
+    auto t0 = std::chrono::steady_clock::now();
+    for (;;) {
+        int n = sve_embed_pending(ctx, 64, nullptr, nullptr);
+        if (n < 0) { fprintf(stderr, "sve_embed_pending failed (%d)\n", n); return false; }
+        if (n == 0) break;
+        count += n;
+        printf("embedded %d\n", count);
+        fflush(stdout);
+    }
+    double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    sec_per_item = count ? sec / count : 0;
+    return true;
+}
+
+// embed: SVE_DB (a copy), SVE_EMBEDDER. search: also SVE_QUESTION ("a|b" for several): top 5 pieces, keyword only and
+// keyword + meaning. gate: SVE_QUESTIONS (jsonl), SVE_RESULTS (out); SVE_GEMMA optional, loaded too for the memory
+// figure. Writes the results file tools/memory/meaning_gate.py run --results scores.
+static int run_meaning(sve_ctx *ctx, const char *mode, const char *db) {
+    const char *emb = getenv("SVE_EMBEDDER");
+    if (!emb) { fprintf(stderr, "set SVE_EMBEDDER (an EmbeddingGemma GGUF)\n"); return 2; }
+    std::vector<std::string> questions;
+    std::vector<json> rows;
+    if (!strcmp(mode, "search")) {
+        const char *q = getenv("SVE_QUESTION");
+        std::string all = q ? q : "";
+        for (size_t a = 0; a <= all.size();) {
+            size_t b = all.find('|', a);
+            if (b == std::string::npos) b = all.size();
+            if (b > a) questions.push_back(all.substr(a, b - a));
+            a = b + 1;
+        }
+        if (questions.empty()) { fprintf(stderr, "set SVE_QUESTION\n"); return 2; }
+    } else if (!strcmp(mode, "gate")) {
+        const char *qf = getenv("SVE_QUESTIONS");
+        if (!qf || !getenv("SVE_RESULTS")) { fprintf(stderr, "set SVE_QUESTIONS and SVE_RESULTS\n"); return 2; }
+        std::ifstream in(qf);
+        for (std::string line; std::getline(in, line);) {
+            json j = json::parse(line, nullptr, false);
+            if (j.is_object() && j.contains("q")) { questions.push_back(j["q"].get<std::string>()); rows.push_back(j); }
+        }
+        if (questions.empty()) { fprintf(stderr, "no questions in %s\n", qf); return 2; }
+    }
+    // Keyword only first, before any embedder is loaded: today's search.
+    std::vector<json> keyword;
+    for (const auto &q : questions) keyword.push_back(search_pieces_of(ctx, q, 5));
+    if (const char *g = getenv("SVE_GEMMA"); g && !strcmp(mode, "gate"))
+        if (sve_load_llm(ctx, g, 8192, 4, 0) != 0) { fprintf(stderr, "sve_load_llm failed\n"); return 1; }
+    if (sve_load_embedder(ctx, emb, 4) != 0) { fprintf(stderr, "sve_load_embedder failed\n"); return 1; }
+    double spp = 0;
+    int count = 0;
+    if (!embed_all(ctx, spp, count)) return 1;
+    sqlite3 *raw = nullptr;
+    int64_t index_bytes = 0, vectors = 0;
+    if (sqlite3_open_v2(db, &raw, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK) {
+        sqlite3_stmt *st = nullptr;
+        if (sqlite3_prepare_v2(raw, "SELECT COUNT(*), COALESCE(SUM(length(vec)),0) FROM embeddings", -1, &st, nullptr) == SQLITE_OK &&
+            sqlite3_step(st) == SQLITE_ROW) {
+            vectors = sqlite3_column_int64(st, 0);
+            index_bytes = sqlite3_column_int64(st, 1);
+        }
+        sqlite3_finalize(st);
+    }
+    sqlite3_close(raw);
+    printf("embedded %d now (%.3f s each), %lld vectors, %lld bytes of vectors, peak memory %.0f MB\n", count, spp,
+           (long long)vectors, (long long)index_bytes, peak_rss_mb());
+    if (!strcmp(mode, "embed")) return 0;
+    std::vector<json> hybrid;
+    for (const auto &q : questions) hybrid.push_back(search_pieces_of(ctx, q, 5));
+    if (!strcmp(mode, "search")) {
+        for (size_t i = 0; i < questions.size(); i++)
+            printf("Q: %s\n  keyword: %s\n  hybrid:  %s\n", questions[i].c_str(), keyword[i].dump().c_str(), hybrid[i].dump().c_str());
+        return 0;
+    }
+    std::ofstream out(getenv("SVE_RESULTS"));
+    const char *slash = strrchr(emb, '/');
+    out << json({{"meta", {{"embedder", slash ? slash + 1 : emb}, {"where", "mac"}, {"embed_sec_per_item", spp},
+                           {"embedded", count}, {"vectors", vectors}, {"index_bytes", index_bytes},
+                           {"peak_rss_mb", peak_rss_mb()}, {"with_gemma", getenv("SVE_GEMMA") != nullptr}}}})
+               .dump()
+        << "\n";
+    for (size_t i = 0; i < questions.size(); i++)
+        out << json({{"i", i}, {"q", questions[i]}, {"keyword", keyword[i]}, {"hybrid", hybrid[i]}}).dump() << "\n";
+    printf("wrote %zu results to %s\n", questions.size(), getenv("SVE_RESULTS"));
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "transcribe";
     const char *gguf = getenv("SVE_GEMMA"), *mmproj = getenv("SVE_MMPROJ"), *wav = getenv("SVE_TEST_WAV");
-    const char *db = !strcmp(mode, "memories") ? getenv("SVE_DB") : nullptr;
-    if (!strcmp(mode, "memories") && !db) { fprintf(stderr, "set SVE_DB (a copy of a notes.sqlite, never the original)\n"); return 2; }
+    const bool meaning = !strcmp(mode, "embed") || !strcmp(mode, "search") || !strcmp(mode, "gate");
+    const bool needs_db = !strcmp(mode, "memories") || meaning;
+    const char *db = needs_db ? getenv("SVE_DB") : nullptr;
+    if (needs_db && !db) { fprintf(stderr, "set SVE_DB (a copy of a notes.sqlite, never the original)\n"); return 2; }
     sve_ctx *ctx = sve_init(db ? db : ":memory:");
     if (!ctx) { fprintf(stderr, "sve_init failed\n"); return 1; }
+    if (meaning) {
+        int rc = run_meaning(ctx, mode, db);
+        sve_free(ctx);
+        return rc;
+    }
     if (!strcmp(mode, "api")) {
         run_api(ctx);
         // No context or no model: nothing to load again. (The flag itself needs a failed GPU run: checked on the phone.)

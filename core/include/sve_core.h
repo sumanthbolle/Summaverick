@@ -427,6 +427,27 @@ char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, vo
 char *sve_insight_latest(sve_ctx *ctx);
 int   sve_insight_dismiss(sve_ctx *ctx, int64_t id);
 
+/* ---- meaning search (optional second model) ----------------------------
+ * EmbeddingGemma 300M, loaded next to Gemma (never unloads it) and always on the CPU, so it also runs in the
+ * background. Vectors (the first 256 values, normalised) are stored per transcript piece and per current memory
+ * (not wrong, superseded, queued or a medicine's), under the model's file name; they are deleted with their piece
+ * or memory, with the note, by sve_note_clear_transcript and by the assistant wipe, and a memory's when its text
+ * changes. With no embedder loaded the search is the keyword search alone. */
+
+/* 0 ok, -1 bad arguments, -2 the model did not load (no embedder is loaded then). n_threads 0 => auto. */
+int   sve_load_embedder(sve_ctx *ctx, const char *gguf_path, int n_threads);
+void  sve_unload_embedder(sve_ctx *ctx);
+int   sve_embedder_loaded(const sve_ctx *ctx);
+/* Embeds up to limit pieces (notes that still have their transcript, newest notes first) and then current memories
+ * that have no vector of this model. Returns how many were stored (0 when none is left or all failed), -1 with no
+ * embedder or on error, -2 when cb (phase "embed", may be NULL) returned non-zero. */
+int   sve_embed_pending(sve_ctx *ctx, int limit, sve_progress_cb cb, void *user);
+/* Search for Ask: [{"kind":"piece","note_id","start_sec","score"} | {"kind":"memory","memory_id","score"}], best
+ * first, at most limit (10 when limit <= 0). The keyword search (top 20 pieces and top 20 current memories, the
+ * question's keywords) fused with the meaning search (top 20 each by cosine) by reciprocal rank fusion (k 60).
+ * With no embedder: the keyword order, pieces and memories interleaved by rank. NULL on error. */
+char *sve_search_json(sve_ctx *ctx, const char *query, int limit);
+
 /* ---- device settings (small key/value store, used by the device web UI and the apps) ---- */
 int   sve_setting_set(sve_ctx *ctx, const char *key, const char *value);
 char *sve_setting_get(sve_ctx *ctx, const char *key); /* NULL if unset */

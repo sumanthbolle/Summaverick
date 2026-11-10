@@ -17,10 +17,15 @@ Llm::~Llm() {
     if (model) llama_model_free(model);
 }
 
-bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers) {
+bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings) {
     llama_model_params mp = llama_model_default_params();
+    this->embeddings = embeddings;
+    if (embeddings) n_gpu_layers = 0;
     this->n_gpu_layers = n_gpu_layers;
     mp.n_gpu_layers = n_gpu_layers; // default load mode is mmap, which is what we want on every host
+    // The embedder runs in the background too, where iOS refuses GPU work: no GPU device at all.
+    static ggml_backend_dev_t kNoDevices[] = {nullptr};
+    if (embeddings) mp.devices = kNoDevices;
     model = llama_model_load_from_file(path, mp);
     if (!model) { sve_logf(2, "failed to load model %s", path); return false; }
     vocab = llama_model_get_vocab(model);
@@ -41,6 +46,13 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     cp.n_threads = n_threads;
     cp.n_threads_batch = n_threads_batch;
     cp.no_perf = true;
+    if (embeddings) {
+        // A whole passage in one ubatch (the embedding model's attention is not causal); pooling from the model.
+        cp.embeddings = true;
+        cp.n_batch = cp.n_ubatch = (uint32_t)n_ctx;
+        cp.n_seq_max = 1;
+        cp.op_offload = false;
+    }
     ctx = llama_init_from_model(model, cp);
     if (!ctx) { sve_logf(2, "failed to create context"); return false; }
 
@@ -51,6 +63,31 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     sve_logf(0, "loaded %s (n_ctx=%d, threads=%d, batch threads=%d, gpu_layers=%d)", desc, n_ctx, n_threads,
              n_threads_batch, n_gpu_layers);
     return true;
+}
+
+bool Llm::embed(const std::string &text, std::vector<float> &out) {
+    out.clear();
+    if (!embeddings || !ctx) return false;
+    std::vector<llama_token> toks = tokenize(text, true, false);
+    if (toks.empty()) return false;
+    if ((int)toks.size() > n_ctx) toks.resize(n_ctx);
+    if (llama_memory_t mem = llama_get_memory(ctx)) llama_memory_clear(mem, true);
+    llama_batch batch = llama_batch_init((int32_t)toks.size(), 0, 1);
+    for (size_t i = 0; i < toks.size(); i++) {
+        batch.token[i] = toks[i];
+        batch.pos[i] = (llama_pos)i;
+        batch.n_seq_id[i] = 1;
+        batch.seq_id[i][0] = 0;
+        batch.logits[i] = 1;  // every token is output; the model pools them
+    }
+    batch.n_tokens = (int32_t)toks.size();
+    bool ok = llama_decode(ctx, batch) == 0;
+    if (!ok) sve_logf(2, "embedding decode failed (%zu tokens)", toks.size());
+    const float *v = ok ? llama_get_embeddings_seq(ctx, 0) : nullptr;
+    if (ok && !v) sve_logf(2, "the embedding model has no pooling");
+    if (v) out.assign(v, v + llama_model_n_embd_out(model));  // the pooled vector's length
+    llama_batch_free(batch);
+    return v != nullptr;
 }
 
 std::vector<llama_token> Llm::tokenize(const std::string &text, bool add_special, bool parse_special) const {

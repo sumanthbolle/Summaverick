@@ -4,6 +4,7 @@
 #include "sve_core.h"
 #include "sve_internal.h"
 #include "sve_context.h"
+#include "sve_embed.h"
 #include "sve_extract.h"
 #include "sve_medcheck.h"
 #include "sve_brainmap.h"
@@ -502,4 +503,98 @@ char *sve_person_questions_json(sve_ctx *ctx) {
 
 int sve_person_question_answer(sve_ctx *ctx, int64_t id, int same) {
     return guard("sve_person_question_answer", -1, [&] { return ctx && ctx->store->answer_person_question(id, same != 0) ? 0 : -1; });
+}
+
+// ---------------------------------------------------------------- meaning search (Task 11)
+
+namespace {
+
+// The embedder's normalised vector of text (with its prompt), or empty on failure.
+std::vector<float> embed_text(sve_ctx *ctx, const std::string &prompt, const std::string &text) {
+    std::vector<float> raw;
+    if (!ctx->embed || !ctx->embed->embed(prompt + text, raw)) return {};
+    return sve::embed_normalize(std::move(raw), sve::kEmbedDims);
+}
+
+}  // namespace
+
+int sve_load_embedder(sve_ctx *ctx, const char *gguf_path, int n_threads) {
+    if (!ctx || !gguf_path) return -1;
+    return guard("sve_load_embedder", -1, [&] {
+        ctx->embed.reset();
+        ctx->embed_model.clear();
+        auto e = std::make_unique<sve::Llm>();
+        // CPU only, 2048 tokens (a piece is far shorter); Gemma (ctx->llm) is not touched.
+        if (!e->load(gguf_path, 2048, n_threads, 0, true)) return -2;
+        std::string name = gguf_path;
+        size_t slash = name.find_last_of('/');
+        if (slash != std::string::npos) name = name.substr(slash + 1);
+        ctx->embed = std::move(e);
+        ctx->embed_model = name + ":" + std::to_string(sve::kEmbedDims);
+        return 0;
+    });
+}
+
+void sve_unload_embedder(sve_ctx *ctx) {
+    if (!ctx) return;
+    ctx->embed.reset();
+    ctx->embed_model.clear();
+}
+
+int sve_embedder_loaded(const sve_ctx *ctx) { return ctx && ctx->embed ? 1 : 0; }
+
+int sve_embed_pending(sve_ctx *ctx, int limit, sve_progress_cb cb, void *user) {
+    if (!ctx || !ctx->store) return -1;
+    return guard("sve_embed_pending", -1, [&] {
+        if (!ctx->embed) return -1;
+        json rows = ctx->store->embed_pending(ctx->embed_model, limit);
+        const int total = (int)rows.size();
+        int done = 0;
+        for (int i = 0; i < total; i++) {
+            if (cb && cb("embed", i, total, user)) return -2;
+            const json &r = rows[i];
+            std::vector<float> v = embed_text(ctx, sve::kEmbedDocPrompt, jstr(r, "text"));
+            if (v.empty()) continue;  // logged by embed; tried again on a later run
+            if (ctx->store->set_embedding(jstr(r, "kind"), jint(r, "ref", 0), v, ctx->embed_model)) done++;
+        }
+        if (cb && cb("embed", total, total, user)) return -2;
+        return done;
+    });
+}
+
+char *sve_search_json(sve_ctx *ctx, const char *query, int limit) {
+    if (!ctx || !ctx->store || !query) return nullptr;
+    return guard("sve_search_json", (char *)nullptr, [&]() -> char * {
+        sve::Store &st = *ctx->store;
+        const std::string q = query;
+        const std::string kq = sve::keyword_query(q);
+        const std::string fq = kq.empty() ? q : kq;
+        std::vector<int64_t> piece_kw, mem_kw, piece_mn, mem_mn;
+        for (const auto &h : st.search_piece_refs(fq, sve::kSearchKeywordTop)) piece_kw.push_back(h["ref"].get<int64_t>());
+        for (const auto &id : st.search_memory_refs(fq, sve::kSearchKeywordTop)) mem_kw.push_back(id.get<int64_t>());
+        if (ctx->embed) {
+            std::vector<float> qv = embed_text(ctx, sve::kEmbedQueryPrompt, q);
+            if (!qv.empty()) {
+                piece_mn = sve::meaning_ranked(qv, st.embeddings("piece", ctx->embed_model), sve::kSearchMeaningTop);
+                mem_mn = sve::meaning_ranked(qv, st.embeddings("memory", ctx->embed_model), sve::kSearchMeaningTop);
+            }
+        }
+        std::vector<sve::SearchHit> hits = sve::fuse_search(piece_kw, piece_mn, mem_kw, mem_mn, limit > 0 ? limit : 10);
+        std::vector<int64_t> piece_ids;
+        for (const auto &h : hits) if (h.kind == "piece") piece_ids.push_back(h.ref);
+        std::map<int64_t, json> pieces;
+        for (const auto &p : st.piece_refs(piece_ids)) pieces[p["ref"].get<int64_t>()] = p;
+        json out = json::array();
+        for (const auto &h : hits) {
+            if (h.kind == "piece") {
+                auto it = pieces.find(h.ref);
+                if (it == pieces.end()) continue;  // deleted since the search
+                out.push_back({{"kind", "piece"}, {"note_id", it->second["note_id"]}, {"start_sec", it->second["start_sec"]},
+                               {"score", h.score}});
+            } else {
+                out.push_back({{"kind", "memory"}, {"memory_id", h.ref}, {"score", h.score}});
+            }
+        }
+        return dump(out);
+    });
 }
