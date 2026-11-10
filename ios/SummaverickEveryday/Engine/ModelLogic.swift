@@ -903,20 +903,25 @@ struct QueuedTap: Codable, Equatable {
     /// How many times in a row this tap's run was cut off (expiry, heat, the GPU stopped) and queued again. Not part
     /// of its identity: the same note and kind are one tap whatever the streak.
     var cutOffs: Int = 0
+    /// A regenerate's parts (of the kinds it writes) were cleared when its first turn started: a turn queued again
+    /// (cut off, stepped aside, the night) goes on from the parts it stored. Not part of its identity either.
+    var partsCleared: Bool = false
 
-    init(noteID: Int64, kind: Kind, cutOffs: Int = 0) {
+    init(noteID: Int64, kind: Kind, cutOffs: Int = 0, partsCleared: Bool = false) {
         self.noteID = noteID
         self.kind = kind
         self.cutOffs = cutOffs
+        self.partsCleared = partsCleared
     }
 
-    private enum CodingKeys: String, CodingKey { case noteID, kind, cutOffs }
+    private enum CodingKeys: String, CodingKey { case noteID, kind, cutOffs, partsCleared }
     /// A queue saved before the streak existed decodes with a streak of 0.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         noteID = try c.decode(Int64.self, forKey: .noteID)
         kind = try c.decode(Kind.self, forKey: .kind)
         cutOffs = try c.decodeIfPresent(Int.self, forKey: .cutOffs) ?? 0
+        partsCleared = try c.decodeIfPresent(Bool.self, forKey: .partsCleared) ?? false
     }
 
     static func == (a: QueuedTap, b: QueuedTap) -> Bool { a.noteID == b.noteID && a.kind == b.kind }
@@ -976,7 +981,7 @@ enum TapQueue {
 
     /// The tap queued again after a cut-off: one more in its streak (a success ends the tap, and the streak).
     static func requeued(_ t: QueuedTap) -> QueuedTap {
-        QueuedTap(noteID: t.noteID, kind: t.kind, cutOffs: t.cutOffs + 1)
+        QueuedTap(noteID: t.noteID, kind: t.kind, cutOffs: t.cutOffs + 1, partsCleared: t.partsCleared)
     }
 
     /// A tap cut off 3 times in a row runs only with the app in front or on the charger, never on battery in the
@@ -1702,21 +1707,32 @@ enum NoteSteps {
         var idx: Int
         var kind: Kind
         var done: Bool
+        /// Tries started (a kill included; a cancel taken back).
         var attempts: Int
         var lastError: String?
+        /// Tries that failed for a real reason (the core never counts a cancel, a kill or a GPU refusal).
+        var failures: Int
 
-        init(idx: Int, kind: Kind, done: Bool, attempts: Int = 0, lastError: String? = nil) {
+        init(idx: Int, kind: Kind, done: Bool, attempts: Int = 0, lastError: String? = nil, failures: Int = 0) {
             self.idx = idx; self.kind = kind; self.done = done; self.attempts = attempts; self.lastError = lastError
+            self.failures = failures
         }
 
-        enum CodingKeys: String, CodingKey { case idx, kind, done, attempts, lastError = "last_error" }
+        enum CodingKeys: String, CodingKey { case idx, kind, done, attempts, lastError = "last_error", failures }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            idx = try c.decode(Int.self, forKey: .idx)
+            kind = try c.decode(Kind.self, forKey: .kind)
+            done = try c.decode(Bool.self, forKey: .done)
+            attempts = try c.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
+            lastError = try c.decodeIfPresent(String.self, forKey: .lastError)
+            failures = try c.decodeIfPresent(Int.self, forKey: .failures) ?? 0
+        }
     }
 
     /// Real failures before a part is left for the person ("I couldn't write part %d. Try again").
     static let maxAttempts = 3
-
-    /// The core's last_error for a GPU run stopped in the background: a cut-off, never a real failure.
-    static let cutOffErrors: Set<String> = ["the run failed on the GPU"]
 
     /// The order: the summary (when missing), each section in order with notes then questions (only the parts not
     /// done and not given up), then the two assemble steps (no model call).
@@ -1741,12 +1757,9 @@ enum NoteSteps {
         return min(1, max(0, Double(done) / Double(total)))
     }
 
-    /// The part failed for a real reason `maxAttempts` times. A cut-off (no error kept, or the GPU refused in the
-    /// background) never counts, however many times it happened.
-    static func gaveUp(_ s: StepState) -> Bool {
-        guard !s.done, s.attempts >= maxAttempts, let e = s.lastError, !e.isEmpty else { return false }
-        return !cutOffErrors.contains(e)
-    }
+    /// The part failed for a real reason `maxAttempts` times. A cut-off (a cancel, a kill, the GPU refused in the
+    /// background) is never counted in failures by the core, however many times it happened.
+    static func gaveUp(_ s: StepState) -> Bool { !s.done && s.failures >= maxAttempts }
 
     /// Parts that gave up, as 1-based part numbers in section order, for "I couldn't write part %d. Try again".
     /// kind nil: either kind.
@@ -1778,10 +1791,20 @@ enum NoteSteps {
         return Double(telugu) / Double(letters) > 0.5
     }
 
+    /// The mark kept after the sections were written again for `lang`: the language and the piece ranges they were
+    /// written for. A mark that no longer matches (the sections changed, another language) does not hold.
+    static func rewriteMark(lang: String, ranges: [(Int, Int)]) -> String {
+        lang + "|" + ranges.map { "\($0.0)-\($0.1)" }.joined(separator: ",")
+    }
+
     /// Whether the sections are written again before the parts: the summaries read as the other language, and either
     /// parts were written in the other language (a switch) or no part is written in this one yet (so a run whose
     /// parts are under way never redoes its sections).
-    static func rewritesSections(summaryTexts: [String], lang: String, doneHere: Int, doneInOther: Int) -> Bool {
-        summariesInOtherLanguage(summaryTexts, lang: lang) && (doneInOther > 0 || doneHere == 0)
+    /// mark: the stored rewriteMark, and current the one for these sections now: once written again for this
+    /// language they are never written again until they change (so English titles in Telugu notes cost it once).
+    static func rewritesSections(summaryTexts: [String], lang: String, doneHere: Int, doneInOther: Int,
+                                 mark: String? = nil, current: String? = nil) -> Bool {
+        if let mark, mark == current { return false }
+        return summariesInOtherLanguage(summaryTexts, lang: lang) && (doneInOther > 0 || doneHere == 0)
     }
 }

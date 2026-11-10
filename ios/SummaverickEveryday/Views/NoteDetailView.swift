@@ -554,8 +554,9 @@ struct NoteDetailView: View {
         let ps = await CoreEngine.shared.pieces(noteID)
         chapters = await CoreEngine.shared.chapters(noteID)
         extracted = await CoreEngine.shared.noteExtracted(noteID)
-        partsLeft = [.notes: await ProcessingPipeline.partsLeft(noteID: noteID, kind: .notes),
-                     .questions: await ProcessingPipeline.partsLeft(noteID: noteID, kind: .questions)]
+        let lang = n?.lang ?? "en"
+        partsLeft = [.notes: await ProcessingPipeline.partsLeft(noteID: noteID, lang: lang, kind: .notes),
+                     .questions: await ProcessingPipeline.partsLeft(noteID: noteID, lang: lang, kind: .questions)]
         note = n
         pieces = ps
         loaded = true

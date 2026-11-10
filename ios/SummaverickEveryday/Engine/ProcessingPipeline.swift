@@ -737,15 +737,6 @@ final class ProcessingPipeline {
     func regenerateOutput(noteID id: Int64, kind: OutputKind?) async -> Previous? {
         let asked = personTapped(id, subtitle: Stage.loadingModel.label)   // before any await: the app is in front
         defer { personRunEnded(asked: asked) }
-        // The parts of what is written again are cleared once, at the tap (the old text stays until the new is put
-        // together): a run of this tap cut off and queued again goes on from the parts it stored.
-        if !(isBusy && activeNoteID == id) {
-            if let kind {
-                if let part = NoteSteps.Kind(kind) { await CoreEngine.shared.clearSectionOutputs(noteID: id, kind: part) }
-            } else {
-                await CoreEngine.shared.clearSectionOutputs(noteID: id, kind: nil)
-            }
-        }
         guard await personMayStart(QueuedTap(noteID: id, kind: .regenerate(output: kind?.rawValue))) else { return nil }
         return await runRegenerate(QueuedTap(noteID: id, kind: .regenerate(output: kind?.rawValue)))
     }
@@ -776,6 +767,17 @@ final class ProcessingPipeline {
         activeNoteID = id
         regenerating = request
         regenerateStopped = false
+        // The parts of what is written again are cleared once, when this tap's first turn starts (the old text stays
+        // until the new is put together): a turn queued again or resumed after a kill goes on from the parts stored.
+        var tap = tap
+        if !tap.partsCleared {
+            if let kind {
+                if let part = NoteSteps.Kind(kind) { await engine.clearSectionOutputs(noteID: id, kind: part) }
+            } else {
+                await engine.clearSectionOutputs(noteID: id, kind: nil)
+            }
+            tap.partsCleared = true
+        }
         runningTap = tap   // on disk: a kill keeps it
         defer { runningTap = nil }
         // A regenerate never queues the note for resuming nor changes its resume banner: put those back after.
@@ -862,6 +864,7 @@ final class ProcessingPipeline {
         }
         if abort.isSet { return nil }
         let covered = SectionWriter.coversAll(await engine.sections(id), pieceCount: pieces.count)
+        if covered { await markRewrittenSections(id, lang: lang) }
         let material = Self.notesMaterial(pieces, transcript: transcript)
         let fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
         var result = Previous(title: nil, outputs: [:])
@@ -940,7 +943,9 @@ final class ProcessingPipeline {
         defer { personRunEnded(asked: asked) }
         // Parts that failed 3 times are tried again by the note's next run (this one, or its queued turn); with the
         // notes already stored, only those parts are written and the notes put together again.
-        if !(await Self.partsLeft(noteID: id, kind: nil)).isEmpty { partsRetry.insert(id) }
+        if let note = await CoreEngine.shared.note(id), !(await Self.partsLeft(noteID: id, lang: note.lang, kind: nil)).isEmpty {
+            partsRetry.insert(id)
+        }
         guard await personMayStart(QueuedTap(noteID: id, kind: .generate)) else { return }
         interrupted.remove(id)
         heatPaused.remove(id)
@@ -1250,6 +1255,7 @@ final class ProcessingPipeline {
         let refill = partsRetry.contains(id)   // Try again on parts that were left: only those, then put together
         await rewriteSectionsIfOtherLanguage(id, lang: lang)
         guard let covered = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
+        if covered { await markRewrittenSections(id, lang: lang) }
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
         let material = Self.notesMaterial(await engine.pieces(id), transcript: transcript)
         let fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
@@ -1414,6 +1420,7 @@ final class ProcessingPipeline {
                                                                        onProgress: progress) { return t }
             // nil: cancelled (our flag) or the sections could not be used, then the transcript as before.
             if abort.isSet { throw CoreError.generationFailed }
+            guard await engine.note(id) != nil else { throw CoreError.notFound }   // deleted meanwhile: nothing to write
             return try await engine.generate(transcript: transcript, kind: kind, lang: lang, shouldStop: { abort.isSet }, onProgress: progress)
         }
     }
@@ -1464,8 +1471,12 @@ final class ProcessingPipeline {
         let engine = CoreEngine.shared
         let sections = await engine.sections(id).count
         let state = await engine.sectionOutputsState(noteID: id, lang: lang) ?? []
-        let total = NoteSteps.total(sections: sections, summary: true)
-        var done = total - NoteSteps.plan(sections: sections, state: state, hasSummary: !toWrite[0]).count
+        // Parts only of the outputs this run puts together (a resumed run with the notes stored writes no notes parts).
+        let kinds = [NoteSteps.Kind.notes, .questions].filter { toWrite[$0.outputKind.rawValue] || refill }
+        let plan = NoteSteps.plan(sections: sections, state: state, hasSummary: !toWrite[0])
+        let total = 1 + kinds.count * (sections + 1)   // the summary, each kind's parts and its putting together
+        let stepsLeft = (toWrite[0] ? 1 : 0) + kinds.map { NoteSteps.parts(plan, kind: $0).count + 1 }.reduce(0, +)
+        var done = total - stepsLeft
         ContinuedWork.shared.update(fraction: Self.stepsFraction(NoteSteps.progress(done: done, total: total)))
         NSLog("[sve] note %lld: notes in steps: %ld parts, %ld of %ld steps done", id, sections, done, total)
 
@@ -1493,7 +1504,7 @@ final class ProcessingPipeline {
         }
 
         // 2. Each section's notes, then its questions.
-        switch await writeParts(noteID: id, lang: lang, kinds: [.notes, .questions], done: done, total: total,
+        switch await writeParts(noteID: id, lang: lang, kinds: kinds, done: done, total: total,
                                 fraction: { Self.stepsFraction($0) }) {
         case .done: break
         case .cutOff: stopShort(CoreError.generationFailed.localizedDescription); return false
@@ -1505,7 +1516,7 @@ final class ProcessingPipeline {
         // 3. Put together (no model): a part that was left shows its heading and "(not written yet)".
         let now = await engine.sectionOutputsState(noteID: id, lang: lang) ?? []
         var missing: [NoteSteps.Kind] = []
-        for kind in [NoteSteps.Kind.notes, .questions] where toWrite[kind.outputKind.rawValue] || refill {
+        for kind in kinds {
             guard let text = await engine.assembleOutput(noteID: id, kind: kind, lang: lang, placeholder: Self.notWrittenYet) else {
                 NSLog("[sve] note %lld: no %@ part written; nothing to put together", id, kind.outputKind.title)
                 missing.append(kind)
@@ -1524,9 +1535,7 @@ final class ProcessingPipeline {
             let line = Self.partLeftLine(first)
             NSLog("[sve] bg: note %lld failed: no part of an output could be written", id)
             partsRetry.remove(id)   // a real failure: the person's Try again marks it again
-            lastFailure[id] = line
-            stage = .failed(line)
-            notifyFailed(id, line: line)
+            stage = .failed(line)   // sets the note's failure line and posts the failed notification
             return false
         }
         if !missing.isEmpty {   // nothing to put together and no part left: not expected; the failure rules decide
@@ -1601,10 +1610,41 @@ final class ProcessingPipeline {
         let other = lang == "te" ? "en" : "te"
         let here = await engine.sectionOutputsState(noteID: id, lang: lang)?.filter(\.done).count ?? 0
         let there = await engine.sectionOutputsState(noteID: id, lang: other)?.filter(\.done).count ?? 0
+        let key = Self.rewriteMarkKey(id), mark = await engine.setting(key)
+        // Being written again for this language already (a run cut off in the middle): the missing ones follow.
+        guard mark != Self.rewritePendingMark(lang) else { return }
         guard NoteSteps.rewritesSections(summaryTexts: secs.flatMap { [$0.summary.title, $0.summary.topic] }, lang: lang,
-                                         doneHere: here, doneInOther: there) else { return }
+                                         doneHere: here, doneInOther: there, mark: mark,
+                                         current: Self.rewriteMark(secs, lang: lang)) else { return }
         NSLog("[sve] note %lld: the part headings read as another language; the sections are written again in %@", id, lang)
         await engine.setSections(id, [])
+        // Matches no sections; marked for real once they are written again (markRewrittenSections). On disk, so a
+        // run cut off or killed in between still marks them when it finishes.
+        await engine.setSetting(key, Self.rewritePendingMark(lang))
+    }
+
+    private static func rewritePendingMark(_ lang: String) -> String { lang + "|" }
+
+    /// Settings key of a note's "sections written again for lang" mark (NoteSteps.rewriteMark).
+    private static func rewriteMarkKey(_ id: Int64) -> String { "sections.rewritten.\(id)" }
+
+    private static func rewriteMark(_ secs: [NoteSection], lang: String) -> String {
+        NoteSteps.rewriteMark(lang: lang, ranges: secs.map { ($0.firstPiece, $0.lastPiece) })
+    }
+
+    /// After writeSections: the sections written again for a language switch now cover the recording, so they are
+    /// marked (once per switch; a later change of the sections makes the mark not hold).
+    private func markRewrittenSections(_ id: Int64, lang: String) async {
+        let engine = CoreEngine.shared, key = Self.rewriteMarkKey(id)
+        guard await engine.setting(key) == Self.rewritePendingMark(lang) else { return }
+        await engine.setSetting(key, Self.rewriteMark(await engine.sections(id), lang: lang))
+    }
+
+    /// Section summaries that failed in a row for a note (a stop each time; the third sends it to the transcript).
+    private func sectionFailures(_ id: Int64) -> Int { UserDefaults.standard.integer(forKey: "sectionFailures.\(id)") }
+    private func setSectionFailures(_ id: Int64, _ n: Int) {
+        if n == 0 { UserDefaults.standard.removeObject(forKey: "sectionFailures.\(id)") }
+        else { UserDefaults.standard.set(n, forKey: "sectionFailures.\(id)") }
     }
 
     /// The parts of a note that failed 3 times for a real reason, in either notes language, cleared so the next run
@@ -1621,13 +1661,10 @@ final class ProcessingPipeline {
         return cleared
     }
 
-    /// Parts of a note that were left, for its "I couldn't write part %d. Try again" lines: kind nil, either kind.
-    nonisolated static func partsLeft(noteID: Int64, kind: NoteSteps.Kind?) async -> [Int] {
-        var parts = Set<Int>()
-        for lang in ["en", "te"] {
-            parts.formUnion(NoteSteps.gaveUpParts(await CoreEngine.shared.sectionOutputsState(noteID: noteID, lang: lang) ?? [], kind: kind))
-        }
-        return parts.sorted()
+    /// Parts of a note that were left, in the note's language, for its "I couldn't write part %d. Try again" lines:
+    /// kind nil, either kind.
+    nonisolated static func partsLeft(noteID: Int64, lang: String, kind: NoteSteps.Kind?) async -> [Int] {
+        NoteSteps.gaveUpParts(await CoreEngine.shared.sectionOutputsState(noteID: noteID, lang: lang) ?? [], kind: kind)
     }
 
     /// Writes the note's missing section summaries from its stored pieces, one at a time, each stored before the
@@ -1701,7 +1738,9 @@ final class ProcessingPipeline {
                 }
                 return nil
             }
-            return SectionWriter.coversAll(done, pieceCount: pieces.count)
+            let covers = SectionWriter.coversAll(done, pieceCount: pieces.count)
+            if covers { setSectionFailures(id, 0) }
+            return covers
         } catch {
             if quiet {
                 NSLog("[sve] section backfill stopped: %@", String(describing: error))
@@ -1710,7 +1749,16 @@ final class ProcessingPipeline {
             }
             if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription, error: error); return nil }
             if pausedForHeat(id) { return nil }
-            NSLog("[sve] section summaries failed, notes come from the transcript: %@", String(describing: error))
+            // One failed section summary is a stop (the failure rules decide: queued again, or Try again); only a
+            // section that failed 3 times sends the note to the whole-transcript path.
+            let fails = sectionFailures(id) + 1
+            setSectionFailures(id, fails)
+            guard fails >= NoteSteps.maxAttempts else {
+                NSLog("[sve] section summary failed (%ld of %ld): %@", fails, NoteSteps.maxAttempts, String(describing: error))
+                stopShort(error.localizedDescription, error: error)
+                return nil
+            }
+            NSLog("[sve] section summaries failed %ld times, notes come from the transcript: %@", fails, String(describing: error))
             return false
         }
     }
