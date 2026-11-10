@@ -114,8 +114,8 @@ public:
     json memory_items(const json &filter);
     // memory_items plus "topics":[{id,name}] (non-person topics the memory is linked to), for the map.
     json memory_items_with_topics(const json &filter);
-    // Memories linked to a person or topic (any role), not wrong, superseded or queued, by importance.
-    json topic_memories(int64_t topic_id);
+    // Memories linked to a person or topic (any role) that the map may show (memory_on_map), by importance.
+    json topic_memories(int64_t topic_id, int64_t note_id = 0);  // same eligibility as the map; note_id 0 = all
     json memory_item(int64_t id);  // null when missing; adds "history" (rows it superseded, newest first)
     bool update_memory_item(int64_t id, const json &fields);  // whitelisted columns only
     bool delete_memory_item(int64_t id);

@@ -1,5 +1,6 @@
 #include "check.h"
 #include "sve_brainmap.h"
+#include "sve_memory.h"
 #include "sve_store.h"
 
 using namespace sve;
@@ -123,6 +124,14 @@ TEST(store_topic_memories_and_map_rows) {
     CHECK(st.link_memory_entity(b, topic, "topic"));
     json under = st.topic_memories(person);
     CHECK_EQ(under.size(), (size_t)2);  // queued one left out
+    int64_t fresh = st.add_memory_item({{"type", "fact"}, {"text", "Unreviewed"}, {"review", "new"}});
+    CHECK(st.add_memory_source(fresh, note, 0, "quote", std::nullopt));
+    CHECK(st.link_memory_entity(fresh, person, "mentioned"));
+    CHECK_EQ(st.topic_memories(person).size(), (size_t)2);  // review new stays out, as on the map
+    int64_t note2 = st.create("n2", "en", nullptr, "y", 1);
+    CHECK(st.add_memory_source(a, note2, 0, "quote", std::nullopt));
+    CHECK_EQ(st.topic_memories(person, note2).size(), (size_t)1);
+    CHECK_EQ(st.topic_memories(person, note).size(), (size_t)2);
     CHECK_EQ(under[0]["id"].get<int64_t>(), b);  // by importance
     CHECK_EQ(st.topic_memories(topic).size(), (size_t)1);
     json rows = st.memory_items_with_topics({{"queue", 0}});
@@ -136,4 +145,24 @@ TEST(store_topic_memories_and_map_rows) {
     CHECK(saw_ravi && saw_budget);
     CHECK(st.update_memory_item(a, {{"last_used", 12345}}));
     CHECK_EQ(st.memory_item(a)["last_used"].get<int>(), 12345);
+}
+
+TEST(map_bad_meaning_pair_does_not_blank_map) {
+    json ms = json::array({mem(1, "promise", 1), mem(2, "promise", 1)});
+    json pairs = json::array({{{"a", "x"}, {"b", 2}, {"cos", 0.9}}, {{"a", 1}, {"b", 2}, {"cos", "high"}},
+                              {{"a", 1}, {"b", 2}, {"cos", 0.9}}});
+    json m = build_brain_map(ms, kNone, kNone, pairs, 0);
+    int n = 0;
+    for (const auto &l : m["links"]) if (l["kind"] == "meaning") n++;
+    CHECK_EQ(n, 1);
+    CHECK(branch(m, "promises") != nullptr);
+}
+
+TEST(touch_raises_importance) {
+    json row = mem(1, "promise", 0);
+    row["last_seen"] = 1000000;
+    const int64_t now = 1000000 + 120 * 86400;
+    double stale = memory_importance(row, 1, 0, now);
+    row["last_used"] = now - 86400;
+    CHECK(memory_importance(row, 1, 0, now) > stale);
 }

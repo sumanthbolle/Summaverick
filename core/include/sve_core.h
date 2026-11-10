@@ -335,8 +335,9 @@ int   sve_memory_edit(sve_ctx *ctx, int64_t id, const char *text);
 /* The mind map as JSON (see sve_brainmap.h): {"center","list","branches","links"}. note_id 0 = all recordings,
  * else only that recording's memories. Only kept or corrected, unqueued, current memories. NULL on error. */
 char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id);
-/* Memories under a person or topic ("Who is this?" for a person), by importance, same rows as sve_memories_json. */
-char *sve_topic_memories_json(sve_ctx *ctx, int64_t topic_id);
+/* Memories under a person or topic ("Who is this?" for a person), by importance, same rows as sve_memories_json,
+ * and only those the map shows (so counts match). note_id > 0: only that recording's. */
+char *sve_topic_memories_json(sve_ctx *ctx, int64_t topic_id, int64_t note_id /* 0 = all */);
 /* Marks a memory as used just now (last_used), which raises its importance. 0 ok, -1 error. */
 int   sve_memory_touch(sve_ctx *ctx, int64_t id);
 /* Deletes a memory (not a medicine's: delete the medicine). 0 ok, -1 error. */

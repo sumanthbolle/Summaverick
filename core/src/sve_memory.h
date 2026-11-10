@@ -65,4 +65,10 @@ bool goes_to_queue(const json &row, int double_check, bool direct_allowed);
 // person appears in. Halves every 60 days since max(last_seen, last_used) (unix seconds).
 double memory_importance(const json &row, int people_met_max, int practice_successes, int64_t now);
 
+// The one rule for what the map and a person's or topic's list may show: current (not superseded), not wrong,
+// not queued, and review kept or corrected unless kDirectToMapDefault. memory_map_review_sql is the same rule
+// as an SQL fragment over alias m (starts with " AND ").
+bool memory_on_map(const json &row);
+const char *memory_map_review_sql();
+
 }  // namespace sve

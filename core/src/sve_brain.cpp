@@ -338,8 +338,8 @@ char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id) {
     });
 }
 
-char *sve_topic_memories_json(sve_ctx *ctx, int64_t topic_id) {
-    return guard<char *>("sve_topic_memories_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->topic_memories(topic_id)) : nullptr; });
+char *sve_topic_memories_json(sve_ctx *ctx, int64_t topic_id, int64_t note_id) {
+    return guard<char *>("sve_topic_memories_json", nullptr, [&]() -> char * { return ctx ? dump(ctx->store->topic_memories(topic_id, note_id)) : nullptr; });
 }
 
 int sve_memory_touch(sve_ctx *ctx, int64_t id) {

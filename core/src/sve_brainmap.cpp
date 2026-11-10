@@ -24,14 +24,7 @@ bool has_source(const json &m, int64_t note_id) {
     return false;
 }
 
-bool shown_on_map(const json &m) {
-    if (m.value("queue", 0) != 0) return false;
-    if (m.contains("superseded_by") && !m["superseded_by"].is_null()) return false;
-    const std::string review = m.value("review", std::string());
-    if (review == "wrong") return false;
-    if (kDirectToMapDefault) return true;
-    return review == "kept" || review == "corrected";
-}
+bool shown_on_map(const json &m) { return memory_on_map(m); }
 
 json item_json(const Item &it) {
     return {{"ref", it.ref}, {"label", it.label}, {"importance", it.importance}, {"new", it.is_new},
@@ -163,6 +156,7 @@ json build_brain_map(const json &memories, const json &people, const json &topic
     if (meaning_pairs.is_array())
         for (const auto &p : meaning_pairs) {
             if (!p.is_object() || !p.contains("a") || !p.contains("b") || !p.contains("cos")) continue;
+            if (!p["a"].is_number_integer() || !p["b"].is_number_integer() || !p["cos"].is_number()) continue;
             const int64_t a = p["a"].get<int64_t>(), b = p["b"].get<int64_t>();
             const double c = p["cos"].get<double>();
             if (a != b && c >= 0.8 && shown.count(a) && shown.count(b)) pairs.push_back({a, b, c});

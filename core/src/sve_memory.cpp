@@ -551,4 +551,16 @@ double memory_importance(const json &row, int people_met_max, int practice_succe
     return base * std::pow(0.5, days / 60.0);
 }
 
+bool memory_on_map(const json &m) {
+    if (!m.is_object() || jint(m, "queue", 0) != 0) return false;
+    if (m.contains("superseded_by") && !m["superseded_by"].is_null()) return false;
+    const std::string review = jstr(m, "review");
+    if (review == "wrong") return false;
+    return kDirectToMapDefault || review == "kept" || review == "corrected";
+}
+
+const char *memory_map_review_sql() {
+    return kDirectToMapDefault ? " AND m.review<>'wrong'" : " AND m.review IN ('kept','corrected')";
+}
+
 }  // namespace sve

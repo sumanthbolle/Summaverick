@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 #include <ctime>
 #include <cstring>
+#include <map>
 
 namespace sve {
 
@@ -839,22 +840,28 @@ json Store::memory_items(const json &filter) {
 
 json Store::memory_items_with_topics(const json &filter) {
     json rows = memory_items(filter);
-    for (auto &r : rows)
-        r["topics"] = query_rows("SELECT DISTINCT t.id AS id, t.name AS name FROM memory_entities e JOIN topics t ON t.id=e.topic_id "
-                                 "WHERE e.memory_id=? AND t.kind<>'person' ORDER BY t.id", {r["id"]});
+    std::map<int64_t, json> by_memory;
+    for (auto &r : query_rows("SELECT DISTINCT e.memory_id AS memory_id, t.id AS id, t.name AS name FROM memory_entities e "
+                              "JOIN topics t ON t.id=e.topic_id WHERE t.kind<>'person' ORDER BY t.id", {}))
+        by_memory[r["memory_id"].get<int64_t>()].push_back({{"id", r["id"]}, {"name", r["name"]}});
+    for (auto &r : rows) {
+        auto it = by_memory.find(r["id"].get<int64_t>());
+        r["topics"] = it == by_memory.end() ? json::array() : it->second;
+    }
     return rows;
 }
 
-json Store::topic_memories(int64_t topic_id) {
-    json rows = memory_items({{"queue", 0}});
-    json out = json::array();
-    for (auto &r : rows) {
-        auto ids = query_rows("SELECT 1 FROM memory_entities WHERE memory_id=? AND topic_id=? LIMIT 1", {r["id"], topic_id});
-        if (!ids.empty()) out.push_back(r);
+json Store::topic_memories(int64_t topic_id, int64_t note_id) {
+    std::string sql = std::string("SELECT ") + kMemoryCols + " FROM memories m JOIN memory_entities e ON e.memory_id=m.id "
+                      "WHERE e.topic_id=? AND m.queue=0 AND m.superseded_by IS NULL" + memory_map_review_sql();
+    std::vector<json> binds = {topic_id};
+    if (note_id > 0) {
+        sql += " AND m.id IN (SELECT memory_id FROM memory_sources WHERE note_id=?)";
+        binds.push_back(note_id);
     }
-    std::stable_sort(out.begin(), out.end(), [](const json &a, const json &b) {
-        return a.value("importance", 0.0) > b.value("importance", 0.0);
-    });
+    sql += " GROUP BY m.id ORDER BY m.importance DESC, m.id DESC";
+    json out = json::array();
+    for (auto &r : query_rows(sql.c_str(), binds)) out.push_back(memory_full(r));
     return out;
 }
 
