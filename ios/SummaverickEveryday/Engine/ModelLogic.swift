@@ -829,6 +829,50 @@ enum TaskLifecycle {
 
 }
 
+/// The continued-processing task asked for at Record, not at Stop (phone log, note 24: a request submitted when Stop
+/// came from the lock-screen Live Activity was accepted by submit() but never started, and the locked app was
+/// suspended; iOS only starts a request made with the app in front). Held through the recording, so a Stop from
+/// anywhere (Live Activity, Control Center, a shortcut, Siri) finds it and the note's work joins it.
+enum TaskAtRecord {
+    enum Action: Equatable {
+        /// Ask now (a held task whose work is done is completed first, as TaskLifecycle.onBegin).
+        case submit
+        /// A task is held or asked for: the recording joins it.
+        case keep
+        /// Nothing is asked: from the background iOS never starts it, or nothing follows Stop (no language pack).
+        case none
+    }
+
+    /// asked: a task is held or asked for; workLeft: a note run in it has not ended.
+    static func atRecord(appActive: Bool, aiReady: Bool, asked: Bool, workLeft: Bool) -> Action {
+        if asked && (workLeft || !appActive) { return .keep }
+        guard appActive, aiReady else { return asked ? .keep : .none }
+        return .submit
+    }
+
+    /// A finish while the recording runs keeps the task: Stop comes later and the note's work joins it.
+    static func finishKeepsTask(recording: Bool) -> Bool { recording }
+
+    /// At Stop (TaskLifecycle.onBegin), a task held for the recording has work left: it is kept, never finished and
+    /// asked for again (from the background that request would never start).
+    static func workLeftAtBegin(noteRunning: Bool, recording: Bool) -> Bool { noteRunning || recording }
+
+    /// Asked at Record but never started (iOS may accept a request and never run it): at a Stop in front it is asked
+    /// for again.
+    static func asksAgainAtStop(appActive: Bool, asked: Bool, held: Bool) -> Bool { appActive && asked && !held }
+
+    /// Right after Stop: with no task held (Record itself came from the background, or iOS ended or refused the task)
+    /// the app is suspended soon and nothing is written until it is opened, so the person is told so, once.
+    static func postsOpenAppNotice(stoppedInBackground: Bool, taskHeld: Bool, workLeft: Bool) -> Bool {
+        stoppedInBackground && !taskHeld && workLeft
+    }
+
+    /// An expiry while recording is a pause (the notes are still to come), never done.
+    static func expiryCompletion(recording: Bool, workLeft: Bool) -> TaskLifecycle.Completion {
+        recording || workLeft ? .paused : .done
+    }
+}
+
 /// A person's tap (Regenerate, Generate notes or Try again, Find reminders) made while another note's work runs: it
 /// waits its turn and runs by itself, never dropped. Kept across launches (TapQueue.key).
 struct QueuedTap: Codable, Equatable {
@@ -937,28 +981,49 @@ enum TapQueue {
 /// never go back. Inside a note, its notes fill units 0...900 and its memories and insight 900...990; a heartbeat
 /// moves the note's units up to 990, so it can always move while that note's work is alive, however many notes
 /// the task runs. Done (the total) is shown only when the task finishes.
+/// A task asked for at Record starts with the recording (startRecording): each heartbeat then adds one unit and
+/// grows the total by up to `recordingSpread`, so the bar always moves but stays under `recordingShare` however long
+/// the recording runs. At Stop the first note takes the rest of the bar from where the recording left it.
 struct TaskProgress: Equatable {
     static let noteUnits: Int64 = 1000
     /// Where the note's notes end and its memories and insight start (of its own 0...1).
     static let notesShare = 0.9
+    /// While recording the bar stays under this (1 / recordingSpread).
+    static let recordingShare = 0.05
+    static let recordingSpread: Int64 = 20
 
     private(set) var totalUnits: Int64 = noteUnits
     private(set) var completedUnits: Int64 = 0
-    /// The note's own progress, of its 1000 units (heartbeats included), 0...0.99.
+    /// The note's own progress, of its units (heartbeats included), 0...0.99.
     private(set) var noteFraction: Double = 0
     /// The note's notes 0...1, as the pipeline reports them (for the note's percent in notices and the Live Activity).
     private(set) var notesFraction: Double = 0
     /// The note in flight has all its notes written.
     private(set) var notesDone = false
+    /// A recording holds the task and no note has started since (heartbeats move the recording's band).
+    private(set) var recording = false
     private var noteBase: Int64 = 0
+    private var noteSpan: Int64 = noteUnits
     private var noteStarted = false
 
-    /// A note run starts in the task: the first one uses the task's first 1000 units, a later one adds its own 1000.
+    /// What the lock screen shows, 0...1.
+    var fraction: Double { totalUnits > 0 ? Double(completedUnits) / Double(totalUnits) : 0 }
+
+    /// A recording starts in this task (asked for at Record, or joining a task already held).
+    mutating func startRecording() { recording = true }
+
+    /// A note run starts in the task: the first one uses the task's first 1000 units (after a recording: the rest of
+    /// the bar from where the recording left it), a later one adds its own 1000.
     mutating func startNote() {
         if noteStarted {
             totalUnits += Self.noteUnits
             noteBase = totalUnits - Self.noteUnits
+            noteSpan = Self.noteUnits
+        } else if recording {
+            noteBase = completedUnits
+            noteSpan = totalUnits - completedUnits
         }
+        recording = false
         noteStarted = true
         noteFraction = 0
         notesFraction = 0
@@ -981,8 +1046,17 @@ struct TaskProgress: Equatable {
         move(to: Self.notesShare + (0.99 - Self.notesShare) * min(1, max(0, part)))
     }
 
-    /// One heartbeat on the note's own units (NotesProgress.heartbeatFraction: never past 990). False when it cannot move.
+    /// One heartbeat on the note's own units (NotesProgress.heartbeatFraction: never past 990). While recording: one
+    /// unit more and a total grown by up to recordingSpread (never so much that the bar goes back). False when it
+    /// cannot move.
     mutating func heartbeat() -> Bool {
+        if recording {
+            let spread = completedUnits == 0 ? Self.recordingSpread
+                : min(Self.recordingSpread, max(1, totalUnits / completedUnits))
+            completedUnits += 1
+            totalUnits += spread
+            return true
+        }
         let next = NotesProgress.heartbeatFraction(noteFraction)
         guard next > noteFraction else { return false }
         move(to: next)
@@ -991,7 +1065,7 @@ struct TaskProgress: Equatable {
 
     private mutating func move(to f: Double) {
         noteFraction = max(noteFraction, min(0.99, max(0, f)))
-        completedUnits = max(completedUnits, noteBase + Int64(noteFraction * Double(Self.noteUnits)))
+        completedUnits = max(completedUnits, noteBase + Int64(noteFraction * Double(noteSpan)))
     }
 }
 
