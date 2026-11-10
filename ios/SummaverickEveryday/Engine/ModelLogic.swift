@@ -408,7 +408,8 @@ enum NotifyRule {
     static func next(posted: Set<String>, stage: String) -> Bool { !posted.contains(stage) }
 
     /// "Transcript ready" only with a real title: with the placeholder, "Summary ready" follows with the real one.
-    static func saysTranscriptReady(title: String) -> Bool { !title.hasPrefix("Recording ") }
+    /// Counting ("1 of 3 ready", StepCount) it is posted with the placeholder too, so the count starts at 1.
+    static func saysTranscriptReady(title: String, counting: Bool = false) -> Bool { counting || !title.hasPrefix("Recording ") }
 
     /// What a regenerate finishing in the background says: a summary-only one "Summary ready", any other "Your notes are ready".
     static func regenerateStage(summaryOnly: Bool) -> String { summaryOnly ? summary : notes }
@@ -450,6 +451,100 @@ enum NotifyCopy {
     static func storedFirstName(in defaults: UserDefaults = .standard) -> String? {
         firstName(of: defaults.string(forKey: firstNameKey))
     }
+}
+
+/// "1 of 3 ready" (owner, 2026-11-10: "so it will give an impression something is already working"). The parts of a
+/// notes run, in order: the transcript (stored after Stop), the summary (title and short summary), the notes
+/// (detailed notes and revision questions: one stored part with one "ready" notification, NotifyRule.notes). The
+/// total is what this run writes; with one part there is no counter. A "Write again" replaces its text only once
+/// everything asked for is written, so it has one ready moment and no counter either (it never counts).
+struct StepCount: Equatable {
+    enum Part: String, Equatable { case transcript, summary, notes }
+
+    let parts: [Part]
+    private(set) var ready: [Part] = []
+
+    init(parts: [Part]) { self.parts = parts }
+
+    /// outputsToWrite: per OutputKind (short summary, detailed notes, questions), as WaitingNotes.outputsToWrite.
+    static func parts(writesTranscript: Bool, outputsToWrite: [Bool]) -> [Part] {
+        var p: [Part] = writesTranscript ? [.transcript] : []
+        if outputsToWrite.first == true { p.append(.summary) }
+        if outputsToWrite.dropFirst().contains(true) { p.append(.notes) }
+        return p
+    }
+
+    /// A "Write again" of these OutputKind raw values (the summary is 0).
+    static func parts(regenerating kinds: [Int]) -> [Part] {
+        parts(writesTranscript: false, outputsToWrite: (0..<3).map { kinds.contains($0) })
+    }
+
+    var total: Int { parts.count }
+    var counts: Bool { total > 1 }
+
+    /// The part is stored: its number (1...total). nil when it is not one this run writes, or was already counted.
+    mutating func stored(_ part: Part) -> Int? {
+        guard parts.contains(part), !ready.contains(part) else { return nil }
+        ready.append(part)
+        return ready.count
+    }
+
+    /// The line of a part's "ready" notification ("1 of 3 ready: what was said. Writing your summary…"); nil without a counter.
+    func readyLine(step: Int, part: Part) -> String? {
+        guard counts else { return nil }
+        let n = min(max(1, step), total), t = total
+        if n == t { return String(localized: "\(n) of \(t) ready. Your notes are done.") }
+        let next = parts.firstIndex(of: part).flatMap { i in i + 1 < parts.count ? parts[i + 1] : nil }
+        switch (part, next) {
+        case (.transcript, .summary): return String(localized: "\(n) of \(t) ready: what was said. Writing your summary…")
+        case (.transcript, .notes): return String(localized: "\(n) of \(t) ready: what was said. Writing your notes…")
+        case (.summary, .notes): return String(localized: "\(n) of \(t) ready: your summary. Writing your notes…")
+        default: return nil
+        }
+    }
+
+    /// The progress line on the note, the Live Activity and the lock screen: "1 of 3 ready · <stage>" once a part is
+    /// stored and more are left; the stage alone otherwise.
+    func workingLine(_ label: String) -> String {
+        guard counts, !ready.isEmpty, ready.count < total else { return label }
+        return String(localized: "\(ready.count) of \(total) ready · \(label)")
+    }
+
+    /// Pieces of about TranscriptRun's 28 s: written down so far and in the whole recording. Done never passes total.
+    static let pieceSeconds = 28.0
+    static func pieces(transcribedSeconds: Double, durationSeconds: Double) -> (done: Int, total: Int) {
+        guard durationSeconds > 0, durationSeconds.isFinite else { return (0, 0) }
+        let total = max(1, Int((durationSeconds / pieceSeconds).rounded(.up)))
+        let t = transcribedSeconds.isFinite ? max(0, transcribedSeconds) : 0
+        let done = t >= durationSeconds ? total : min(total, Int(t / pieceSeconds))
+        return (done, total)
+    }
+
+    /// "Writing down what was said · 14 of 56 parts"; nil for a recording of one piece (the percent line stays).
+    static func transcribingLine(transcribedSeconds: Double, durationSeconds: Double) -> String? {
+        let p = pieces(transcribedSeconds: transcribedSeconds, durationSeconds: durationSeconds)
+        guard p.total > 1 else { return nil }
+        return String(localized: "Writing down what was said · \(p.done) of \(p.total) parts")
+    }
+}
+
+/// What a run that stopped short shows, everywhere (note screen, Live Activity, notifications, the lock screen's
+/// continued-processing progress): only a real failure (FailureKind .failed) says failed. A cut-off (expiry, heat,
+/// the GPU stopped in the background, a kill, the first unknown error) is a pause that continues by itself.
+enum PauseWords {
+    enum Shows: Equatable { case paused, failed }
+
+    static func shows(_ outcome: FailureKind.Outcome) -> Shows { outcome == .failed ? .failed : .paused }
+
+    /// The note screen's banner for a note with a line (lastFailure): failed only while that line is the one its real
+    /// failure wrote (failedLine); any other line (cut off, too warm, waiting) is a pause. nil: no line, no banner.
+    static func banner(line: String?, failedLine: String?) -> Shows? {
+        guard let line else { return nil }
+        return line == failedLine ? .failed : .paused
+    }
+
+    /// The lock screen's line when the continued-processing task ends with work left.
+    static var paused: String { String(localized: "Paused. I'll finish this by myself.") }
 }
 
 /// The one decision for a notes run (and a tap) that stopped short: a cut-off (the work is kept and continues by
@@ -672,6 +767,15 @@ enum TaskLifecycle {
     static func finishes(working: Bool, personRunsPending: Int, queued: Int) -> Bool {
         !working && personRunsPending <= 0 && queued <= 0
     }
+
+    /// How the continued-processing task ends: done, or paused with work left (a cut-off, a note waiting its turn).
+    enum Completion: Equatable { case done, paused }
+    static func completion(workLeft: Bool) -> Completion { workLeft ? .paused : .done }
+
+    /// Told to iOS as success either way: a task completed with success false shows "Failed" on the lock screen (the
+    /// owner saw "failed at 50%" for note 22, which was only cut off and finished by itself). Paused first changes
+    /// the task's lines to the paused wording (PauseWords.paused).
+    static func reportsSuccess(_ c: Completion) -> Bool { true }
 
     /// The task expired (or the background time ran out without one): the run in flight is cut off (resumed later,
     /// "paused" posted) only while it still has notes to write. Memories, and the insight after a note's notes are

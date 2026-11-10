@@ -138,7 +138,8 @@ struct NoteDetailView: View {
 
                     if isThisNoteBusy {
                         if !isRegeneratingHere {
-                            StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 8))
+                            StatusBanner(stage: pipeline.stage, line: pipeline.progressLine)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             if pipeline.overnightOffer == noteID { overnightOffer }
                         }
                     } else if pipeline.isOvernight(noteID) {
@@ -154,15 +155,17 @@ struct NoteDetailView: View {
                         // A tap made while another note was being written (or the AI was not ready, or the phone was
                         // too warm): it runs by itself in its turn.
                         Text(pipeline.tapWaitingLine(noteID)).font(.subheadline).foregroundStyle(Theme.secondary)
-                    } else if let failure = pipeline.lastFailure[noteID] {
-                        // Paused or cut off: it continues by itself, and "Continue now" runs it at once. "Try again"
-                        // only for a real failure.
-                        StatusBanner(stage: pipeline.interrupted.contains(noteID) ? .paused(failure) : .failed(failure),
+                    } else if let failure = pipeline.lastFailure[noteID],
+                              let shows = PauseWords.banner(line: failure, failedLine: pipeline.failedLines[noteID]) {
+                        // Paused or cut off: it continues by itself, and "Continue now" runs it at once. "Couldn't
+                        // finish" and "Try again" only for a real failure (PauseWords: never for a cut-off).
+                        let paused = shows == .paused
+                        StatusBanner(stage: paused ? .paused(failure) : .failed(failure),
                                      onTryAgain: RegenerateRules.showsTryAgain(needsWork: needsGeneration, aiReady: models.isReady,
                                                                                overnight: pipeline.isOvernight(noteID)) ? {
                                          Task { await pipeline.tryAgain(noteID: noteID) }
                                      } : nil,
-                                     continueNow: pipeline.interrupted.contains(noteID),
+                                     continueNow: paused,
                                      tryAgainDisabled: pipeline.isBusy)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }

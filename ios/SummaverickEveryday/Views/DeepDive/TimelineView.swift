@@ -77,6 +77,8 @@ struct NoteRow: View {
 
 struct StatusBanner: View {
     let stage: ProcessingPipeline.Stage
+    /// The line to show instead of the stage's own (ProcessingPipeline.progressLine: "1 of 3 ready · …").
+    var line: String? = nil
     /// Waiting for the charger: "Do it now" runs the note at once.
     var onDoItNow: (() -> Void)? = nil
     /// A regenerate running: Stop cancels it (the old text stays).
@@ -95,7 +97,7 @@ struct StatusBanner: View {
             default: ProgressView().controlSize(.small)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(stage.label).font(.footnote).lineLimit(2)
+                Text(verbatim: line ?? stage.label).font(.footnote).lineLimit(2)
                 if stage.isWorking {
                     Text("You can close the app and get on with your day. I'll let you know when your notes are ready.")
                         .font(.caption).foregroundStyle(Theme.secondary)

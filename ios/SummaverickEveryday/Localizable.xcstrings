@@ -117,6 +117,61 @@
         }
       }
     },
+    "%lld of %lld ready · %@": {
+      "comment": "Parts ready, total parts, then what is being written now",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld లో %1$lld సిద్ధం · %3$@"
+          }
+        }
+      }
+    },
+    "%lld of %lld ready. Your notes are done.": {
+      "comment": "Parts ready, total parts of a note's notes",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld లో %1$lld సిద్ధం. మీ నోట్స్ పూర్తయ్యాయి."
+          }
+        }
+      }
+    },
+    "%lld of %lld ready: what was said. Writing your notes…": {
+      "comment": "Parts ready, total parts of a note's notes",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld లో %1$lld సిద్ధం: చెప్పినదంతా రాశాను. ఇప్పుడు నోట్స్ రాస్తున్నాను…"
+          }
+        }
+      }
+    },
+    "%lld of %lld ready: what was said. Writing your summary…": {
+      "comment": "Parts ready, total parts of a note's notes",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld లో %1$lld సిద్ధం: చెప్పినదంతా రాశాను. ఇప్పుడు సారాంశం రాస్తున్నాను…"
+          }
+        }
+      }
+    },
+    "%lld of %lld ready: your summary. Writing your notes…": {
+      "comment": "Parts ready, total parts of a note's notes",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld లో %1$lld సిద్ధం: మీ సారాంశం. ఇప్పుడు నోట్స్ రాస్తున్నాను…"
+          }
+        }
+      }
+    },
     "%lld open to-dos": {
       "localizations": {
         "en": {
@@ -3380,6 +3435,16 @@
         }
       }
     },
+    "Paused. I'll finish this by myself.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆగాను. దీన్ని నేనే పూర్తి చేస్తాను."
+          }
+        }
+      }
+    },
     "Paused: I need more space": {
       "comment": "The AI download needs more free storage",
       "localizations": {
@@ -5842,6 +5907,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "మీరు మాట్లాడుతుండగానే రాస్తున్నాను"
+          }
+        }
+      }
+    },
+    "Writing down what was said · %lld of %lld parts": {
+      "comment": "Pieces of the recording written down so far, total pieces",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చెప్పినది రాస్తున్నాను · %2$lld భాగాల్లో %1$lld"
           }
         }
       }

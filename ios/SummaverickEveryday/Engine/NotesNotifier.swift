@@ -1,7 +1,8 @@
 // Local notifications about a recording's notes while the app is not in front: each part as it is ready (transcript,
 // summary, notes), paused (the background work was cut off; it continues by itself) and failed (a real failure only).
-// One identifier per note (notes.<id>), so a later state replaces the earlier one; at most one per stage per run
-// (NotifyRule.next), never one per percent. Tapping opens the note through ReminderScheduler.pendingRoute. Uses
+// A notes run of more than one part says which part this is ("1 of 3 ready: what was said. Writing your summary…",
+// StepCount) in the notification's subtitle. One identifier per note (notes.<id>), so a later state replaces the
+// earlier one; at most one per stage per run (NotifyRule.next), never one per percent. Tapping opens the note through ReminderScheduler.pendingRoute. Uses
 // the same notification permission as reminders. Nothing is posted while the app is active (it shows the note).
 import UIKit
 import UserNotifications
@@ -12,13 +13,13 @@ enum NotesNotifier {
     nonisolated static let prefix = "notes."
 
     /// The transcript is stored after Stop (the summary and notes follow).
-    static func transcriptReady(noteID: Int64, title: String, hold: Hold? = nil) {
-        post(noteID, state: "transcript ready", title: String(localized: "Heard it all"),
+    static func transcriptReady(noteID: Int64, title: String, step: String? = nil, hold: Hold? = nil) {
+        post(noteID, state: "transcript ready", title: String(localized: "Heard it all"), subtitle: step,
              body: String(localized: "\"\(title)\": writing your notes now."), hold: hold)
     }
 
     /// The title and the short summary are stored (the detailed notes and the questions follow).
-    static func summaryReady(noteID: Int64, title: String, hold: Hold? = nil) {
+    static func summaryReady(noteID: Int64, title: String, step: String? = nil, hold: Hold? = nil) {
         let heading: String, body: String
         switch NotifyCopy.variant(noteID: noteID, stage: NotifyRule.summary, count: 2) {
         case 0:
@@ -29,11 +30,11 @@ enum NotesNotifier {
             heading = String(localized: "Got the gist!")
             body = String(localized: "\"\(title)\": the full notes are on the way.")
         }
-        post(noteID, state: "summary ready", title: heading, body: body, hold: hold)
+        post(noteID, state: "summary ready", title: heading, subtitle: step, body: body, hold: hold)
     }
 
     /// The note's detailed notes and questions are written (the memories may still follow).
-    static func notesReady(noteID: Int64, title: String, hold: Hold? = nil) {
+    static func notesReady(noteID: Int64, title: String, step: String? = nil, hold: Hold? = nil) {
         let heading: String, body: String
         switch NotifyCopy.variant(noteID: noteID, stage: NotifyRule.notes, count: 3) {
         case 0:
@@ -47,7 +48,7 @@ enum NotesNotifier {
             heading = String(localized: "You can relax now")
             body = String(localized: "I wrote it all down: \"\(title)\".")
         }
-        post(noteID, state: "ready", title: heading, body: body, hold: hold)
+        post(noteID, state: "ready", title: heading, subtitle: step, body: body, hold: hold)
     }
 
     /// The background work was cut off; the note continues by itself (the overnight task, or when the app is opened).
@@ -64,7 +65,8 @@ enum NotesNotifier {
 
     /// hold: background time the caller took synchronously, before any await (right after a cut-off the app may be
     /// suspended at any moment); ended once the request is handed over. Without one, it is taken here.
-    private static func post(_ noteID: Int64, state: String, title: String, body: String, hold given: Hold?) {
+    private static func post(_ noteID: Int64, state: String, title: String, subtitle: String? = nil, body: String,
+                             hold given: Hold?) {
         let hold = given ?? Hold()
         guard NotifyRule.shouldNotify(appActive: UIApplication.shared.applicationState == .active) else {
             NSLog("[sve] bg: note %lld %@ with the app in front: no notification", noteID, state)
@@ -73,6 +75,7 @@ enum NotesNotifier {
         }
         let content = UNMutableNotificationContent()
         content.title = title
+        if let subtitle { content.subtitle = subtitle }
         content.body = body
         content.sound = .default
         content.userInfo = ["note_id": NSNumber(value: noteID)]

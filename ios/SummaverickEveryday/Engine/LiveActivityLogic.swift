@@ -63,14 +63,20 @@ enum LiveActivityLogic {
     }
 
     /// The state to show for a stage. line: the stage line (processing), the note's title (ready), or the paused or
-    /// failed line. startedAt and the note id stay as they were.
+    /// failed line. startedAt and the note id stay as they were. Paused or failed keeps the percent the work got to:
+    /// a cut-off reported as 0 (a note that waited its turn, a run whose progress is not known) never resets it.
     static func state(for stage: Stage, line: String, percent: Int,
                       after previous: RecordingActivity.ContentState) -> RecordingActivity.ContentState {
         if stage == .cancelled || stage == .deleted { return previous }
         var s = previous
         s.phase = phase(for: stage)
         s.stageLine = line
-        s.percent = s.phase == .ready ? 100 : max(0, min(100, percent))
+        let p = max(0, min(100, percent))
+        switch s.phase {
+        case .ready: s.percent = 100
+        case .paused, .failed: s.percent = max(previous.percent, p)
+        case .recording, .processing: s.percent = p
+        }
         return s
     }
 

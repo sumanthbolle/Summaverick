@@ -85,11 +85,12 @@ final class ProcessingPipeline {
 
     private(set) var stage: Stage = .idle {
         didSet {
-            if stage.isWorking { ContinuedWork.shared.update(subtitle: stage.label) }
+            if stage.isWorking { ContinuedWork.shared.update(subtitle: progressLine) }
             guard case .failed(let msg) = stage, let id = activeNoteID else { followStage(); return }
             // Only stopShort sets .failed, and only for a real failure (FailureKind): an interruption is a cut-off
             // there and never reaches this.
             lastFailure[id] = msg
+            failedLines[id] = msg
             notifyFailed(id, line: msg)
             RecordingActivities.shared.update(noteID: id, .failed, line: msg, percent: ContinuedWork.shared.percent)
         }
@@ -107,7 +108,7 @@ final class ProcessingPipeline {
         switch stage {
         case .idle: line = lastFailure[id] ?? Self.waitingMessage
         case .done, .memories: line = noteTitles[id] ?? ""
-        default: line = stage.label
+        default: line = progressLine
         }
         RecordingActivities.shared.update(noteID: id, stage.activityStage, line: line, percent: ContinuedWork.shared.percent)
     }
@@ -139,6 +140,23 @@ final class ProcessingPipeline {
     private(set) var activeNoteID: Int64?
     /// Last failure message per note, so the note screen can show why nothing was generated.
     private(set) var lastFailure: [Int64: String] = [:]
+    /// The line a real failure (FailureKind .failed) wrote into lastFailure: the note screen says "couldn't finish"
+    /// only while lastFailure still holds it (PauseWords.banner); any other line there is a pause.
+    private(set) var failedLines: [Int64: String] = [:]
+    /// "1 of 3 ready" for the notes run in flight (nil for any other run).
+    private(set) var stepCount: StepCount?
+    /// While writing down what was said: seconds done and the recording's length, for "14 of 56 parts".
+    private(set) var transcribing: (done: Double, duration: Double)?
+
+    /// The progress line of the run in flight (note screen, Live Activity, lock screen): the stage, with "14 of 56
+    /// parts" while writing down what was said and "1 of 3 ready" once a part of a notes run is stored.
+    var progressLine: String {
+        var label = stage.label
+        if case .transcribing = stage, let t = transcribing,
+           let line = StepCount.transcribingLine(transcribedSeconds: t.done, durationSeconds: t.duration) { label = line }
+        guard notesRun, let steps = stepCount else { return label }
+        return steps.workingLine(label)
+    }
     /// Any model work, memories included: nothing else that runs the model may start.
     var isWorking: Bool { starting || stage.isWorking }
     /// What the person's controls (Ask, Regenerate, Try again, Generate notes) treat as busy: memory work never is,
@@ -530,6 +548,7 @@ final class ProcessingPipeline {
         defer { if !interrupted.contains(id) { markAutoTried(id) } }
         defer { settleOvernight(id) }
         offerOvernightIfLong(id, audio: audio, duration: duration)
+        stepCount = StepCount(parts: StepCount.parts(writesTranscript: true, outputsToWrite: OutputKind.allCases.map { _ in true }))
         if !(await heatGate(id)) { return id }
 
         // 1. transcript
@@ -590,6 +609,7 @@ final class ProcessingPipeline {
         // Already finished (for example queued twice): nothing to do, and no duplicate suggestions.
         guard WaitingNotes.needsWork(hasTranscript: !(note.transcript ?? "").isEmpty,
                                      outputs: OutputKind.allCases.map { note.output($0) != nil }) else {
+            lastFailure[noteID] = nil   // nothing to say: it is done (a cut-off line here read as "couldn't finish")
             RecordingActivities.shared.update(noteID: noteID, .ready, line: note.title, percent: 100)
             return
         }
@@ -598,6 +618,8 @@ final class ProcessingPipeline {
         activeNoteID = noteID
         lastFailure[noteID] = nil
         startNotesRun(noteID)
+        stepCount = StepCount(parts: StepCount.parts(writesTranscript: (note.transcript ?? "").isEmpty,
+                                                     outputsToWrite: WaitingNotes.outputsToWrite(stored: OutputKind.allCases.map { note.output($0) })))
         defer { notesRun = false }
         if !(await heatGate(noteID)) { return }
 
@@ -840,8 +862,9 @@ final class ProcessingPipeline {
         stepOnGPU = false   // transcription always runs on the CPU
         let duration = Double(max(1, durationSeconds))
         func report(_ s: TranscriptSidecar) {
-            // The fraction first: the stage change sends it to the recording's Live Activity.
+            // The fraction and the pieces first: the stage change sends them to the recording's Live Activity.
             ContinuedWork.shared.update(fraction: NotesProgress.fraction(transcribedSeconds: s.transcribedSeconds, durationSeconds: duration))
+            transcribing = (s.transcribedSeconds, duration)
             stage = .transcribing(min(1, s.transcribedSeconds / duration))
         }
         report(TranscriptSidecar.load(audioPath: audio.path))   // from where live transcription got to
@@ -942,6 +965,8 @@ final class ProcessingPipeline {
     private func startNotesRun(_ id: Int64) {
         notesRun = true
         runningNote = id
+        stepCount = nil
+        transcribing = nil
         pausedPosted.remove(id)
         postedStages[id] = nil
         steppedAside.remove(id)
@@ -1026,14 +1051,26 @@ final class ProcessingPipeline {
     /// placeholder title: "Summary ready" follows with the real one.
     private func transcriptStored(_ id: Int64) {
         setStreak(id, .notes, nil)
+        let step = partStored(.transcript)
         notifyStage(id, NotifyRule.transcript) { title, hold in
-            guard NotifyRule.saysTranscriptReady(title: title) else {
+            guard NotifyRule.saysTranscriptReady(title: title, counting: step != nil) else {
                 NSLog("[sve] bg: note %lld: transcript stored; the title is still the placeholder, no notification", id)
                 hold.end()
                 return
             }
-            NotesNotifier.transcriptReady(noteID: id, title: title, hold: hold)
+            NotesNotifier.transcriptReady(noteID: id, title: title, step: step, hold: hold)
         }
+    }
+
+    /// A part of this notes run is stored: counted (StepCount), and the note screen and Live Activity show "1 of 3
+    /// ready" now. Returns the "ready" notification's step line (nil without a counter).
+    private func partStored(_ part: StepCount.Part) -> String? {
+        guard notesRun, var steps = stepCount, let n = steps.stored(part) else { return nil }
+        stepCount = steps
+        NSLog("[sve] note %lld: %@ ready, %ld of %ld", activeNoteID ?? 0, part.rawValue, n, steps.total)
+        if case .transcribing = stage { transcribing = nil } else { followStage() }   // the next stage shows it
+        if stage.isWorking { ContinuedWork.shared.update(subtitle: progressLine) }
+        return steps.readyLine(step: n, part: part)
     }
 
     /// A part of the note's notes is ready: posted at most once per stage in this run (NotifyRule.next), under the
@@ -1148,7 +1185,8 @@ final class ProcessingPipeline {
                 NotificationCenter.default.post(name: .notesChanged, object: nil)
                 ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.firstOutputStep + 1 + i, outputsTotal: steps))
                 if kind == .shortSummary {   // the title was written just before it
-                    notifyStage(id, NotifyRule.summary) { NotesNotifier.summaryReady(noteID: id, title: $0, hold: $1) }
+                    let step = partStored(.summary)
+                    notifyStage(id, NotifyRule.summary) { NotesNotifier.summaryReady(noteID: id, title: $0, step: step, hold: $1) }
                 }
             } catch {
                 stopShort(error.localizedDescription, error: error)
@@ -1157,7 +1195,8 @@ final class ProcessingPipeline {
         }
         // The detailed notes and the questions are stored: "ready" now (when the app is not in front), not after the
         // memories.
-        notifyStage(id, NotifyRule.notes) { NotesNotifier.notesReady(noteID: id, title: $0, hold: $1) }
+        let step = partStored(.notes)
+        notifyStage(id, NotifyRule.notes) { NotesNotifier.notesReady(noteID: id, title: $0, step: step, hold: $1) }
         RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
         notesStored = true   // from here an expiry only stops the run (TaskLifecycle.expiryCutsOff)
         // Memories now, never before them; a stop or failure here never fails the notes
@@ -2163,6 +2202,7 @@ final class ProcessingPipeline {
         insightDue.remove(id)
         heatPaused.remove(id)
         lastFailure[id] = nil
+        failedLines[id] = nil
         regenerateFailed[id] = nil
         tapTooWarm.remove(id)
         failureStreak = FailureKind.forgetting(noteID: id, in: failureStreak)

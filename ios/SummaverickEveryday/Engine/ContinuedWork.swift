@@ -25,10 +25,15 @@ final class ContinuedWork {
         let task: AnyObject              // BGContinuedProcessingTask
         let completed = AtomicFlag()
         init(_ task: AnyObject) { self.task = task }
-        /// setTaskCompleted exactly once, from whichever side gets here first.
-        func complete(success: Bool) {
+        /// setTaskCompleted exactly once, from whichever side gets here first. Always as success
+        /// (TaskLifecycle.reportsSuccess): iOS shows "Failed" for success false, and work left is only paused. Paused
+        /// first says so on the lock screen ("Taking a short break" / PauseWords.paused), with the progress where it was.
+        func complete(_ c: TaskLifecycle.Completion) {
             guard completed.setOnce(), let t = task as? BGTask else { return }
-            t.setTaskCompleted(success: success)
+            if c == .paused, #available(iOS 26, *), let p = t as? BGContinuedProcessingTask {
+                p.updateTitle(String(localized: "Taking a short break"), subtitle: PauseWords.paused)
+            }
+            t.setTaskCompleted(success: TaskLifecycle.reportsSuccess(c))
         }
     }
     private var held: Held?
@@ -117,7 +122,7 @@ final class ContinuedWork {
             guard TaskLifecycle.onBegin(held: true, workLeft: noteRunning) == .finishThenSubmit, inFront else { apply(); return }
             NSLog("[sve] bg: old task ended, new task asked for")
             wanted = false
-            complete(success: true)
+            complete(.done)
         }
         refused = false
         progress = TaskProgress()
@@ -175,15 +180,16 @@ final class ContinuedWork {
         apply()
     }
 
-    /// All work is done (or paused until the app is opened). Completes the task exactly once.
+    /// All work is done (success), or paused until later (work left: never shown as failed). Completes the task
+    /// exactly once.
     func finish(success: Bool) {
         if wanted || held != nil {
             if success { NSLog("[sve] bg: task finished (work done)") }
-            else { NSLog("[sve] bg: continued processing finished (work left)") }
+            else { NSLog("[sve] bg: continued processing finished (work left): shown as paused") }
         }
         wanted = false
         refused = false
-        complete(success: success)
+        complete(TaskLifecycle.completion(workLeft: !success))
     }
 
     private func started(_ t: BGTask) {
@@ -197,8 +203,9 @@ final class ContinuedWork {
         let h = Held(t)
         held = h
         t.expirationHandler = {
-            // Completed right here, on whatever thread this runs: the app may be suspended before a hop.
-            h.complete(success: false)
+            // Completed right here, on whatever thread this runs: the app may be suspended before a hop. Paused, not
+            // failed: the note is kept and finishes by itself (note 22 showed "failed at 50%" here).
+            h.complete(.paused)
             // Before the hop as well: without it the app may be suspended before the "paused" notice starts.
             let hold = NotesNotifier.Hold()
             Task { @MainActor in ContinuedWork.shared.expired(h, hold: hold) }
@@ -222,12 +229,12 @@ final class ContinuedWork {
         t.updateTitle(Self.title, subtitle: subtitle)
     }
 
-    private func complete(success: Bool) {
+    private func complete(_ c: TaskLifecycle.Completion) {
         guard let h = held else { return }
         held = nil
-        if #available(iOS 26, *), success, let t = h.task as? BGContinuedProcessingTask {
+        if #available(iOS 26, *), c == .done, let t = h.task as? BGContinuedProcessingTask {
             t.progress.completedUnitCount = t.progress.totalUnitCount
         }
-        h.complete(success: success)
+        h.complete(c)
     }
 }

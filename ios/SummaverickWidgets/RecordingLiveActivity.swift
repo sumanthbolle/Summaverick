@@ -59,7 +59,14 @@ private struct RecordingActivityView: View {
                     Text(state.stageLine).font(.subheadline).lineLimit(2)
                     ProgressView(value: Double(state.percent), total: 100)
                         .tint(Theme.color(.link, mode))
-                case .ready, .paused, .failed:
+                case .paused:
+                    // Where the work got to stays (it carries on from there by itself).
+                    Text(state.stageLine).font(.subheadline).lineLimit(3)
+                    if state.percent > 0 {
+                        ProgressView(value: Double(state.percent), total: 100)
+                            .tint(Theme.color(.cautionIcon, mode))
+                    }
+                case .ready, .failed:
                     Text(state.stageLine).font(.subheadline).lineLimit(3)
                 }
                 // Stop when quiet: the warning while recording, or why it stopped (written by the app, localized there).
