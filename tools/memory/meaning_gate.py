@@ -146,6 +146,20 @@ def load_results(path):
     return meta, rows
 
 
+def results_problems(qs, meta, rows, questions_sha, embedder=None):
+    """Why a results file is not of these questions (and this embedder): [] when it is."""
+    problems = []
+    if meta.get("questions_sha256") != questions_sha:
+        problems.append(f"results are of questions sha256 {meta.get('questions_sha256')}, not {questions_sha}")
+    if embedder and meta.get("embedder") != os.path.basename(embedder):
+        problems.append(f"results are of embedder {meta.get('embedder')}, not {os.path.basename(embedder)}")
+    for i, q in enumerate(qs):
+        r = rows.get(i)
+        if r is not None and r.get("q") != q["q"]:
+            problems.append(f"result {i} is for another question: {r.get('q')!r}")
+    return problems
+
+
 def hit(pieces, note_id, gold):
     return any(p[0] == note_id and p[1] in gold for p in pieces[:TOP])
 
@@ -187,8 +201,15 @@ def print_score(s, meta):
 def cmd_score(a):
     qs = load_questions(a.questions)
     meta, rows = load_results(a.results)
+    qsha = sha256(a.questions)
+    print(f"questions sha256 {qsha}")
+    problems = results_problems(qs, meta, rows, qsha, getattr(a, "embedder", None))
+    if problems:
+        for p in problems:
+            print(p)
+        print("MEANING-GATE: FAIL (the results do not match; nothing scored)")
+        return 1
     s = score(qs, rows)
-    print(f"questions sha256 {sha256(a.questions)}")
     print_score(s, meta)
     return 0 if s["pass"] else 1
 
@@ -209,7 +230,8 @@ def cmd_run(a):
             if os.path.exists(a.db + suf):
                 shutil.copyfile(a.db + suf, work + suf)
         results = os.path.join(tmp, "results.jsonl")
-        env = dict(os.environ, SVE_DB=work, SVE_EMBEDDER=a.embedder, SVE_QUESTIONS=a.questions, SVE_RESULTS=results)
+        env = dict(os.environ, SVE_DB=work, SVE_EMBEDDER=a.embedder, SVE_QUESTIONS=a.questions, SVE_RESULTS=results,
+                   SVE_QUESTIONS_SHA256=sha256(a.questions))
         if a.gemma:
             env["SVE_GEMMA"] = a.gemma
         else:
@@ -271,6 +293,20 @@ def selftest():
     expect(not score(qs, r)["pass"], "a missing result fails")
     expect(hit([[1, 9]] * 5 + [[1, 0]], 1, [0]) is False, "only the top 5 count")
 
+    # The results file must be of these questions, in this order, and of this embedder.
+    rows = rows_for(set(), set())
+    for i, q in enumerate(qs):
+        rows[i]["q"] = q["q"]
+    meta = {"questions_sha256": "abc", "embedder": "eg-q4.gguf"}
+    expect(results_problems(qs, meta, rows, "abc", "/models/eg-q4.gguf") == [], "a matching file has no problems")
+    expect(results_problems(qs, meta, rows, "abc") == [], "no --embedder: not compared")
+    expect(len(results_problems(qs, meta, rows, "def")) == 1, "another questions file's sha256")
+    expect(len(results_problems(qs, meta, rows, "abc", "eg-q8.gguf")) == 1, "another embedder")
+    rows[7]["q"] = "a different question"
+    p = results_problems(qs, meta, rows, "abc")
+    expect(len(p) == 1 and "result 7" in p[0], f"a row of another question: {p}")
+    expect(len(results_problems(qs, {}, rows, "abc", "eg-q4.gguf")) == 3, "no meta at all")
+
     for f in fails:
         print("FAIL", f)
     print("SELFTEST OK" if not fails else f"SELFTEST FAIL ({len(fails)})")
@@ -292,6 +328,7 @@ def main():
     s = sub.add_parser("score")
     s.add_argument("--questions", required=True)
     s.add_argument("--results", required=True)
+    s.add_argument("--embedder", help="the GGUF the results must be of (its file name is compared)")
     sub.add_parser("selftest")
     a = ap.parse_args()
     if a.cmd == "check":

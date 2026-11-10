@@ -41,19 +41,22 @@ into the app's Documents folder with `xcrun devicectl device copy to ...`:
 2. Load Gemma as the app does (CPU, 4 threads), then `sve_load_embedder(ctx, <gguf>, 4)` (always CPU).
    First the smallest EmbeddingGemma 300M GGUF quant at or under about 200 MB; Q8_0 only if that one fails.
 3. Call `sve_embed_pending(ctx, 64, cb, user)` until it returns 0, timing it: seconds per embedded item.
+   Stop with an error on -1 (no embedder, or a batch where nothing could be embedded: the embedder is broken),
+   and on -2 (cancelled); never loop on a negative value.
 4. For every question, `sve_search_json(ctx, q, 60)` again: the first 5 pieces are the hybrid result.
 5. Write `meaning_results.jsonl` in Documents:
 
-       {"meta": {"embedder": "<gguf file name>", "where": "iphone", "embed_sec_per_item": 0.0, "embedded": 0,
+       {"meta": {"embedder": "<gguf file name>", "questions_sha256": "<sha256 of the questions file>",
+                 "where": "iphone", "embed_sec_per_item": 0.0, "embedded": 0,
                  "vectors": 0, "index_bytes": 0, "peak_rss_mb": 0, "with_gemma": true}}
        {"i": 0, "q": "...", "keyword": [[17, 120], ...], "hybrid": [[17, 90], ...]}
 
-   `i` is the question's line number, counted from 0 (blank lines skipped). `vectors` and `index_bytes` are
+   `i` is the question's line number, counted from 0 (blank lines skipped), and `q` its text as in the file. `vectors` and `index_bytes` are
    `SELECT COUNT(*), SUM(length(vec)) FROM embeddings`. `peak_rss_mb` is the app's peak resident memory with
    both models loaded.
 
 `core/tests/smoke_gemma.sh gate` does the same steps and writes the same file on a host where models may run
-(`SVE_DB`, `SVE_EMBEDDER`, `SVE_QUESTIONS`, `SVE_RESULTS`, optional `SVE_GEMMA`). It is not used on the Mac.
+(`SVE_DB`, `SVE_EMBEDDER`, `SVE_QUESTIONS`, `SVE_RESULTS`, `SVE_QUESTIONS_SHA256`, optional `SVE_GEMMA`). It is not used on the Mac.
 
 ## 3. Score (Mac, no model)
 
@@ -63,7 +66,10 @@ Copy `meaning_results.jsonl` back with `xcrun devicectl device copy from ...`, t
         --questions tools/memory/private/questions.jsonl --embedder <gguf file name> \
         --results meaning_results.jsonl
 
-With `--results`, `run` loads no model: it checks the questions again and scores the file. It prints hit@5
+With `--results`, `run` loads no model: it checks the questions again and scores the file. The file must be of
+these questions: its `questions_sha256` must be the questions file's, every row's `q` must be that question's
+text, and its `embedder` must be the `--embedder` file name; otherwise nothing is scored and it prints
+`MEANING-GATE: FAIL`. It prints hit@5
 (a gold piece in the top 5 pieces) per language group for keyword and hybrid, the phone's figures, and
 `MEANING-GATE: PASS` or `MEANING-GATE: FAIL`.
 
