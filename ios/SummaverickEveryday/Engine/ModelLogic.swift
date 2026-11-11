@@ -1845,3 +1845,97 @@ enum NoteSteps {
         return summariesInOtherLanguage(summaryTexts, lang: lang) && (doneInOther > 0 || doneHere == 0)
     }
 }
+
+/// "Finish now" (FinishNowView): the app stays in front with a dim screen, so the notes are written on the GPU (about
+/// 4 times the locked phone's CPU) until they are ready. Pure: the view feeds what it reads from the pipeline.
+enum FinishNow {
+    /// Seconds a part (one section's notes and questions) takes, iPhone 16e, measured 2026-11-11. Recalibrate in Task 6.
+    static let gpuSecondsPerPart = 12.0
+    static let cpuSecondsPerPart = 50.0
+    /// A section covers about this much of the recording (SectionWriter: ~5 minutes of transcript each).
+    static let sectionSeconds = 300.0
+    /// The screen's brightness while the mode is on (0…1).
+    static let dimBrightness = 0.1
+
+    /// "Finish now · about %d min": the parts left at the backend's pace, rounded up, at least 1.
+    static func estimateMinutes(partsLeft: Int, onGPU: Bool) -> Int {
+        let seconds = Double(max(0, partsLeft)) * (onGPU ? gpuSecondsPerPart : cpuSecondsPerPart)
+        return max(1, Int((seconds / 60).rounded(.up)))
+    }
+
+    /// Parts still to write: the sections not done yet, plus the sections the recording will have that are not cut yet
+    /// (right after Stop none are; about one per sectionSeconds).
+    static func partsLeft(sectionsUndone: Int, sectionsKnown: Int, durationSeconds: Double) -> Int {
+        let expected = durationSeconds.isFinite && durationSeconds > 0 ? Int((durationSeconds / sectionSeconds).rounded(.up)) : 0
+        return max(0, sectionsUndone) + max(0, expected - max(0, sectionsKnown))
+    }
+
+    /// Sections with a part still to write in a plan (NoteSteps.plan): both kinds of a section are one part.
+    static func sectionsUndone(_ plan: [NoteSteps.Step]) -> Int {
+        Set(plan.compactMap { step -> Int? in if case .part(let idx, _) = step { return idx } else { return nil } }).count
+    }
+
+    /// "The phone is warm, so I'm resting": the work goes at the heat ladder's pace (minimal rests, paused waits).
+    static func resting(_ level: HeatLadder.Level) -> Bool { level >= .minimal }
+
+    /// The notes are ready: a counted run reached its last part ("3 of 3"), or the notes are stored and nothing is
+    /// writing them (an earlier run finished them).
+    static func notesReady(stepsReady: Int?, stepsTotal: Int?, hasNotes: Bool, writing: Bool) -> Bool {
+        if let r = stepsReady, let t = stepsTotal, t > 1, r >= t { return true }
+        return hasNotes && !writing
+    }
+
+    /// After a Stop the new note has no id yet: the mode follows the first note the pipeline works on that is newer
+    /// than the newest note before the recording (ids only grow).
+    static func followed(activeNoteID: Int64?, newerThan newest: Int64) -> Int64? {
+        guard let id = activeNoteID, id > newest else { return nil }
+        return id
+    }
+}
+
+/// The mode's screen as a state machine: enter dims it and keeps it awake; finishing, leaving and going to the
+/// background each give back the brightness saved at enter and let the screen sleep, exactly once.
+struct FinishNowSession: Equatable {
+    enum Phase: Equatable { case off, on, finished }
+    /// What to set on the screen.
+    struct Screen: Equatable {
+        var brightness: Double
+        var idleTimerDisabled: Bool
+    }
+
+    private(set) var phase: Phase = .off
+    private var saved: Double?
+
+    var isOn: Bool { phase == .on }
+
+    /// The mode opens: dims to dimBrightness and keeps the screen on. nil when it is on already.
+    mutating func enter(brightness: Double) -> Screen? {
+        guard phase != .on else { return nil }
+        saved = min(1, max(0, brightness.isFinite ? brightness : 1))
+        phase = .on
+        return Screen(brightness: FinishNow.dimBrightness, idleTimerDisabled: true)
+    }
+
+    /// The notes are ready: the screen comes back and may sleep; the mode stays to say so.
+    mutating func finish() -> Screen? {
+        guard let s = restore() else { return nil }
+        phase = .finished
+        return s
+    }
+
+    /// Leave, or the view goes away: back to the app; the work goes on in the background, nothing lost.
+    mutating func leave() -> Screen? {
+        let s = restore()
+        phase = .off
+        return s
+    }
+
+    /// Locked or switched away: the same as leaving.
+    mutating func background() -> Screen? { leave() }
+
+    private mutating func restore() -> Screen? {
+        guard phase == .on, let b = saved else { return nil }
+        saved = nil
+        return Screen(brightness: b, idleTimerDisabled: false)
+    }
+}
