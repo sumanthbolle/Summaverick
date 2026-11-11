@@ -230,6 +230,20 @@ actor CoreEngine {
         return out
     }
 
+    /// One part's notes and questions written together (one reading of the part, two replies), each stored by the
+    /// core as it ends; the core writes them one at a time when they do not fit together. Returns how many were
+    /// stored (1 or 2). Throws when none was: a cancel (shouldStop), no model, the note or its sections gone, or
+    /// both tries failed (the core counts them; sectionOutputsState says how many and why).
+    func sectionOutputsPair(noteID: Int64, idx: Int, lang: String, shouldStop: @escaping () -> Bool = { false },
+                            onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> Int {
+        guard let ctx else { throw CoreError.initFailed }
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        let stored = Int(sve_section_outputs_pair(ctx, noteID, Int32(idx), lang, CoreEngine.progressTrampoline, user))
+        guard stored > 0 else { throw CoreError.generationFailed }
+        return stored
+    }
+
     func ask(context: String, question: String, lang: String) throws -> String {
         guard let ctx else { throw CoreError.initFailed }
         let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled })

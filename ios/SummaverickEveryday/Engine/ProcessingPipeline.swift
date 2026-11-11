@@ -1562,7 +1562,8 @@ final class ProcessingPipeline {
             guard await engine.note(id) != nil else { NSLog("[sve] note %lld is gone; its parts stop", id); return .gone }
             let count = await engine.sections(id).count
             guard let state = await engine.sectionOutputsState(noteID: id, lang: lang) else { return .failed }
-            let next = NoteSteps.plan(sections: count, state: state, hasSummary: true).first {
+            let plan = NoteSteps.plan(sections: count, state: state, hasSummary: true)
+            let next = plan.first {
                 if case .part(_, let k) = $0 { return kinds.contains(k) }
                 return false
             }
@@ -1572,37 +1573,66 @@ final class ProcessingPipeline {
                 NSLog("[sve] note %lld: part %ld %@ stopped %ld times this run; the run stops", id, idx + 1, kind.outputKind.title, tried)
                 return .failed
             }
+            // Both kinds of this part due: written together, sharing one reading of the part.
+            let qKey = "\(idx).\(NoteSteps.Kind.questions.rawValue)"
+            let pair = kind == .notes && kinds.contains(.questions) && plan.contains(.part(idx: idx, kind: .questions)) &&
+                tries[qKey, default: 0] < NoteSteps.maxAttempts
             tries[key] = tried + 1
+            if pair { tries[qKey, default: 0] += 1 }
             if !(await heatGate(id)) { return .paused }
             if abort.isSet { return .cutOff }
             stage = .generating(kind.outputKind, "part", idx, count)
             NSLog("[sve] note %lld: step %ld of %ld: part %ld of %ld, %@ (try %ld this run)", id, done + 1, total, idx + 1, count,
-                  kind.outputKind.title, tried + 1)
+                  pair ? "notes and questions" : kind.outputKind.title, tried + 1)
+            let steps = pair ? 2 : 1
             let step = done, counter = CallbackCounter(), expected = kind == .notes ? 440 : 300
             let progress: (String, Int, Int) -> Void = { phase, d, t in
                 ContinuedWork.beat()
                 let seen = counter.next(key: "\(phase).\(d)")
                 let part = OutputProgress.part(done: d, total: t, callbacks: seen, expectedTokens: expected)
-                Task { @MainActor in ContinuedWork.shared.update(fraction: fraction((Double(step) + part) / Double(max(total, 1)))) }
-            }
-            do {
-                let text = try await onBackend {
-                    try await engine.sectionOutput(noteID: id, idx: idx, kind: kind, lang: lang, shouldStop: { abort.isSet },
-                                                   onProgress: progress)
+                Task { @MainActor in
+                    ContinuedWork.shared.update(fraction: fraction((Double(step) + Double(steps) * part) / Double(max(total, 1))))
                 }
-                done += 1
+            }
+            let started = Date()
+            let what = pair ? "notes and questions" : kind.outputKind.title
+            do {
+                if pair {
+                    let stored = try await onBackend {
+                        try await engine.sectionOutputsPair(noteID: id, idx: idx, lang: lang, shouldStop: { abort.isSet },
+                                                            onProgress: progress)
+                    }
+                    done += stored
+                    if Self.timingLogs {
+                        NSLog("[sve] timing: pair section %ld %.1f s", idx + 1, Date().timeIntervalSince(started))
+                    }
+                    NSLog("[sve] note %lld: part %ld notes and questions: %ld of 2 stored", id, idx + 1, stored)
+                } else {
+                    let text = try await onBackend {
+                        try await engine.sectionOutput(noteID: id, idx: idx, kind: kind, lang: lang, shouldStop: { abort.isSet },
+                                                       onProgress: progress)
+                    }
+                    done += 1
+                    if Self.timingLogs {
+                        NSLog("[sve] timing: single section %ld %@ %.1f s", idx + 1, kind.outputKind.title,
+                              Date().timeIntervalSince(started))
+                    }
+                    NSLog("[sve] note %lld: part %ld %@ stored (%ld characters)", id, idx + 1, kind.outputKind.title, text.count)
+                }
                 ContinuedWork.shared.update(fraction: fraction(NoteSteps.progress(done: done, total: total)))
-                NSLog("[sve] note %lld: part %ld %@ stored (%ld characters)", id, idx + 1, kind.outputKind.title, text.count)
             } catch {
                 if abort.isSet {
-                    NSLog("[sve] bg: note %lld: part %ld %@ cut off; nothing stored, the next run starts here", id, idx + 1, kind.outputKind.title)
+                    NSLog("[sve] bg: note %lld: part %ld %@ cut off; what was not stored is written next run", id, idx + 1, what)
                     return .cutOff
                 }
-                NSLog("[sve] note %lld: part %ld %@ not written (%@); read the store again", id, idx + 1, kind.outputKind.title,
+                NSLog("[sve] note %lld: part %ld %@ not written (%@); read the store again", id, idx + 1, what,
                       String(describing: error))
             }
         }
     }
+
+    /// SVE_TIMING=1 (in the scheme's environment): per-part seconds in the log, pair against single.
+    private static let timingLogs = ProcessInfo.processInfo.environment["SVE_TIMING"] == "1"
 
     /// After a language switch the section summaries (the part headings) are still in the old language: they are
     /// written again in `lang` (one summary per section), which also clears the parts written for the old ranges.
