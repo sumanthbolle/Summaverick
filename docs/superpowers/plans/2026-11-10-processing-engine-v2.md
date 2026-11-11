@@ -313,3 +313,89 @@ notice that updates in place.
   - If it passes, set `kParallelGate = true` for the cases that passed, in a separate commit.
   - If it fails, the gate stays off and the report says so.
 - [ ] **Step 3: Commit** the report (and the gate change if passed).
+
+---
+
+## Addendum (owner approved 2026-11-11: "yes go ahead with all three speed-ups")
+
+The first night on the phone (note 25: 40 minutes, locked) gave 16 parts in 12.5 minutes, about 47 s each, with no
+failures. What is left to speed up: the GPU is only used when the app is open, nothing is written during the
+recording, and every part pays its own prefill. Task 5 is replaced by Task 9 below, which is the same idea
+scoped to the two outputs of one section.
+
+### Task 7: "Finish now" mode (iOS)
+
+- **Files:** create `Views/FinishNowView.swift`. Modify `Views/NoteDetailView.swift` (the button),
+  `Views/RecordView.swift` (offer it after Stop), `Engine/ModelLogic.swift` (pure `FinishNow.estimateMinutes`),
+  `Localizable.xcstrings`.
+- **Offer:** after Stop with the app in front, and on any note whose notes are still being written, offer
+  "Finish now · about %d min". It also appears as a notification action, "Finish now", which opens the app into
+  the mode.
+- **What the mode does:**
+  - A full-screen dark view: the note title, "Writing your notes · %d of %d", a bar, and "Keep Summaverick open.
+    You can put the phone face-up on the desk."
+  - It sets `UIApplication.shared.isIdleTimerDisabled = true` and lowers the screen brightness to 0.1. Both are
+    restored on leaving, on finishing, and when the scene goes to the background.
+  - The app stays active, so the work runs on the GPU.
+- **Ending:**
+  - When "3 of 3" is reached, it shows "Your notes are ready", restores brightness, and lets the idle timer
+    sleep the screen again.
+  - A Leave button, or locking the phone, returns to background work with nothing lost.
+- **Heat ladder:** at minimal or paused, the mode says "The phone is warm, so I'm resting" and keeps going at the
+  ladder's pace.
+- **`FinishNow.estimateMinutes(partsLeft: Int, onGPU: Bool) -> Int`:**
+  - GPU 12 s per part, CPU 50 s per part (measured 2026-11-11), rounded up, at least 1. Recalibrate in Task 6.
+- **swiftc check `finishnow_check`:**
+  - (16 parts, GPU) gives 4;
+  - (16, CPU) gives 14;
+  - (0, GPU) gives 1;
+  - the brightness is restored in every exit path. Test this through a pure `FinishNowSession` state machine:
+    enter, finish, leave, background.
+- **Commit:** `feat(ios): finish now: keep the app open with a dim screen and the notes finish in minutes`.
+
+### Task 8: Notes during the recording (core + iOS)
+
+- **Core:**
+  - `char *sve_section_output_text(sve_ctx*, const char *pieces_json, const char *summary_json, int idx, sve_output_kind kind, const char *lang, sve_progress_cb, void*)`.
+    It works like `sve_section_output` but takes the material directly, stores nothing, and omits "of N"
+    (the line is "This is part %d of the recording.").
+  - `int sve_section_output_put(sve_ctx*, int64_t note_id, int idx, sve_output_kind kind, const char *lang, int first_piece, int last_piece, const char *text, int cut)`.
+    It stores an output written earlier, only if the note's section `idx` has the same range. It returns 1 when
+    stored, 0 on a range mismatch, and -1 on error.
+  - Tests: put with a matching range is stored and done; put with a mismatched range gives 0.
+- **iOS:**
+  - **When:** while recording with the app in front (`.active`) and the heat level full or eased, after each live
+    section summary (`SectionWriter`), write that section's notes and questions with `sve_section_output_text`.
+    Keep them in the sidecar (`TranscriptSidecar`, new field `parts: [{idx, kind, lang, first, last, text, cut}]`).
+  - **At Stop:** after the note's sections are stored, `put` each sidecar part. Mismatches are dropped and
+    written again by the normal steps.
+  - **Priority:** live transcription keeps priority. A part is written only when the transcription queue is empty.
+    It is cancelled at once when a piece is waiting or the app leaves the front.
+  - **Locked:** while recording locked (CPU), no parts are written during the recording.
+- **swiftc check:** the sidecar round-trips parts; the rule "parts only when active, heat ≤ eased, and no piece
+  waiting" holds.
+- **Commit:** `feat: notes written while you record, so only the last minutes remain at Stop`.
+
+### Task 9: Notes and questions of a part written together (core)
+
+- **`int sve_section_outputs_pair(sve_ctx*, int64_t note_id, int idx, const char *lang, sve_progress_cb, void*)`:**
+  - It writes and stores both kinds for one section.
+  - It prefills the shared prefix once (system, then the section material and guide) into sequence 0, copies it
+    to sequence 1 with `llama_memory_seq_cp`, appends each kind's instruction, and then decodes both sequences in
+    one `llama_decode` per token round until both end or reach their caps.
+  - It returns the number stored (0–2), or -2 on cancel. Finished outputs stay stored.
+  - Attempts and failures are counted per kind, as now.
+  - The context needs `n_seq_max >= 2`. If the context can't hold two sequences, it falls back to two
+    `sve_section_output` calls.
+  - The prompt layout changes so the kind-specific instruction comes last. The existing checks
+    (`finish_output`, question parsing) are unchanged.
+- **iOS:** `writeParts` calls the pair for a section when both kinds are due, and the single call otherwise. A
+  `SVE_TIMING` log line prints the seconds per pair against the last single parts.
+- **Tests:** the pure parts (prompt split into a shared prefix and a suffix per kind, with the prefix identical
+  for both kinds), plus the fallback choice. The speed is measured on the phone in Task 6.
+- **Commit:** `feat(core): a part's notes and questions written together, sharing one reading of the part`.
+
+### Order and conflicts
+
+- Task 9 (core) runs now, in parallel with the second-brain Task 17 fix round (iOS Views).
+- Then Task 7, then Task 8, because both touch the views and `Localizable.xcstrings`.
