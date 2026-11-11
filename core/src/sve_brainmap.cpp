@@ -4,7 +4,7 @@
 #include <set>
 #include <string>
 #include <vector>
-#include "sve_memory.h"  // kDirectToMapDefault
+#include "sve_memory.h"  // memory_on_map, memory_waiting
 
 namespace sve {
 namespace {
@@ -13,6 +13,8 @@ struct Item {
     std::string ref, label;
     double importance = 0;
     bool is_new = false, low = false, done = false;
+    // Waiting to be checked: a memory in the review queue, or a person/topic whose memories all are.
+    bool waiting = false;
     int count = 0;
     bool counted = false;
 };
@@ -28,7 +30,7 @@ bool shown_on_map(const json &m) { return memory_on_map(m); }
 
 json item_json(const Item &it) {
     return {{"ref", it.ref}, {"label", it.label}, {"importance", it.importance}, {"new", it.is_new},
-            {"low_confidence", it.low}, {"done", it.done}, {"count", it.count}};
+            {"low_confidence", it.low}, {"done", it.done}, {"count", it.count}, {"waiting", it.waiting}};
 }
 
 std::string name_of(const json &list, int64_t id) {
@@ -42,7 +44,8 @@ void add_branch(json &out, const std::string &kind, std::vector<Item> items, int
     if (items.empty()) return;
     std::stable_sort(items.begin(), items.end(), [&](const Item &a, const Item &b) {
         if (open_first && a.done != b.done) return !a.done;
-        return a.importance > b.importance;
+        if (a.importance != b.importance) return a.importance > b.importance;
+        return !a.waiting && b.waiting;  // kept before waiting at equal importance
     });
     const int cap = std::max(per_branch, 0);
     json arr = json::array();
@@ -70,7 +73,9 @@ json build_brain_map(const json &memories, const json &people, const json &topic
         if (it.ref.empty()) {
             it.ref = prefix + std::to_string(tid);
             it.label = name_of(list, tid);
+            it.waiting = true;
         }
+        it.waiting = it.waiting && mi.waiting;
         it.count++;
         it.importance = std::max(it.importance, mi.importance);
         it.is_new = it.is_new || mi.is_new;
@@ -85,7 +90,8 @@ json build_brain_map(const json &memories, const json &people, const json &topic
         mi.ref = "m" + std::to_string(id);
         mi.label = m.value("text", std::string());
         mi.importance = m.value("importance", 0.0);
-        mi.is_new = m.value("review", std::string()) == "new";
+        mi.waiting = memory_waiting(m);
+        mi.is_new = m.value("review", std::string()) == "new" && !mi.waiting;
         mi.low = m.value("confidence", std::string()) == "low";
         mi.done = m.value("done", 0) != 0;
         const std::string type = m.value("type", std::string());

@@ -403,10 +403,12 @@ int   sve_memory_review(sve_ctx *ctx, int64_t id, const char *state);
  * Medicine memories are changed by saving the medicine instead (-1). 0 ok, -1 error. */
 int   sve_memory_edit(sve_ctx *ctx, int64_t id, const char *text);
 /* The mind map as JSON (see sve_brainmap.h): {"center","list","branches","links"}. note_id 0 = all recordings,
- * else only that recording's memories. Only kept or corrected, unqueued, current memories. NULL on error. */
+ * else only that recording's memories. Current memories that are kept or corrected, or waiting in the review
+ * queue (each item's "waiting": true, drawn lighter); never wrong or a medicine's. NULL on error. */
 char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id);
 /* Memories under a person or topic ("Who is this?" for a person), by importance, same rows as sve_memories_json,
- * and only those the map shows (so counts match). note_id > 0: only that recording's. */
+ * and only those the map shows (so counts match), each with "waiting" (in the review queue, not checked yet).
+ * Kept before waiting at equal importance. note_id > 0: only that recording's. */
 char *sve_topic_memories_json(sve_ctx *ctx, int64_t topic_id, int64_t note_id /* 0 = all */);
 /* Marks a memory as used just now (last_used), which raises its importance. 0 ok, -1 error. */
 int   sve_memory_touch(sve_ctx *ctx, int64_t id);

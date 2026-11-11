@@ -43,15 +43,70 @@ TEST(map_open_before_done) {
     CHECK((*branch(m, "promises"))["items"][1]["done"] == true);
 }
 
-TEST(map_excludes_wrong_queued_superseded) {
-    json w = mem(1, "decision", 5, "wrong"), q = mem(2, "decision", 5, "kept", 1), s = mem(3, "decision", 5);
+TEST(map_excludes_wrong_superseded_medicine_and_odd_queue_states) {
+    // wrong (queued or not), superseded (even waiting), medicine, kept-but-queued, new-not-queued: all out.
+    json w = mem(1, "decision", 5, "wrong"), wq = mem(6, "decision", 5, "wrong", 1), q = mem(2, "decision", 5, "kept", 1);
+    json s = mem(3, "decision", 5), sw = mem(7, "decision", 5, "new", 1);
     s["superseded_by"] = 9;
+    sw["superseded_by"] = 9;
+    json med = mem(8, "decision", 5);
+    med["origin"] = "medicine";
     json ok = mem(4, "decision", 1), nw = mem(5, "decision", 5, "new");
-    json m = build_brain_map(json::array({w, q, s, ok, nw}), kNone, kNone, kNone, 0);
+    json m = build_brain_map(json::array({w, wq, q, s, sw, med, ok, nw}), kNone, kNone, kNone, 0);
     const json *b = branch(m, "decisions");
     CHECK(b != nullptr);
     CHECK_EQ(b->at("items").size(), (size_t)1);
     CHECK_EQ(b->at("items")[0]["ref"].get<std::string>(), std::string("m4"));
+    for (const json &r : {w, wq, q, s, sw, med, nw}) CHECK(!memory_on_map(r));
+    CHECK(memory_on_map(ok));
+}
+
+TEST(map_shows_waiting_with_flag) {
+    json kept = mem(1, "promise", 2), corr = mem(2, "promise", 2, "corrected"), wait = mem(3, "promise", 2, "new", 1);
+    CHECK(memory_on_map(wait));
+    CHECK(memory_waiting(wait));
+    CHECK(!memory_waiting(kept));
+    CHECK(!memory_waiting(corr));
+    json m = build_brain_map(json::array({wait, kept, corr}), kNone, kNone, kNone, 0);
+    const json &items = (*branch(m, "promises"))["items"];
+    CHECK_EQ(items.size(), (size_t)3);
+    CHECK(items[2]["ref"] == "m3");  // kept before waiting at equal importance
+    CHECK(items[2]["waiting"] == true);
+    CHECK(items[2]["new"] == false);  // waiting is its own mark, not "new"
+    CHECK(items[0]["waiting"] == false);
+    CHECK(items[1]["waiting"] == false);
+}
+
+TEST(map_waiting_orders_by_importance_and_counts) {
+    // A stronger waiting item still comes before a weaker kept one; "more" and "list" count waiting ones.
+    json ms = json::array({mem(1, "question", 1), mem(2, "question", 5, "new", 1)});
+    for (int i = 3; i <= 9; i++) ms.push_back(mem(i, "question", 0.5, "new", 1));
+    json m = build_brain_map(ms, kNone, kNone, kNone, 0);
+    const json *b = branch(m, "questions");
+    CHECK(b != nullptr);
+    CHECK(b->at("items")[0]["ref"] == "m2");
+    CHECK(b->at("items")[1]["ref"] == "m1");
+    CHECK_EQ(b->at("more").get<int>(), 3);
+    CHECK(m["list"] == false);
+    json few = json::array({mem(1, "question", 1), mem(2, "question", 1, "new", 1)});
+    CHECK(build_brain_map(few, kNone, kNone, kNone, 0)["list"] == true);
+}
+
+TEST(map_person_waiting_only_when_all_waiting) {
+    json a = mem(1, "fact", 1, "new", 1), b = mem(2, "fact", 1, "new", 1), c = mem(3, "fact", 1);
+    a["people"] = json::array({{{"id", 10}}});
+    b["people"] = json::array({{{"id", 11}}});
+    c["people"] = json::array({{{"id", 11}}});
+    json people = json::array({{{"id", 10}, {"name", "Ravi"}}, {{"id", 11}, {"name", "Sita"}}});
+    json m = build_brain_map(json::array({a, b, c}), people, kNone, kNone, 0);
+    const json *p = branch(m, "people");
+    CHECK(p != nullptr);
+    CHECK_EQ(p->at("items").size(), (size_t)2);
+    for (const auto &it : p->at("items")) {
+        if (it["label"] == "Ravi") { CHECK(it["waiting"] == true); CHECK_EQ(it["count"].get<int>(), 1); }
+        if (it["label"] == "Sita") { CHECK(it["waiting"] == false); CHECK_EQ(it["count"].get<int>(), 2); }
+    }
+    CHECK(p->at("items")[0]["label"] == "Sita");  // kept before waiting at equal importance
 }
 
 TEST(map_list_when_few) {
@@ -83,10 +138,11 @@ TEST(map_meaning_links_capped) {
     CHECK_EQ(n, 2);
 }
 
-TEST(map_direct_off_shows_only_kept) {
-    json ms = json::array({mem(1, "promise", 1, "new"), mem(2, "promise", 1, "kept"), mem(3, "promise", 1, "corrected")});
+TEST(map_direct_off_shows_kept_and_waiting) {
+    json ms = json::array({mem(1, "promise", 1, "new"), mem(2, "promise", 1, "kept"), mem(3, "promise", 1, "corrected"),
+                           mem(4, "promise", 1, "new", 1)});
     json m = build_brain_map(ms, kNone, kNone, kNone, 0);
-    CHECK_EQ((*branch(m, "promises"))["items"].size(), (size_t)2);
+    CHECK_EQ((*branch(m, "promises"))["items"].size(), (size_t)3);
 }
 
 TEST(map_people_topics_counts_and_links) {
@@ -123,23 +179,43 @@ TEST(store_topic_memories_and_map_rows) {
     for (int64_t m : {a, b, q}) CHECK(st.link_memory_entity(m, person, "mentioned"));
     CHECK(st.link_memory_entity(b, topic, "topic"));
     json under = st.topic_memories(person);
-    CHECK_EQ(under.size(), (size_t)2);  // queued one left out
+    CHECK_EQ(under.size(), (size_t)2);  // kept-but-queued left out
+    CHECK(under[0]["waiting"] == false);
     int64_t fresh = st.add_memory_item({{"type", "fact"}, {"text", "Unreviewed"}, {"review", "new"}});
     CHECK(st.add_memory_source(fresh, note, 0, "quote", std::nullopt));
     CHECK(st.link_memory_entity(fresh, person, "mentioned"));
-    CHECK_EQ(st.topic_memories(person).size(), (size_t)2);  // review new stays out, as on the map
+    CHECK_EQ(st.topic_memories(person).size(), (size_t)2);  // new, not queued: out, as on the map
+    // Waiting in the review queue: shown, flagged, after a kept one of the same importance.
+    int64_t wait = st.add_memory_item({{"type", "fact"}, {"text", "Waiting"}, {"review", "new"}, {"queue", 1}, {"importance", 2.0}});
+    CHECK(st.add_memory_source(wait, note, 0, "quote", std::nullopt));
+    CHECK(st.link_memory_entity(wait, person, "mentioned"));
+    json with_wait = st.topic_memories(person);
+    CHECK_EQ(with_wait.size(), (size_t)3);
+    CHECK_EQ(with_wait[0]["id"].get<int64_t>(), b);
+    CHECK_EQ(with_wait[1]["id"].get<int64_t>(), wait);
+    CHECK(with_wait[1]["waiting"] == true);
+    // Wrong and superseded waiting ones stay out.
+    int64_t wrong = st.add_memory_item({{"type", "fact"}, {"text", "Wrong"}, {"review", "wrong"}, {"queue", 1}});
+    int64_t old = st.add_memory_item({{"type", "fact"}, {"text", "Old"}, {"review", "new"}, {"queue", 1}});
+    CHECK(st.update_memory_item(old, {{"superseded_by", b}}));
+    int64_t med = st.add_memory_item({{"type", "fact"}, {"text", "Pill"}, {"review", "kept"}, {"origin", "medicine"}});
+    for (int64_t m : {wrong, old, med}) CHECK(st.link_memory_entity(m, person, "mentioned"));
+    CHECK_EQ(st.topic_memories(person).size(), (size_t)3);
+    CHECK(st.update_memory_item(wait, {{"review", "kept"}, {"queue", 0}}));  // Keep: solid
+    CHECK(st.topic_memories(person)[1]["waiting"] == false);
+    CHECK(st.update_memory_item(wait, {{"review", "new"}, {"queue", 1}}));
     int64_t note2 = st.create("n2", "en", nullptr, "y", 1);
     CHECK(st.add_memory_source(a, note2, 0, "quote", std::nullopt));
     CHECK_EQ(st.topic_memories(person, note2).size(), (size_t)1);
-    CHECK_EQ(st.topic_memories(person, note).size(), (size_t)2);
+    CHECK_EQ(st.topic_memories(person, note).size(), (size_t)3);  // the waiting one too
     CHECK_EQ(under[0]["id"].get<int64_t>(), b);  // by importance
     CHECK_EQ(st.topic_memories(topic).size(), (size_t)1);
-    json rows = st.memory_items_with_topics({{"queue", 0}});
+    json rows = st.memory_items_with_topics(json::object());
     json map = build_brain_map(rows, st.topics("person"), st.topics("topic"), json::array(), 0);
     bool saw_ravi = false, saw_budget = false;
     for (const auto &br : map["branches"])
         for (const auto &it : br["items"]) {
-            if (it["label"] == "Ravi") { saw_ravi = true; CHECK_EQ(it["count"].get<int>(), 2); }
+            if (it["label"] == "Ravi") { saw_ravi = true; CHECK_EQ(it["count"].get<int>(), 3); CHECK(it["waiting"] == false); }
             if (it["label"] == "Budget") saw_budget = true;
         }
     CHECK(saw_ravi && saw_budget);

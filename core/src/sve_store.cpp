@@ -981,15 +981,19 @@ json Store::memory_items_with_topics(const json &filter) {
 
 json Store::topic_memories(int64_t topic_id, int64_t note_id) {
     std::string sql = std::string("SELECT ") + kMemoryCols + " FROM memories m JOIN memory_entities e ON e.memory_id=m.id "
-                      "WHERE e.topic_id=? AND m.queue=0 AND m.superseded_by IS NULL" + memory_map_review_sql();
+                      "WHERE e.topic_id=?" + memory_map_review_sql();
     std::vector<json> binds = {topic_id};
     if (note_id > 0) {
         sql += " AND m.id IN (SELECT memory_id FROM memory_sources WHERE note_id=?)";
         binds.push_back(note_id);
     }
-    sql += " GROUP BY m.id ORDER BY m.importance DESC, m.id DESC";
+    sql += " GROUP BY m.id ORDER BY m.importance DESC, (m.queue=1 AND m.review='new') ASC, m.id DESC";
     json out = json::array();
-    for (auto &r : query_rows(sql.c_str(), binds)) out.push_back(memory_full(r));
+    for (auto &r : query_rows(sql.c_str(), binds)) {
+        json row = memory_full(r);
+        row["waiting"] = memory_waiting(row);
+        out.push_back(row);
+    }
     return out;
 }
 

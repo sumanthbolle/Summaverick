@@ -551,16 +551,26 @@ double memory_importance(const json &row, int people_met_max, int practice_succe
     return base * std::pow(0.5, days / 60.0);
 }
 
+bool memory_waiting(const json &m) {
+    return m.is_object() && jint(m, "queue", 0) == 1 && jstr(m, "review") == "new";
+}
+
 bool memory_on_map(const json &m) {
-    if (!m.is_object() || jint(m, "queue", 0) != 0) return false;
+    if (!m.is_object() || jstr(m, "origin") == "medicine") return false;
     if (m.contains("superseded_by") && !m["superseded_by"].is_null()) return false;
     const std::string review = jstr(m, "review");
     if (review == "wrong") return false;
+    if (memory_waiting(m)) return true;
+    if (jint(m, "queue", 0) != 0) return false;
     return kDirectToMapDefault || review == "kept" || review == "corrected";
 }
 
 const char *memory_map_review_sql() {
-    return kDirectToMapDefault ? " AND m.review<>'wrong'" : " AND m.review IN ('kept','corrected')";
+    return kDirectToMapDefault
+               ? " AND m.origin<>'medicine' AND m.superseded_by IS NULL AND m.review<>'wrong'"
+                 " AND (m.queue=0 OR (m.queue=1 AND m.review='new'))"
+               : " AND m.origin<>'medicine' AND m.superseded_by IS NULL"
+                 " AND ((m.queue=0 AND m.review IN ('kept','corrected')) OR (m.queue=1 AND m.review='new'))";
 }
 
 }  // namespace sve

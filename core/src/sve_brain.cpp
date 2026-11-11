@@ -403,7 +403,7 @@ char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id) {
     return guard<char *>("sve_brain_map_json", nullptr, [&]() -> char * {
         if (!ctx) return nullptr;
         sve::Store &st = *ctx->store;
-        json f = {{"queue", 0}};
+        json f = json::object();  // waiting ones too: memory_on_map decides
         if (note_id > 0) f["note_id"] = note_id;
         // Meaning pairs come with embeddings (not built yet): none for now.
         return dump(sve::build_brain_map(st.memory_items_with_topics(f), st.topics("person"), st.topics("topic"), json::array(), note_id));
