@@ -61,6 +61,21 @@ TEST(map_excludes_wrong_superseded_medicine_and_odd_queue_states) {
     CHECK(memory_on_map(ok));
 }
 
+TEST(map_waiting_health_or_conflict_stays_off) {
+    // Waiting health memories and waiting conflicts are decided in the review queue first; kept health ones show.
+    json wh = mem(1, "promise", 2, "new", 1), wc = mem(2, "promise", 2, "new", 1), kh = mem(3, "promise", 2);
+    wh["health"] = 1;
+    wc["conflict_with"] = 9;
+    kh["health"] = 1;
+    CHECK(!memory_on_map(wh));
+    CHECK(!memory_on_map(wc));
+    CHECK(memory_on_map(kh));
+    json m = build_brain_map(json::array({wh, wc, kh}), kNone, kNone, kNone, 0);
+    const json &items = (*branch(m, "promises"))["items"];
+    CHECK_EQ(items.size(), (size_t)1);
+    CHECK(items[0]["ref"] == "m3");
+}
+
 TEST(map_shows_waiting_with_flag) {
     json kept = mem(1, "promise", 2), corr = mem(2, "promise", 2, "corrected"), wait = mem(3, "promise", 2, "new", 1);
     CHECK(memory_on_map(wait));
@@ -201,6 +216,14 @@ TEST(store_topic_memories_and_map_rows) {
     int64_t med = st.add_memory_item({{"type", "fact"}, {"text", "Pill"}, {"review", "kept"}, {"origin", "medicine"}});
     for (int64_t m : {wrong, old, med}) CHECK(st.link_memory_entity(m, person, "mentioned"));
     CHECK_EQ(st.topic_memories(person).size(), (size_t)3);
+    // Waiting health and waiting conflicts stay out until decided; a kept health one is shown.
+    int64_t wh = st.add_memory_item({{"type", "fact"}, {"text", "BP"}, {"review", "new"}, {"queue", 1}, {"health", 1}});
+    int64_t wc = st.add_memory_item({{"type", "fact"}, {"text", "Clash"}, {"review", "new"}, {"queue", 1}, {"conflict_with", b}});
+    for (int64_t m : {wh, wc}) CHECK(st.link_memory_entity(m, person, "mentioned"));
+    CHECK_EQ(st.topic_memories(person).size(), (size_t)3);
+    CHECK(st.update_memory_item(wh, {{"review", "kept"}, {"queue", 0}}));
+    CHECK_EQ(st.topic_memories(person).size(), (size_t)4);
+    CHECK(st.update_memory_item(wh, {{"review", "wrong"}}));
     CHECK(st.update_memory_item(wait, {{"review", "kept"}, {"queue", 0}}));  // Keep: solid
     CHECK(st.topic_memories(person)[1]["waiting"] == false);
     CHECK(st.update_memory_item(wait, {{"review", "new"}, {"queue", 1}}));

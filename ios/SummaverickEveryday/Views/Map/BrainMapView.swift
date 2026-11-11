@@ -566,7 +566,8 @@ struct BrainMapCanvas: View {
         }
     }
 
-    /// Open or folded for a branch; done, new, waiting to be checked and "not sure I heard this right" for an item.
+    /// Open or folded for a branch; done, new, waiting to be checked and "not sure I heard this right" for an item
+    /// (people and topics are items too: one whose memories all wait says so).
     private func accessibilityState(_ n: PlacedNode) -> String {
         switch n.kind {
         case .branch: return expanded.contains(n.branch ?? "") ? String(localized: "Open") : String(localized: "Folded")
@@ -781,6 +782,8 @@ struct MapListRow: View {
         }
         .frame(minHeight: 44)
         .contentShape(Rectangle())
+        // One element: the label, the count and (not checked yet) "Waiting for you to check".
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -1100,10 +1103,15 @@ private struct MoreList: View {
 
     private func reload() async {
         if let type = MapStyle.memoryType(branch) {
-            // The map's own rule (core memory_on_map): checked, or waiting in the queue; never a medicine's.
-            // The core leaves out wrong and superseded rows. Strongest first, checked before waiting.
+            // The map's own rule (core memory_on_map): checked, or waiting in the queue and neither health-related
+            // nor a conflict; never a medicine's. The core leaves out wrong and superseded rows. Strongest first,
+            // checked before waiting.
             let ms = await CoreEngine.shared.memories(MemoryFilter(noteID: noteID, types: [type]))
-                .filter { !$0.isMedicine && ($0.waitingForCheck || (!$0.queued && ($0.review == "kept" || $0.review == "corrected"))) }
+                .filter { m in
+                    guard !m.isMedicine else { return false }
+                    if m.waitingForCheck { return !m.health && m.conflictWith == nil }
+                    return !m.queued && (m.review == "kept" || m.review == "corrected")
+                }
             rows = ms.sorted {
                 if $0.importance != $1.importance { return $0.importance > $1.importance }
                 if $0.waitingForCheck != $1.waitingForCheck { return !$0.waitingForCheck }

@@ -560,7 +560,9 @@ bool memory_on_map(const json &m) {
     if (m.contains("superseded_by") && !m["superseded_by"].is_null()) return false;
     const std::string review = jstr(m, "review");
     if (review == "wrong") return false;
-    if (memory_waiting(m)) return true;
+    // Waiting: not a health one and not a conflict (both are decided in the review queue first).
+    if (memory_waiting(m))
+        return jint(m, "health", 0) == 0 && (!m.contains("conflict_with") || m["conflict_with"].is_null());
     if (jint(m, "queue", 0) != 0) return false;
     return kDirectToMapDefault || review == "kept" || review == "corrected";
 }
@@ -568,9 +570,10 @@ bool memory_on_map(const json &m) {
 const char *memory_map_review_sql() {
     return kDirectToMapDefault
                ? " AND m.origin<>'medicine' AND m.superseded_by IS NULL AND m.review<>'wrong'"
-                 " AND (m.queue=0 OR (m.queue=1 AND m.review='new'))"
+                 " AND (m.queue=0 OR (m.queue=1 AND m.review='new' AND m.health=0 AND m.conflict_with IS NULL))"
                : " AND m.origin<>'medicine' AND m.superseded_by IS NULL"
-                 " AND ((m.queue=0 AND m.review IN ('kept','corrected')) OR (m.queue=1 AND m.review='new'))";
+                 " AND ((m.queue=0 AND m.review IN ('kept','corrected'))"
+                 " OR (m.queue=1 AND m.review='new' AND m.health=0 AND m.conflict_with IS NULL))";
 }
 
 }  // namespace sve

@@ -404,7 +404,8 @@ int   sve_memory_review(sve_ctx *ctx, int64_t id, const char *state);
 int   sve_memory_edit(sve_ctx *ctx, int64_t id, const char *text);
 /* The mind map as JSON (see sve_brainmap.h): {"center","list","branches","links"}. note_id 0 = all recordings,
  * else only that recording's memories. Current memories that are kept or corrected, or waiting in the review
- * queue (each item's "waiting": true, drawn lighter); never wrong or a medicine's. NULL on error. */
+ * queue and neither health-related nor a conflict (each item's "waiting": true, drawn lighter); never wrong or
+ * a medicine's. NULL on error. */
 char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id);
 /* Memories under a person or topic ("Who is this?" for a person), by importance, same rows as sve_memories_json,
  * and only those the map shows (so counts match), each with "waiting" (in the review queue, not checked yet).

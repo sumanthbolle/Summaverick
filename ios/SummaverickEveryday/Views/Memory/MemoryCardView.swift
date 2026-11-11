@@ -102,7 +102,8 @@ struct MemoryDetails: View {
                 .frame(width: 28)
                 .accessibilityHidden(true)
             Text(MemoryFormat.typeLabel(m.type)).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
-            if m.review == "new" {
+            // Not while "Waiting for you to check" shows below: that already says it.
+            if m.review == "new" && !(showsWaiting && m.waitingForCheck) {
                 Text("New").font(.caption.weight(.bold)).foregroundStyle(Theme.primaryLabel)
                     .padding(.horizontal, 8).padding(.vertical, 2)
                     .background(Theme.primaryFill, in: Capsule())

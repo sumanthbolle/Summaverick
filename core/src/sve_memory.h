@@ -67,7 +67,8 @@ double memory_importance(const json &row, int people_met_max, int practice_succe
 
 // The one rule for what the map and a person's or topic's list may show: current (not superseded), not wrong,
 // not a medicine's, and either checked (not queued, review kept or corrected, or any review but wrong when
-// kDirectToMapDefault) or waiting (memory_waiting). memory_map_review_sql is the same rule as an SQL fragment
+// kDirectToMapDefault) or waiting (memory_waiting) and neither health-related nor a conflict (those are
+// decided in the review queue first). memory_map_review_sql is the same rule as an SQL fragment
 // over alias m (starts with " AND ").
 bool memory_on_map(const json &row);
 const char *memory_map_review_sql();
