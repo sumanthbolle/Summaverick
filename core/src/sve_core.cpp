@@ -304,12 +304,8 @@ static bool part_input(sve_ctx *ctx, int64_t note_id, int idx, PartInput &in) {
     if (!in.sec.is_object()) return false;
     in.first = in.sec.value("first_piece", (int64_t)0);
     in.last = in.sec.value("last_piece", (int64_t)0);
-    sve::json pieces = sve::json::array();
-    for (const auto &p : ctx->store->pieces(note_id)) {
-        const int64_t pi = p.value("idx", (int64_t)-1);
-        if (pi >= in.first && pi < in.last) pieces.push_back(p);
-    }
-    in.text = sve::notes_material(pieces);
+    // [first_piece, last_piece], both included (the app's NoteSection): the last piece is the part's too.
+    in.text = sve::notes_material(sve::section_pieces(ctx->store->pieces(note_id), in.first, in.last));
     in.guide = sve::sections_text(sve::json::array({in.sec}));
     in.total = (int)in.secs.size();
     in.part = 1;

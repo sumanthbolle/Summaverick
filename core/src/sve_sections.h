@@ -54,6 +54,9 @@ double piece_conf(const nlohmann::json &piece);
 // The notes material of a note's pieces ([{"text","conf"?}], in order): the texts joined by "\n", each unclear
 // one marked, the whole trimmed. With nothing unclear it is the transcript the app stores (pieces joined, trimmed).
 std::string notes_material(const nlohmann::json &pieces);
+// The pieces of a section (pieces as Store::pieces gives them, with "idx"): idx in [first, last], both included,
+// as the app stores a section's range (NoteSection). [] for anything else.
+nlohmann::json section_pieces(const nlohmann::json &pieces, int64_t first, int64_t last);
 
 // Saved vocabulary terms in a text (N7 rev 1: another note's "AI bubble" was listed as a term of note 20, so a saved
 // term reaches a section, memory or notes prompt only when that note says it). Case-insensitive (ASCII); a Latin-

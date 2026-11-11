@@ -619,3 +619,15 @@ TEST(says_no_tasks_reads_english_and_telugu) {
     CHECK(says_no_tasks("No tasks were given."));
     CHECK(!says_no_tasks(""));
 }
+
+TEST(section_pieces_include_both_ends) {
+    // A section's range is [first_piece, last_piece], both included (NoteSection, SectionWriter).
+    json pieces = json::array();
+    for (int i = 0; i < 5; ++i) pieces.push_back({{"idx", i}, {"start_sec", i * 28}, {"text", "p" + std::to_string(i)}});
+    json in = section_pieces(pieces, 1, 3);
+    CHECK_EQ(in.size(), (size_t)3);
+    CHECK(in[0]["text"] == "p1" && in[2]["text"] == "p3");
+    CHECK_EQ(section_pieces(pieces, 4, 4).size(), (size_t)1);
+    CHECK(section_pieces(pieces, 6, 8).empty());
+    CHECK(section_pieces(json::object(), 0, 1).empty());
+}

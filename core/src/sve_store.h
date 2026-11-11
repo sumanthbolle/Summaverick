@@ -71,9 +71,10 @@ public:
     bool clear_transcript(int64_t note_id);
 
     // Section outputs (engine v2): one section's detailed notes (kind 1) or revision questions (kind 2), in lang,
-    // for the section's piece range [first_piece, last_piece). set refuses (false) a deleted note and a range that
-    // is not the section's now (re-planned while it was written); text "" is a part with no speech. set_sections
-    // drops rows whose range changed; clear_transcript, note delete and wipe_assistant drop all.
+    // for the section's piece range [first_piece, last_piece] (both included, as the app stores sections). set
+    // refuses (false) a deleted note and a range that is not the section's now (re-planned while it was written);
+    // text "" is a part with no speech. set_sections drops rows whose range changed; clear_transcript, note delete
+    // and wipe_assistant drop all.
     bool set_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
                             int64_t last_piece, const std::string &text, bool cut = false);
     // [{idx,kind,lang,first_piece,last_piece,text,cut}], every stored row; cut: the reply reached its token cap.

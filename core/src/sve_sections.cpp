@@ -134,6 +134,17 @@ std::string notes_material(const json &pieces) {
     return trim_ws(out);
 }
 
+json section_pieces(const json &pieces, int64_t first, int64_t last) {
+    json out = json::array();
+    if (!pieces.is_array()) return out;
+    for (const auto &p : pieces) {
+        if (!p.is_object() || !p.contains("idx") || !p["idx"].is_number_integer()) continue;
+        const int64_t i = p["idx"].get<int64_t>();
+        if (i >= first && i <= last) out.push_back(p);
+    }
+    return out;
+}
+
 std::string strip_unclear_tags(const std::string &s) {
     static const std::string tag = "[unclear]";
     std::string out;
