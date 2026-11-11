@@ -30,14 +30,18 @@ struct Llm {
     // A model run failed on the GPU backend (iOS refuses GPU work in the background): the Metal state stays broken and
     // every later run fails at once, even in front, until the model is loaded again (sve_llm_needs_reload).
     bool decode_failed = false;
-    bool last_cut = false;  // the last generate stopped at max_new_tokens, before an end-of-generation token
+    bool last_cut = false;
+    // The last complete_pair stopped on a failed decode (decode_failed is also set, for sve_llm_needs_reload, but it
+    // stays set from any earlier run).
+    bool last_pair_decode_failed = false;  // the last generate stopped at max_new_tokens, before an end-of-generation token
 
     ~Llm();
     bool embeddings = false;  // loaded as an embedding model (meaning search): embed() only, never complete()
 
     // embeddings: an embedding model (EmbeddingGemma), CPU only whatever n_gpu_layers says (no GPU device, no op
     // offload), the model's own pooling, one sequence per batch (n_batch n_ctx, n_ubatch 512); batch threads = decode threads.
-    bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings = false);
+    // n_seq: sequences of a generation context (2 for complete_pair, in one unified KV memory; 1 without).
+    bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings = false, int n_seq = 1);
     // The pooled vector of text (its first n_ubatch tokens), as the model gives it (not normalised). False on error.
     bool embed(const std::string &text, std::vector<float> &out);
     std::vector<llama_token> tokenize(const std::string &text, bool add_special, bool parse_special) const;

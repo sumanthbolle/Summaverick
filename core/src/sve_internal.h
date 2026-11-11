@@ -84,6 +84,9 @@ struct sve_ctx {
     // of them were heard a second time; logged and cleared at its "end" (N7: the phone check measures the share).
     std::map<std::string, std::pair<int, int>> hearings;
     std::unique_ptr<sve::Llm> llm;
+    // Notes and questions of a part written together (sve_set_pair_enabled): off, the model loads with one sequence
+    // and every part is written by single calls.
+    bool pair_enabled = true;
     // Meaning search (sve_load_embedder): a second, CPU-only model next to llm, and the tag its vectors are stored
     // under (file name and dimensions), so vectors of another model are never compared with its own.
     std::unique_ptr<sve::Llm> embed;

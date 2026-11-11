@@ -1573,14 +1573,17 @@ final class ProcessingPipeline {
                 NSLog("[sve] note %lld: part %ld %@ stopped %ld times this run; the run stops", id, idx + 1, kind.outputKind.title, tried)
                 return .failed
             }
-            // Both kinds of this part due: written together, sharing one reading of the part.
             let qKey = "\(idx).\(NoteSteps.Kind.questions.rawValue)"
-            let pair = kind == .notes && kinds.contains(.questions) && plan.contains(.part(idx: idx, kind: .questions)) &&
+            let bothDue = kind == .notes && kinds.contains(.questions) && plan.contains(.part(idx: idx, kind: .questions)) &&
                 tries[qKey, default: 0] < NoteSteps.maxAttempts
             tries[key] = tried + 1
-            if pair { tries[qKey, default: 0] += 1 }
             if !(await heatGate(id)) { return .paused }
             if abort.isSet { return .cutOff }
+            // Both kinds of this part due: written together, sharing one reading of the part, only with pair writing
+            // on and the heat at full or eased (the ladder stays in charge: minimal or paused means single calls).
+            let level = HeatGovernor.shared.level
+            let pair = bothDue && CoreEngine.pairWriting && (level == .full || level == .eased)
+            if pair { tries[qKey, default: 0] += 1 }
             stage = .generating(kind.outputKind, "part", idx, count)
             NSLog("[sve] note %lld: step %ld of %ld: part %ld of %ld, %@ (try %ld this run)", id, done + 1, total, idx + 1, count,
                   pair ? "notes and questions" : kind.outputKind.title, tried + 1)

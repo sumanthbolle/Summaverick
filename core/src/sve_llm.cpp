@@ -17,7 +17,7 @@ Llm::~Llm() {
     if (model) llama_model_free(model);
 }
 
-bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings) {
+bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings, int n_seq) {
     llama_model_params mp = llama_model_default_params();
     this->embeddings = embeddings;
     if (embeddings) n_gpu_layers = 0;
@@ -49,8 +49,10 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     cp.no_perf = true;
     // Two sequences (sve_section_outputs_pair: a part's notes and questions from one reading of it), in one unified
     // KV memory: the copied prefix shares its cells and each sequence may use the whole n_ctx.
-    cp.n_seq_max = 2;
-    cp.kv_unified = true;
+    if (n_seq >= 2) {
+        cp.n_seq_max = 2;
+        cp.kv_unified = true;
+    }
     if (embeddings) {
         // Pooling from the model. The attention is not causal, so a passage must fit one ubatch: embed() keeps the
         // first n_ubatch tokens (512, far more than a piece; it caps the compute buffer next to Gemma).
@@ -67,8 +69,8 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     if (t) tmpl = t;
     char desc[128];
     llama_model_desc(model, desc, sizeof desc);
-    sve_logf(0, "loaded %s (n_ctx=%d, threads=%d, batch threads=%d, gpu_layers=%d)", desc, n_ctx, n_threads,
-             n_threads_batch, n_gpu_layers);
+    sve_logf(0, "loaded %s (n_ctx=%d, threads=%d, batch threads=%d, gpu_layers=%d, sequences=%u)", desc, n_ctx, n_threads,
+             n_threads_batch, n_gpu_layers, llama_n_seq_max(ctx));
     return true;
 }
 
@@ -254,9 +256,16 @@ static bool decode_into(llama_context *ctx, const std::vector<llama_token> &toks
 bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], const int (&max_new)[2],
                         const PairDoneFn &on_done, sve_progress_cb cb, void *user, const char *phase) {
     last_cut = false;
+    last_pair_decode_failed = false;
     llama_memory_t mem = llama_get_memory(ctx);
     if (!mem || llama_n_seq_max(ctx) < 2) { sve_logf(2, "pair: the context has one sequence"); return false; }
     llama_memory_clear(mem, true);
+    // Guards: every exit from here (a cancel, an error, an exception) frees the samplers and the batch and clears
+    // the memory.
+    struct Clear {
+        llama_memory_t m;
+        ~Clear() { llama_memory_clear(m, true); }
+    } clear_after{mem};
     struct Seq {
         std::vector<llama_token> tail;
         llama_sampler *smpl = nullptr;
@@ -264,7 +273,14 @@ bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], 
         llama_pos pos = 0;
         int n = 0, idx = -1;
         bool done = false;
+        ~Seq() { if (smpl) llama_sampler_free(smpl); }
     } q[2];
+    struct Batch {
+        llama_batch b;
+        ~Batch() { llama_batch_free(b); }
+    } rb{llama_batch_init(2, 0, 1)};
+    llama_batch &b = rb.b;
+
     const std::vector<llama_token> h = tokenize(head, true, true);
     q[0].tail = tokenize(tails[0], false, true);
     q[1].tail = tokenize(tails[1], false, true);
@@ -275,7 +291,7 @@ bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], 
         return false;
     }
     auto fail = [&](const char *what) {
-        decode_failed = true;
+        decode_failed = last_pair_decode_failed = true;
         sve_logf(2, "pair: decode failed (%s)", what);
         return false;
     };
@@ -286,7 +302,6 @@ bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], 
         if (cb && cb(phase, 0, 2, user)) return false;
     }
     llama_memory_seq_cp(mem, 0, 1, -1, -1);
-    bool ok = true;
     char piece[256];
     // Samples sequence i's next token from logits index idx of the last decode; ends it on EOG or at its cap.
     auto sample = [&](int i, int idx) {
@@ -306,19 +321,22 @@ bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], 
         }
         if (s.done && on_done) on_done(i, s.out, cut);
     };
-    for (int i = 0; i < 2 && ok; ++i) {
+    for (int i = 0; i < 2; ++i) {
         q[i].smpl = make_sampler(vocab, false, false);
         q[i].pos = (llama_pos)h.size();
         int idx = -1;
-        if (!decode_into(ctx, q[i].tail, i, q[i].pos, idx)) { ok = fail("suffix"); break; }
+        if (!decode_into(ctx, q[i].tail, i, q[i].pos, idx)) return fail("suffix");
         q[i].pos += (llama_pos)q[i].tail.size();
-        if (max_new[i] <= 0) { q[i].done = true; if (on_done) on_done(i, "", true); continue; }
+        if (max_new[i] <= 0) {
+            q[i].done = true;
+            if (on_done) on_done(i, "", true);
+            continue;
+        }
         sample(i, idx);  // before the other sequence's suffix replaces these logits
-        if (cb && cb(phase, 0, 2, user)) ok = false;
+        if (cb && cb(phase, 0, 2, user)) return false;
     }
     // One decode per round: the last token of every sequence still going.
-    llama_batch b = llama_batch_init(2, 0, 1);
-    for (int round = 0; ok && !(q[0].done && q[1].done); ++round) {
+    for (int round = 0; !(q[0].done && q[1].done); ++round) {
         b.n_tokens = 0;
         for (int i = 0; i < 2; ++i) {
             if (q[i].done) continue;
@@ -330,16 +348,12 @@ bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], 
             b.logits[j] = 1;
             q[i].idx = j;
         }
-        if (llama_decode(ctx, b) != 0) { ok = fail("round"); break; }
+        if (llama_decode(ctx, b) != 0) return fail("round");
         for (int i = 0; i < 2; ++i)
             if (!q[i].done) sample(i, q[i].idx);
-        if ((round & 15) == 0 && cb && cb(phase, 0, 2, user)) ok = false;
+        if ((round & 15) == 0 && cb && cb(phase, 0, 2, user)) return false;
     }
-    llama_batch_free(b);
-    for (auto &s : q)
-        if (s.smpl) llama_sampler_free(s.smpl);
-    llama_memory_clear(mem, true);
-    return ok;
+    return true;
 }
 
 // Remove thinking blocks (Qwen3 "<think>…</think>", Gemma 4 "<|channel>…<channel|>") and surrounding whitespace.

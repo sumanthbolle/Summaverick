@@ -95,9 +95,14 @@ int sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, 
     sve_unload_audio(ctx);
     ctx->llm.reset();
     auto l = std::make_unique<sve::Llm>();
-    if (!l->load(gguf_path, n_ctx, n_threads, n_gpu_layers)) return -2;
+    if (!l->load(gguf_path, n_ctx, n_threads, n_gpu_layers, false, ctx->pair_enabled ? 2 : 1)) return -2;
     ctx->llm = std::move(l);
     return 0;
+}
+
+void sve_set_pair_enabled(sve_ctx *ctx, int on) {
+    if (!ctx) return;
+    ctx->pair_enabled = on != 0;
 }
 
 void sve_unload_llm(sve_ctx *ctx) { if (ctx) { sve_unload_audio(ctx); ctx->llm.reset(); } }
@@ -401,6 +406,10 @@ char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind
 
 int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char *lang_c, sve_progress_cb cb,
                              void *user) {
+    static const sve_output_kind kKinds[2] = {SVE_OUT_DETAILED_NOTES, SVE_OUT_REVISION_QUESTIONS};
+    // A kind whose try this call counted and that is neither stored nor handed to a single call: an exception records
+    // its reason, as section_output_run does.
+    bool owned[2] = {false, false};
     try {
         if (!ctx || !ctx->llm) return -1;
         PartInput in;
@@ -408,7 +417,6 @@ int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char 
         const std::string lang = lang_c ? lang_c : "en";
         sve::Store &st = *ctx->store;
         sve::Llm &llm = *ctx->llm;
-        static const sve_output_kind kKinds[2] = {SVE_OUT_DETAILED_NOTES, SVE_OUT_REVISION_QUESTIONS};
         static const sve::SectionOutputKind kSk[2] = {sve::SectionOutputKind::Notes, sve::SectionOutputKind::Questions};
         // One kind by itself (the single call), from its first try (greedy_only false) or only its greedy retry.
         // 1 stored, 0 not, -2 cancelled.
@@ -441,17 +449,20 @@ int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char 
             split = split && sve::split_templated(llm.apply_template(sys, shared + suffix), shared, suffix, head[i], tail[i]);
         }
         if (!split || head[0] != head[1] ||
-            !sve::section_pair_fits((int)llama_n_seq_max(llm.ctx), llm.n_ctx, (int)llama_n_ctx_seq(llm.ctx),
+            !sve::section_pair_fits(ctx->pair_enabled ? (int)llama_n_seq_max(llm.ctx) : 1, llm.n_ctx, (int)llama_n_ctx_seq(llm.ctx),
                                     llm.count_tokens(head[0]) + 1, llm.count_tokens(tail[0]), llm.count_tokens(tail[1]))) {
             sve_logf(1, "section %d: notes and questions written one at a time (no room for both together)", idx);
             return both_single();
         }
         // Both tries counted before the model runs; a cancel takes back those not stored.
         if (!st.bump_step_attempt(note_id, idx, (int)kKinds[0], lang)) return -1;
+        owned[0] = true;
         if (!st.bump_step_attempt(note_id, idx, (int)kKinds[1], lang)) {
             st.undo_step_attempt(note_id, idx, (int)kKinds[0]);
+            owned[0] = false;
             return -1;
         }
+        owned[1] = true;
         const std::string source = in.text + "\n" + in.guide;
         bool ended[2] = {false, false}, stored[2] = {false, false}, refused = false;
         std::string error[2];
@@ -466,6 +477,7 @@ int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char 
                 return;
             }
             stored[i] = true;
+            owned[i] = false;
         };
         CancelWatch w{cb, user, false};
         const int caps[2] = {sve::section_output_max_out(kSk[0]), sve::section_output_max_out(kSk[1])};
@@ -474,6 +486,7 @@ int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char 
         if (!ok && w.cancelled) {
             for (int i = 0; i < 2; ++i)
                 if (!stored[i]) st.undo_step_attempt(note_id, idx, (int)kKinds[i]);
+            owned[0] = owned[1] = false;
             return -2;
         }
         if (refused) return n;
@@ -481,7 +494,8 @@ int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char 
         for (int i = 0; i < 2; ++i) {
             if (stored[i]) continue;
             int r;
-            if (ended[i] || llm.decode_failed) {
+            owned[i] = false;  // the single call records its own outcome from here
+            if (ended[i] || llm.last_pair_decode_failed) {
                 // The sampled reply failed (or the run did): the greedy retry, as the single call's second try.
                 r = single(i, true);
             } else {
@@ -495,8 +509,12 @@ int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char 
         return got;
     } catch (const std::exception &e) {
         sve_logf(2, "section outputs pair failed: %s", e.what());
+        for (int i = 0; i < 2; ++i)
+            if (owned[i] && ctx && ctx->store) ctx->store->set_step_error(note_id, idx, (int)kKinds[i], e.what());
         return -1;
     } catch (...) {
+        for (int i = 0; i < 2; ++i)
+            if (owned[i] && ctx && ctx->store) ctx->store->set_step_error(note_id, idx, (int)kKinds[i], "unknown error");
         return -1;
     }
 }

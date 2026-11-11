@@ -135,6 +135,9 @@ actor CoreEngine {
         if !broken, loadedModelPath == path, loadedBackend == backend, sve_llm_loaded(ctx) != 0,
            mmprojPath == nil || sve_audio_loaded(ctx) != 0 { applyHeatThreads(); return }
         cpuThreads = nil
+        let pair = CoreEngine.pairWriting
+        sve_set_pair_enabled(ctx, pair ? 1 : 0)   // before the load: off loads the model with one sequence
+        NSLog("[sve] pair writing %@", pair ? "on" : "off")
         if sve_load_llm(ctx, path, contextTokens, backend.threads, backend.gpuLayers) != 0 {
             loadedModelPath = nil
             loadedBackend = nil
@@ -228,6 +231,14 @@ actor CoreEngine {
             throw CoreError.generationFailed
         }
         return out
+    }
+
+    /// A part's notes and questions written together (sectionOutputsPair). On by default (the owner approved the
+    /// speed-up); off with the UserDefaults bool "engine.pairWrite" set to false, or SVE_PAIR=0 in the launch
+    /// environment (the phone gate). Read at every model load.
+    nonisolated static var pairWriting: Bool {
+        if ProcessInfo.processInfo.environment["SVE_PAIR"] == "0" { return false }
+        return UserDefaults.standard.object(forKey: "engine.pairWrite") as? Bool ?? true
     }
 
     /// One part's notes and questions written together (one reading of the part, two replies), each stored by the

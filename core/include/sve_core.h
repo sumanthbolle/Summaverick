@@ -66,6 +66,10 @@ void sve_free(sve_ctx *ctx);
 
 /* Loads a GGUF model. n_ctx 0 => 4096. n_threads 0 => auto. n_gpu_layers: 99 on iOS (Metal), 0 on the device. */
 int  sve_load_llm(sve_ctx *ctx, const char *gguf_path, int n_ctx, int n_threads, int n_gpu_layers);
+/* Pair writing (sve_section_outputs_pair) on (1, the default) or off (0). Applies from the next sve_load_llm: on, the
+ * model loads with two sequences in one unified KV memory; off, with one, and sve_section_outputs_pair always writes
+ * the two kinds by two single calls. Turning it off also stops pairs at once with a model already loaded. */
+void sve_set_pair_enabled(sve_ctx *ctx, int on);
 void sve_unload_llm(sve_ctx *ctx);
 /* CPU threads for the next model calls (the heat ladder eases them off): n_decode for generation, n_batch for
  * prefill. 0 => the load-time rule (decode up to 4 cores; batch up to 8, never fewer than decode). The audio
