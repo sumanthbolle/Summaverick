@@ -654,17 +654,24 @@ private struct MapLabel: View {
         let waiting = it?.waiting == true
         return VStack(alignment: .leading, spacing: 1) {
                 CappedWidth(max: 112) {
-                    (Text(verbatim: it?.label ?? "") + Text(verbatim: it?.lowConfidence == true || waiting ? " ?" : "").foregroundStyle(Theme.secondary))
+                    (Text(verbatim: it?.label ?? "") + Text(verbatim: it?.lowConfidence == true ? " ?" : "").foregroundStyle(Theme.secondary))
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(it?.done == true || waiting ? Theme.secondary : Theme.text)
                         .strikethrough(it?.done == true, color: Theme.secondary)
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
                 }
-                if let n = it?.count, n > 0 {
-                    Label { Text(verbatim: "\(n)") } icon: { Image(systemName: "square.stack.3d.up.fill") }
-                        .labelStyle(.titleAndIcon)
-                        .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
+                let n = it?.count ?? 0
+                if n > 0 || waiting {
+                    HStack(spacing: 6) {
+                        if n > 0 {
+                            Label { Text(verbatim: "\(n)") } icon: { Image(systemName: "square.stack.3d.up.fill") }
+                                .labelStyle(.titleAndIcon)
+                        }
+                        // Its own mark, so a long label's "…" or a question's own "?" never hides it.
+                        if waiting { Image(systemName: "questionmark.circle") }
+                    }
+                    .font(.caption2.weight(.semibold)).foregroundStyle(Theme.secondary)
                 }
         }
         .padding(.leading, 14).padding(.trailing, 10).padding(.vertical, 7)
@@ -741,7 +748,7 @@ struct MapListRow: View {
     var done = false
     var count = 0
     var detail: String? = nil
-    /// Not checked yet: an open dashed point, lighter text, a "?" and the queue's words.
+    /// Not checked yet: an open dashed point, lighter text and the queue's words.
     var waiting = false
 
     var body: some View {
@@ -757,7 +764,7 @@ struct MapListRow: View {
             .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                (Text(verbatim: label) + Text(verbatim: lowConfidence || waiting ? " ?" : "").foregroundStyle(Theme.secondary))
+                (Text(verbatim: label) + Text(verbatim: lowConfidence ? " ?" : "").foregroundStyle(Theme.secondary))
                     .font(.body)
                     .foregroundStyle(done || waiting ? Theme.secondary : Theme.text)
                     .strikethrough(done, color: Theme.secondary)
