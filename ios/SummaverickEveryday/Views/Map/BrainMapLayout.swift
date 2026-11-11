@@ -313,6 +313,18 @@ enum BrainMapLayout {
         return c
     }
 
+    /// The camera after a change, by who chose the zoom.
+    /// - Not chosen by the person (`userZoomed` false): the map's own zoom, from 1 down until everything fits.
+    /// - Chosen by a pinch or the zoom buttons: that zoom is kept and the map only moves; a change that needs more
+    ///   room (`mayZoomOut`: a branch opened, new labels measured, a new size) may zoom out from it, never back in.
+    static func refit(_ nodes: [PlacedNode], size: CGSize, camera: MapCamera, sizes: [String: CGSize] = [:],
+                      userZoomed: Bool, mayZoomOut: Bool) -> MapCamera {
+        var start = camera
+        start.pan = .zero
+        if !userZoomed { start.zoom = 1 }
+        return fitted(nodes, size: size, camera: start, sizes: sizes, zoomOut: !userZoomed || mayZoomOut)
+    }
+
     static func clash(_ a: CGRect, _ b: CGRect) -> Bool {
         a.minX < b.maxX + gapX && a.maxX > b.minX - gapX && a.minY < b.maxY + gapY && a.maxY > b.minY - gapY
     }

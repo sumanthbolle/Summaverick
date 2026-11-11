@@ -205,6 +205,14 @@ struct BrainMapCanvas: View {
     @State private var anim: CameraAnimation?
     @State private var dragStart: MapCamera?
     @State private var zoomStart: Double?
+    /// The person chose the zoom (pinch or + / −): refits keep it and only move the map, except that opening a
+    /// branch may zoom out from it. Cleared by a tap on the centre.
+    @State private var userZoomed = false
+    /// A refit was asked for during a drag or pinch; it runs when the gesture ends.
+    @State private var refitPending = false
+    /// The note map: whether this gesture is the page's (vertical) or the map's (sideways), decided once.
+    @State private var dragAxis: DragAxis = .undecided
+    private enum DragAxis { case undecided, sideways, vertical }
     @State private var sizes: [String: CGSize] = [:]
     @State private var stageSize: CGSize = .zero
 
@@ -262,7 +270,7 @@ struct BrainMapCanvas: View {
                 sizes = rounded
                 // New labels were measured (a branch just opened): fit again, also mid-animation (it then lands
                 // on the corrected camera).
-                if dragStart == nil && zoomStart == nil { refit(animated: anim != nil, zoomOut: true) }
+                refit(animated: anim != nil, zoomOut: true)
             }
         }
         // Notes started: whatever is moving lands where it was going, and nothing moves until they are done.
@@ -320,14 +328,12 @@ struct BrainMapCanvas: View {
                               branchLabel: MapStyle.title, moreLabel: MapStyle.more)
     }
 
-    /// `c` moved (and, with zoomOut, zoomed out from 1) so every label is inside the stage, clear of the hint and
-    /// the zoom buttons (BrainMapLayout.fitted). zoomOut is false after the person chose a zoom: then it only moves.
+    /// `c` moved (and zoomed, by BrainMapLayout.refit's rules) so every label is inside the stage, clear of the hint
+    /// and the zoom buttons. zoomOut: the change may need more room (a branch opened, labels measured, a new size).
     private func fitted(_ c: MapCamera, zoomOut: Bool) -> MapCamera {
         guard stageSize.width > 0 else { return c }
-        var start = shown(c)
-        start.pan = .zero
-        if zoomOut { start.zoom = max(1, c.zoom) }
-        let f = BrainMapLayout.fitted(nodes, size: stageSize, camera: start, sizes: sizes, zoomOut: zoomOut)
+        let f = BrainMapLayout.refit(nodes, size: stageSize, camera: shown(c), sizes: sizes,
+                                     userZoomed: userZoomed, mayZoomOut: zoomOut)
         var out = c
         out.zoom = f.zoom
         out.pan = f.pan
@@ -336,7 +342,7 @@ struct BrainMapCanvas: View {
     }
 
     private func refit(animated: Bool, zoomOut: Bool) {
-        guard dragStart == nil, zoomStart == nil else { return }
+        guard dragStart == nil, zoomStart == nil else { refitPending = true; return }
         let current = anim?.to ?? camera
         let target = fitted(current, zoomOut: zoomOut)
         guard target != current else { return }
@@ -348,8 +354,13 @@ struct BrainMapCanvas: View {
     private var drag: some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { v in
-                // In a scrolling page a mostly-vertical swipe is the page's.
-                if inScroll && dragStart == nil && abs(v.translation.height) > abs(v.translation.width) { return }
+                // In a scrolling page a mostly-vertical swipe is the page's: decided once per gesture.
+                if inScroll {
+                    if dragAxis == .undecided {
+                        dragAxis = abs(v.translation.height) > abs(v.translation.width) ? .vertical : .sideways
+                    }
+                    if dragAxis == .vertical { return }
+                }
                 if dragStart == nil { land(); dragStart = camera }
                 guard let s = dragStart else { return }
                 if moving {
@@ -363,13 +374,19 @@ struct BrainMapCanvas: View {
                 }
             }
             .onEnded { _ in
+                dragAxis = .undecided
                 guard dragStart != nil else { return }
                 dragStart = nil
-                guard moving else { return }
+                let pending = refitPending
+                refitPending = false
+                guard moving else {
+                    if pending { refit(animated: false, zoomOut: true) }
+                    return
+                }
                 var target = camera
                 target.yaw = BrainMapLayout.settledYaw(camera.yaw)
                 target.tilt = BrainMapLayout.restTilt
-                animate(to: fitted(target, zoomOut: false), duration: 0.42)
+                animate(to: fitted(target, zoomOut: pending), duration: 0.42)
             }
     }
 
@@ -379,11 +396,19 @@ struct BrainMapCanvas: View {
                 if zoomStart == nil { land(); zoomStart = camera.zoom }
                 camera.zoom = BrainMapLayout.clampZoom((zoomStart ?? 1) * Double(v.magnification))
             }
-            .onEnded { _ in zoomStart = nil; refit(animated: true, zoomOut: false) }
+            .onEnded { _ in
+                zoomStart = nil
+                userZoomed = true
+                // Measured labels that arrived during the pinch may still zoom out from the chosen zoom.
+                let pending = refitPending
+                refitPending = false
+                refit(animated: true, zoomOut: pending)
+            }
     }
 
     private func zoom(by step: Double) {
         land()
+        userZoomed = true
         var target = camera
         target.zoom = BrainMapLayout.clampZoom(camera.zoom + step)
         target = fitted(target, zoomOut: false)
@@ -558,6 +583,7 @@ struct BrainMapCanvas: View {
         switch n.kind {
         case .center:
             // Back to the start: no zoom, no pan, the first angle.
+            userZoomed = false
             let target = fitted(moving ? MapCamera() : MapCamera(yaw: camera.yaw, tilt: camera.tilt), zoomOut: true)
             if moving { animate(to: target, duration: 0.42) } else { camera = target }
         case .branch: if let b = n.branch { toggle(b) }
