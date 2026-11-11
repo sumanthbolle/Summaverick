@@ -267,8 +267,8 @@ struct NoteDetailView: View {
 
     @ViewBuilder private var content: some View {
         if tab == .map {
-            // This recording's map: its centre is the title. Drag on it turns it; scroll outside it.
-            BrainMapScreen(noteID: noteID, centerTitle: title) { id, sec in playMoment(id, sec) }
+            // This recording's map: its centre is the title. Sideways drags turn it; up and down scroll the page.
+            BrainMapScreen(noteID: noteID, centerTitle: title, inScroll: true) { id, sec in playMoment(id, sec) }
                 .frame(height: 540)
                 .background(Theme.background, in: RoundedRectangle(cornerRadius: 16))
                 .clipShape(RoundedRectangle(cornerRadius: 16))

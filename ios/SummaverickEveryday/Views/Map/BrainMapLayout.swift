@@ -28,6 +28,8 @@ struct PlacedNode: Equatable, Identifiable {
     let parent: String?
     /// The label's size before depth scaling: an estimate; the view passes the measured size instead.
     let labelSize: CGSize
+    /// Reading order (VoiceOver): the centre, then each branch followed by its items and its "more".
+    var order: Int = 0
 }
 
 /// How the floor is seen.
@@ -135,6 +137,7 @@ enum BrainMapLayout {
                                         labelSize: estimate(moreLabel(b.more), .more)))
             }
         }
+        for i in nodes.indices { nodes[i].order = i }
         return nodes
     }
 
@@ -173,19 +176,40 @@ enum BrainMapLayout {
         return (CGPoint(x: px, y: py), k, depth)
     }
 
-    /// Every node on screen, front ones placed first so they keep their short stems; a label that would overlap
-    /// one already placed rises until it does not. Returned back to front (the order to draw them).
+    /// What the map keeps clear at the bottom of the stage: the hint line under the map, and the zoom buttons at
+    /// the bottom right (BrainMapView draws them there with these numbers).
+    static let hintBand: Double = 36
+    static let zoomColumn = CGSize(width: 44 + 12 + 6, height: 44 * 2 + 8 + 36 + 6)
+    static func reservedAreas(_ size: CGSize) -> [CGRect] {
+        let w = Double(size.width), h = Double(size.height)
+        return [CGRect(x: 0, y: h - hintBand, width: w, height: hintBand),
+                CGRect(x: w - Double(zoomColumn.width), y: h - Double(zoomColumn.height),
+                       width: Double(zoomColumn.width), height: Double(zoomColumn.height))]
+    }
+    /// The space labels must stay inside: the stage, less a margin, above the hint line.
+    static func labelSpace(_ size: CGSize, margin: Double = 6) -> CGRect {
+        CGRect(x: 0, y: margin, width: Double(size.width), height: max(0, Double(size.height) - hintBand - margin))
+    }
+
+    /// Every node on screen. The centre and the branches are placed first (nearest first), so they keep short stems
+    /// next to their points; then the items and "more", nearest first. A label that would overlap one already placed,
+    /// or the hint line or the zoom buttons, rises until it does not. Returned back to front (the order to draw them).
     /// `sizes`: measured label sizes by node id (unscaled); missing ones use the node's estimate.
     static func projected(_ nodes: [PlacedNode], size: CGSize, camera: MapCamera,
-                          sizes: [String: CGSize] = [:]) -> [ProjectedNode] {
+                          sizes: [String: CGSize] = [:], reserved: [CGRect]? = nil) -> [ProjectedNode] {
         let w = Double(size.width)
+        func structural(_ n: PlacedNode) -> Bool { n.kind == .center || n.kind == .branch }
         let order = nodes.map { n -> (PlacedNode, (point: CGPoint, k: Double, depth: Double)) in
             (n, project(x: n.x, y: n.y, size: size, camera: camera))
         }
-        // Nearest first; ties by id, so the result never depends on the input order.
-        .sorted { a, b in a.1.depth != b.1.depth ? a.1.depth > b.1.depth : a.0.id < b.0.id }
+        // Centre and branches first, then nearest first; ties by id, so the result never depends on the input order.
+        .sorted { a, b in
+            if structural(a.0) != structural(b.0) { return structural(a.0) }
+            return a.1.depth != b.1.depth ? a.1.depth > b.1.depth : a.0.id < b.0.id
+        }
 
-        var placed: [CGRect] = []
+        var placed: [CGRect] = reserved ?? reservedAreas(size)
+        let space = labelSpace(size)
         var out: [ProjectedNode] = []
         for (n, q) in order {
             let sc = max(0.74, min(1.12, q.k))
@@ -196,32 +220,97 @@ enum BrainMapLayout {
             var cx = Double(q.point.x)
             if w > fw + 12 { cx = min(max(cx, fw / 2 + 6), w - fw / 2 - 6) }
             let base = baseStem(n.kind) * sc
+            let py = Double(q.point.y)
+            // The nearest free spot inside the label space: on a taller stem, a little to one side, or hanging
+            // under the point (in that order of preference, by how far the label moves).
+            var frame: CGRect?
             var lift = 0.0
-            var frame = CGRect.zero
-            while true {
-                // The tap frame's bottom sits where the label's bottom sits; a taller frame grows upward.
-                let bottom = Double(q.point.y) - base - lift
-                frame = CGRect(x: cx - fw / 2, y: bottom - fh, width: fw, height: fh)
-                if !placed.contains(where: { clash($0, frame) }) { break }
-                lift += 6
+            for spot in spots {
+                let x = min(max(cx + spot.dx * fw, fw / 2), w - fw / 2)
+                let f = spot.below
+                    ? CGRect(x: x - fw / 2, y: py + base + spot.dy, width: fw, height: fh)
+                    : CGRect(x: x - fw / 2, y: py - base - spot.dy - fh, width: fw, height: fh)
+                if space.contains(f) && !placed.contains(where: { clash($0, f) }) { frame = f; lift = spot.dy; break }
             }
-            placed.append(frame)
-            let label = CGRect(x: cx - lw / 2, y: Double(frame.maxY) - lh, width: lw, height: lh)
+            if frame == nil {
+                // No room inside: straight up on a taller stem until free (the caller zooms out or moves the map).
+                lift = 0
+                while true {
+                    let f = CGRect(x: cx - fw / 2, y: py - base - lift - fh, width: fw, height: fh)
+                    if !placed.contains(where: { clash($0, f) }) { frame = f; break }
+                    lift += 6
+                }
+            }
+            let fr = frame ?? .zero
+            placed.append(fr)
+            let hangs = Double(fr.minY) > py
+            let label = CGRect(x: Double(fr.midX) - lw / 2, y: hangs ? Double(fr.minY) : Double(fr.maxY) - lh, width: lw, height: lh)
             let opacity = max(0.78, min(1, 1 + q.depth / 400))
             out.append(ProjectedNode(node: n, foot: q.point, k: q.k, labelScale: sc, depth: q.depth,
-                                     stem: base + lift, label: label, frame: frame, opacity: opacity))
+                                     stem: base + lift, label: label, frame: fr, opacity: opacity))
         }
-        return out.reversed()
+        return out.sorted { a, b in a.depth != b.depth ? a.depth < b.depth : a.id > b.id }
     }
 
-    /// How far to move the map down so labels that rose above the top edge come into view, using only the
-    /// empty room under the lowest label or point (never pushing anything off the bottom). 0 when all fit.
-    static func fitShift(_ p: [ProjectedNode], size: CGSize, margin: Double = 8) -> Double {
-        guard let top = p.map({ Double($0.frame.minY) }).min() else { return 0 }
-        let bottom = p.map { max(Double($0.frame.maxY), Double($0.foot.y) + 8) }.max() ?? 0
-        let over = max(0, margin - top)
-        let room = max(0, Double(size.height) - margin - bottom)
-        return min(over, room)
+    /// Where a label may go, nearest first: dx in label widths, dy in points (up the stem, or down when below).
+    private static let spots: [(dx: Double, dy: Double, below: Bool)] = {
+        var all: [(dx: Double, dy: Double, below: Bool, cost: Double)] = []
+        for dy in stride(from: 0.0, through: 600, by: 6) {
+            for dx in [0.0, -0.5, 0.5, -1, 1, -1.5, 1.5] {
+                all.append((dx, dy, false, dy + abs(dx) * 70))
+                all.append((dx, dy, true, 36 + dy * 1.3 + abs(dx) * 70))
+            }
+        }
+        // Stable: equal costs keep the order above (straight before sideways, left before right).
+        return all.enumerated().sorted { $0.element.cost != $1.element.cost ? $0.element.cost < $1.element.cost : $0.offset < $1.offset }
+            .map { ($0.element.dx, $0.element.dy, $0.element.below) }
+    }()
+
+    /// True when every label's tap frame is inside the label space.
+    static func fits(_ p: [ProjectedNode], size: CGSize) -> Bool {
+        let space = labelSpace(size)
+        return p.allSatisfy { space.contains($0.frame) }
+    }
+
+    /// How far to move the map up or down so every label frame is inside the label space; nil when moving alone
+    /// cannot do it (too tall, or out at both ends).
+    static func shiftToFit(_ p: [ProjectedNode], size: CGSize) -> Double? {
+        let space = labelSpace(size)
+        guard let top = p.map({ Double($0.frame.minY) }).min(), let bottom = p.map({ Double($0.frame.maxY) }).max() else { return 0 }
+        let down = Double(space.minY) - top, up = bottom - Double(space.maxY)
+        if down > 0 && up > 0 { return nil }
+        if down > 0 { return bottom + down <= Double(space.maxY) ? down : nil }
+        if up > 0 { return top - up >= Double(space.minY) ? -up : nil }
+        return 0
+    }
+
+    /// The camera that shows every label: moved up or down, and, when `zoomOut`, zoomed out in steps (from the
+    /// camera's own zoom down to 0.5) until everything fits. Without `zoomOut` (the person chose the zoom) it only
+    /// moves. Spin and tilt are kept. When nothing fits even at 0.5, the smallest zoom with the best move.
+    static func fitted(_ nodes: [PlacedNode], size: CGSize, camera: MapCamera, sizes: [String: CGSize] = [:],
+                       zoomOut: Bool) -> MapCamera {
+        var c = camera
+        c.grow = 1
+        var zoom = clampZoom(camera.zoom)
+        while true {
+            c.zoom = zoom
+            c.pan = CGSize(width: 0, height: 0)
+            // Lifting depends a little on where the hint and zoom buttons fall, so a move is checked again.
+            for _ in 0..<4 {
+                let p = projected(nodes, size: size, camera: c, sizes: sizes)
+                if fits(p, size: size) { return c }
+                guard let d = shiftToFit(p, size: size), abs(d) > 0.5 else { break }
+                c.pan.height += CGFloat(d)
+            }
+            if !zoomOut || zoom <= zoomRange.lowerBound + 1e-9 { break }
+            zoom = max(zoomRange.lowerBound, zoom - 0.05)
+        }
+        // Nothing fits: the top stays in view (labels rise upward, so the top is what gets lost).
+        let p = projected(nodes, size: size, camera: c, sizes: sizes)
+        if let top = p.map({ Double($0.frame.minY) }).min(), top < Double(labelSpace(size).minY) {
+            c.pan.height += CGFloat(Double(labelSpace(size).minY) - top)
+        }
+        return c
     }
 
     static func clash(_ a: CGRect, _ b: CGRect) -> Bool {
@@ -250,6 +339,8 @@ enum BrainMapLayout {
     static func stemTop(_ p: ProjectedNode) -> CGPoint {
         let inset = min(10, Double(p.label.width) / 2)
         let x = min(max(Double(p.foot.x), Double(p.label.minX) + inset), Double(p.label.maxX) - inset)
+        // A label hanging under its point (no room above) is joined at its top edge.
+        if Double(p.label.minY) > Double(p.foot.y) { return CGPoint(x: x, y: Double(p.label.minY) + 2) }
         return CGPoint(x: x, y: Double(p.label.maxY) - 2)
     }
 

@@ -7032,6 +7032,23 @@
           }
         }
       }
+    },
+    "Not sure I heard this right": {
+      "comment": "VoiceOver: a map point whose words were heard with low confidence",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure I heard this right"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సరిగ్గా విన్నానో లేదో తెలియదు"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

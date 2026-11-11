@@ -83,6 +83,8 @@ struct BrainMapScreen: View {
     var noteID: Int64? = nil
     /// The centre of a recording's map: its title.
     var centerTitle: String? = nil
+    /// Inside a scrolling page: sideways drags turn the map, up and down scroll the page.
+    var inScroll = false
     /// ▶ on a memory: open the recording at that second. Called once the card has closed.
     let onPlay: (Int64, Int) -> Void
 
@@ -106,7 +108,7 @@ struct BrainMapScreen: View {
                 if map.list {
                     BrainMapList(map: map) { selection = $0 }
                 } else {
-                    BrainMapCanvas(map: map, centerLabel: centerLabel) { selection = $0 }
+                    BrainMapCanvas(map: map, centerLabel: centerLabel, inScroll: inScroll) { selection = $0 }
                 }
             } else if readFailed {
                 HStack(spacing: 12) {
@@ -185,7 +187,12 @@ private struct CappedWidth: Layout {
 struct BrainMapCanvas: View {
     let map: BrainMap
     let centerLabel: String
+    /// Inside a scrolling page (the note screen): drags only turn it sideways, so up and down still scroll the page.
+    var inScroll = false
     let onSelect: (MapSelection) -> Void
+
+    /// The intro plays once per app run, not every time the map comes back into view.
+    @MainActor private static var introPlayed = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var scheme
@@ -199,7 +206,6 @@ struct BrainMapCanvas: View {
     @State private var dragStart: MapCamera?
     @State private var zoomStart: Double?
     @State private var sizes: [String: CGSize] = [:]
-    @State private var introPlayed = false
     @State private var stageSize: CGSize = .zero
 
     private struct CameraAnimation: Equatable {
@@ -226,12 +232,14 @@ struct BrainMapCanvas: View {
                     ground(placed, cam: cam, size: geo.size)
                     ForEach(placed) { p in label(p) }
                 }
+                .accessibilityElement(children: .contain)
                 .frame(width: geo.size.width, height: geo.size.height)
             }
             .contentShape(Rectangle())
-            .gesture(drag.simultaneously(with: pinch))
+            .gesture(drag.simultaneously(with: pinch), including: inScroll ? .none : .all)
+            .simultaneousGesture(drag.simultaneously(with: pinch), including: inScroll ? .all : .none)
             .onAppear { stageSize = geo.size; start() }
-            .onChange(of: geo.size) { _, s in stageSize = s; refit(animated: false) }
+            .onChange(of: geo.size) { _, s in stageSize = s; refit(animated: false, zoomOut: true) }
         }
         .clipped()
         .overlay(alignment: .bottomTrailing) { zoomButtons }
@@ -249,15 +257,15 @@ struct BrainMapCanvas: View {
             let rounded = new.mapValues { CGSize(width: ($0.width * 2).rounded() / 2, height: ($0.height * 2).rounded() / 2) }
             if rounded != sizes {
                 sizes = rounded
-                if anim == nil && dragStart == nil { refit(animated: false) }
+                if anim == nil && dragStart == nil { refit(animated: false, zoomOut: true) }
             }
         }
         // Notes started: whatever is moving lands where it was going, and nothing moves until they are done.
         .onChange(of: still) { _, s in if s { land() } }
-        .onChange(of: reduceMotion) { _, _ in land(); camera.pan = .zero; refit(animated: false) }
+        .onChange(of: reduceMotion) { _, _ in land(); camera.pan = .zero; refit(animated: false, zoomOut: true) }
         .onChange(of: map) { _, m in
             expanded = expanded.filter { k in m.branches.contains { $0.kind == k } }
-            refit(animated: false)
+            refit(animated: false, zoomOut: true)
         }
         .sensoryFeedback(.selection, trigger: expanded)
     }
@@ -290,13 +298,11 @@ struct BrainMapCanvas: View {
     /// Stops any animation where it was going.
     private func land() { if let a = anim { camera = a.to; anim = nil } }
 
-    /// The first appearance: the branches grow from the centre once.
+    /// The first appearance in this app run: the branches grow from the centre once.
     private func start() {
-        guard !introPlayed else { return }
-        introPlayed = true
-        var target = camera
-        target.pan = CGSize(width: 0, height: fit(for: target))
-        if moving {
+        let target = fitted(camera, zoomOut: true)
+        if moving && !Self.introPlayed {
+            Self.introPlayed = true
             camera = MapCamera(yaw: target.yaw, tilt: target.tilt, zoom: target.zoom, grow: 0, pan: target.pan)
             animate(to: target, duration: 0.7)
         } else {
@@ -304,22 +310,31 @@ struct BrainMapCanvas: View {
         }
     }
 
-    /// Labels that rose above the top come down into the empty room below (spin mode; the flat map is moved by hand).
-    private func fit(for c: MapCamera) -> Double {
-        guard !reduceMotion, !still, stageSize.width > 0 else { return Double(c.pan.height) }
-        var rest = c
-        rest.pan = .zero
-        rest.grow = 1
-        let nodes = BrainMapLayout.layout(map: map, size: stageSize, expanded: expanded, centerLabel: centerLabel,
-                                          branchLabel: MapStyle.title, moreLabel: MapStyle.more)
-        return BrainMapLayout.fitShift(BrainMapLayout.projected(nodes, size: stageSize, camera: rest, sizes: sizes), size: stageSize)
+    private var nodes: [PlacedNode] {
+        BrainMapLayout.layout(map: map, size: stageSize, expanded: expanded, centerLabel: centerLabel,
+                              branchLabel: MapStyle.title, moreLabel: MapStyle.more)
     }
 
-    private func refit(animated: Bool) {
-        guard !reduceMotion, !still, dragStart == nil else { return }
-        var target = anim?.to ?? camera
-        target.pan = CGSize(width: 0, height: fit(for: target))
-        guard target != (anim?.to ?? camera) else { return }
+    /// `c` moved (and, with zoomOut, zoomed out from 1) so every label is inside the stage, clear of the hint and
+    /// the zoom buttons (BrainMapLayout.fitted). zoomOut is false after the person chose a zoom: then it only moves.
+    private func fitted(_ c: MapCamera, zoomOut: Bool) -> MapCamera {
+        guard stageSize.width > 0 else { return c }
+        var start = shown(c)
+        start.pan = .zero
+        if zoomOut { start.zoom = max(1, c.zoom) }
+        let f = BrainMapLayout.fitted(nodes, size: stageSize, camera: start, sizes: sizes, zoomOut: zoomOut)
+        var out = c
+        out.zoom = f.zoom
+        out.pan = f.pan
+        out.grow = c.grow
+        return out
+    }
+
+    private func refit(animated: Bool, zoomOut: Bool) {
+        guard dragStart == nil, zoomStart == nil else { return }
+        let current = anim?.to ?? camera
+        let target = fitted(current, zoomOut: zoomOut)
+        guard target != current else { return }
         if animated { animate(to: target, duration: 0.35) } else { land(); camera = target }
     }
 
@@ -328,24 +343,28 @@ struct BrainMapCanvas: View {
     private var drag: some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { v in
+                // In a scrolling page a mostly-vertical swipe is the page's.
+                if inScroll && dragStart == nil && abs(v.translation.height) > abs(v.translation.width) { return }
                 if dragStart == nil { land(); dragStart = camera }
                 guard let s = dragStart else { return }
                 if moving {
                     camera.yaw = s.yaw + Double(v.translation.width) * 0.45
-                    camera.tilt = BrainMapLayout.clampTilt(s.tilt - Double(v.translation.height) * 0.2)
+                    // In a scrolling page, up and down belong to the page.
+                    if !inScroll { camera.tilt = BrainMapLayout.clampTilt(s.tilt - Double(v.translation.height) * 0.2) }
                 } else {
                     // Flat (Reduce Motion) or kept still: the drag moves the map instead of turning it.
-                    camera.pan = CGSize(width: s.pan.width + v.translation.width, height: s.pan.height + v.translation.height)
+                    camera.pan = CGSize(width: s.pan.width + v.translation.width,
+                                        height: s.pan.height + (inScroll ? 0 : v.translation.height))
                 }
             }
             .onEnded { _ in
+                guard dragStart != nil else { return }
                 dragStart = nil
                 guard moving else { return }
                 var target = camera
                 target.yaw = BrainMapLayout.settledYaw(camera.yaw)
                 target.tilt = BrainMapLayout.restTilt
-                target.pan = CGSize(width: 0, height: fit(for: target))
-                animate(to: target, duration: 0.42)
+                animate(to: fitted(target, zoomOut: false), duration: 0.42)
             }
     }
 
@@ -355,14 +374,14 @@ struct BrainMapCanvas: View {
                 if zoomStart == nil { land(); zoomStart = camera.zoom }
                 camera.zoom = BrainMapLayout.clampZoom((zoomStart ?? 1) * Double(v.magnification))
             }
-            .onEnded { _ in zoomStart = nil; refit(animated: true) }
+            .onEnded { _ in zoomStart = nil; refit(animated: true, zoomOut: false) }
     }
 
     private func zoom(by step: Double) {
         land()
         var target = camera
         target.zoom = BrainMapLayout.clampZoom(camera.zoom + step)
-        target.pan.height = CGFloat(fit(for: target))
+        target = fitted(target, zoomOut: false)
         if moving { animate(to: target, duration: 0.25) } else { camera = target }
     }
 
@@ -396,16 +415,14 @@ struct BrainMapCanvas: View {
             if opening { expanded.insert(branch) } else { expanded.remove(branch) }
         }
         if moving { withAnimation(.easeOut(duration: 0.3)) { change() } } else { change() }
-        guard moving, opening, let i = map.branches.firstIndex(where: { $0.kind == branch }) else {
-            refit(animated: true)
-            return
-        }
         land()
         var target = camera
-        target.yaw = BrainMapLayout.facingYaw(branch: i, of: map.branches.count, from: camera.yaw)
-        target.tilt = BrainMapLayout.restTilt
-        target.pan = CGSize(width: 0, height: fit(for: target))
-        animate(to: target, duration: 0.55)
+        if moving, opening, let i = map.branches.firstIndex(where: { $0.kind == branch }) {
+            target.yaw = BrainMapLayout.facingYaw(branch: i, of: map.branches.count, from: camera.yaw)
+            target.tilt = BrainMapLayout.restTilt
+        }
+        // Everything in view again: moved, and zoomed out from 1 if it must.
+        animate(to: fitted(target, zoomOut: true), duration: opening ? 0.55 : 0.35)
     }
 
     // MARK: drawing
@@ -483,7 +500,7 @@ struct BrainMapCanvas: View {
     private func label(_ p: ProjectedNode) -> some View {
         let n = p.node
         // Farther labels are a touch softer; the flat map is all equally sharp.
-        let blur = reduceMotion ? 0 : min(0.4, max(0, -p.depth / 200))
+        let blur = reduceMotion || dragStart != nil || zoomStart != nil ? 0 : min(0.4, max(0, -p.depth / 200))
         return Button { tap(n) } label: {
             MapLabel(node: n, centerLabel: centerLabel, expanded: n.branch.map(expanded.contains) ?? false)
                 .fixedSize()
@@ -501,7 +518,9 @@ struct BrainMapCanvas: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: accessibilityText(n)))
         .accessibilityAddTraits(n.kind == .center ? [] : .isButton)
-        .accessibilityValue(n.kind == .branch ? Text(expanded.contains(n.branch ?? "") ? "Open" : "Folded") : Text(verbatim: ""))
+        .accessibilityValue(Text(verbatim: accessibilityState(n)))
+        // VoiceOver reads the centre, then each branch followed by its items, whatever their depth.
+        .accessibilitySortPriority(Double(10_000 - n.order))
     }
 
     private func accessibilityText(_ n: PlacedNode) -> String {
@@ -515,13 +534,27 @@ struct BrainMapCanvas: View {
         }
     }
 
+    /// Open or folded for a branch; done, new and "not sure I heard this right" for an item.
+    private func accessibilityState(_ n: PlacedNode) -> String {
+        switch n.kind {
+        case .branch: return expanded.contains(n.branch ?? "") ? String(localized: "Open") : String(localized: "Folded")
+        case .item:
+            guard let it = n.item else { return "" }
+            var words: [String] = []
+            if it.done { words.append(String(localized: "Done")) }
+            if it.isNew { words.append(String(localized: "New")) }
+            if it.lowConfidence { words.append(String(localized: "Not sure I heard this right")) }
+            return words.joined(separator: ", ")
+        default: return ""
+        }
+    }
+
     private func tap(_ n: PlacedNode) {
         switch n.kind {
         case .center:
             // Back to the start: no zoom, no pan, the first angle.
-            var target = MapCamera()
-            target.pan = CGSize(width: 0, height: fit(for: target))
-            if moving { animate(to: target, duration: 0.42) } else { camera = MapCamera(yaw: camera.yaw, tilt: camera.tilt) }
+            let target = fitted(moving ? MapCamera() : MapCamera(yaw: camera.yaw, tilt: camera.tilt), zoomOut: true)
+            if moving { animate(to: target, duration: 0.42) } else { camera = target }
         case .branch: if let b = n.branch { toggle(b) }
         case .more: if let b = n.branch { onSelect(.more(b)) }
         case .item: if let it = n.item, let b = n.branch, let s = MapSelection.of(it, branch: b) { onSelect(s) }
