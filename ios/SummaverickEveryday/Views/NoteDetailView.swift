@@ -56,9 +56,11 @@ struct NoteDetailView: View {
             case .notes: return "Notes"
             case .questions: return "Questions"
             case .transcript: return "Word for word"
-            case .map: return "Map"
+            case .map: return "Graph"
             }
         }
+        /// What VoiceOver says: the full name where the control shows a short one.
+        var accessibilityTitle: LocalizedStringKey { self == .map ? "Knowledge graph" : title }
         /// The output this tab shows; nil for the transcript.
         var kind: OutputKind? {
             switch self {
@@ -177,7 +179,7 @@ struct NoteDetailView: View {
                     }
 
                     Picker("Section", selection: $tab) {
-                        ForEach(Tab.allCases) { Text($0.title).tag($0) }
+                        ForEach(Tab.allCases) { Text($0.title).accessibilityLabel(Text($0.accessibilityTitle)).tag($0) }
                     }
                     .pickerStyle(.segmented)
 

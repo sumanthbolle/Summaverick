@@ -6676,19 +6676,36 @@
         }
       }
     },
-    "Map": {
-      "comment": "Deep dive and a note: the map of what was kept",
+    "Graph": {
+      "comment": "Deep dive and a note: short name of the knowledge graph in a segmented control",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Map"
+            "value": "Graph"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మ్యాప్"
+            "value": "గ్రాఫ్"
+          }
+        }
+      }
+    },
+    "Knowledge graph": {
+      "comment": "The knowledge graph of what was kept: VoiceOver name and title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Knowledge graph"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "జ్ఞాన గ్రాఫ్"
           }
         }
       }
@@ -6880,19 +6897,19 @@
         }
       }
     },
-    "Nothing on the map yet": {
-      "comment": "Empty map",
+    "Nothing in the knowledge graph yet": {
+      "comment": "Knowledge graph: empty",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nothing on the map yet"
+            "value": "Nothing in the knowledge graph yet"
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మ్యాప్‌లో ఇంకా ఏమీ లేదు"
+            "value": "జ్ఞాన గ్రాఫ్‌లో ఇంకా ఏమీ లేదు"
           }
         }
       }

@@ -30,7 +30,8 @@ struct DeepDiveView: View {
                         .background(Theme.card)
                 }
                 Picker("Browse by", selection: $segment) {
-                    Text("Map").tag(Segment.map)
+                    // Short in the control (four segments); the full name for VoiceOver.
+                    Text("Graph").accessibilityLabel(Text("Knowledge graph")).tag(Segment.map)
                     Text("Topics").tag(Segment.topics)
                     Text("People").tag(Segment.people)
                     Text("Timeline").tag(Segment.timeline)

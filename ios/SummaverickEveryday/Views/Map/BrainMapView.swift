@@ -123,7 +123,7 @@ struct BrainMapScreen: View {
                 .frame(maxHeight: .infinity, alignment: .top)
             } else if loaded {
                 ContentUnavailableView {
-                    Label("Nothing on the map yet", systemImage: "point.3.connected.trianglepath.dotted")
+                    Label("Nothing in the knowledge graph yet", systemImage: "point.3.connected.trianglepath.dotted")
                 } description: {
                     Text("Things I remember from your recordings show up here.")
                 }
