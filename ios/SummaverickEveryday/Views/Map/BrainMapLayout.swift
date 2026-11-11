@@ -96,7 +96,7 @@ enum BrainMapLayout {
     /// Ring radii for a screen size: the branches' ring, and the first ring of items.
     static func radii(_ size: CGSize) -> (branch: Double, item: Double) {
         let base = max(240, min(Double(size.width), Double(size.height) * 1.1))
-        return (base * 0.19, base * 0.34)
+        return (base * 0.25, base * 0.40)
     }
 
     /// The nodes to draw for `expanded` branches (items and "more" only for those). Same input, same output.
@@ -232,6 +232,26 @@ enum BrainMapLayout {
 
     /// The spin on release: the nearest 15 degree step.
     static func settledYaw(_ yaw: Double) -> Double { (yaw / yawStep).rounded() * yawStep }
+
+    /// The spin that turns branch `index` of `count` to the front (straight below the centre, nearest you), so its
+    /// items fan out across the screen; the shortest way round from `current`. (Exact, not on a 15 degree step:
+    /// five branches sit 72 degrees apart. The next drag settles to the steps again.)
+    static func facingYaw(branch index: Int, of count: Int, from current: Double) -> Double {
+        guard count > 0 else { return current }
+        let a = Double(index) * 360 / Double(count) - 90
+        var target = 90 - a
+        while target - current > 180 { target -= 360 }
+        while target - current < -180 { target += 360 }
+        return target
+    }
+
+    /// Where a stem meets its label: straight above the point, or, when the label was kept inside the screen
+    /// sideways, the nearest spot on the label's bottom edge.
+    static func stemTop(_ p: ProjectedNode) -> CGPoint {
+        let inset = min(10, Double(p.label.width) / 2)
+        let x = min(max(Double(p.foot.x), Double(p.label.minX) + inset), Double(p.label.maxX) - inset)
+        return CGPoint(x: x, y: Double(p.label.maxY) - 2)
+    }
 
     static func clampZoom(_ z: Double) -> Double { min(max(z, zoomRange.lowerBound), zoomRange.upperBound) }
     static func clampTilt(_ t: Double) -> Double { min(max(t, tiltRange.lowerBound), tiltRange.upperBound) }

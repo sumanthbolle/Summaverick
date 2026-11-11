@@ -30,6 +30,8 @@ enum ThemeToken: CaseIterable {
     case badgeFill, badgeLabel           // the counts on section titles
     case record, recordText              // the red record circle, and "Record" under it
     case swipe, swipeLabel               // neutral swipe action
+    // The map's branches: fills, lines and points only, never text.
+    case mapPeople, mapTopics, mapPromises, mapDecisions, mapQuestions
 }
 
 enum ThemePalette {
@@ -116,6 +118,16 @@ enum ThemePalette {
         case (.swipe, .white): return 0x0051A3
         case (.swipe, .dark): return 0x0060C0
         case (.swipeLabel, _): return 0xFFFFFF
+        case (.mapPeople, .white): return 0x0066CC
+        case (.mapPeople, .dark): return 0x2997FF
+        case (.mapTopics, .white): return 0x5856D6
+        case (.mapTopics, .dark): return 0x7D7AFF
+        case (.mapPromises, .white): return 0x34C759
+        case (.mapPromises, .dark): return 0x30D158
+        case (.mapDecisions, .white): return 0xFF9500
+        case (.mapDecisions, .dark): return 0xFF9F0A
+        case (.mapQuestions, .white): return 0x30B0C7
+        case (.mapQuestions, .dark): return 0x40C8E0
         }
     }
 

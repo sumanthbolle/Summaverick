@@ -76,6 +76,13 @@ enum Theme {
     static let swipe = color(.swipe)
     static let swipeLabel = color(.swipeLabel)
 
+    // The map's branches (fills, lines and points; text on the map stays Theme.text on a card).
+    static let mapPeople = color(.mapPeople)
+    static let mapTopics = color(.mapTopics)
+    static let mapPromises = color(.mapPromises)
+    static let mapDecisions = color(.mapDecisions)
+    static let mapQuestions = color(.mapQuestions)
+
     /// Links and controls.
     static let accent = link
     /// A switch that is on.

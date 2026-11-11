@@ -65,6 +65,22 @@ extension CoreEngine {
     /// nil when the queue could not be read.
     nonisolated func reviewQueue() async -> [ReviewItem]? { await store { ReviewItem.queue(fromJSON: self.take(sve_review_queue_json($0))) } }
 
+    // MARK: the map (store context)
+
+    /// The map of everything kept (noteID nil), or of one recording; nil when it could not be read.
+    nonisolated func brainMap(noteID: Int64? = nil) async -> BrainMap? {
+        await store { BrainMap.from(json: self.take(sve_brain_map_json($0, noteID ?? 0))) }
+    }
+
+    /// The memories under a person or topic ("Who is this?"), strongest first; only that recording's when
+    /// noteID is given. nil when they could not be read.
+    nonisolated func topicMemories(_ topicID: Int64, noteID: Int64? = nil) async -> [BrainMemory]? {
+        await store { self.memoryJSON([BrainMemory].self, sve_topic_memories_json($0, topicID, noteID ?? 0)) }
+    }
+
+    /// The person opened this memory: it counts as used just now, which keeps it strong on the map.
+    @discardableResult nonisolated func touchMemory(_ id: Int64) async -> Bool { await store { sve_memory_touch($0, id) == 0 } }
+
     // MARK: the person's changes (store context; medicine memories follow their medicine: these refuse them)
 
     /// "Keep" (kept: true) or "Wrong". Both take the memory out of the review queue.
