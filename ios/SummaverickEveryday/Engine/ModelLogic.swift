@@ -335,6 +335,42 @@ enum BackendChoice {
     }
 }
 
+/// The notes run's backend (ProcessingPipeline.stepBackend), picked at every step boundary: before each transcript
+/// piece, section summary, part and output, never during one. In front (active for frontStintSeconds or more) with the
+/// heat full or eased: the GPU. In the background, while recording, or warmer than eased: the CPU (iOS refuses GPU work
+/// in the background). A short stint in front (quick front/background flips, 2026-11-11 log 11:34:53-11:35:02) and
+/// inactive (Control Center, a banner) keep what is loaded, so no reload (about 5 s) is spent on a moment.
+enum StepBackend {
+    static let frontStintSeconds = 3.0
+    /// Transcript pieces follow the rule too (false: always the CPU, as before 2026-11-11).
+    static let piecesOnGPU = true
+
+    enum Why: Equatable { case inFront, background, recording, warm, kept }
+
+    /// frontSeconds: how long the app has been in front since it last left the background. current: what is loaded.
+    static func choose(state: ThreadChoice.AppState, frontSeconds: Double, heat: HeatLadder.Level, recording: Bool,
+                       current: ModelBackend?) -> (backend: ModelBackend, why: Why) {
+        if state == .background { return (.cpu, .background) }
+        if recording { return (.cpu, .recording) }
+        if heat > .eased { return (.cpu, .warm) }
+        if state == .active, frontSeconds.isFinite, frontSeconds >= frontStintSeconds { return (.gpu, .inFront) }
+        // A moment in front, or inactive: nothing is moved. Nothing loaded yet: the CPU only for a moment in front
+        // that may end at once; inactive loads the CPU too (it is on the way to the background as often as back).
+        return (current ?? .cpu, .kept)
+    }
+
+    /// The log line when the backend changes ("[sve] " is added by the caller); nil when it stays.
+    static func moveLine(from current: ModelBackend?, to next: ModelBackend, why: Why) -> String? {
+        guard let current, current != next else { return nil }
+        if next == .gpu { return "backend: moving to the GPU (in front)" }
+        switch why {
+        case .recording: return "backend: moving to the CPU (recording)"
+        case .warm: return "backend: moving to the CPU (warm)"
+        default: return "backend: moving to the CPU (background)"
+        }
+    }
+}
+
 enum LivePause: Equatable {
     case heat, battery
 
@@ -1892,10 +1928,117 @@ enum FinishNow {
     /// The screen's brightness while the mode is on (0…1).
     static let dimBrightness = 0.1
 
-    /// "Finish now · about %d min": the parts left at the backend's pace, rounded up, at least 1.
-    static func estimateMinutes(partsLeft: Int, onGPU: Bool) -> Int {
-        let seconds = Double(max(0, partsLeft)) * (onGPU ? gpuSecondsPerPart : cpuSecondsPerPart)
+    /// Seconds a transcript piece (~28 s of audio) takes. CPU: measured on the phone 2026-11-11 (one every ~35 s in
+    /// front with the heat eased, rests included). GPU: the 2026-11-07 spike measured 0.78-1.01x real time, so about
+    /// 25 s; not measured in this pipeline yet (recalibrate from the "backend: moving to the GPU" runs).
+    static let gpuSecondsPerPiece = 25.0
+    static let cpuSecondsPerPiece = 35.0
+    /// Seconds a section summary takes. Placeholders (not measured yet): about half a part.
+    static let gpuSecondsPerSummary = 6.0
+    static let cpuSecondsPerSummary = 25.0
+
+    /// "Finish now · about %d min": the pieces, section summaries and parts left at the backend's pace, rounded up,
+    /// at least 1.
+    static func estimateMinutes(piecesLeft: Int = 0, summariesLeft: Int = 0, partsLeft: Int, onGPU: Bool) -> Int {
+        let seconds = Double(max(0, piecesLeft)) * (onGPU ? gpuSecondsPerPiece : cpuSecondsPerPiece)
+            + Double(max(0, summariesLeft)) * (onGPU ? gpuSecondsPerSummary : cpuSecondsPerSummary)
+            + Double(max(0, partsLeft)) * (onGPU ? gpuSecondsPerPart : cpuSecondsPerPart)
         return max(1, Int((seconds / 60).rounded(.up)))
+    }
+
+    /// What a note has, for the whole job's measure (FinishNowView, the estimate): read from the store, the sidecar and
+    /// the pipeline.
+    struct Work: Equatable {
+        var durationSeconds: Double
+        /// Written down so far (the sidecar's cursor, or the pipeline's progress); ignored once transcriptDone.
+        var transcribedSeconds: Double = 0
+        /// The transcript is stored in the note.
+        var transcriptDone = false
+        /// Section summaries stored (the note's, or the sidecar's while recording).
+        var sectionsDone = 0
+        /// The sections the note will have, once the summaries step has planned them (nil: not yet).
+        var sectionsPlanned: Int? = nil
+        /// The stored sections cover every piece: no summary is left.
+        var sectionsCover = false
+        /// Sections whose part (notes and questions) is still to write (sectionsUndone of the plan).
+        var partsUndone = 0
+    }
+
+    enum Stage: Equatable { case transcript, summaries, parts }
+
+    /// done of total for each stage. Totals are what the note will have: the pieces from the duration (StepCount.pieces),
+    /// the sections as planned (else about one per sectionSeconds), one part per section.
+    static func measure(_ w: Work) -> (pieces: (done: Int, total: Int), summaries: (done: Int, total: Int),
+                                       parts: (done: Int, total: Int)) {
+        var pieces = StepCount.pieces(transcribedSeconds: w.transcribedSeconds, durationSeconds: w.durationSeconds)
+        if w.transcriptDone { pieces.done = pieces.total }
+        let done = max(0, w.sectionsDone)
+        let expected = w.durationSeconds.isFinite && w.durationSeconds > 0
+            ? Int((w.durationSeconds / sectionSeconds).rounded(.up)) : 0
+        let sections: Int
+        if w.sectionsCover {
+            sections = done
+        } else if let planned = w.sectionsPlanned {
+            sections = max(done, planned)
+        } else {
+            sections = max(w.transcriptDone ? done + 1 : done, expected)
+        }
+        // One part per section: written are the stored sections without a part left (as partsProgress counts).
+        let partsDone = done - min(max(0, w.partsUndone), done)
+        return (pieces, (min(done, sections), sections), (min(partsDone, sections), sections))
+    }
+
+    /// The whole job as one measure: the stage being worked on with its count, and 0…1 across the three stages, each
+    /// weighted by its pace on the GPU (so the bar moves as the time goes).
+    struct Job: Equatable {
+        var stage: Stage
+        /// The item of the stage being worked on (1-based, never past total), and the stage's total.
+        var current: Int
+        var total: Int
+        var fraction: Double
+    }
+
+    static func job(_ w: Work) -> Job {
+        let m = measure(w)
+        let units = Double(m.pieces.done) * gpuSecondsPerPiece + Double(m.summaries.done) * gpuSecondsPerSummary
+            + Double(m.parts.done) * gpuSecondsPerPart
+        let all = Double(m.pieces.total) * gpuSecondsPerPiece + Double(m.summaries.total) * gpuSecondsPerSummary
+            + Double(m.parts.total) * gpuSecondsPerPart
+        let f = all > 0 ? min(1, max(0, units / all)) : 0
+        func at(_ s: Stage, _ c: (done: Int, total: Int)) -> Job {
+            Job(stage: s, current: c.total > 0 ? min(c.done + 1, c.total) : 0, total: c.total, fraction: f)
+        }
+        if !w.transcriptDone, m.pieces.done < m.pieces.total { return at(.transcript, m.pieces) }
+        if m.summaries.done < m.summaries.total { return at(.summaries, m.summaries) }
+        return at(.parts, m.parts)
+    }
+
+    /// The pieces, section summaries and parts left, for the estimate.
+    static func left(_ w: Work) -> (pieces: Int, summaries: Int, parts: Int) {
+        let m = measure(w)
+        return (m.pieces.total - m.pieces.done, m.summaries.total - m.summaries.done, m.parts.total - m.parts.done)
+    }
+
+    static func estimateMinutes(_ w: Work, onGPU: Bool) -> Int {
+        let l = left(w)
+        return estimateMinutes(piecesLeft: l.pieces, summariesLeft: l.summaries, partsLeft: l.parts, onGPU: onGPU)
+    }
+
+    /// The headline of the working screen.
+    static func headline(_ j: Job) -> String {
+        switch j.stage {
+        case .transcript: return String(localized: "Writing down what was said · \(j.current) of \(j.total)")
+        case .summaries: return String(localized: "Summarising part \(j.current) of \(j.total)")
+        case .parts: return String(localized: "Writing your notes · \(j.current) of \(j.total) parts")
+        }
+    }
+
+    /// The bar never goes back (a total that grows, the sections planned, the transcript stored) and, while the note is
+    /// being worked on, never shows empty.
+    static let workingFloor = 0.02
+    static func shownFraction(previous: Double, next: Double, working: Bool) -> Double {
+        let f = max(previous.isFinite ? previous : 0, next.isFinite ? next : 0)
+        return min(1, working ? max(workingFloor, f) : f)
     }
 
     /// Parts still to write: the sections not done yet, plus the sections the recording will have that are not cut yet

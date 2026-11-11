@@ -7081,7 +7081,7 @@
           }
         }
       },
-      "comment": "Finish now screen; parts of the notes written, total parts"
+      "comment": "Finish now screen; the part of the notes being written, total parts"
     },
     "Keep Summaverick open. You can put the phone face-up on the desk.": {
       "localizations": {
@@ -7136,6 +7136,28 @@
         }
       },
       "comment": "After Stop; %lld is minutes for the notes with the phone locked"
+    },
+    "Writing down what was said · %lld of %lld": {
+      "comment": "Finish now screen; the piece of the recording being written down, total pieces",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చెప్పినది రాస్తున్నాను · %2$lld లో %1$lld"
+          }
+        }
+      }
+    },
+    "Summarising part %lld of %lld": {
+      "comment": "Finish now screen; the part of the recording being summarised, total parts",
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సారాంశం రాస్తున్నాను · %2$lld భాగాల్లో %1$lld"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
