@@ -11,6 +11,15 @@ import UserNotifications
 enum NotesNotifier {
     /// Identifiers of these notifications start with this (NotifyRule.identifier).
     nonisolated static let prefix = "notes."
+    /// The notices of a note still being written carry "Finish now": it opens the app into the mode (FinishNowView),
+    /// where the notes are written on the GPU. Answered in ReminderScheduler.
+    nonisolated static let workingCategory = "sve.notes.working"
+    nonisolated static let finishNowAction = "sve.notes.finishnow"
+
+    nonisolated static var workingCategoryDefinition: UNNotificationCategory {
+        let finish = UNNotificationAction(identifier: finishNowAction, title: String(localized: "Finish now"), options: [.foreground])
+        return UNNotificationCategory(identifier: workingCategory, actions: [finish], intentIdentifiers: [], options: [])
+    }
 
     /// The transcript is stored after Stop (the summary and notes follow).
     static func transcriptReady(noteID: Int64, title: String, step: String? = nil, hold: Hold? = nil) {
@@ -19,7 +28,8 @@ enum NotesNotifier {
         let body = NotifyRule.transcriptBodyNamesNote(title: title)
             ? String(localized: "\"\(title)\": writing your notes now.")
             : String(localized: "I'll let you know as each part is ready.")
-        post(noteID, state: "transcript ready", title: String(localized: "Heard it all"), subtitle: step, body: body, hold: hold)
+        post(noteID, state: "transcript ready", title: String(localized: "Heard it all"), subtitle: step, body: body,
+             finishNow: true, hold: hold)
     }
 
     /// The title and the short summary are stored (the detailed notes and the questions follow).
@@ -34,7 +44,7 @@ enum NotesNotifier {
             heading = String(localized: "Got the gist!")
             body = String(localized: "\"\(title)\": the full notes are on the way.")
         }
-        post(noteID, state: "summary ready", title: heading, subtitle: step, body: body, hold: hold)
+        post(noteID, state: "summary ready", title: heading, subtitle: step, body: body, finishNow: true, hold: hold)
     }
 
     /// The note's detailed notes and questions are written (the memories may still follow).
@@ -58,7 +68,7 @@ enum NotesNotifier {
     /// The background work was cut off; the note continues by itself (the overnight task, or when the app is opened).
     static func paused(noteID: Int64, title: String, percent: Int, hold: Hold? = nil) {
         post(noteID, state: "paused at \(percent)%", title: String(localized: "Taking a short break"),
-             body: String(localized: "\"\(title)\" is safe. I'll carry on by myself soon."), hold: hold)
+             body: String(localized: "\"\(title)\" is safe. I'll carry on by myself soon."), finishNow: true, hold: hold)
     }
 
     /// Right after a Stop from the background with no background time (TaskAtRecord.postsOpenAppNotice): the
@@ -67,7 +77,8 @@ enum NotesNotifier {
     @discardableResult
     static func recordingSaved(noteID: Int64, hold: Hold? = nil) -> Bool {
         post(noteID, state: "saved, open the app", title: String(localized: "Your recording is saved"),
-             body: String(localized: "Open Summaverick and I'll write your notes. It takes a few minutes."), hold: hold)
+             body: String(localized: "Open Summaverick and I'll write your notes. It takes a few minutes."), finishNow: true,
+             hold: hold)
     }
 
     /// The notes run failed for real (not a cut-off); `line` is the failure the note shows.
@@ -78,10 +89,11 @@ enum NotesNotifier {
 
     /// hold: background time the caller took synchronously, before any await (right after a cut-off the app may be
     /// suspended at any moment); ended once the request is handed over. Without one, it is taken here.
+    /// finishNow: the notes are still being written, so the notice carries the "Finish now" action.
     /// False when nothing is posted (the app is in front).
     @discardableResult
     private static func post(_ noteID: Int64, state: String, title: String, subtitle: String? = nil, body: String,
-                             hold given: Hold?) -> Bool {
+                             finishNow: Bool = false, hold given: Hold?) -> Bool {
         let hold = given ?? Hold()
         guard NotifyRule.shouldNotify(appActive: UIApplication.shared.applicationState == .active) else {
             NSLog("[sve] bg: note %lld %@ with the app in front: no notification", noteID, state)
@@ -99,6 +111,7 @@ enum NotesNotifier {
             content.sound = .default
         }
         content.userInfo = ["note_id": NSNumber(value: noteID)]
+        if finishNow { content.categoryIdentifier = workingCategory }
         let request = UNNotificationRequest(identifier: NotifyRule.identifier(noteID: noteID), content: content, trigger: nil)
         Task {
             do {
@@ -141,11 +154,12 @@ enum QuietNotifier {
     nonisolated static let category = "sve.quiet"
     nonisolated static let keepAction = "sve.quiet.keep"
 
-    /// At launch, before a notification can be answered. The app's only notification category.
+    /// At launch, before a notification can be answered. Registers the app's notification categories together (each
+    /// call replaces them all): this one, and the notes notices' "Finish now" (NotesNotifier.workingCategory).
     nonisolated static func registerCategory() {
         let keep = UNNotificationAction(identifier: keepAction, title: String(localized: "Keep recording"), options: [])
         let c = UNNotificationCategory(identifier: category, actions: [keep], intentIdentifiers: [], options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([c])
+        UNUserNotificationCenter.current().setNotificationCategories([c, NotesNotifier.workingCategoryDefinition])
     }
 
     static func warn(_ line: String) { post(title: String(localized: "Still there? 👀"), line, category: category) }

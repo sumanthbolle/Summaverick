@@ -7,6 +7,8 @@ enum ReminderRoute: Equatable {
     case note(id: Int64, startSec: Int?)
     case profile
     case deletedRecording(reminderID: Int64)
+    /// "Finish now" on a note's notes notice: the note opens, with the mode over it (FinishNowView).
+    case finishNow(noteID: Int64)
 }
 
 /// One notification request, computed without touching UNUserNotificationCenter.
@@ -259,6 +261,9 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
                 // Stop when quiet's warning: Keep recording carries on (a tap only opens the app).
                 if identifier == QuietNotifier.identifier {
                     if action == QuietNotifier.keepAction { RecordingController.shared.keepRecording() }
+                } else if action == NotesNotifier.finishNowAction, identifier.hasPrefix(NotesNotifier.prefix),
+                          case .note(let id, _) = route {
+                    ReminderScheduler.shared.pendingRoute = .finishNow(noteID: id)
                 } else if action == UNNotificationDefaultActionIdentifier,
                           identifier.hasPrefix(Self.prefix) || identifier.hasPrefix(NotesNotifier.prefix) {
                     ReminderScheduler.shared.pendingRoute = route

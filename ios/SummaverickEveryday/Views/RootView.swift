@@ -30,6 +30,9 @@ final class Router {
         case .note(let id, let startSec): openNote = (id, startSec)
         case .profile: showSettings = true
         case .deletedRecording: showDeletedRecording = true
+        case .finishNow(let id):
+            openNote = (id, nil)
+            FinishNowController.shared.start(noteID: id)
         }
     }
 }

@@ -5,8 +5,53 @@ struct RecordView: View {
     @State private var controller = RecordingController.shared
     @State private var live = LiveTranscriber.shared
     @State private var permissionDenied = false
+    /// Stopped with this screen's button (the app in front): "Finish now" is offered before the screen closes.
+    @State private var stoppedHere = false
+    /// The recording's length at Stop, for the estimate.
+    @State private var stoppedSeconds: TimeInterval = 0
+    /// The newest note before this recording: the note it becomes is newer (FinishNow.followed).
+    @State private var newestBefore: Int64 = 0
 
     var body: some View {
+        if stoppedHere { finishNowOffer } else { recorder }
+    }
+
+    /// After Stop: the recording is saved and the notes are under way. Finish now keeps the app open (the GPU) until
+    /// they are ready; Done closes this screen and they carry on in the background.
+    private var finishNowOffer: some View {
+        let parts = FinishNow.partsLeft(sectionsUndone: 0, sectionsKnown: 0, durationSeconds: stoppedSeconds)
+        return VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "checkmark.circle").font(.system(size: 48)).foregroundStyle(Theme.positiveIcon)
+                .accessibilityHidden(true)
+            Text("Saved. I'm writing your notes now.")
+                .font(.title3.weight(.semibold)).multilineTextAlignment(.center)
+            Text("With the phone locked, it takes about \(FinishNow.estimateMinutes(partsLeft: parts, onGPU: false)) min.")
+                .font(.footnote).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
+            Spacer()
+            Button {
+                FinishNowController.shared.startAfterStop(newerThan: newestBefore)
+                dismiss()
+            } label: {
+                Label(String(localized: "Finish now · about \(FinishNow.estimateMinutes(partsLeft: parts, onGPU: true)) min"),
+                      systemImage: "bolt")
+                    .font(.title3.weight(.semibold))
+                    .frame(maxWidth: .infinity).padding(.vertical, 16)
+            }
+            .buttonStyle(.pillProminent)
+            .buttonBorderShape(.capsule)
+            Button { dismiss() } label: { Text("Done").frame(maxWidth: .infinity, minHeight: 44) }
+                .buttonStyle(.pill)
+                .padding(.bottom, 24)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.background)
+        .interactiveDismissDisabled()
+    }
+
+    private var recorder: some View {
         VStack(spacing: 28) {
             HStack {
                 Button("Cancel", role: .cancel) { cancel() }
@@ -53,10 +98,11 @@ struct RecordView: View {
         .background(Theme.background)
         .interactiveDismissDisabled()
         .task { await begin() }
+        .task { newestBefore = await CoreEngine.shared.notes(limit: 1).first?.id ?? 0 }
         .onAppear { controller.recordScreenShown = true }
         .onDisappear { controller.recordScreenShown = false }
         // Stopped from the Live Activity, a shortcut or the control: this screen has nothing left to show.
-        .onChange(of: controller.isRecording) { was, now in if was && !now { dismiss() } }
+        .onChange(of: controller.isRecording) { was, now in if was && !now && !stoppedHere { dismiss() } }
         .alert("Microphone access needed", isPresented: $permissionDenied) {
             Button("Open Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }; dismiss() }
             Button("Cancel", role: .cancel) { dismiss() }
@@ -119,8 +165,12 @@ struct RecordView: View {
 
     private func stopAndProcess() {
         // Synchronous, before anything awaits: claims the work and the background time right in the tap.
-        guard controller.stop() else { return }
-        dismiss()
+        let seconds = controller.elapsed
+        // Finish now only when the notes will be written now (the language pack is ready).
+        stoppedHere = ModelManager.shared.isReady
+        guard controller.stop() else { stoppedHere = false; return }
+        stoppedSeconds = seconds
+        if !stoppedHere { dismiss() }
     }
 
     private func timeString(_ t: TimeInterval) -> String {

@@ -7049,6 +7049,93 @@
           }
         }
       }
+    },
+    "Finish now": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడే పూర్తి చేయండి"
+          }
+        }
+      },
+      "comment": "Notification action and button: keep the app open so the notes finish sooner"
+    },
+    "Finish now · about %lld min": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడే పూర్తి చేయండి · సుమారు %lld నిమిషాలు"
+          }
+        }
+      },
+      "comment": "Button; %lld is minutes until the notes are ready with the app open"
+    },
+    "Writing your notes · %lld of %lld": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ నోట్స్ రాస్తున్నాను · %2$lld లో %1$lld"
+          }
+        }
+      },
+      "comment": "Finish now screen; parts of the notes ready, total parts"
+    },
+    "Keep Summaverick open. You can put the phone face-up on the desk.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverickని తెరిచే ఉంచండి. ఫోన్‌ను డెస్క్ మీద తెర పైకి ఉండేలా పెట్టొచ్చు."
+          }
+        }
+      }
+    },
+    "The phone is warm, so I'm resting": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ వేడిగా ఉంది, అందుకే కాస్త ఆగుతున్నాను"
+          }
+        }
+      },
+      "comment": "Finish now screen: the work goes slower to let the phone cool"
+    },
+    "Leave": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "బయటకు వెళ్ళండి"
+          }
+        }
+      },
+      "comment": "Leaves the Finish now screen; the notes carry on in the background"
+    },
+    "Saved. I'm writing your notes now.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సేవ్ అయింది. ఇప్పుడు మీ నోట్స్ రాస్తున్నాను."
+          }
+        }
+      },
+      "comment": "After Stop"
+    },
+    "With the phone locked, it takes about %lld min.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ లాక్ చేసి ఉంటే, సుమారు %lld నిమిషాలు పడుతుంది."
+          }
+        }
+      },
+      "comment": "After Stop; %lld is minutes for the notes with the phone locked"
     }
   },
   "version": "1.0"

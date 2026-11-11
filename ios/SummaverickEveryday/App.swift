@@ -11,7 +11,7 @@ struct SummaverickEverydayApp: App {
     init() {
         // Must be set before launch finishes so a tap that cold-starts the app is delivered.
         UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
-        QuietNotifier.registerCategory()   // Keep recording on Stop when quiet's warning
+        QuietNotifier.registerCategory()   // Keep recording on Stop when quiet's warning; Finish now on notes notices
         AudioRecorder.sweepAskVoice()
         // Live Activities left by a closed app go before this launch can start its own.
         RecordingActivities.endStale()
