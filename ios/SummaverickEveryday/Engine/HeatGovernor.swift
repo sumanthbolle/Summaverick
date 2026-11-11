@@ -24,6 +24,12 @@ final class HeatThreads: @unchecked Sendable {
         let t = ThreadChoice.threads(level: level, inBackground: inBackground)
         return (Int32(t.decode), Int32(t.batch))
     }
+    /// The heat ladder's level as last read on the main actor (HeatGovernor.level, which also runs on every thermal
+    /// change), readable on any thread: a live part in flight stops when it goes above eased.
+    var currentLevel: HeatLadder.Level {
+        lock.lock(); defer { lock.unlock() }
+        return level
+    }
     func set(_ level: HeatLadder.Level) {
         lock.lock()
         self.level = level

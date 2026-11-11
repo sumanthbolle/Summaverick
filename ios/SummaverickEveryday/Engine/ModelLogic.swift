@@ -355,7 +355,7 @@ enum LivePause: Equatable {
 /// Only with the app in front (the GPU is free; locked, the CPU is busy with transcription) at a cool phone (heat
 /// full or eased), and only when at most `startMaxWaiting` pieces wait to be transcribed (as section summaries, a
 /// part may make transcription fall a little behind). The run stops at once when `stopWaiting` pieces wait (about 3
-/// minutes of lag), the app leaves the front, or the phone gets hot (serious). A section whose try was stopped
+/// minutes of lag), the app leaves the front, the heat ladder goes above eased, or the phone gets hot (serious). A section whose try was stopped
 /// `maxCancels` times is left for the normal steps after Stop.
 enum LiveParts {
     /// One live piece of audio (LiveSections.pieceSeconds).
@@ -380,8 +380,9 @@ enum LiveParts {
     }
 
     /// The part in flight stops now (asked during the run, any thread).
-    static func mustStop(appActive: Bool, piecesWaiting: Int, thermal: ProcessInfo.ThermalState) -> Bool {
-        !appActive || piecesWaiting >= stopWaiting || Heat.isTooHot(thermal)
+    static func mustStop(appActive: Bool, piecesWaiting: Int, heat: HeatLadder.Level,
+                         thermal: ProcessInfo.ThermalState) -> Bool {
+        !appActive || piecesWaiting >= stopWaiting || heat > .eased || Heat.isTooHot(thermal)
     }
 }
 
