@@ -173,7 +173,9 @@ int count_questions(const std::string &reply) { return (int)questions_of(strip_u
 
 std::string section_prompt_shared(const std::string &material, const std::string &guide, int part, int total,
                                   bool from_bullets) {
-    std::string head = "This is part " + std::to_string(part) + " of " + std::to_string(total) + " of the recording.\n";
+    // total 0: a part written while the recording goes on, when nobody knows yet how many parts there will be.
+    std::string head = "This is part " + std::to_string(part) +
+                       (total > 0 ? " of " + std::to_string(total) : std::string()) + " of the recording.\n";
     if (!trim(guide).empty())
         head += "A short outline of this part, as a guide only (the transcript is what counts):\n" + trim(guide) + "\n";
     head += "\n";

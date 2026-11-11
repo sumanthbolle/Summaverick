@@ -19,7 +19,8 @@ int section_output_max_out(SectionOutputKind kind);
 // (sve_section_outputs_pair). Notes end with "## Topic", as sve_generate's do.
 std::string section_output_prompt(SectionOutputKind kind, const std::string &material, const std::string &guide,
                                   int part, int total, bool from_bullets = false);
-// The part of a part's prompt both kinds share: "This is part <part> of <total> of the recording.", the part's
+// The part of a part's prompt both kinds share: "This is part <part> of <total> of the recording." ("This is part
+// <part> of the recording." when total is 0: written during the recording), the part's
 // section summary (guide, as sections_text renders it) as a guide, then the part's own material (its pieces,
 // unclear ones marked; from_bullets when it had to be reduced first) in triple quotes.
 std::string section_prompt_shared(const std::string &material, const std::string &guide, int part, int total,

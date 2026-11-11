@@ -77,6 +77,10 @@ public:
     // and wipe_assistant drop all.
     bool set_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
                             int64_t last_piece, const std::string &text, bool cut = false);
+    // An output written earlier (while recording, from the sidecar) stored as set_section_output stores it: 1 stored,
+    // 0 when the note has no section idx with this range now (re-planned, or the note is gone), -1 on error.
+    int put_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
+                           int64_t last_piece, const std::string &text, bool cut);
     // [{idx,kind,lang,first_piece,last_piece,text,cut}], every stored row; cut: the reply reached its token cap.
     json section_outputs(int64_t note_id);
     // The texts of every section in order, when each has a row of this kind and lang for its current range;

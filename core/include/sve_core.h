@@ -231,6 +231,24 @@ char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind
  * cancel (outputs already stored stay; the tries of the others are taken back), -1 with no model, for a note or
  * section that is gone, or on error. */
 int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char *lang, sve_progress_cb cb, void *user);
+/* A part written while the recording is still going (the note does not exist yet): as sve_section_output, from the
+ * section's own pieces_json ([{"start_sec","text","conf"?}]) and its summary_json (as sve_section_summarize returns
+ * it), with "This is part <idx + 1> of the recording." (no total). Stores and counts nothing: the host keeps the reply
+ * and puts it in the note with sve_section_output_put. *cut (optional) is 1 when the reply reached its cap. "" for a
+ * part with no speech. NULL on cancel, with no model, for other kinds or bad input, or when both tries failed. */
+char *sve_section_output_text(sve_ctx *ctx, const char *pieces_json, const char *summary_json, int idx,
+                              sve_output_kind kind, const char *lang, int *cut, sve_progress_cb cb, void *user);
+/* sve_section_outputs_pair for a part written while the recording is going (material as sve_section_output_text):
+ * {"notes":{"text","cut"}|null,"questions":{"text","cut"}|null,"cancelled":bool}. A kind is null when it was not
+ * written (failed, or not reached before a cancel); one finished before a cancel is kept. Stores nothing. NULL with
+ * no model, on bad input or error. */
+char *sve_section_outputs_pair_text(sve_ctx *ctx, const char *pieces_json, const char *summary_json, int idx,
+                                    const char *lang, sve_progress_cb cb, void *user);
+/* Stores a part written earlier (sve_section_output_text) for the note's section idx, only when that section's range
+ * is [first_piece, last_piece] now. 1 stored (done, as a stored part), 0 when the range differs (or there is no such
+ * section, or the note is gone; the normal steps write it again), -1 on error or another kind. Counts no try. */
+int sve_section_output_put(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang,
+                           int first_piece, int last_piece, const char *text, int cut);
 /* [{"idx":0,"kind":1,"done":true,"attempts":1,"last_error":null,"failures":0},…]: every section x {1 notes,
  * 2 questions}, by idx then kind. done only when the stored part's lang, first_piece and last_piece match the section
  * now. attempts (tries started, a kill included), failures (tries that failed for a real reason: not a cancel, a

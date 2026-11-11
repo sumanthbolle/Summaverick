@@ -494,3 +494,39 @@ TEST(section_outputs_clear_by_kind_and_part) {
     CHECK_EQ(st.clear_section_outputs(id, -1, -1), 0);
     CHECK(st.sections(id).size() == 2);  // the sections themselves stay
 }
+
+TEST(section_prompt_without_a_total_omits_of_n) {
+    // A part written while the recording goes on does not know how many parts there will be.
+    const std::string sh = section_prompt_shared("the words", "guide", 3, 0);
+    CHECK(sh.find("This is part 3 of the recording.\n") != std::string::npos);
+    CHECK(sh.find(" of 0") == std::string::npos);
+    const std::string n = section_output_prompt(SectionOutputKind::Notes, "the words", "guide", 3, 0);
+    CHECK_EQ(n, sh + section_prompt_suffix(SectionOutputKind::Notes));
+    CHECK(section_prompt_shared("x", "", 2, 5).find("This is part 2 of 5 of the recording.") != std::string::npos);
+}
+
+TEST(put_section_output_matching_range_is_stored_and_done) {
+    Store st(":memory:");
+    int64_t id = st.create("t", "en", nullptr, "x", 600);
+    CHECK(st.set_sections(id, json::array({sec(0, 0, 9, "A"), sec(1, 10, 19, "B")})));
+    CHECK_EQ(st.put_section_output(id, 1, 1, "en", 10, 19, "## Key points\n- two", true), 1);
+    CHECK_EQ(st.put_section_output(id, 1, 2, "en", 10, 19, "Q1. x?\nA1. y", false), 1);
+    json s = st.section_outputs_state(id, "en");
+    CHECK(state_row(s, 1, 1)["done"] == true && state_row(s, 1, 2)["done"] == true);
+    CHECK(state_row(s, 0, 1)["done"] == false);
+    CHECK(state_row(s, 1, 1)["attempts"] == 0);  // written earlier: no try counted here
+    json rows = st.section_outputs(id);
+    CHECK_EQ(rows.size(), (size_t)2);
+    CHECK(rows[0]["cut"] == true && rows[1]["cut"] == false);
+}
+
+TEST(put_section_output_mismatched_range_gives_0) {
+    Store st(":memory:");
+    int64_t id = st.create("t", "en", nullptr, "x", 600);
+    CHECK(st.set_sections(id, json::array({sec(0, 0, 9, "A")})));
+    CHECK_EQ(st.put_section_output(id, 0, 1, "en", 0, 8, "notes", false), 0);   // the range changed
+    CHECK_EQ(st.put_section_output(id, 1, 1, "en", 10, 19, "notes", false), 0);  // no such section
+    CHECK(st.section_outputs(id).empty());
+    CHECK(st.remove(id));
+    CHECK_EQ(st.put_section_output(id, 0, 1, "en", 0, 9, "notes", false), 0);   // the note is gone
+}

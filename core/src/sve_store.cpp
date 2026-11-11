@@ -1286,6 +1286,12 @@ bool Store::set_section_output(int64_t note_id, int idx, int kind, const std::st
     return true;
 }
 
+int Store::put_section_output(int64_t note_id, int idx, int kind, const std::string &lang, int64_t first_piece,
+                              int64_t last_piece, const std::string &text, bool cut) {
+    if (set_section_output(note_id, idx, kind, lang, first_piece, last_piece, text, cut)) return 1;
+    return err_ == "no such section" ? 0 : -1;
+}
+
 json Store::section_outputs(int64_t note_id) {
     return query_rows("SELECT idx,kind,lang,first_piece,last_piece,text,cut FROM section_outputs WHERE note_id=? "
                       "ORDER BY idx,kind", {note_id});
