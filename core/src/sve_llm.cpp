@@ -47,6 +47,10 @@ bool Llm::load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_lay
     cp.n_threads = n_threads;
     cp.n_threads_batch = n_threads_batch;
     cp.no_perf = true;
+    // Two sequences (sve_section_outputs_pair: a part's notes and questions from one reading of it), in one unified
+    // KV memory: the copied prefix shares its cells and each sequence may use the whole n_ctx.
+    cp.n_seq_max = 2;
+    cp.kv_unified = true;
     if (embeddings) {
         // Pooling from the model. The attention is not causal, so a passage must fit one ubatch: embed() keeps the
         // first n_ubatch tokens (512, far more than a piece; it caps the compute buffer next to Gemma).
@@ -155,15 +159,11 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
     return generate(max_new_tokens, greedy, out, cb, user, phase, done, total, nullptr, nullptr, false, on_piece);
 }
 
-// Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
-bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
-              sve_progress_cb cb, void *user, const char *phase, int done, int total, double *mean_prob,
-              int *n_out, bool second_hearing, const PieceFn &on_piece) {
+// The sampler chain of generate (and of each sequence of complete_pair).
+static llama_sampler *make_sampler(const llama_vocab *vocab, bool greedy, bool second_hearing) {
     llama_sampler_chain_params sp = llama_sampler_chain_default_params();
     sp.no_perf = true;
     llama_sampler *smpl = llama_sampler_chain_init(sp);
-    double prob_sum = 0;
-    int prob_n = 0;
     if (second_hearing) {
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, 1.05f, 0.0f, 0.0f));
         llama_sampler_chain_add(smpl, llama_sampler_init_top_p(0.9f, 1));
@@ -182,6 +182,16 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
         llama_sampler_chain_add(smpl, llama_sampler_init_dist(42));
     }
 
+    return smpl;
+}
+
+// Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
+bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
+              sve_progress_cb cb, void *user, const char *phase, int done, int total, double *mean_prob,
+              int *n_out, bool second_hearing, const PieceFn &on_piece) {
+    llama_sampler *smpl = make_sampler(vocab, greedy, second_hearing);
+    double prob_sum = 0;
+    int prob_n = 0;
     bool ok = true, eog = false;
     char piece[256];
     if (n_out) *n_out = 0;
@@ -214,6 +224,121 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
     llama_sampler_free(smpl);
     last_cut = ok && !eog;
     if (mean_prob) *mean_prob = prob_n ? prob_sum / prob_n : std::nan("");
+    return ok;
+}
+
+// Decodes toks into sequence seq from position pos, in n_batch-sized batches; only the last token gives logits.
+// Its logits are those of the last llama_decode (index n-1 of that batch), so the caller samples before the next one.
+static bool decode_into(llama_context *ctx, const std::vector<llama_token> &toks, llama_seq_id seq, llama_pos pos,
+                        int &last_idx) {
+    const int nb = (int)llama_n_batch(ctx);
+    llama_batch b = llama_batch_init(nb, 0, 1);
+    bool ok = true;
+    for (size_t i = 0; i < toks.size() && ok; i += nb) {
+        const int n = (int)std::min<size_t>(nb, toks.size() - i);
+        for (int j = 0; j < n; ++j) {
+            b.token[j] = toks[i + j];
+            b.pos[j] = pos + (llama_pos)(i + j);
+            b.n_seq_id[j] = 1;
+            b.seq_id[j][0] = seq;
+            b.logits[j] = i + j + 1 == toks.size();
+        }
+        b.n_tokens = n;
+        ok = llama_decode(ctx, b) == 0;
+        last_idx = n - 1;
+    }
+    llama_batch_free(b);
+    return ok;
+}
+
+bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], const int (&max_new)[2],
+                        const PairDoneFn &on_done, sve_progress_cb cb, void *user, const char *phase) {
+    last_cut = false;
+    llama_memory_t mem = llama_get_memory(ctx);
+    if (!mem || llama_n_seq_max(ctx) < 2) { sve_logf(2, "pair: the context has one sequence"); return false; }
+    llama_memory_clear(mem, true);
+    struct Seq {
+        std::vector<llama_token> tail;
+        llama_sampler *smpl = nullptr;
+        std::string out;
+        llama_pos pos = 0;
+        int n = 0, idx = -1;
+        bool done = false;
+    } q[2];
+    const std::vector<llama_token> h = tokenize(head, true, true);
+    q[0].tail = tokenize(tails[0], false, true);
+    q[1].tail = tokenize(tails[1], false, true);
+    const long nh = (long)h.size(), n0 = (long)q[0].tail.size(), n1 = (long)q[1].tail.size();
+    const long seq_cells = (long)llama_n_ctx_seq(ctx), need = nh + n0 + n1 + max_new[0] + max_new[1] + 16;
+    if (h.empty() || need > n_ctx || nh + n0 + max_new[0] + 16 > seq_cells || nh + n1 + max_new[1] + 16 > seq_cells) {
+        sve_logf(2, "pair: %ld cells needed for n_ctx %d", need, n_ctx);
+        return false;
+    }
+    auto fail = [&](const char *what) {
+        decode_failed = true;
+        sve_logf(2, "pair: decode failed (%s)", what);
+        return false;
+    };
+    // The shared prefix once, in sequence 0, then a copy for sequence 1 (cells shared, nothing computed).
+    for (size_t i = 0; i < h.size(); i += llama_n_batch(ctx)) {
+        const int n = (int)std::min<size_t>(llama_n_batch(ctx), h.size() - i);
+        if (llama_decode(ctx, llama_batch_get_one(const_cast<llama_token *>(h.data()) + i, n)) != 0) return fail("prefix");
+        if (cb && cb(phase, 0, 2, user)) return false;
+    }
+    llama_memory_seq_cp(mem, 0, 1, -1, -1);
+    bool ok = true;
+    char piece[256];
+    // Samples sequence i's next token from logits index idx of the last decode; ends it on EOG or at its cap.
+    auto sample = [&](int i, int idx) {
+        Seq &s = q[i];
+        const llama_token id = llama_sampler_sample(s.smpl, ctx, idx);
+        ++s.n;
+        sve_log_tokens('o', &id, 1);
+        bool cut = false;
+        if (llama_vocab_is_eog(vocab, id)) {
+            s.done = true;
+        } else {
+            llama_sampler_accept(s.smpl, id);
+            const int np = llama_token_to_piece(vocab, id, piece, sizeof piece, 0, false);
+            if (np > 0) s.out.append(piece, np);
+            s.tail.assign(1, id);  // decoded next round
+            if (s.n >= max_new[i]) s.done = cut = true;
+        }
+        if (s.done && on_done) on_done(i, s.out, cut);
+    };
+    for (int i = 0; i < 2 && ok; ++i) {
+        q[i].smpl = make_sampler(vocab, false, false);
+        q[i].pos = (llama_pos)h.size();
+        int idx = -1;
+        if (!decode_into(ctx, q[i].tail, i, q[i].pos, idx)) { ok = fail("suffix"); break; }
+        q[i].pos += (llama_pos)q[i].tail.size();
+        if (max_new[i] <= 0) { q[i].done = true; if (on_done) on_done(i, "", true); continue; }
+        sample(i, idx);  // before the other sequence's suffix replaces these logits
+        if (cb && cb(phase, 0, 2, user)) ok = false;
+    }
+    // One decode per round: the last token of every sequence still going.
+    llama_batch b = llama_batch_init(2, 0, 1);
+    for (int round = 0; ok && !(q[0].done && q[1].done); ++round) {
+        b.n_tokens = 0;
+        for (int i = 0; i < 2; ++i) {
+            if (q[i].done) continue;
+            const int j = b.n_tokens++;
+            b.token[j] = q[i].tail[0];
+            b.pos[j] = q[i].pos++;
+            b.n_seq_id[j] = 1;
+            b.seq_id[j][0] = i;
+            b.logits[j] = 1;
+            q[i].idx = j;
+        }
+        if (llama_decode(ctx, b) != 0) { ok = fail("round"); break; }
+        for (int i = 0; i < 2; ++i)
+            if (!q[i].done) sample(i, q[i].idx);
+        if ((round & 15) == 0 && cb && cb(phase, 0, 2, user)) ok = false;
+    }
+    llama_batch_free(b);
+    for (auto &s : q)
+        if (s.smpl) llama_sampler_free(s.smpl);
+    llama_memory_clear(mem, true);
     return ok;
 }
 

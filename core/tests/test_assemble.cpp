@@ -177,6 +177,70 @@ TEST(section_output_prompt_says_part_and_guide) {
     CHECK_EQ(section_output_max_out(SectionOutputKind::Questions), 300);
 }
 
+TEST(section_prompt_shared_prefix_is_the_same_for_both_kinds) {
+    const std::string sh = section_prompt_shared("the words", "[0:00] Elections\n- point", 2, 3);
+    const std::string n = section_output_prompt(SectionOutputKind::Notes, "the words", "[0:00] Elections\n- point", 2, 3);
+    const std::string q = section_output_prompt(SectionOutputKind::Questions, "the words", "[0:00] Elections\n- point", 2, 3);
+    // Each kind's prompt is the shared prefix, then its own suffix.
+    CHECK_EQ(n, sh + section_prompt_suffix(SectionOutputKind::Notes));
+    CHECK_EQ(q, sh + section_prompt_suffix(SectionOutputKind::Questions));
+    // The part, the guide and the material are all in the shared prefix, before anything kind-specific.
+    CHECK(sh.find("This is part 2 of 3 of the recording.") != std::string::npos);
+    CHECK(sh.find("[0:00] Elections") != std::string::npos);
+    CHECK(sh.find("\"\"\"\nthe words\n\"\"\"") != std::string::npos);
+    CHECK(sh.find("## Topic") == std::string::npos && sh.find("Q1.") == std::string::npos);
+    CHECK(sh.find("Rules:") == std::string::npos);
+    // The kind's instruction and its rules come after the material.
+    const std::string ns = section_prompt_suffix(SectionOutputKind::Notes);
+    const std::string qs = section_prompt_suffix(SectionOutputKind::Questions);
+    CHECK(ns.find("## Key points") != std::string::npos && ns.find("Rules:") != std::string::npos);
+    CHECK(ns.find("Write an action item only when") != std::string::npos);
+    CHECK(qs.find("Q1. <question") != std::string::npos && qs.find("Rules:") != std::string::npos);
+    CHECK(qs.find("Write an action item") == std::string::npos);
+    // Notes still end with "## Topic" (finish_output puts it back); questions do not.
+    CHECK(n.size() > 8 && n.compare(n.size() - 8, 8, "## Topic") == 0);
+    CHECK(q.find("## Topic") == std::string::npos);
+    // from_bullets changes only the shared prefix's wording.
+    CHECK(section_prompt_shared("x", "", 1, 1, true).find("bullet points extracted from") != std::string::npos);
+    CHECK(section_prompt_shared("x", "", 1, 1).find("bullet points") == std::string::npos);
+}
+
+TEST(split_templated_prompt_at_the_shared_user_text) {
+    const std::string shared = "SHARED part\n", sn = "notes ask", sq = "questions ask";
+    auto tmpl = [](const std::string &u) { return "<|turn>system\nSYS<turn|>\n<|turn>user\n" + u + "<turn|>\n<|turn>model\n"; };
+    std::string hn, tn, hq, tq;
+    CHECK(split_templated(tmpl(shared + sn), shared, sn, hn, tn));
+    CHECK(split_templated(tmpl(shared + sq), shared, sq, hq, tq));
+    CHECK_EQ(hn, hq);
+    CHECK_EQ(hn, std::string("<|turn>system\nSYS<turn|>\n<|turn>user\nSHARED part\n"));
+    CHECK_EQ(tn, std::string("notes ask<turn|>\n<|turn>model\n"));
+    CHECK_EQ(tq, std::string("questions ask<turn|>\n<|turn>model\n"));
+    // A template that rewrote the user text (not found as it is): no split.
+    std::string h, t;
+    CHECK(!split_templated("<s>shared part\nnotes ask", shared, sn, h, t));
+    // The user text also appears in the system part: the user turn's copy (the last) is the one split.
+    CHECK(split_templated(shared + sn + "|" + shared + sn + "|end", shared, sn, h, t));
+    CHECK_EQ(t, std::string("notes ask|end"));
+    CHECK_EQ(h, shared + sn + "|" + shared);
+}
+
+TEST(section_pair_fits_only_with_two_sequences_and_room) {
+    // 8192 cells shared by both sequences (unified): a 3000-token prefix and two suffixes fit with both caps.
+    CHECK(section_pair_fits(2, 8192, 8192, 3000, 300, 250));
+    // One sequence only: never.
+    CHECK(!section_pair_fits(1, 8192, 8192, 3000, 300, 250));
+    CHECK(!section_pair_fits(0, 8192, 8192, 10, 10, 10));
+    // The total must hold the prefix once, both suffixes and both caps (440 + 300) with a small margin.
+    const int edge = 8192 - 300 - 250 - 440 - 300 - kPairMargin;
+    CHECK(section_pair_fits(2, 8192, 8192, edge, 300, 250));
+    CHECK(!section_pair_fits(2, 8192, 8192, edge + 1, 300, 250));
+    // Split (non-unified) streams: each sequence must fit its own share of the context.
+    CHECK(!section_pair_fits(2, 8192, 4096, 3800, 300, 250));
+    CHECK(section_pair_fits(2, 8192, 4096, 2000, 300, 250));
+    // An empty prefix (nothing to share) is no pair.
+    CHECK(!section_pair_fits(2, 8192, 8192, 0, 300, 250));
+}
+
 // ---- store ----
 
 static json state_row(const json &state, int idx, int kind) {

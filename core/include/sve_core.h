@@ -216,6 +216,17 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
  * deleted or its sections re-planned meanwhile): nothing is stored then. */
 char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang,
                          sve_progress_cb cb, void *user);
+/* The detailed notes and the revision questions of ONE section written together: the part's shared prompt (system,
+ * its place, its summary as a guide and its material) is read once into one sequence, copied to a second, each
+ * kind's instruction is appended to its own, and both are sampled independently, one decode per token round, until
+ * each ends or reaches its cap (440 / 300). Each reply gets sve_section_output's checks and is stored as soon as it
+ * ends; one that fails them gets sve_section_output's greedy retry alone afterwards. Both tries are counted before
+ * the model runs, per kind and lang, as sve_section_output counts them. When the context has one sequence, the part
+ * must be reduced first, it is silence, or the prefix, both instructions and both caps do not fit the context, the
+ * two kinds are written by two sve_section_output calls instead. Returns how many kinds were stored (0-2), -2 on
+ * cancel (outputs already stored stay; the tries of the others are taken back), -1 with no model, for a note or
+ * section that is gone, or on error. */
+int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char *lang, sve_progress_cb cb, void *user);
 /* [{"idx":0,"kind":1,"done":true,"attempts":1,"last_error":null,"failures":0},…]: every section x {1 notes,
  * 2 questions}, by idx then kind. done only when the stored part's lang, first_piece and last_piece match the section
  * now. attempts (tries started, a kill included), failures (tries that failed for a real reason: not a cancel, a

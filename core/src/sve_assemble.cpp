@@ -171,14 +171,60 @@ int section_output_max_out(SectionOutputKind kind) { return kind == SectionOutpu
 
 int count_questions(const std::string &reply) { return (int)questions_of(strip_unclear_tags(reply)).size(); }
 
-std::string section_output_prompt(SectionOutputKind kind, const std::string &material, const std::string &guide,
-                                  int part, int total, bool from_bullets) {
+std::string section_prompt_shared(const std::string &material, const std::string &guide, int part, int total,
+                                  bool from_bullets) {
     std::string head = "This is part " + std::to_string(part) + " of " + std::to_string(total) + " of the recording.\n";
     if (!trim(guide).empty())
         head += "A short outline of this part, as a guide only (the transcript is what counts):\n" + trim(guide) + "\n";
     head += "\n";
-    return head + (kind == SectionOutputKind::Notes ? detailed_notes_prompt(material, from_bullets)
-                                                    : revision_questions_prompt(material, from_bullets));
+    return head + "Below " + (from_bullets ? "are bullet points extracted from" : "is") +
+           " the transcript of this part (a lecture, lesson, meeting, discussion or personal note).\n\n"
+           "Transcript:\n\"\"\"\n" + material + "\n\"\"\"\n\n";
+}
+
+std::string section_prompt_suffix(SectionOutputKind kind) {
+    if (kind == SectionOutputKind::Notes)
+        return "Turn the text above into organised notes using exactly this structure (keep the headings, leave a "
+               "heading as 'None' if nothing applies):\n\n"
+               "## Topic\n(one line)\n\n"
+               "## Key points\n- bullet points, grouped by sub-topic, keep every definition, number, name and date\n\n"
+               "## Decisions and instructions\n- anything that was decided, prescribed, assigned or promised\n\n"
+               "## Action items\n- [ ] task — who — when (only if stated; only what a speaker asked for or committed to)\n\n"
+               "## Dates and numbers mentioned\n- …\n\n"
+               "## Open questions\n- things left unresolved\n\n"
+               "Use only what is in the text.\n" + faithful_rules(true) + "\n## Topic";
+    return "Write 6 revision questions a student could use to test themselves on the text above, from easy to hard. "
+           "Every answer must come from the text; do not invent anything.\n" + faithful_rules(false) +
+           "Use exactly this format, with a blank line between questions:\n\n"
+           "Q1. <question about the text>\nA1. <answer taken from the text>\n\n"
+           "Q2. <question about the text>\nA2. <answer taken from the text>\n\n"
+           "(continue to Q6)";
+}
+
+std::string section_output_prompt(SectionOutputKind kind, const std::string &material, const std::string &guide,
+                                  int part, int total, bool from_bullets) {
+    return section_prompt_shared(material, guide, part, total, from_bullets) + section_prompt_suffix(kind);
+}
+
+bool split_templated(const std::string &full, const std::string &shared_user, const std::string &suffix_user,
+                     std::string &head, std::string &tail) {
+    const size_t at = full.rfind(shared_user + suffix_user);
+    if (shared_user.empty() || at == std::string::npos) return false;
+    head = full.substr(0, at + shared_user.size());
+    tail = full.substr(at + shared_user.size());
+    return true;
+}
+
+bool section_pair_fits(int n_seq_max, int n_ctx, int n_ctx_seq, int shared_tokens, int notes_suffix_tokens,
+                       int questions_suffix_tokens) {
+    if (n_seq_max < 2 || shared_tokens <= 0) return false;
+    const int cap_n = section_output_max_out(SectionOutputKind::Notes);
+    const int cap_q = section_output_max_out(SectionOutputKind::Questions);
+    const long total = (long)shared_tokens + notes_suffix_tokens + questions_suffix_tokens + cap_n + cap_q + kPairMargin;
+    if (total > n_ctx) return false;
+    if ((long)shared_tokens + notes_suffix_tokens + cap_n + kPairMargin > n_ctx_seq) return false;
+    if ((long)shared_tokens + questions_suffix_tokens + cap_q + kPairMargin > n_ctx_seq) return false;
+    return true;
 }
 
 std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json &outputs, const std::string *placeholder) {

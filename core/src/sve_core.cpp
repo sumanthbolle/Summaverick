@@ -128,13 +128,21 @@ static std::string notes_system(sve_ctx *ctx, const std::string &lang, const std
 // continued from it, [unclear] tags removed, and a reply cut at the token cap trimmed to its last whole sentence or
 // bullet (N7 rev 1). Then the two checks of the owner's note 19: an abbreviation's expansion that `source` (what the
 // output was written from) never says is removed, and an action item that says there are none becomes "None".
+static std::string finish_output_cut(std::string out, const std::string &prefix, int max_out, const std::string &source,
+                                     bool cut);
 static std::string finish_output(const sve::Llm &llm, std::string out, const std::string &prefix, int max_out,
                                  const std::string &source) {
+    return finish_output_cut(std::move(out), prefix, max_out, source, llm.last_cut);
+}
+// finish_output for a reply that may not be llm's last one (a sequence of Llm::complete_pair): cut says whether it
+// stopped at its cap.
+static std::string finish_output_cut(std::string out, const std::string &prefix, int max_out, const std::string &source,
+                                     bool cut) {
     // The material's [unclear] tags (also those carried over in reduce_to_fit's chunk bullets) are never shown.
     out = strip_thinking(sve::strip_unclear_tags(out));
     // The prompt ended with the first heading/label; put it back if the model continued from it.
     if (!prefix.empty() && out.rfind(prefix, 0) != 0) out = prefix + " " + out;
-    if (llm.last_cut) {
+    if (cut) {
         const std::string t = sve::trim_cut_reply(out);
         sve_logf(1, "notes output reached its %d-token cap: trimmed to the last whole line (%zu -> %zu bytes)", max_out,
                  out.size(), t.size());
@@ -254,89 +262,121 @@ static bool section_kind(sve_output_kind kind, sve::SectionOutputKind &out) {
     return false;
 }
 
-char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang_c,
-                         sve_progress_cb cb, void *user) {
+// One part's reply checked as a stored part must be: finish_output against the part's own words and its summary
+// (source), not empty, and for questions at least one readable question. False with error (and a log line) when not.
+static bool check_part(sve::SectionOutputKind sk, const std::string &raw, bool cut, const std::string &source, int idx,
+                       int attempt, std::string &done, std::string &error) {
+    const std::string prefix = sk == sve::SectionOutputKind::Notes ? "## Topic" : "";
+    done = finish_output_cut(raw, prefix, sve::section_output_max_out(sk), source, cut);
+    if (sve::strip_unclear_tags(done).find_first_not_of(" \t\r\n") == std::string::npos || done == prefix) {
+        error = "empty reply";
+        sve_logf(1, "section %d output attempt %d was empty", idx, attempt + 1);
+        return false;
+    }
+    // Questions that assemble_questions cannot read would give an empty part: not stored, tried again.
+    if (sk == sve::SectionOutputKind::Questions && sve::count_questions(done) == 0) {
+        error = "no questions in the reply";
+        sve_logf(1, "section %d questions attempt %d had no question", idx, attempt + 1);
+        return false;
+    }
+    return true;
+}
+
+// A part of a note: the section, its own pieces' text (unclear ones marked, as sve_generate's material), its summary
+// as a guide, and its place among the sections.
+struct PartInput {
+    sve::json secs, sec;
+    int64_t first = 0, last = 0;
+    std::string text, guide;
+    int part = 1, total = 0;
+};
+
+static bool part_input(sve_ctx *ctx, int64_t note_id, int idx, PartInput &in) {
+    if (!ctx->store->get(note_id)) return false;  // the note is gone
+    in.secs = ctx->store->sections(note_id);
+    for (const auto &s : in.secs)
+        if (s.value("idx", -1) == idx) in.sec = s;
+    if (!in.sec.is_object()) return false;
+    in.first = in.sec.value("first_piece", (int64_t)0);
+    in.last = in.sec.value("last_piece", (int64_t)0);
+    sve::json pieces = sve::json::array();
+    for (const auto &p : ctx->store->pieces(note_id)) {
+        const int64_t pi = p.value("idx", (int64_t)-1);
+        if (pi >= in.first && pi < in.last) pieces.push_back(p);
+    }
+    in.text = sve::notes_material(pieces);
+    in.guide = sve::sections_text(sve::json::array({in.sec}));
+    in.total = (int)in.secs.size();
+    in.part = 1;
+    for (const auto &s : in.secs) { if (s.value("idx", -1) == idx) break; ++in.part; }
+    return true;
+}
+
+// Forwards the host's progress and remembers a cancel.
+struct CancelWatch { sve_progress_cb cb; void *user; bool cancelled; };
+static int watch_cb(const char *ph, int d, int t, void *u) {
+    CancelWatch *x = static_cast<CancelWatch *>(u);
+    if (x->cb && x->cb(ph, d, t, x->user)) x->cancelled = true;
+    return x->cancelled ? 1 : 0;
+}
+
+// sve_section_output's work. greedy_only: the try was already counted and its sampled reply failed
+// (sve_section_outputs_pair), so only the greedy retry runs. cancelled (optional) says whether NULL was a cancel.
+static char *section_output_run(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang_c,
+                                sve_progress_cb cb, void *user, bool greedy_only, bool *cancelled_out) {
+    if (cancelled_out) *cancelled_out = false;
     try {
         sve::SectionOutputKind sk;
         if (!ctx || !ctx->llm || !section_kind(kind, sk)) return nullptr;
-        if (!ctx->store->get(note_id)) return nullptr;  // the note is gone
-        const sve::json secs = ctx->store->sections(note_id);
-        sve::json sec;
-        for (const auto &s : secs)
-            if (s.value("idx", -1) == idx) sec = s;
-        if (!sec.is_object()) return nullptr;
+        PartInput in;
+        if (!part_input(ctx, note_id, idx, in)) return nullptr;
         const std::string lang = lang_c ? lang_c : "en";
-        const int64_t first = sec.value("first_piece", (int64_t)0), last = sec.value("last_piece", (int64_t)0);
         const int k = (int)kind;
         sve::Store &st = *ctx->store;
-        // The section's own pieces, unclear ones marked (as sve_generate's material).
-        sve::json pieces = sve::json::array();
-        for (const auto &p : st.pieces(note_id)) {
-            const int64_t pi = p.value("idx", (int64_t)-1);
-            if (pi >= first && pi < last) pieces.push_back(p);
-        }
-        const std::string text = sve::notes_material(pieces);
-        if (!st.bump_step_attempt(note_id, idx, k, lang)) return nullptr;  // counted before the model runs
+        const std::string &text = in.text;
+        if (!greedy_only && !st.bump_step_attempt(note_id, idx, k, lang)) return nullptr;  // counted before the model runs
         if (strip_thinking(text).empty()) {  // silence or music: an empty part, done
-            if (!st.set_section_output(note_id, idx, k, lang, first, last, "")) return nullptr;
+            if (!st.set_section_output(note_id, idx, k, lang, in.first, in.last, "")) return nullptr;
             return dup_str("");
         }
         sve::Llm &llm = *ctx->llm;
-        const std::string guide = sve::sections_text(sve::json::array({sec}));
         const std::string sys = notes_system(ctx, lang, text);
         const int max_out = sve::section_output_max_out(sk);
         // A part normally fits as it is; one that does not is reduced first, as in sve_generate.
         const int budget = sve::notes_budget(llm.n_ctx, llm.count_tokens(sys));
-        struct Watch { sve_progress_cb cb; void *user; bool cancelled; } w{cb, user, false};
-        auto watch = [](const char *ph, int d, int t, void *u) -> int {
-            Watch *x = static_cast<Watch *>(u);
-            if (x->cb && x->cb(ph, d, t, x->user)) x->cancelled = true;
-            return x->cancelled ? 1 : 0;
-        };
+        CancelWatch w{cb, user, false};
         // A cancel (the host's background time is up) takes this call's count back, so it is never a "real" failure.
         // That holds even when the sampled try already failed and the greedy retry was cancelled: the failed try is
         // not counted either, and the step is simply tried again later (with both tries again).
-        auto cancelled = [&]() -> char * { st.undo_step_attempt(note_id, idx, k); return nullptr; };
+        auto cancelled = [&]() -> char * {
+            st.undo_step_attempt(note_id, idx, k);
+            if (cancelled_out) *cancelled_out = true;
+            return nullptr;
+        };
         std::string material;
         bool from_bullets = false;
-        if (!reduce_to_fit(llm, sys, text, budget, material, from_bullets, watch, &w)) {
+        if (!reduce_to_fit(llm, sys, text, budget, material, from_bullets, watch_cb, &w)) {
             if (w.cancelled) return cancelled();
             st.set_step_error(note_id, idx, k, "the part could not be shortened to fit");
             return nullptr;
         }
-        const int total = (int)secs.size();
-        int part = 1;
-        for (const auto &s : secs) { if (s.value("idx", -1) == idx) break; ++part; }
-        const std::string userp = sve::section_output_prompt(sk, material, guide, part, total, from_bullets);
-        const std::string prefix = sk == sve::SectionOutputKind::Notes ? "## Topic" : "";
+        const std::string userp = sve::section_output_prompt(sk, material, in.guide, in.part, in.total, from_bullets);
         const std::string prompt = llm.apply_template(sys, userp);
         const char *phase = sk == sve::SectionOutputKind::Notes ? "section_notes" : "section_questions";
         std::string error = "no reply";
-        for (int attempt = 0; attempt < 2; ++attempt) {  // sampled, then greedy
+        for (int attempt = greedy_only ? 1 : 0; attempt < 2; ++attempt) {  // sampled, then greedy
             std::string out;
-            if (!llm.complete(prompt, max_out, out, watch, &w, phase, attempt, 2, attempt == 1)) {
+            if (!llm.complete(prompt, max_out, out, watch_cb, &w, phase, attempt, 2, attempt == 1)) {
                 if (w.cancelled) return cancelled();
                 error = llm.decode_failed ? "the run failed on the GPU" : "the run failed";
                 sve_logf(1, "section %d output attempt %d failed", idx, attempt + 1);
                 continue;
             }
-            // Checked against the part's own words and its summary.
-            const std::string done = finish_output(llm, out, prefix, max_out, text + "\n" + guide);
-            if (sve::strip_unclear_tags(done).find_first_not_of(" \t\r\n") == std::string::npos ||
-                done == prefix) {
-                error = "empty reply";
-                sve_logf(1, "section %d output attempt %d was empty", idx, attempt + 1);
-                continue;
-            }
-            // Questions that assemble_questions cannot read would give an empty part: not stored, tried again.
-            if (sk == sve::SectionOutputKind::Questions && sve::count_questions(done) == 0) {
-                error = "no questions in the reply";
-                sve_logf(1, "section %d questions attempt %d had no question", idx, attempt + 1);
-                continue;
-            }
+            std::string done;
+            if (!check_part(sk, out, llm.last_cut, text + "\n" + in.guide, idx, attempt, done, error)) continue;
             // cut: the reply reached its cap, so headings after the cut (Action items) may be missing; the
             // assembly then never says "None" for the action items.
-            if (!st.set_section_output(note_id, idx, k, lang, first, last, done, llm.last_cut)) {
+            if (!st.set_section_output(note_id, idx, k, lang, in.first, in.last, done, llm.last_cut)) {
                 sve_logf(1, "section %d output not stored (note deleted or sections re-planned)", idx);
                 return nullptr;
             }
@@ -351,6 +391,113 @@ char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind
         return nullptr;
     } catch (...) {
         return nullptr;
+    }
+}
+
+char *sve_section_output(sve_ctx *ctx, int64_t note_id, int idx, sve_output_kind kind, const char *lang_c,
+                         sve_progress_cb cb, void *user) {
+    return section_output_run(ctx, note_id, idx, kind, lang_c, cb, user, false, nullptr);
+}
+
+int sve_section_outputs_pair(sve_ctx *ctx, int64_t note_id, int idx, const char *lang_c, sve_progress_cb cb,
+                             void *user) {
+    try {
+        if (!ctx || !ctx->llm) return -1;
+        PartInput in;
+        if (!part_input(ctx, note_id, idx, in)) return -1;
+        const std::string lang = lang_c ? lang_c : "en";
+        sve::Store &st = *ctx->store;
+        sve::Llm &llm = *ctx->llm;
+        static const sve_output_kind kKinds[2] = {SVE_OUT_DETAILED_NOTES, SVE_OUT_REVISION_QUESTIONS};
+        static const sve::SectionOutputKind kSk[2] = {sve::SectionOutputKind::Notes, sve::SectionOutputKind::Questions};
+        // One kind by itself (the single call), from its first try (greedy_only false) or only its greedy retry.
+        // 1 stored, 0 not, -2 cancelled.
+        auto single = [&](int i, bool greedy_only) -> int {
+            bool cancelled = false;
+            char *r = section_output_run(ctx, note_id, idx, kKinds[i], lang_c, cb, user, greedy_only, &cancelled);
+            if (r) { free(r); return 1; }
+            return cancelled ? -2 : 0;
+        };
+        auto both_single = [&]() -> int {
+            int n = 0;
+            for (int i = 0; i < 2; ++i) {
+                const int r = single(i, false);
+                if (r == -2) return -2;
+                n += r;
+            }
+            return n;
+        };
+        // Silence (stored "" without the model) or a part that must be reduced first: one at a time.
+        const std::string sys = notes_system(ctx, lang, in.text);
+        const int sys_tokens = llm.count_tokens(sys);
+        if (strip_thinking(in.text).empty() || !sve::notes_material_fits(llm.count_tokens(in.text), llm.n_ctx, sys_tokens))
+            return both_single();
+        // The shared prefix (system, the part's place, guide and material) and each kind's instruction after it.
+        const std::string shared = sve::section_prompt_shared(in.text, in.guide, in.part, in.total);
+        std::string head[2], tail[2];
+        bool split = true;
+        for (int i = 0; i < 2; ++i) {
+            const std::string suffix = sve::section_prompt_suffix(kSk[i]);
+            split = split && sve::split_templated(llm.apply_template(sys, shared + suffix), shared, suffix, head[i], tail[i]);
+        }
+        if (!split || head[0] != head[1] ||
+            !sve::section_pair_fits((int)llama_n_seq_max(llm.ctx), llm.n_ctx, (int)llama_n_ctx_seq(llm.ctx),
+                                    llm.count_tokens(head[0]) + 1, llm.count_tokens(tail[0]), llm.count_tokens(tail[1]))) {
+            sve_logf(1, "section %d: notes and questions written one at a time (no room for both together)", idx);
+            return both_single();
+        }
+        // Both tries counted before the model runs; a cancel takes back those not stored.
+        if (!st.bump_step_attempt(note_id, idx, (int)kKinds[0], lang)) return -1;
+        if (!st.bump_step_attempt(note_id, idx, (int)kKinds[1], lang)) {
+            st.undo_step_attempt(note_id, idx, (int)kKinds[0]);
+            return -1;
+        }
+        const std::string source = in.text + "\n" + in.guide;
+        bool ended[2] = {false, false}, stored[2] = {false, false}, refused = false;
+        std::string error[2];
+        // Each reply is checked and stored as soon as its sequence ends, so it stays stored after a cancel.
+        auto on_done = [&](int i, const std::string &out, bool cut) {
+            ended[i] = true;
+            std::string done;
+            if (!check_part(kSk[i], out, cut, source, idx, 0, done, error[i])) return;
+            if (!st.set_section_output(note_id, idx, (int)kKinds[i], lang, in.first, in.last, done, cut)) {
+                sve_logf(1, "section %d output not stored (note deleted or sections re-planned)", idx);
+                refused = true;
+                return;
+            }
+            stored[i] = true;
+        };
+        CancelWatch w{cb, user, false};
+        const int caps[2] = {sve::section_output_max_out(kSk[0]), sve::section_output_max_out(kSk[1])};
+        const bool ok = llm.complete_pair(head[0], tail, caps, on_done, watch_cb, &w, "section_pair");
+        const int n = (stored[0] ? 1 : 0) + (stored[1] ? 1 : 0);
+        if (!ok && w.cancelled) {
+            for (int i = 0; i < 2; ++i)
+                if (!stored[i]) st.undo_step_attempt(note_id, idx, (int)kKinds[i]);
+            return -2;
+        }
+        if (refused) return n;
+        int got = n;
+        for (int i = 0; i < 2; ++i) {
+            if (stored[i]) continue;
+            int r;
+            if (ended[i] || llm.decode_failed) {
+                // The sampled reply failed (or the run did): the greedy retry, as the single call's second try.
+                r = single(i, true);
+            } else {
+                // The pair stopped before this kind was tried at all: its count back, and a whole single call.
+                st.undo_step_attempt(note_id, idx, (int)kKinds[i]);
+                r = single(i, false);
+            }
+            if (r == -2) return -2;
+            got += r;
+        }
+        return got;
+    } catch (const std::exception &e) {
+        sve_logf(2, "section outputs pair failed: %s", e.what());
+        return -1;
+    } catch (...) {
+        return -1;
     }
 }
 

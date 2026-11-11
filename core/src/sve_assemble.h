@@ -14,11 +14,34 @@ enum class SectionOutputKind { Notes = 1, Questions = 2 };
 // Output tokens of one part: notes 440, questions 300 (Telugu takes more tokens per word).
 int section_output_max_out(SectionOutputKind kind);
 
-// The user prompt of one part: "This is part <part> of <total> of the recording.", the part's section summary
-// (guide, as sections_text renders it) as a guide, then detailed_notes_prompt / revision_questions_prompt over the
-// part's own material (its pieces, unclear ones marked; from_bullets when it had to be reduced first). Notes end with "## Topic", as sve_generate's do.
+// The user prompt of one part: section_prompt_shared, then section_prompt_suffix(kind). Everything kind-specific
+// comes after the material, so the notes and the questions of a part can share one reading of it
+// (sve_section_outputs_pair). Notes end with "## Topic", as sve_generate's do.
 std::string section_output_prompt(SectionOutputKind kind, const std::string &material, const std::string &guide,
                                   int part, int total, bool from_bullets = false);
+// The part of a part's prompt both kinds share: "This is part <part> of <total> of the recording.", the part's
+// section summary (guide, as sections_text renders it) as a guide, then the part's own material (its pieces,
+// unclear ones marked; from_bullets when it had to be reduced first) in triple quotes.
+std::string section_prompt_shared(const std::string &material, const std::string &guide, int part, int total,
+                                  bool from_bullets = false);
+// What one kind asks of the material above: the detailed notes structure (ending "## Topic") or the 6 revision
+// questions, each with its rules (faithful_rules, as detailed_notes_prompt / revision_questions_prompt).
+std::string section_prompt_suffix(SectionOutputKind kind);
+
+// Splits full (a chat-templated prompt of the user text shared_user + suffix_user) where shared_user ends: head is
+// everything up to and including shared_user, tail the rest (suffix_user and the template's end of turn). The last
+// copy of the user text is the one split. False when the template did not keep the user text as it is.
+bool split_templated(const std::string &full, const std::string &shared_user, const std::string &suffix_user,
+                     std::string &head, std::string &tail);
+
+// Cells kept free next to a pair, as Llm::complete keeps for one prompt.
+constexpr int kPairMargin = 16;
+// True when a part's notes and questions can be written together: a context with n_seq_max >= 2 sequences, a
+// non-empty shared prefix, and room for the prefix once plus both suffixes and both caps (440 + 300) in n_ctx
+// cells (a unified KV memory: the copied prefix shares its cells), and for each sequence's prefix, suffix and cap
+// in n_ctx_seq (the cells one sequence may use). Otherwise the part is written by two single calls.
+bool section_pair_fits(int n_seq_max, int n_ctx, int n_ctx_seq, int shared_tokens, int notes_suffix_tokens,
+                       int questions_suffix_tokens);
 
 // The detailed notes of a recording from its parts. sections: as sve_note_sections returns them (in order);
 // outputs: the parts' notes, one string per section, same order.

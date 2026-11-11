@@ -62,6 +62,17 @@ struct Llm {
                   sve_progress_cb cb, void *user, const char *phase, int done, int total,
                   double *mean_prob = nullptr, int *n_out = nullptr, bool second_hearing = false,
                   const PieceFn &on_piece = nullptr);
+    // One sequence of complete_pair has ended (index 0 or 1): its raw text, and cut when it stopped at its cap.
+    using PairDoneFn = std::function<void(int seq, const std::string &out, bool cut)>;
+    // Two replies to prompts that start alike (the notes and the questions of one part): head is prefilled once into
+    // sequence 0 and copied to sequence 1 (llama_memory_seq_cp), tails[i] is appended to sequence i, then both are
+    // sampled, each with its own chain (complete's sampled default), and decoded in one llama_decode per token round
+    // until each ends or reaches max_new[i]. on_done(i, …) when sequence i ends, in the order they end (the other
+    // goes on). Clears KV memory first and after. Needs a context with n_seq_max >= 2 (load gives 2, kv unified).
+    // False on cancel (cb), error, or a context that cannot hold both: sequences that ended before keep their
+    // on_done; the others get none.
+    bool complete_pair(const std::string &head, const std::string (&tails)[2], const int (&max_new)[2],
+                       const PairDoneFn &on_done, sve_progress_cb cb, void *user, const char *phase);
 };
 
 // Remove thinking blocks and surrounding whitespace.
