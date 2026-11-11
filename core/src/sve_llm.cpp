@@ -162,6 +162,8 @@ bool Llm::complete(const std::string &prompt, int max_new_tokens, std::string &o
 }
 
 // The sampler chain of generate (and of each sequence of complete_pair).
+// llama_sampler_sample already accepts the token it returns: no second llama_sampler_accept (it filled the penalty
+// window twice, so it covered 32 tokens instead of 64).
 static llama_sampler *make_sampler(const llama_vocab *vocab, bool greedy, bool second_hearing) {
     llama_sampler_chain_params sp = llama_sampler_chain_default_params();
     sp.no_perf = true;
@@ -215,7 +217,6 @@ bool Llm::generate(int max_new_tokens, bool greedy, std::string &out,
                 ++prob_n;
             }
         }
-        llama_sampler_accept(smpl, id);
         int n = llama_token_to_piece(vocab, id, piece, sizeof piece, 0, false);
         if (n > 0) out.append(piece, n);
         if (n > 0 && on_piece && !on_piece(std::string(piece, n))) { ok = false; break; }
@@ -313,7 +314,6 @@ bool Llm::complete_pair(const std::string &head, const std::string (&tails)[2], 
         if (llama_vocab_is_eog(vocab, id)) {
             s.done = true;
         } else {
-            llama_sampler_accept(s.smpl, id);
             const int np = llama_token_to_piece(vocab, id, piece, sizeof piece, 0, false);
             if (np > 0) s.out.append(piece, np);
             s.tail.assign(1, id);  // decoded next round
