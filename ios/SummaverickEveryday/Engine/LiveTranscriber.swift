@@ -342,9 +342,9 @@ final class LiveTranscriber {
 
     /// After a piece (and its section, if one was due): the notes and questions of the oldest section that lacks
     /// them, written while recording so only the last minutes are left after Stop (LiveParts). Only with the app in
-    /// front, the heat full or eased and no piece waiting; on the GPU (free while the CPU transcribes; the next piece
-    /// switches back). Stopped at once when a piece is waiting, the app leaves the front, the phone gets hot, or on
-    /// Stop or Cancel; a kind finished before that is kept. Returns the progress with the parts kept.
+    /// front, the heat full or eased and at most LiveParts.startMaxWaiting pieces waiting; on the GPU (free while the
+    /// CPU transcribes; the next piece switches back). Stopped at once when LiveParts.stopWaiting pieces wait, the app
+    /// leaves the front, the phone gets hot, or on Stop or Cancel; a kind finished before that is kept. Returns the progress with the parts kept.
     private func writeLiveParts(_ s: LiveSession, _ p: TranscriptSidecar) async -> TranscriptSidecar {
         let finishing = s.finishing, abort = s.abort, inFront = self.inFront
         let lang = AppSettings.shared.notesLanguage
@@ -365,8 +365,8 @@ final class LiveTranscriber {
                                       thermal: ProcessInfo.processInfo.thermalState)
         }
         let names = due.kinds.map { $0 == LivePart.notes ? "notes" : "questions" }.joined(separator: " and ")
-        NSLog("[sve] live part %ld: writing %@ (%.0f s to the next piece)", sec.idx + 1, names,
-              LiveParts.pieceSeconds - (recorded - transcribed))
+        NSLog("[sve] live part %ld: writing %@ (lag %ld pieces)", sec.idx + 1, names,
+              LiveParts.piecesWaiting(recordedSeconds: recorded, transcribedSeconds: transcribed))
         var out = p
         do {
             try await ModelManager.shared.loadIntoCore(for: .transcription)   // the files; the GPU is switched to inside
@@ -380,15 +380,17 @@ final class LiveTranscriber {
             }
             let kept = w.parts.map { $0.kind == LivePart.notes ? "notes" : "questions" }.joined(separator: " and ")
             let secs = Date().timeIntervalSince(started)
+            let lag = LiveParts.piecesWaiting(recordedSeconds: recorded + secs, transcribedSeconds: transcribed)
             if w.cancelled {
                 let n = (s.partCancels[sec.idx] ?? 0) + 1
                 s.partCancels[sec.idx] = n
                 NSLog("[sve] live part %ld: stopped after %.0f s (%@; try %ld of %ld)%@", sec.idx + 1, secs,
-                      inFront.isSet ? "a piece is waiting or the phone is warm" : "the app left the front", n,
+                      inFront.isSet ? "lag \(lag) pieces or the phone is warm" : "the app left the front", n,
                       LiveParts.maxCancels, kept.isEmpty ? "" : ", kept \(kept)")
             } else {
                 if out.partsDue(lang: lang, skip: skip)?.section.idx == sec.idx { s.partsLeft.insert(sec.idx) }
-                NSLog("[sve] live part %ld: kept %@ in %.0f s", sec.idx + 1, kept.isEmpty ? "nothing" : kept, secs)
+                NSLog("[sve] live part %ld: kept (lag %ld pieces): %@ in %.0f s", sec.idx + 1, lag,
+                      kept.isEmpty ? "nothing" : kept, secs)
             }
         } catch {
             // A GPU refused (the app left the front) or a failed load: tried again only while tries are left.
