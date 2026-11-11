@@ -35,11 +35,14 @@ enum TranscriptRun {
     /// lost, the cursor stays. shouldContinue is asked before every piece (main actor); shouldStart once
     /// the engine is free, right before the run (any thread). onPiece gets the progress after each piece.
     /// afterPiece then may write section summaries and their notes and questions: the sections and parts of the
-    /// progress it returns are saved (nil: nothing new).
+    /// progress it returns are saved (nil: nothing new). backend: asked before every piece, never during one (live:
+    /// the CPU; after Stop the pipeline's StepBackend). A GPU piece that fails (the app left the front) is tried once
+    /// more on the CPU, unless shouldStop says the run is over.
     static func run(audioPath: String, isFinal: Bool,
                     shouldStop: @escaping () -> Bool,
                     shouldContinue: () -> Bool = { true },
                     shouldStart: @escaping () -> Bool = { true },
+                    backend: () async -> ModelBackend = { .cpu },
                     beforePiece: () async -> Bool = { true },
                     onPiece: (TranscriptSidecar) -> Void = { _ in },
                     afterPiece: (TranscriptSidecar) async throws -> TranscriptSidecar? = { _ in nil }) async throws -> (TranscriptSidecar, Stop) {
@@ -49,12 +52,22 @@ enum TranscriptRun {
             if !shouldContinue() || !shouldStart() { return (progress, .yielded) }
             // The heat gate (the heat ladder's rest; paused stops); false yields.
             if !(await beforePiece()) || !shouldContinue() || !shouldStart() { return (progress, .yielded) }
-            // Loads the files if needed; the CPU itself is ensured inside the run (same actor turn).
-            try await ModelManager.shared.loadIntoCore(for: .transcription)
-            let next = try await CoreEngine.shared.transcribeNextPiece(path: audioPath, startSample: progress.cursor_sample,
-                                                                       isFinal: isFinal, previousText: progress.previousText,
-                                                                       backend: .cpu, shouldStart: shouldStart,
-                                                                       shouldStop: shouldStop)
+            // Loads the files on the backend for this piece; it is ensured again inside the run (same actor turn).
+            let b = await backend()
+            try await ModelManager.shared.loadIntoCore(backend: b)
+            let start = progress.cursor_sample, previous = progress.previousText
+            let next: CoreEngine.NextPiece
+            do {
+                next = try await CoreEngine.shared.transcribeNextPiece(path: audioPath, startSample: start, isFinal: isFinal,
+                                                                       previousText: previous, backend: b,
+                                                                       shouldStart: shouldStart, shouldStop: shouldStop)
+            } catch {
+                guard b == .gpu, !shouldStop(), !Task.isCancelled else { throw error }
+                NSLog("[sve] a GPU piece stopped (%@); this piece again on the CPU", String(describing: error))
+                next = try await CoreEngine.shared.transcribeNextPiece(path: audioPath, startSample: start, isFinal: isFinal,
+                                                                       previousText: previous, backend: .cpu,
+                                                                       shouldStart: shouldStart, shouldStop: shouldStop)
+            }
             switch next {
             case .end: return (progress, .end)
             case .wait: return (progress, .wait)

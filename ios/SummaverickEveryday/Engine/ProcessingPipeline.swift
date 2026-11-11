@@ -303,6 +303,10 @@ final class ProcessingPipeline {
     @ObservationIgnored private var noteTitles: [Int64: String] = [:]
     /// The model step running (or that just failed) is on the GPU: its failure in the background is a cut-off.
     @ObservationIgnored private var stepOnGPU = false
+    /// Since when the app has been in front without going to the background (nil: in the background), for
+    /// StepBackend's debounce. Kept by the active and background observers.
+    @ObservationIgnored private var frontSince: Date?
+    @ObservationIgnored private var enterBackgroundObserver: NSObjectProtocol?
     /// After Stop: the note whose work left is long enough to offer finishing it overnight.
     private(set) var overnightOffer: Int64?
     /// "Yes" tapped while the note is being written: it stops before its next piece or stage.
@@ -390,7 +394,15 @@ final class ProcessingPipeline {
         }
         activeObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.appOpened() }
+            MainActor.assumeIsolated {
+                if self?.frontSince == nil { self?.frontSince = Date() }
+                self?.appOpened()
+            }
+        }
+        if UIApplication.shared.applicationState == .active { frontSince = Date() }
+        enterBackgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.frontSince = nil }
         }
         let leftFront = self.leftFront
         resignObserver = NotificationCenter.default.addObserver(
@@ -955,12 +967,13 @@ final class ProcessingPipeline {
         await rerun(noteID: id)
     }
 
-    /// Audio → text, on the CPU, from where live transcription (or an interrupted run) stopped. The model
+    /// Audio → text, piece by piece on the backend for right now (StepBackend: the GPU in front, the CPU in the
+    /// background), from where live transcription (or an interrupted run) stopped. The model
     /// hears the recording itself, so any language mix works. Stops (the progress callback cancels) as
     /// soon as the phone gets too hot or the background time runs out; the caller treats that as a pause,
     /// and the next run continues from the saved cursor.
     private func transcribe(_ audio: URL, noteID: Int64, durationSeconds: Int64) async throws -> TranscriptSidecar {
-        stepOnGPU = false   // transcription always runs on the CPU
+        stepOnGPU = false
         let duration = Double(max(1, durationSeconds))
         func report(_ s: TranscriptSidecar) {
             // The fraction and the pieces first: the stage change sends them to the recording's Live Activity.
@@ -972,6 +985,11 @@ final class ProcessingPipeline {
         let abort = self.abort
         let (done, stop) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true,
                                                        shouldStop: { ContinuedWork.beat(); return Self.critical || abort.isSet },
+                                                       backend: {
+                                                           let b: ModelBackend = StepBackend.piecesOnGPU ? await self.stepBackend() : .cpu
+                                                           self.stepOnGPU = b == .gpu
+                                                           return b
+                                                       },
                                                        beforePiece: { await self.heatGate(noteID) },
                                                        onPiece: { report($0) })
         if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
@@ -1011,22 +1029,36 @@ final class ProcessingPipeline {
 
     private func loadSelectedModel() async throws {
         stage = .loadingModel
-        expectBackend()
-        stepOnGPU = try await ModelManager.shared.loadIntoCore(for: .generation) == .gpu
+        let backend = await stepBackend()
+        stepOnGPU = backend == .gpu   // before the load, which may throw
+        try await ModelManager.shared.loadIntoCore(backend: backend)
     }
 
-    /// Before a load that may throw: the backend it is about to use (as ModelManager picks it).
-    private func expectBackend() {
-        stepOnGPU = BackendChoice.backend(for: .generation, appActive: UIApplication.shared.applicationState != .background,
-                                          recording: LiveTranscriber.shared.isRecording) == .gpu
+    /// The backend for the next step of a notes run (a piece, a section summary, a part, an output), picked at the step
+    /// boundary and never during a step (StepBackend): the GPU once the app has been in front a few seconds with the
+    /// heat full or eased, the CPU in the background, while recording or when warmer. A move is logged.
+    private func stepBackend() async -> ModelBackend {
+        let state: ThreadChoice.AppState
+        switch UIApplication.shared.applicationState {
+        case .active: state = .active
+        case .background: state = .background
+        default: state = .inactive
+        }
+        if state == .background { frontSince = nil } else if frontSince == nil { frontSince = Date() }
+        let current = await CoreEngine.shared.loadedBackend
+        let c = StepBackend.choose(state: state, frontSeconds: frontSince.map { Date().timeIntervalSince($0) } ?? 0,
+                                   heat: HeatGovernor.threads.currentLevel, recording: LiveTranscriber.shared.isRecording,
+                                   current: current)
+        if let line = StepBackend.moveLine(from: current, to: c.backend, why: c.why) { NSLog("[sve] %@", line) }
+        return c.backend
     }
 
-    /// One model step on the backend for right now (GPU in front, else CPU). A GPU run cut off by the app
-    /// going to the background is retried once on the CPU while a continued-processing task is held.
+    /// One model step on the backend for right now (StepBackend: GPU in front, else CPU). A GPU run cut off by the
+    /// app going to the background is retried once on the CPU while a continued-processing task is held.
     private func onBackend<T>(_ body: () async throws -> T) async throws -> T {
-        expectBackend()
-        let backend = try await ModelManager.shared.loadIntoCore(for: .generation)
+        let backend = await stepBackend()
         stepOnGPU = backend == .gpu
+        try await ModelManager.shared.loadIntoCore(backend: backend)
         do {
             return try await body()
         } catch {
@@ -1345,7 +1377,7 @@ final class ProcessingPipeline {
         var written = false
         if LiveFirst.yields(recording: live.isSet, runIsLive: false) {
             yielded.set(true)
-        } else if !abort.isSet, (try? await ModelManager.shared.loadIntoCore(for: .generation)) != nil {
+        } else if !abort.isSet, (try? await ModelManager.shared.loadIntoCore(backend: await stepBackend())) != nil {
             ContinuedWork.beat()   // a CPU reload calls back nothing
             written = await CoreEngine.shared.generateInsight(noteID: id, shouldStop: {
                 ContinuedWork.beat()
@@ -1949,8 +1981,7 @@ final class ProcessingPipeline {
         let memoryStop = self.memoryStop
         var retried = false
         while true {
-            var backend: ModelBackend = retried ? .cpu
-                : BackendChoice.backend(for: .generation, appActive: appIsActive, recording: LiveTranscriber.shared.isRecording)
+            var backend: ModelBackend = retried ? .cpu : await stepBackend()
             if backend == .gpu {
                 leftFront.set(false)
                 if !appIsActive { backend = .cpu }   // left the front just now
