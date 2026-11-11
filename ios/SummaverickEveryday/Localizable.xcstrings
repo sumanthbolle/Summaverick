@@ -7158,6 +7158,22 @@
           }
         }
       }
+    },
+    "The phone is warm. Put it on a table, out of your pocket, and I'll catch up after.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The phone is warm. Put it on a table, out of your pocket, and I'll catch up after."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ వేడెక్కింది. జేబులోంచి తీసి టేబుల్ మీద పెట్టండి, తర్వాత నేను అందుకుంటాను."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

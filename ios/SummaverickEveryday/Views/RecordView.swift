@@ -144,6 +144,13 @@ struct RecordView: View {
             Text(live.statusLine)
                 .font(.footnote.weight(.medium)).foregroundStyle(Theme.secondary)
                 .multilineTextAlignment(.center).padding(.horizontal, 32)
+            // Warm while recording (LivePace.showsWarmTip): a calm tip; the recording itself goes on.
+            if live.phoneWarm {
+                Text("The phone is warm. Put it on a table, out of your pocket, and I'll catch up after.")
+                    .font(.footnote).foregroundStyle(Theme.secondary)
+                    .multilineTextAlignment(.center).padding(.horizontal, 32)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
