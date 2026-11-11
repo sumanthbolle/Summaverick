@@ -209,6 +209,12 @@ final class LiveTranscriber {
         TranscriptSidecar.remove(audioPath: audio.path)   // a new recording always starts at 0
         // isReady also means the phone is supported.
         guard ModelManager.shared.isReady else { status = .later; return }
+        // Off by default (LiveTranscribe): the recording stays cool and the transcript is written after Stop.
+        guard LiveTranscribe.isOn() else {
+            NSLog("[sve] live: off, every piece is written after Stop")
+            status = .later
+            return
+        }
         status = .writing
         UIDevice.current.isBatteryMonitoringEnabled = true
         running[audio.path] = session

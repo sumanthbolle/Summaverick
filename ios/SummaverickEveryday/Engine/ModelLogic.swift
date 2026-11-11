@@ -403,6 +403,18 @@ enum LivePause: Equatable {
 /// cooler, or after Stop). Past `lagCapPieces` (about 15 minutes) eased goes back to the ladder's own rest, so the
 /// extra rests stay only at minimal (and paused, which waits). Threads while recording: 2 and 2 at eased and above
 /// (ThreadChoice; locked, the background cap already gives 2 and 2 at every level).
+/// Whether Gemma transcribes during the recording. Off by default (2026-11-11): on this phone's CPU a 28 s piece took
+/// 34-40 s and the phone still reached thermal 2 within 10 minutes, even with LivePace's rests, so the recording
+/// stays cool and every piece is written after Stop (on the GPU with the app open). On: UserDefaults "live.transcribe"
+/// = true, or the environment SVE_LIVE=1.
+enum LiveTranscribe {
+    static let key = "live.transcribe"
+    static func isOn(defaults: UserDefaults = .standard, environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        if let e = environment["SVE_LIVE"] { return e == "1" }
+        return defaults.object(forKey: key) as? Bool ?? false
+    }
+}
+
 enum LivePace {
     /// Rest before a live piece or section at eased (the ladder's own is 5 s): a locked CPU piece takes about 20-27 s,
     /// so the CPU works about half the time.
