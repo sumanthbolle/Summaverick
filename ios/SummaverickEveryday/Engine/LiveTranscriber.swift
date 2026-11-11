@@ -144,6 +144,13 @@ final class LiveTranscriber {
     private(set) var status: Status = .idle { didSet { liveChanged() } }
     /// Transcript so far of the current recording, one entry per piece, oldest first.
     private(set) var lines: [String] = []
+    /// The Record screen shows the "the phone is warm" tip (LivePace.showsWarmTip): read at the start, at Stop and at
+    /// every thermal change.
+    private(set) var phoneWarm = false
+    private func readWarm() {
+        let warm = LivePace.showsWarmTip(recording: current != nil, thermal: ProcessInfo.processInfo.thermalState)
+        if warm != phoneWarm { phoneWarm = warm }
+    }
 
     /// The recording going now; Stop or Cancel clears it at once.
     private var current: LiveSession? { didSet { liveChanged() } }
@@ -168,6 +175,10 @@ final class LiveTranscriber {
                 flag.set(active)
             })
         }
+        frontObservers.append(NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { LiveTranscriber.shared.readWarm() }
+        })
     }
 
     var statusLine: String {
@@ -190,6 +201,8 @@ final class LiveTranscriber {
         let session = LiveSession(audioPath: audio.path)
         current = session
         recordingNow.set(true)
+        HeatGovernor.threads.setRecording(true)   // 2 and 2 CPU threads from eased up (LivePace.threads)
+        readWarm()
         lines = []
         transcribedSeconds = 0
         self.elapsed = elapsed
@@ -214,6 +227,8 @@ final class LiveTranscriber {
         s.finishing.set(true)
         current = nil
         recordingNow.set(false)
+        HeatGovernor.threads.setRecording(false)
+        readWarm()
         status = .idle
     }
 
@@ -243,17 +258,25 @@ final class LiveTranscriber {
                                 charging: d.batteryState == .charging || d.batteryState == .full)
     }
 
-    /// Before each piece and section: the shared heat ladder (HeatGovernor), as the pipeline's gate. Eased or
-    /// minimal: rest 5 or 20 s (Stop/Cancel or a cooler phone cut it short), then go on; the CPU run takes the
-    /// ladder's threads (CoreEngine). False when paused.
+    /// Before each piece and section: the shared heat ladder (HeatGovernor), paced to keep the phone cool while
+    /// recording (LivePace). Eased or minimal: rest 20 or 60 s (eased only 5 s past about 15 minutes of lag); Stop,
+    /// Cancel or a cooler phone cut it short, a warmer one lengthens it; then go on. The audio keeps recording
+    /// meanwhile and the lag is caught up later. The CPU run takes the threads (2 and 2 while recording warm:
+    /// CoreEngine). False when paused.
     private func heatGate(_ s: LiveSession) async -> Bool {
         let heat = HeatGovernor.shared
         let level = heat.level
         if level == .paused { return false }
         guard HeatLadder.showsCooling(level) else { return true }
         show(s, .cooling)
+        let lag = { LiveParts.piecesWaiting(recordedSeconds: self.elapsed(), transcribedSeconds: self.transcribedSeconds) }
+        let lagNow = current === s ? lag() : 0
+        NSLog("[sve] live: heat %@, resting %d s (lag %d pieces)", level.name,
+              Int32(LivePace.restSeconds(level: level, lagPieces: lagNow)), Int32(clamping: lagNow))
         let start = HeatGovernor.now
-        while !s.finishing.isSet, !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now) {
+        while !s.finishing.isSet,
+              !LivePace.restOver(level: heat.level, lagPieces: current === s ? lag() : 0, started: start,
+                                 now: HeatGovernor.now) {
             do { try await Task.sleep(nanoseconds: 250_000_000) } catch { break }
         }
         if heat.level == .paused { return false }

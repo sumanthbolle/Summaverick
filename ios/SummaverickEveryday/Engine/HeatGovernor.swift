@@ -13,15 +13,17 @@ extension Notification.Name {
     static let heatLevelChanged = Notification.Name("sve.heatLevelChanged")
 }
 
-/// CPU threads wanted (ThreadChoice: the heat ladder's, capped while the app is in the background), readable on any
-/// thread: CoreEngine applies them, and the audio encoder's, before each CPU run and each piece.
+/// CPU threads wanted (ThreadChoice: the heat ladder's, fewer while recording warm (LivePace), capped while the app is
+/// in the background), readable on any thread: CoreEngine applies them, and the audio encoder's, before each CPU run
+/// and each piece.
 final class HeatThreads: @unchecked Sendable {
     private let lock = NSLock()
     private var level: HeatLadder.Level = .full
     private var inBackground = false
+    private var recording = false
     var wanted: (decode: Int32, batch: Int32) {
         lock.lock(); defer { lock.unlock() }
-        let t = ThreadChoice.threads(level: level, inBackground: inBackground)
+        let t = ThreadChoice.threads(level: level, inBackground: inBackground, recording: recording)
         return (Int32(t.decode), Int32(t.batch))
     }
     /// The heat ladder's level as last read on the main actor (HeatGovernor.level, which also runs on every thermal
@@ -35,18 +37,24 @@ final class HeatThreads: @unchecked Sendable {
         self.level = level
         lock.unlock()
     }
+    /// A recording for notes started or ended (LiveTranscriber): the next CPU run takes the count.
+    func setRecording(_ value: Bool) {
+        lock.lock()
+        recording = value
+        lock.unlock()
+    }
     /// The app went to the background or came back; logged when it changes.
     func setInBackground(_ value: Bool) {
         lock.lock()
         let changed = inBackground != value
         inBackground = value
-        let level = self.level
+        let level = self.level, recording = self.recording
         lock.unlock()
         guard changed else { return }
         if value {
             NSLog("[sve] threads: background cap %d/%d", ThreadChoice.backgroundCap, ThreadChoice.backgroundCap)
         } else {
-            let t = ThreadChoice.threads(level: level, inBackground: false)
+            let t = ThreadChoice.threads(level: level, inBackground: false, recording: recording)
             NSLog("[sve] threads: in front, cap off (heat %@: %d decode, %d batch; 0: the core's rule)", level.name,
                   Int32(t.decode), Int32(t.batch))
         }

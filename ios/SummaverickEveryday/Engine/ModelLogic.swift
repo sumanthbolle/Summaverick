@@ -192,9 +192,11 @@ enum ThreadChoice {
     /// Center, the app switcher, Face ID, a call, launch) counts as in front, as ModelManager.loadIntoCore does.
     static func inBackground(_ state: AppState) -> Bool { state == .background }
 
-    /// decode, batch (batch 0: the core's own rule, up to 8 cores, so it counts as above the cap).
-    static func threads(level: HeatLadder.Level, inBackground: Bool) -> (decode: Int, batch: Int) {
-        let decode = HeatLadder.cpuThreads(level), batch = HeatLadder.batchThreads(level)
+    /// decode, batch (batch 0: the core's own rule, up to 8 cores, so it counts as above the cap). recording: a
+    /// recording for notes is going (LivePace.threads: 2 and 2 from eased up).
+    static func threads(level: HeatLadder.Level, inBackground: Bool, recording: Bool = false) -> (decode: Int, batch: Int) {
+        let (decode, batch) = recording ? LivePace.threads(level: level)
+                                        : (HeatLadder.cpuThreads(level), HeatLadder.batchThreads(level))
         guard inBackground else { return (decode, batch) }
         return (min(decode, backgroundCap), batch == 0 ? backgroundCap : min(batch, backgroundCap))
     }
@@ -391,6 +393,52 @@ enum LivePause: Equatable {
         if heat == .paused { return .heat }
         if batteryLevel >= 0, batteryLevel < lowBattery, !charging { return .battery }
         return nil
+    }
+}
+
+/// Live transcription's pace by heat, so the phone reaches Stop cool (2026-11-11: a 24-minute recording, locked in a
+/// pocket, held thermal serious throughout at the ladder's 20 s rests and 2 threads, and every step after Stop then ran
+/// at minimal: 68 minutes to notes). Only the rest before each live piece and section changes; the audio is always
+/// recorded to the WAV and the recording never stops: the lag grows and the pieces are caught up later (live, once
+/// cooler, or after Stop). Past `lagCapPieces` (about 15 minutes) eased goes back to the ladder's own rest, so the
+/// extra rests stay only at minimal (and paused, which waits). Threads while recording: 2 and 2 at eased and above
+/// (ThreadChoice; locked, the background cap already gives 2 and 2 at every level).
+enum LivePace {
+    /// Rest before a live piece or section at eased (the ladder's own is 5 s): a locked CPU piece takes about 20-27 s,
+    /// so the CPU works about half the time.
+    static let easedRest: Double = 20
+    /// At minimal (the ladder's own is 20 s): the CPU works about a quarter of the time.
+    static let minimalRest: Double = 60
+    /// About 15 minutes of pieces (LiveParts.pieceSeconds) waiting.
+    static let lagCapPieces = 32
+
+    /// Seconds to rest before the next live piece or section; .infinity at paused (the loop pauses instead).
+    static func restSeconds(level: HeatLadder.Level, lagPieces: Int) -> Double {
+        switch level {
+        case .full: return 0
+        case .eased: return lagPieces > lagCapPieces ? HeatLadder.restSeconds(.eased) : easedRest
+        case .minimal: return minimalRest
+        case .paused: return .infinity
+        }
+    }
+
+    /// A rest that began at `started` is over: its seconds at the level now have passed (a cooler phone shortens it,
+    /// a warmer one lengthens it), or the level is paused (the caller pauses instead).
+    static func restOver(level: HeatLadder.Level, lagPieces: Int, started: TimeInterval, now: TimeInterval) -> Bool {
+        level == .paused || now - started >= restSeconds(level: level, lagPieces: lagPieces)
+    }
+
+    /// CPU threads while recording (decode, batch): 2 and 2 from eased up, else the ladder's.
+    static let recordingWarmThreads = 2
+    static func threads(level: HeatLadder.Level) -> (decode: Int, batch: Int) {
+        level >= .eased ? (recordingWarmThreads, recordingWarmThreads)
+                        : (HeatLadder.cpuThreads(level), HeatLadder.batchThreads(level))
+    }
+
+    /// The Record screen's "the phone is warm" tip: while recording, from thermal fair up (a pocket warms the phone
+    /// long before serious, and taking it out early is what keeps it cool). Low Power Mode or battery alone never.
+    static func showsWarmTip(recording: Bool, thermal: ProcessInfo.ThermalState) -> Bool {
+        recording && (thermal == .fair || thermal == .serious || thermal == .critical)
     }
 }
 
