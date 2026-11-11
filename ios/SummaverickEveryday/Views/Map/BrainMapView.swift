@@ -246,6 +246,9 @@ struct BrainMapCanvas: View {
         .overlay(alignment: .bottom) {
             Text(moving ? "Drag to turn. Tap a branch to open it." : "Tap a branch to open it.")
                 .font(.footnote).foregroundStyle(Theme.secondary)
+                // One line, so it stays inside the band the labels keep clear of (BrainMapLayout.hintBand).
+                .lineLimit(1).minimumScaleFactor(0.6)
+                .dynamicTypeSize(...DynamicTypeSize.xxLarge)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .background(Capsule().fill(Theme.background.opacity(0.85)))
@@ -257,7 +260,9 @@ struct BrainMapCanvas: View {
             let rounded = new.mapValues { CGSize(width: ($0.width * 2).rounded() / 2, height: ($0.height * 2).rounded() / 2) }
             if rounded != sizes {
                 sizes = rounded
-                if anim == nil && dragStart == nil { refit(animated: false, zoomOut: true) }
+                // New labels were measured (a branch just opened): fit again, also mid-animation (it then lands
+                // on the corrected camera).
+                if dragStart == nil && zoomStart == nil { refit(animated: anim != nil, zoomOut: true) }
             }
         }
         // Notes started: whatever is moving lands where it was going, and nothing moves until they are done.
