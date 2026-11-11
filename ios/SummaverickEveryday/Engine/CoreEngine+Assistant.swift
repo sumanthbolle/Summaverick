@@ -398,6 +398,56 @@ extension CoreEngine {
         return summary
     }
 
+    /// What a live part run wrote (writeLiveParts): each kind written, and whether the run was stopped.
+    struct LiveWritten {
+        var parts: [(kind: Int, text: String, cut: Bool)] = []
+        var cancelled = false
+    }
+
+    /// A section's notes and questions (`kinds`: LivePart.notes, LivePart.questions) written while recording, from its
+    /// pieces and summary, stored nowhere (the sidecar keeps them; the note gets them at Stop). Both kinds: together
+    /// (sve_section_outputs_pair_text, one reading of the part), else one kind (sve_section_output_text). On `backend`,
+    /// switched here in the same actor turn. nil when `shouldStart` said no once the engine was free (nothing ran).
+    /// A kind finished before a stop is kept.
+    func writeLiveParts(pieces: [TranscriptPiece], summary: SectionSummary, idx: Int, kinds: [Int], lang: String,
+                        backend: ModelBackend, shouldStart: () -> Bool,
+                        shouldStop: @escaping () -> Bool) throws -> LiveWritten? {
+        guard let ctx else { throw CoreError.initFailed }
+        guard shouldStart() else { return nil }
+        try ensureBackend(backend)
+        guard let pj = encodeJSON(pieces), let sj = encodeJSON(summary) else { throw AssistantError.badJSON }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        var out = LiveWritten()
+        if kinds.contains(LivePart.notes) && kinds.contains(LivePart.questions) {
+            struct Reply: Decodable { let text: String; let cut: Bool }
+            struct Pair: Decodable { let notes: Reply?; let questions: Reply?; let cancelled: Bool }
+            guard let json = take(sve_section_outputs_pair_text(ctx, pj, sj, Int32(idx), lang, CoreEngine.progressTrampoline, user)),
+                  let r = decode(Pair.self, json) else { throw CoreError.generationFailed }
+            if let n = r.notes { out.parts.append((LivePart.notes, n.text, n.cut)) }
+            if let q = r.questions { out.parts.append((LivePart.questions, q.text, q.cut)) }
+            out.cancelled = r.cancelled
+            return out
+        }
+        for k in kinds {
+            var cut: Int32 = 0
+            guard let text = take(sve_section_output_text(ctx, pj, sj, Int32(idx), sve_output_kind(UInt32(k)), lang, &cut,
+                                                         CoreEngine.progressTrampoline, user)) else {
+                if box.isCancelled() { out.cancelled = true; return out }
+                continue   // both tries failed: left for the normal steps after Stop
+            }
+            out.parts.append((k, text, cut != 0))
+        }
+        return out
+    }
+
+    /// A part written while recording into the note (sve_section_output_put): 1 stored, 0 when the note's section
+    /// idx no longer has that range (the normal steps write it again), -1 on error.
+    nonisolated func putSectionOutput(noteID: Int64, _ p: LivePart) async -> Int {
+        await store { Int(sve_section_output_put($0, noteID, Int32(p.idx), sve_output_kind(UInt32(p.kind)), p.lang,
+                                                 Int32(p.first), Int32(p.last), p.text, p.cut ? 1 : 0)) }
+    }
+
     /// The text the notes are written from (sve_notes_material): the pieces joined as the transcript is, a piece heard
     /// with conf < 0.80 marked "[unclear] " so the notes prompts do not state it as fact. nil on bad input.
     nonisolated func notesMaterial(_ pieces: [TranscriptPiece]) -> String? {

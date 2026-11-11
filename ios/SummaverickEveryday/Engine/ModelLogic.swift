@@ -351,6 +351,35 @@ enum LivePause: Equatable {
     }
 }
 
+/// A section's notes and questions written while recording (Task 8), so only the last minutes are left after Stop.
+/// Only with the app in front (the GPU is free; locked, the CPU is busy with transcription) at a cool phone (heat
+/// full or eased), and only when no piece waits to be transcribed: transcription keeps priority. The run stops at
+/// once when a piece is waiting, the app leaves the front, or the phone gets hot (serious). A section whose try was
+/// stopped `maxCancels` times is left for the normal steps after Stop.
+enum LiveParts {
+    /// One live piece of audio (LiveSections.pieceSeconds).
+    static let pieceSeconds: Double = 28
+    /// Stopped tries per section before it is left for after Stop (each costs a model switch, about 5 s each way).
+    static let maxCancels = 2
+
+    /// Whole pieces of recorded audio not transcribed yet.
+    static func piecesWaiting(recordedSeconds: Double, transcribedSeconds: Double) -> Int {
+        let behind = recordedSeconds - transcribedSeconds
+        guard behind > 0, behind.isFinite else { return 0 }
+        return Int(behind / pieceSeconds)
+    }
+
+    /// A part may start now.
+    static func mayWrite(appActive: Bool, heat: HeatLadder.Level, piecesWaiting: Int, cancels: Int) -> Bool {
+        appActive && heat <= .eased && piecesWaiting == 0 && cancels < maxCancels
+    }
+
+    /// The part in flight stops now (asked during the run, any thread).
+    static func mustStop(appActive: Bool, piecesWaiting: Int, thermal: ProcessInfo.ThermalState) -> Bool {
+        !appActive || piecesWaiting > 0 || Heat.isTooHot(thermal)
+    }
+}
+
 enum LiveLag {
     /// One piece is always in the making (28 s + 3 s wait, then about as long again to write it), so
     /// up to this much lag still counts as "writing as you talk".

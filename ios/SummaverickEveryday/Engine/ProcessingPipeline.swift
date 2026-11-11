@@ -986,6 +986,14 @@ final class ProcessingPipeline {
         await engine.setPieces(id, pieces)
         await engine.setTranscript(id, transcript)
         await engine.setSections(id, NoteSection.validPrefix(done.sections, pieceCount: pieces.count))
+        // Notes and questions written while recording (LiveParts): into the note when its section still has the
+        // range they were written for; the others are dropped and written again by the normal steps.
+        guard !done.parts.isEmpty else { return }
+        var put = 0, dropped = 0
+        for part in done.parts {
+            if await engine.putSectionOutput(noteID: id, part) == 1 { put += 1 } else { dropped += 1 }
+        }
+        NSLog("[sve] live parts: %ld put into note %lld at Stop, %ld dropped (range changed)", put, id, dropped)
     }
 
     private static func joined(_ pieces: [TranscriptPiece]) -> String {

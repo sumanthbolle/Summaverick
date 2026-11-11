@@ -34,15 +34,15 @@ enum TranscriptRun {
     /// shouldStop is asked during a model run (any thread) and cancels it: the run throws and the piece is
     /// lost, the cursor stays. shouldContinue is asked before every piece (main actor); shouldStart once
     /// the engine is free, right before the run (any thread). onPiece gets the progress after each piece.
-    /// afterPiece then may write section summaries: the sections it returns are saved with the progress
-    /// (nil: nothing new).
+    /// afterPiece then may write section summaries and their notes and questions: the sections and parts of the
+    /// progress it returns are saved (nil: nothing new).
     static func run(audioPath: String, isFinal: Bool,
                     shouldStop: @escaping () -> Bool,
                     shouldContinue: () -> Bool = { true },
                     shouldStart: @escaping () -> Bool = { true },
                     beforePiece: () async -> Bool = { true },
                     onPiece: (TranscriptSidecar) -> Void = { _ in },
-                    afterPiece: (TranscriptSidecar) async throws -> [NoteSection]? = { _ in nil }) async throws -> (TranscriptSidecar, Stop) {
+                    afterPiece: (TranscriptSidecar) async throws -> TranscriptSidecar? = { _ in nil }) async throws -> (TranscriptSidecar, Stop) {
         var progress = TranscriptSidecar.load(audioPath: audioPath)
         while true {
             if shouldStop() || Task.isCancelled { throw CancellationError() }
@@ -63,8 +63,9 @@ enum TranscriptRun {
                 progress.append(startSec: startSec, endSample: endSample, text: text, conf: conf)
                 progress.save(audioPath: audioPath)   // skipped when the audio was deleted meanwhile
                 onPiece(progress)
-                if let sections = try await afterPiece(progress) {
-                    progress.sections = sections
+                if let updated = try await afterPiece(progress) {
+                    progress.sections = updated.sections
+                    progress.parts = updated.parts
                     progress.save(audioPath: audioPath)
                 }
             }
@@ -87,6 +88,9 @@ final class LiveSession {
     /// Cancel: the piece in flight is dropped too.
     let abort = AtomicFlag()
     var task: Task<Void, Never>?
+    /// Live parts (LiveParts): stopped tries per section, and sections left for after Stop (a try failed).
+    var partCancels: [Int: Int] = [:]
+    var partsLeft: Set<Int> = []
     init(audioPath: String) { self.audioPath = audioPath }
 }
 
@@ -138,7 +142,20 @@ final class LiveTranscriber {
     /// Wait after this many failures in a row before trying again (the recording goes on meanwhile).
     static let failureBackoff: Double = 60
 
-    private init() {}
+    /// The app is in front (active), readable on any thread: a live part stops at once when it leaves.
+    nonisolated let inFront = AtomicFlag()
+    @ObservationIgnored private var frontObservers: [NSObjectProtocol] = []
+
+    private init() {
+        let flag = inFront
+        for (name, active) in [(UIApplication.didBecomeActiveNotification, true),
+                               (UIApplication.willResignActiveNotification, false),
+                               (UIApplication.didEnterBackgroundNotification, false)] {
+            frontObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                flag.set(active)
+            })
+        }
+    }
 
     var statusLine: String {
         switch status {
@@ -265,7 +282,12 @@ final class LiveTranscriber {
                         self.transcribedSeconds = p.transcribedSeconds
                         self.refresh(s)
                     },
-                    afterPiece: { p in try await self.writeSections(s, p) })
+                    afterPiece: { p in
+                        var next = p
+                        if let sections = try await self.writeSections(s, p) { next.sections = sections }
+                        next = await self.writeLiveParts(s, next)
+                        return next == p ? nil : next
+                    })
                 failures = 0
                 if stop == .wait { await nap(3, s) }
                 else if stop == .yielded, pauseReason() != nil { continue }
@@ -316,6 +338,64 @@ final class LiveTranscriber {
             if !finishing.isSet { NSLog("[sve] live section summary failed: %@", String(describing: error)) }
             return nil   // Stop: the loop ends at the next check; the pipeline takes over
         }
+    }
+
+    /// After a piece (and its section, if one was due): the notes and questions of the oldest section that lacks
+    /// them, written while recording so only the last minutes are left after Stop (LiveParts). Only with the app in
+    /// front, the heat full or eased and no piece waiting; on the GPU (free while the CPU transcribes; the next piece
+    /// switches back). Stopped at once when a piece is waiting, the app leaves the front, the phone gets hot, or on
+    /// Stop or Cancel; a kind finished before that is kept. Returns the progress with the parts kept.
+    private func writeLiveParts(_ s: LiveSession, _ p: TranscriptSidecar) async -> TranscriptSidecar {
+        let finishing = s.finishing, abort = s.abort, inFront = self.inFront
+        let lang = AppSettings.shared.notesLanguage
+        let skip = s.partsLeft.union(s.partCancels.filter { $0.value >= LiveParts.maxCancels }.map(\.key))
+        guard current === s, !finishing.isSet, let due = p.partsDue(lang: lang, skip: skip) else { return p }
+        inFront.set(UIApplication.shared.applicationState == .active)
+        let recorded = elapsed(), transcribed = p.transcribedSeconds
+        let sec = due.section
+        guard LiveParts.mayWrite(appActive: inFront.isSet, heat: HeatGovernor.shared.level,
+                                 piecesWaiting: LiveParts.piecesWaiting(recordedSeconds: recorded, transcribedSeconds: transcribed),
+                                 cancels: s.partCancels[sec.idx] ?? 0) else { return p }
+        let started = Date()
+        let mustStop: () -> Bool = {
+            if finishing.isSet || abort.isSet { return true }
+            let waiting = LiveParts.piecesWaiting(recordedSeconds: recorded + Date().timeIntervalSince(started),
+                                                  transcribedSeconds: transcribed)
+            return LiveParts.mustStop(appActive: inFront.isSet, piecesWaiting: waiting,
+                                      thermal: ProcessInfo.processInfo.thermalState)
+        }
+        let names = due.kinds.map { $0 == LivePart.notes ? "notes" : "questions" }.joined(separator: " and ")
+        NSLog("[sve] live part %ld: writing %@ (%.0f s to the next piece)", sec.idx + 1, names,
+              LiveParts.pieceSeconds - (recorded - transcribed))
+        var out = p
+        do {
+            try await ModelManager.shared.loadIntoCore(for: .transcription)   // the files; the GPU is switched to inside
+            let pieces = Array(TranscriptRun.pieces(p)[sec.firstPiece...sec.lastPiece])
+            guard let w = try await CoreEngine.shared.writeLiveParts(
+                pieces: pieces, summary: sec.summary, idx: sec.idx, kinds: due.kinds, lang: lang, backend: .gpu,
+                shouldStart: { !mustStop() }, shouldStop: mustStop) else { return p }
+            for r in w.parts {
+                out.keep(LivePart(idx: sec.idx, kind: r.kind, lang: lang, first: sec.firstPiece, last: sec.lastPiece,
+                                  text: r.text, cut: r.cut))
+            }
+            let kept = w.parts.map { $0.kind == LivePart.notes ? "notes" : "questions" }.joined(separator: " and ")
+            let secs = Date().timeIntervalSince(started)
+            if w.cancelled {
+                let n = (s.partCancels[sec.idx] ?? 0) + 1
+                s.partCancels[sec.idx] = n
+                NSLog("[sve] live part %ld: stopped after %.0f s (%@; try %ld of %ld)%@", sec.idx + 1, secs,
+                      inFront.isSet ? "a piece is waiting or the phone is warm" : "the app left the front", n,
+                      LiveParts.maxCancels, kept.isEmpty ? "" : ", kept \(kept)")
+            } else {
+                if out.partsDue(lang: lang, skip: skip)?.section.idx == sec.idx { s.partsLeft.insert(sec.idx) }
+                NSLog("[sve] live part %ld: kept %@ in %.0f s", sec.idx + 1, kept.isEmpty ? "nothing" : kept, secs)
+            }
+        } catch {
+            // A GPU refused (the app left the front) or a failed load: tried again only while tries are left.
+            s.partCancels[sec.idx] = (s.partCancels[sec.idx] ?? 0) + 1
+            if !finishing.isSet { NSLog("[sve] live part %ld failed: %@", sec.idx + 1, String(describing: error)) }
+        }
+        return out
     }
 
     /// Sleeps up to `seconds`, waking early on Stop, Cancel or task cancellation.

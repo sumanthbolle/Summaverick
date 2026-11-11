@@ -1,9 +1,10 @@
 // Transcription progress kept next to the recording, in "<audio>.live.json":
-// {"cursor_sample":N,"pieces":[{"start_sec":N,"text":"…"}],"sections":[…]}. Every transcription (live while
-// recording, after Stop, after an interruption, for notes that waited for the AI) continues from the cursor, so an
-// interruption never starts over. Section summaries written while recording are kept here too, until the note
-// stores them. Written atomically after every piece or section; deleted once the transcript is saved to the note,
-// and together with the audio. Foundation only, checked with a standalone swiftc script.
+// {"cursor_sample":N,"pieces":[{"start_sec":N,"text":"…"}],"sections":[…],"parts":[…]}. Every transcription (live
+// while recording, after Stop, after an interruption, for notes that waited for the AI) continues from the cursor,
+// so an interruption never starts over. Section summaries written while recording are kept here too, until the note
+// stores them, and so are those sections' notes and questions written while recording (parts, LiveParts). Written
+// atomically after every piece, section or part; deleted once the transcript is saved to the note, and together
+// with the audio. Foundation only, checked with a standalone swiftc script.
 import Foundation
 
 /// One section's summary, as the core writes it (sve_section_summarize):
@@ -91,6 +92,21 @@ enum LiveSections {
     }
 }
 
+/// One section's notes (kind 1) or questions (kind 2) written while recording (sve_section_output_text), for the
+/// section's pieces first...last (both included) in lang. Put into the note at Stop (sve_section_output_put) when
+/// the note's section idx still has that range.
+struct LivePart: Codable, Equatable {
+    var idx: Int
+    var kind: Int
+    var lang: String
+    var first: Int
+    var last: Int
+    var text: String
+    var cut: Bool
+
+    static let notes = 1, questions = 2
+}
+
 struct TranscriptSidecar: Codable, Equatable {
     struct Piece: Codable, Equatable {
         var start_sec: Int
@@ -104,6 +120,8 @@ struct TranscriptSidecar: Codable, Equatable {
     var pieces: [Piece] = []
     /// Section summaries written while recording, over `pieces` (validPrefix before use).
     var sections: [NoteSection] = []
+    /// Notes and questions of `sections` written while recording.
+    var parts: [LivePart] = []
 
     static let sampleRate: Double = 16_000
 
@@ -155,6 +173,29 @@ extension TranscriptSidecar {
         cursor_sample = try c.decode(Int64.self, forKey: .cursor_sample)
         pieces = try c.decode([Piece].self, forKey: .pieces)
         sections = (try? c.decodeIfPresent([NoteSection].self, forKey: .sections)) ?? []
+        parts = (try? c.decodeIfPresent([LivePart].self, forKey: .parts)) ?? []
+    }
+
+    /// The parts written for `section` as it is now in lang.
+    func part(_ section: NoteSection, kind: Int, lang: String) -> LivePart? {
+        parts.first { $0.idx == section.idx && $0.kind == kind && $0.lang == lang
+            && $0.first == section.firstPiece && $0.last == section.lastPiece }
+    }
+
+    /// The oldest section (of the valid ones) with a kind still to write in lang, and those kinds (notes first), or
+    /// nil when every section has both. `skip`: sections left for after Stop.
+    func partsDue(lang: String, skip: Set<Int> = []) -> (section: NoteSection, kinds: [Int])? {
+        for s in NoteSection.validPrefix(sections, pieceCount: pieces.count) where !skip.contains(s.idx) {
+            let kinds = [LivePart.notes, LivePart.questions].filter { part(s, kind: $0, lang: lang) == nil }
+            if !kinds.isEmpty { return (s, kinds) }
+        }
+        return nil
+    }
+
+    /// Keeps a part, in place of an older one of the same section and kind.
+    mutating func keep(_ p: LivePart) {
+        parts.removeAll { $0.idx == p.idx && $0.kind == p.kind }
+        parts.append(p)
     }
 }
 
