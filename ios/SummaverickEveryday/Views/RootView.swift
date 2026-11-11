@@ -18,6 +18,13 @@ final class Router {
     var showSettings = false
     var showDeletedRecording = false
 
+    /// "Ask about this" on a memory: closes an open note, then opens Ask with the words in its box.
+    func ask(_ draft: String) {
+        openNote = nil
+        askDraft = draft
+        tab = .ask
+    }
+
     func handle(_ route: ReminderRoute) {
         switch route {
         case .note(let id, let startSec): openNote = (id, startSec)

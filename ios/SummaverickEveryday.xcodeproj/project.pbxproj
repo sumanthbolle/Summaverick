@@ -81,6 +81,10 @@
 			isa = PBXBuildFile;
 			fileRef = 4EC1FF35F8179A094C3AB745;
 		};
+		3F3EF1BBEFE445AAA7E90A0E = {
+			isa = PBXBuildFile;
+			fileRef = F76CFB3FA4C8F8FBA28F7976;
+		};
 		408386E2C748923A7048D478 = {
 			isa = PBXBuildFile;
 			fileRef = 8A6F757330F3179FB40BD3E2;
@@ -269,6 +273,10 @@
 			isa = PBXBuildFile;
 			fileRef = A134B997A05BEC16D4B96325;
 		};
+		CCE03DBE92FEAE25E86430F5 = {
+			isa = PBXBuildFile;
+			fileRef = E6063C3DF54DA54ED6DC32F1;
+		};
 		CE05B940BCBE599A11AE22E8 = {
 			isa = PBXBuildFile;
 			fileRef = 171A4CC9E4CFD6CB1704585A;
@@ -289,6 +297,10 @@
 					RemoveHeadersOnCopy,
 				);
 			};
+		};
+		D9865442550D6A995B0F4FDB = {
+			isa = PBXBuildFile;
+			fileRef = 58C590454FC63BC4EDF7F18D;
 		};
 		DACFC767C169503E4AB3CA4F = {
 			isa = PBXBuildFile;
@@ -629,6 +641,13 @@
 			lastKnownFileType = text.plist.xml;
 			name = Info.plist;
 			path = SummaverickWidgets/Info.plist;
+			sourceTree = SOURCE_ROOT;
+		};
+		58C590454FC63BC4EDF7F18D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = BrainMapLayout.swift;
+			path = SummaverickEveryday/Views/Map/BrainMapLayout.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		5B6316DBD705D039EA15B281 = {
@@ -1044,6 +1063,13 @@
 			path = ../core/src/sve_suggest.h;
 			sourceTree = SOURCE_ROOT;
 		};
+		E6063C3DF54DA54ED6DC32F1 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = BrainMapView.swift;
+			path = SummaverickEveryday/Views/Map/BrainMapView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		E6FD595D542BBAD86BA1B59B = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -1098,6 +1124,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = NoteMemoriesSection.swift;
 			path = SummaverickEveryday/Views/Memory/NoteMemoriesSection.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		F76CFB3FA4C8F8FBA28F7976 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = MapModels.swift;
+			path = SummaverickEveryday/Engine/MapModels.swift;
 			sourceTree = SOURCE_ROOT;
 		};
 		FB9B4C78668184CF16F3ABA6 = {
@@ -1215,6 +1248,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		6089C6FE5C91A9ED59F5EAFE = {
+			isa = PBXGroup;
+			children = (
+				58C590454FC63BC4EDF7F18D,
+				E6063C3DF54DA54ED6DC32F1,
+			);
+			name = Views/Map;
+			sourceTree = "<group>";
+		};
 		649F037DD903349A9F8F2971 = {
 			isa = PBXGroup;
 			children = (
@@ -1235,6 +1277,7 @@
 				13A63ABDA892EF2D8A1A560A,
 				515BBF6A31C68F3F903DB724,
 				FB9B4C78668184CF16F3ABA6,
+				F76CFB3FA4C8F8FBA28F7976,
 				DAD9D4F5BE940D31ED604618,
 				C593582C209D99DB076F4AB2,
 				B05E051B8E13E602C77A96F0,
@@ -1259,6 +1302,7 @@
 				BECA9321D0D66DAD007659AB,
 				3A82B61681BFF18BB638B388,
 				14170FB9E149C3DD932A78DD,
+				6089C6FE5C91A9ED59F5EAFE,
 				3EC16C5E440AEDC2F8EC5F6A,
 				DA0A32E81D9A4713BC65BFBC,
 				BEBE7E84826B6F21349BCBB4,
@@ -1535,6 +1579,7 @@
 				1E01B2EFF4A31A1034B15098,
 				B73BD37B74FFE5DE3C398EE9,
 				F8E97681421A53898F3C82E0,
+				3F3EF1BBEFE445AAA7E90A0E,
 				832433C1965C36667340EE3B,
 				A062B0CDA53604F5D8A7D47D,
 				5997944FB95EF3E94D57974F,
@@ -1553,6 +1598,8 @@
 				B65B60C3D1ED1A91BF301F39,
 				7145186EECA51AD6A675CA64,
 				25A6412A3165EE7261515DB6,
+				D9865442550D6A995B0F4FDB,
+				CCE03DBE92FEAE25E86430F5,
 				23C44AF0CB03B5875E813B5F,
 				8E779B106668C15FE8259AA8,
 				C6FD0A316798F1839A28EADE,

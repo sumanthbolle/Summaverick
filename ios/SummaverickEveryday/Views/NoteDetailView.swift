@@ -46,7 +46,7 @@ struct NoteDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable {
-        case summary, notes, questions, transcript
+        case summary, notes, questions, transcript, map
         var id: String { rawValue }
         var title: LocalizedStringKey {
             switch self {
@@ -54,6 +54,7 @@ struct NoteDetailView: View {
             case .notes: return "Notes"
             case .questions: return "Questions"
             case .transcript: return "Word for word"
+            case .map: return "Map"
             }
         }
         /// The output this tab shows; nil for the transcript.
@@ -62,7 +63,7 @@ struct NoteDetailView: View {
             case .summary: return .shortSummary
             case .notes: return .detailedNotes
             case .questions: return .revisionQuestions
-            case .transcript: return nil
+            case .transcript, .map: return nil
             }
         }
     }
@@ -265,7 +266,13 @@ struct NoteDetailView: View {
     }
 
     @ViewBuilder private var content: some View {
-        if tab == .transcript && !pieces.isEmpty {
+        if tab == .map {
+            // This recording's map: its centre is the title. Drag on it turns it; scroll outside it.
+            BrainMapScreen(noteID: noteID, centerTitle: title) { id, sec in playMoment(id, sec) }
+                .frame(height: 540)
+                .background(Theme.background, in: RoundedRectangle(cornerRadius: 16))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+        } else if tab == .transcript && !pieces.isEmpty {
             piecesList
         } else {
             let text: String? = {
@@ -275,6 +282,7 @@ struct NoteDetailView: View {
                 case .notes: return n.detailed_notes
                 case .questions: return n.revision_questions
                 case .transcript: return n.transcript
+                case .map: return nil
                 }
             }()
             if let text, !text.isEmpty, tab == .transcript {

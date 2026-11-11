@@ -1,4 +1,4 @@
-// Deep dive (spec §6.2): Topics · People · Timeline. Topics and people are filed by Gemma after each
+// Deep dive (spec §6.2): Map · Topics · People · Timeline. The map is the second brain (BrainMapView). Topics and people are filed by Gemma after each
 // recording. RootView owns the Record button and the settings sheet; recordings open by pushing
 // NoteDetailView inside this tab's own navigation stack.
 import SwiftUI
@@ -14,9 +14,9 @@ struct DeepDiveView: View {
     @Environment(Router.self) private var router
     @State private var pipeline = ProcessingPipeline.shared
     @State private var models = ModelManager.shared
-    @State private var segment: Segment = .topics
+    @State private var segment: Segment = .map
 
-    enum Segment: Hashable { case topics, people, timeline }
+    enum Segment: Hashable { case map, topics, people, timeline }
 
     var body: some View {
         NavigationStack {
@@ -30,6 +30,7 @@ struct DeepDiveView: View {
                         .background(Theme.card)
                 }
                 Picker("Browse by", selection: $segment) {
+                    Text("Map").tag(Segment.map)
                     Text("Topics").tag(Segment.topics)
                     Text("People").tag(Segment.people)
                     Text("Timeline").tag(Segment.timeline)
@@ -39,6 +40,7 @@ struct DeepDiveView: View {
                 .padding(.horizontal).padding(.vertical, 8)
 
                 switch segment {
+                case .map: BrainMapScreen { id, sec in router.openNote = (id, sec) }
                 case .topics: TopicListView(kind: "topic").id("topic")
                 case .people: TopicListView(kind: "person").id("person")
                 case .timeline: TimelineView()

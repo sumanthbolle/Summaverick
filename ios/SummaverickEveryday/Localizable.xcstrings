@@ -6675,6 +6675,363 @@
           }
         }
       }
+    },
+    "Map": {
+      "comment": "Deep dive and a note: the map of what was kept",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Map"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మ్యాప్"
+          }
+        }
+      }
+    },
+    "You": {
+      "comment": "The centre of the map",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు"
+          }
+        }
+      }
+    },
+    "Promises": {
+      "comment": "Map branch",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Promises"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మాటలు ఇచ్చినవి"
+          }
+        }
+      }
+    },
+    "Decisions": {
+      "comment": "Map branch",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decisions"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నిర్ణయాలు"
+          }
+        }
+      }
+    },
+    "Open questions": {
+      "comment": "Map branch",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open questions"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తేలని ప్రశ్నలు"
+          }
+        }
+      }
+    },
+    "%lld more": {
+      "comment": "Map: the rest of a branch, opens a list",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld more"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా %lld"
+          }
+        }
+      }
+    },
+    "Ask about this": {
+      "comment": "Memory card on the map: opens Ask with a question about it",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask about this"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీని గురించి అడగండి"
+          }
+        }
+      }
+    },
+    "Tell me more about: %@": {
+      "comment": "The question put in the Ask box from a memory",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tell me more about: %@"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీని గురించి ఇంకా చెప్పండి: %@"
+          }
+        }
+      }
+    },
+    "Who is this?": {
+      "comment": "A person's memories, from the map",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Who is this?"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వీరు ఎవరు?"
+          }
+        }
+      }
+    },
+    "Drag to turn. Tap a branch to open it.": {
+      "comment": "Hint under the map",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to turn. Tap a branch to open it."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తిప్పడానికి లాగండి. తెరవడానికి శాఖను నొక్కండి."
+          }
+        }
+      }
+    },
+    "Tap a branch to open it.": {
+      "comment": "Hint under the map when it keeps still",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap a branch to open it."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తెరవడానికి శాఖను నొక్కండి."
+          }
+        }
+      }
+    },
+    "Only a few things so far, so here they are as a list.": {
+      "comment": "Map with fewer than 8 points",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only a few things so far, so here they are as a list."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పటికి కొన్నే ఉన్నాయి, అందుకే జాబితాగా చూపిస్తున్నాను."
+          }
+        }
+      }
+    },
+    "Nothing on the map yet": {
+      "comment": "Empty map",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing on the map yet"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మ్యాప్‌లో ఇంకా ఏమీ లేదు"
+          }
+        }
+      }
+    },
+    "Things I remember from your recordings show up here.": {
+      "comment": "Empty map",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Things I remember from your recordings show up here."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రికార్డింగ్‌ల నుండి నేను గుర్తుంచుకున్నవి ఇక్కడ కనిపిస్తాయి."
+          }
+        }
+      }
+    },
+    "This recording": {
+      "comment": "Centre of a recording's map when it has no title",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This recording"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ రికార్డింగ్"
+          }
+        }
+      }
+    },
+    "Nothing kept about this yet.": {
+      "comment": "Empty list of a person's or topic's memories",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing kept about this yet."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీని గురించి ఇంకా ఏమీ ఉంచలేదు."
+          }
+        }
+      }
+    },
+    "Choose a time, then save.": {
+      "comment": "Reminder offered from a memory: a time is never made up",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a time, then save."
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఒక సమయం ఎంచుకుని, సేవ్ చేయండి."
+          }
+        }
+      }
+    },
+    "Open": {
+      "comment": "VoiceOver value of an open map branch",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తెరిచి ఉంది"
+          }
+        }
+      }
+    },
+    "Folded": {
+      "comment": "VoiceOver value of a folded map branch",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folded"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మూసి ఉంది"
+          }
+        }
+      }
+    },
+    "Zoom in": {
+      "comment": "Map zoom button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom in"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దగ్గరగా"
+          }
+        }
+      }
+    },
+    "Zoom out": {
+      "comment": "Map zoom button",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom out"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దూరంగా"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -281,12 +281,17 @@ struct MemoryEditSheet: View {
 
 // MARK: - the card
 
+/// What the map adds to a memory's card: make it a reminder or a to-do, or ask about it.
+enum MapMemoryAction: Equatable { case remind, task, ask }
+
 struct MemoryCardView: View {
     let memoryID: Int64
     /// ▶: open the recording (note id, second).
     let onPlay: ((Int64, Int) -> Void)?
     /// Called after Wrong or Delete took the memory away.
     var onRemoved: (() -> Void)? = nil
+    /// Set by the map: the card offers Ask about this, Remind me and Make a task, and hands them back here.
+    var onMapAction: ((MapMemoryAction, BrainMemory) -> Void)? = nil
 
     @State private var memory: BrainMemory?
     /// The core said it no longer exists.
@@ -298,10 +303,12 @@ struct MemoryCardView: View {
     @State private var editing = false
     @State private var confirmDelete = false
 
-    init(memoryID: Int64, onPlay: ((Int64, Int) -> Void)?, onRemoved: (() -> Void)? = nil) {
+    init(memoryID: Int64, onPlay: ((Int64, Int) -> Void)?, onRemoved: (() -> Void)? = nil,
+         onMapAction: ((MapMemoryAction, BrainMemory) -> Void)? = nil) {
         self.memoryID = memoryID
         self.onPlay = onPlay
         self.onRemoved = onRemoved
+        self.onMapAction = onMapAction
     }
 
     var body: some View {
@@ -359,6 +366,18 @@ struct MemoryCardView: View {
 
     private func actions(_ m: BrainMemory) -> some View {
         VStack(spacing: 10) {
+            if let onMapAction {
+                Button { onMapAction(.ask, m) } label: {
+                    Label("Ask about this", systemImage: "bubble.left.and.text.bubble.right")
+                        .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.pillProminent)
+                .disabled(busy)
+                MemoryActionButtons(busy: busy, buttons: [
+                    .init(title: "Remind me", icon: "bell") { onMapAction(.remind, m) },
+                    .init(title: "Make a task", icon: "checklist") { onMapAction(.task, m) },
+                ])
+            }
             if m.canBeDone {
                 Button { Task { await run { await CoreEngine.shared.setMemoryDone(m.id, !m.done) } } } label: {
                     Label("Done", systemImage: m.done ? "checkmark.circle.fill" : "circle")
