@@ -65,6 +65,34 @@ final class FinishNowController {
         }
     }
 
+    /// What a note has left, for the whole job's measure and the estimate (FinishNow.Work): the store (transcript,
+    /// sections and their outputs), the sidecar (written down so far) and the pipeline (its progress on this note, the
+    /// sections it planned), as the pipeline's steps see them.
+    static func work(for n: Note) async -> FinishNow.Work {
+        let engine = CoreEngine.shared, pipeline = ProcessingPipeline.shared, id = n.id
+        let sections = await engine.sections(id)
+        let pieceCount = await engine.pieces(id).count
+        let state = await engine.sectionOutputsState(noteID: id, lang: n.lang) ?? []
+        let plan = NoteSteps.plan(sections: sections.count, state: state, hasSummary: true)
+        let running = pipeline.activeNoteID == id && pipeline.isWorking
+        var w = FinishNow.Work(durationSeconds: Double(n.duration_seconds))
+        w.transcriptDone = !(n.transcript ?? "").isEmpty
+        if !w.transcriptDone {
+            if running, let t = pipeline.transcribing {
+                w.transcribedSeconds = t.done
+            } else if let path = AudioRecorder.existingAudioPath(n.audio_path) {
+                w.transcribedSeconds = TranscriptSidecar.load(audioPath: path).transcribedSeconds
+            }
+        }
+        w.sectionsDone = sections.count
+        w.sectionsCover = w.transcriptDone && SectionWriter.coversAll(sections, pieceCount: pieceCount)
+        if running, case .sections(let written, let total) = pipeline.stage {
+            w.sectionsPlanned = max(0, sections.count - written) + total   // the stored ones include those written
+        }
+        w.partsUndone = FinishNow.sectionsUndone(plan)
+        return w
+    }
+
     /// The highest note id (ids only grow, so it is the newest note); 0 with none.
     nonisolated static func highestNoteID() async -> Int64 {
         await CoreEngine.shared.notes(limit: 200).map(\.id).max() ?? 0
@@ -163,8 +191,11 @@ struct FinishNowView: View {
     @State private var pipeline = ProcessingPipeline.shared
     @State private var recording = RecordingController.shared
     @State private var note: Note?
-    /// Parts written of the parts the note will have: the one measure of the headline and the bar.
-    @State private var parts: (done: Int, total: Int) = (0, 0)
+    /// The whole job (FinishNow.job): pieces written down, then section summaries, then parts. The one measure of
+    /// the headline and the bar.
+    @State private var job: FinishNow.Job?
+    /// The bar as shown: it never goes back (FinishNow.shownFraction); starts again for another note.
+    @State private var shown = 0.0
     @State private var heat: HeatLadder.Level = .full
 
     var body: some View {
@@ -197,10 +228,10 @@ struct FinishNowView: View {
         .preferredColorScheme(.dark)
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
-        .task(id: noteID) { await load() }
+        .task(id: noteID) { shown = 0; job = nil; await load() }
         .task {
             while !Task.isCancelled {
-                await readParts()
+                await readJob()
                 heat = HeatGovernor.shared.level
                 try? await Task.sleep(for: .seconds(2))
             }
@@ -231,7 +262,7 @@ struct FinishNowView: View {
         VStack(spacing: 14) {
             Text(headline).font(.title3.weight(.semibold)).multilineTextAlignment(.center)
                 .contentTransition(.numericText())
-            ProgressView(value: FinishNow.fraction(done: parts.done, total: parts.total))   // VoiceOver reads its percent
+            ProgressView(value: shown)   // VoiceOver reads its percent
                 .tint(Theme.text)   // steel, as the app look (no blue)
             if !detail.isEmpty {
                 Text(detail).font(.subheadline).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
@@ -266,10 +297,11 @@ struct FinishNowView: View {
         return FinishNow.notesReady(stepsReady: steps?.ready.count, stepsTotal: steps?.total, hasNotes: hasNotes, writing: writing)
     }
 
-    /// "Writing your notes · 6 of 16 parts"; "Working on it…" before the note is known.
+    /// "Writing down what was said · 58 of 172", "Summarising part 7 of 16", "Writing your notes · 6 of 16 parts";
+    /// "Working on it…" before the note is known.
     private var headline: String {
-        guard noteID != nil, parts.total > 0 else { return String(localized: "Working on it…") }
-        return String(localized: "Writing your notes · \(parts.done) of \(parts.total) parts")
+        guard noteID != nil, let job, job.total > 0 else { return String(localized: "Working on it…") }
+        return FinishNow.headline(job)
     }
 
     /// Only why this note is not moving: waiting behind another note, or paused (its line). Nothing while it is
@@ -280,20 +312,20 @@ struct FinishNowView: View {
         return pipeline.lastFailure[id] ?? ""
     }
 
-    /// The parts from the store (sections and their outputs), as the pipeline's steps see them.
-    private func readParts() async {
-        guard let id = noteID, let n = note else { return }
-        let sections = await CoreEngine.shared.sections(id).count
-        let state = await CoreEngine.shared.sectionOutputsState(noteID: id, lang: n.lang) ?? []
-        let plan = NoteSteps.plan(sections: sections, state: state, hasSummary: true)
-        let p = FinishNow.partsProgress(sectionsUndone: FinishNow.sectionsUndone(plan), sectionsKnown: sections,
-                                        durationSeconds: Double(n.duration_seconds))
-        if p.done != parts.done || p.total != parts.total { parts = p }
+    /// The job from the store (transcript, sections and their outputs), the sidecar (written down so far) and the
+    /// pipeline (its progress on this note, the sections it planned), as the pipeline's steps see them.
+    private func readJob() async {
+        guard noteID != nil, let n = note else { return }
+        let w = await FinishNowController.work(for: n)
+        let j = FinishNow.job(w)
+        if j != job { job = j }
+        let f = FinishNow.shownFraction(previous: shown, next: j.fraction, working: writing)
+        if f != shown { shown = f }
     }
 
     private func load() async {
         guard let id = noteID else { note = nil; return }
         note = await CoreEngine.shared.note(id)
-        await readParts()
+        await readJob()
     }
 }

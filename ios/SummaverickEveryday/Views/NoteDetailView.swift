@@ -16,8 +16,8 @@ struct NoteDetailView: View {
     @State private var chapters: [Chapter] = []
     /// Parts of the notes and of the questions that failed 3 times ("I couldn't write part %d. Try again").
     @State private var partsLeft: [NoteSteps.Kind: [Int]] = [:]
-    /// Parts (sections' notes and questions) still to write, for "Finish now · about %d min".
-    @State private var partsToWrite = 0
+    /// What is left to write (pieces, section summaries, parts), for "Finish now · about %d min".
+    @State private var workLeft = FinishNow.Work(durationSeconds: 0)
     @State private var tab: Tab
     @State private var title = ""
     @State private var question = ""
@@ -400,7 +400,7 @@ struct NoteDetailView: View {
     /// The notes are still being written: keep the app open with a dim screen and they finish in minutes (FinishNowView).
     private var finishNowButton: some View {
         Button { FinishNowController.shared.start(noteID: noteID) } label: {
-            Label(String(localized: "Finish now · about \(FinishNow.estimateMinutes(partsLeft: partsToWrite, onGPU: true)) min"),
+            Label(String(localized: "Finish now · about \(FinishNow.estimateMinutes(workLeft, onGPU: true)) min"),
                   systemImage: "bolt")
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
@@ -579,11 +579,7 @@ struct NoteDetailView: View {
         partsLeft = [.notes: await ProcessingPipeline.partsLeft(noteID: noteID, lang: lang, kind: .notes),
                      .questions: await ProcessingPipeline.partsLeft(noteID: noteID, lang: lang, kind: .questions)]
         if let n, n.detailed_notes == nil || n.revision_questions == nil {
-            let sections = await CoreEngine.shared.sections(noteID).count
-            let state = await CoreEngine.shared.sectionOutputsState(noteID: noteID, lang: lang) ?? []
-            let plan = NoteSteps.plan(sections: sections, state: state, hasSummary: true)
-            partsToWrite = FinishNow.partsLeft(sectionsUndone: FinishNow.sectionsUndone(plan), sectionsKnown: sections,
-                                               durationSeconds: Double(n.duration_seconds))
+            workLeft = await FinishNowController.work(for: n)
         }
         note = n
         pieces = ps

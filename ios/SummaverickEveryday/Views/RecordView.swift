@@ -7,8 +7,9 @@ struct RecordView: View {
     @State private var permissionDenied = false
     /// Stopped with this screen's button (the app in front): "Finish now" is offered before the screen closes.
     @State private var stoppedHere = false
-    /// The recording's length at Stop, for the estimate.
-    @State private var stoppedSeconds: TimeInterval = 0
+    /// What is left at Stop (the pieces live transcription has not written down, the sections and parts it has not
+    /// written), for the estimate.
+    @State private var workAtStop = FinishNow.Work(durationSeconds: 0)
     /// The highest note id before this recording: the note it becomes is newer (FinishNow.followed).
     @State private var newestBefore: Int64 = 0
 
@@ -19,21 +20,20 @@ struct RecordView: View {
     /// After Stop: the recording is saved and the notes are under way. Finish now keeps the app open (the GPU) until
     /// they are ready; Done closes this screen and they carry on in the background.
     private var finishNowOffer: some View {
-        let parts = FinishNow.partsLeft(sectionsUndone: 0, sectionsKnown: 0, durationSeconds: stoppedSeconds)
         return VStack(spacing: 20) {
             Spacer()
             Image(systemName: "checkmark.circle").font(.system(size: 48)).foregroundStyle(Theme.positiveIcon)
                 .accessibilityHidden(true)
             Text("Saved. I'm writing your notes now.")
                 .font(.title3.weight(.semibold)).multilineTextAlignment(.center)
-            Text("With the phone locked, it takes about \(FinishNow.estimateMinutes(partsLeft: parts, onGPU: false)) min.")
+            Text("With the phone locked, it takes about \(FinishNow.estimateMinutes(workAtStop, onGPU: false)) min.")
                 .font(.footnote).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
             Spacer()
             Button {
                 FinishNowController.shared.startAfterStop(newerThan: newestBefore)
                 dismiss()
             } label: {
-                Label(String(localized: "Finish now · about \(FinishNow.estimateMinutes(partsLeft: parts, onGPU: true)) min"),
+                Label(String(localized: "Finish now · about \(FinishNow.estimateMinutes(workAtStop, onGPU: true)) min"),
                       systemImage: "bolt")
                     .font(.title3.weight(.semibold))
                     .frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -166,11 +166,27 @@ struct RecordView: View {
     private func stopAndProcess() {
         // Synchronous, before anything awaits: claims the work and the background time right in the tap.
         let seconds = controller.elapsed
+        let audioPath = controller.recorder.currentURL?.path
         // Finish now only when the notes will be written now (the language pack is ready), for 3 minutes or more.
         stoppedHere = ModelManager.shared.isReady && FinishNow.offersAfterStop(recordedSeconds: seconds)
         guard controller.stop() else { stoppedHere = false; return }
-        stoppedSeconds = seconds
-        if !stoppedHere { dismiss() }
+        if !stoppedHere { dismiss(); return }
+        workAtStop = Self.workLeft(durationSeconds: seconds, audioPath: audioPath)
+    }
+
+    /// The work left at Stop from the recording's sidecar: written down so far, the sections and parts written live.
+    private static func workLeft(durationSeconds: TimeInterval, audioPath: String?) -> FinishNow.Work {
+        var w = FinishNow.Work(durationSeconds: durationSeconds)
+        guard let audioPath else { return w }
+        let live = TranscriptSidecar.load(audioPath: audioPath)
+        let lang = AppSettings.shared.notesLanguage
+        let sections = NoteSection.validPrefix(live.sections, pieceCount: live.pieces.count)
+        w.transcribedSeconds = live.transcribedSeconds
+        w.sectionsDone = sections.count
+        w.partsUndone = sections.filter { s in
+            [LivePart.notes, LivePart.questions].contains { live.part(s, kind: $0, lang: lang) == nil }
+        }.count
+        return w
     }
 
     private func timeString(_ t: TimeInterval) -> String {
