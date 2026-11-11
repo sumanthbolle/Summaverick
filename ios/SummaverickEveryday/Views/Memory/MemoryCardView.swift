@@ -1,6 +1,7 @@
 // A memory, shown as a card: what it says, the exact words it came from (▶ plays them), who, when it was said,
 // when it is due, and what it replaced. MemoryCardView loads one memory by id and offers Edit, Wrong, Delete and
-// (promises and questions) Done. Medicine memories follow the saved medicine and are read-only here.
+// (promises and questions) Done; one still waiting to be checked shows the review queue's Keep and Wrong first.
+// Medicine memories follow the saved medicine and are read-only here.
 // Reused by the review queue (MemoryReviewCard), a note's Remembered section, the map and recall.
 import SwiftUI
 
@@ -366,6 +367,13 @@ struct MemoryCardView: View {
 
     private func actions(_ m: BrainMemory) -> some View {
         VStack(spacing: 10) {
+            // Not checked yet: the review queue's Keep and Wrong come first (the same calls as the queue's card).
+            if m.waitingForCheck {
+                MemoryActionButtons(busy: busy, buttons: [
+                    .init(title: "Keep", icon: "checkmark", tone: .positive, prominent: true) { decideLinked(.keep, m) },
+                    .init(title: "Wrong", icon: "xmark", tone: .negative) { decideLinked(.wrong, m) },
+                ])
+            }
             if let onMapAction {
                 Button { onMapAction(.ask, m) } label: {
                     Label("Ask about this", systemImage: "bubble.left.and.text.bubble.right")
@@ -386,12 +394,16 @@ struct MemoryCardView: View {
                 .buttonStyle(.pillPositive)
                 .accessibilityAddTraits(m.done ? .isSelected : [])
             }
-            MemoryActionButtons(busy: busy, buttons: [
-                .init(title: "Edit", icon: "pencil") { failed = false; editing = true },
-                .init(title: "Wrong", icon: "xmark", tone: .negative) { decideLinked(.wrong, m) },
-                .init(title: "Forget this", icon: "trash", tone: .warning) { confirmDelete = true },
-            ])
+            MemoryActionButtons(busy: busy, buttons: lastRow(m))
         }
+    }
+
+    /// Edit, Wrong (unless it is already above, for a memory not checked yet) and Forget this.
+    private func lastRow(_ m: BrainMemory) -> [MemoryActionButtons.Item] {
+        var row: [MemoryActionButtons.Item] = [.init(title: "Edit", icon: "pencil") { failed = false; editing = true }]
+        if !m.waitingForCheck { row.append(.init(title: "Wrong", icon: "xmark", tone: .negative) { decideLinked(.wrong, m) }) }
+        row.append(.init(title: "Forget this", icon: "trash", tone: .warning) { confirmDelete = true })
+        return row
     }
 
     /// Runs one change; on success tells the app (every view showing memories reloads), on failure keeps the
@@ -417,15 +429,17 @@ struct MemoryCardView: View {
         }
     }
 
-    /// Wrong or Delete. A memory waiting in the queue with a pending reminder or to-do in its card declines that
-    /// first (ReviewItem.linkedDecision), so it does not come back on its own in "Waiting for you". When the queue
-    /// cannot be read, nothing is changed and the inline message shows.
+    /// Keep, Wrong or Delete. A memory waiting in the queue goes through the queue's own plan
+    /// (ReviewItem.linkedDecision): Wrong or Delete declines a pending reminder or to-do in its card first, so it
+    /// does not come back on its own in "Waiting for you"; Keep touches only the memory. When the queue cannot be
+    /// read, nothing is changed and the inline message shows. Keep leaves the card open (now checked).
     private func decideLinked(_ tap: ReviewTap, _ m: BrainMemory) {
         guard !busy else { return }
         busy = true
         failed = false
         Task {
-            var plan = LinkedDecision(memoryReview: tap == .wrong ? "wrong" : nil, removesMemory: tap == .delete)
+            var plan = LinkedDecision(memoryReview: tap == .wrong ? "wrong" : tap == .keep ? "kept" : nil,
+                                      removesMemory: tap == .delete)
             var linked: Suggestion?
             var r = LinkedRunResult()
             if m.waitingForCheck {
@@ -447,7 +461,7 @@ struct MemoryCardView: View {
             busy = false
             failed = r.failed
             if r.needsReload { NotificationCenter.default.post(name: .assistantChanged, object: nil) }
-            if !r.failed { onRemoved?() }
+            if !r.failed && tap != .keep { onRemoved?() }
         }
     }
 

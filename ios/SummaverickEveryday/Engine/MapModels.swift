@@ -15,20 +15,23 @@ struct MapItem: Decodable, Equatable, Hashable {
     var done: Bool
     /// People and topics: how many memories sit under them. 0 for a memory.
     var count: Int
+    /// Not checked yet: a memory waiting in the review queue, or a person or topic whose memories all are.
+    /// Drawn lighter, with a "?"; Keep on its card makes it solid.
+    var waiting: Bool
 
     init(ref: String, label: String, importance: Double = 0, isNew: Bool = false, lowConfidence: Bool = false,
-         done: Bool = false, count: Int = 0) {
+         done: Bool = false, count: Int = 0, waiting: Bool = false) {
         self.ref = ref; self.label = label; self.importance = importance; self.isNew = isNew
-        self.lowConfidence = lowConfidence; self.done = done; self.count = count
+        self.lowConfidence = lowConfidence; self.done = done; self.count = count; self.waiting = waiting
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         ref = c.lenient(.ref) ?? ""; label = c.lenient(.label) ?? ""; importance = c.lenient(.importance) ?? 0
         isNew = c.flag(.isNew) ?? false; lowConfidence = c.flag(.lowConfidence) ?? false
-        done = c.flag(.done) ?? false; count = c.lenient(.count) ?? 0
+        done = c.flag(.done) ?? false; count = c.lenient(.count) ?? 0; waiting = c.flag(.waiting) ?? false
     }
     enum CodingKeys: String, CodingKey {
-        case ref, label, importance, done, count
+        case ref, label, importance, done, count, waiting
         case isNew = "new", lowConfidence = "low_confidence"
     }
 

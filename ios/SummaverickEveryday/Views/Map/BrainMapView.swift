@@ -5,6 +5,8 @@
 // fainter; labels rise on taller stems so they never overlap (BrainMapLayout). The branches grow from the centre
 // once, when the map first appears. Reduce Motion: a flat, still map (drag moves it). While notes are being
 // written the map keeps still: no intro, no spin, no settle (the phone stays cool).
+// Points still waiting in the review queue are on the map too, drawn lighter with a dashed outline and a "?";
+// their card offers the queue's Keep and Wrong first (Keep makes them solid, Wrong takes them off).
 // Tapping a memory opens its card with Ask about this, Remind me, Make a task, Done, Edit and Wrong. Tapping a
 // person or topic opens its memories ("Who is this?" for a person). Fewer than 8 points: a plain grouped list.
 import SwiftUI
@@ -564,7 +566,7 @@ struct BrainMapCanvas: View {
         }
     }
 
-    /// Open or folded for a branch; done, new and "not sure I heard this right" for an item.
+    /// Open or folded for a branch; done, new, waiting to be checked and "not sure I heard this right" for an item.
     private func accessibilityState(_ n: PlacedNode) -> String {
         switch n.kind {
         case .branch: return expanded.contains(n.branch ?? "") ? String(localized: "Open") : String(localized: "Folded")
@@ -573,6 +575,7 @@ struct BrainMapCanvas: View {
             var words: [String] = []
             if it.done { words.append(String(localized: "Done")) }
             if it.isNew { words.append(String(localized: "New")) }
+            if it.waiting { words.append(String(localized: "Waiting for you to check")) }
             if it.lowConfidence { words.append(String(localized: "Not sure I heard this right")) }
             return words.joined(separator: ", ")
         default: return ""
@@ -647,11 +650,13 @@ private struct MapLabel: View {
 
     private var item: some View {
         let it = node.item
+        // Not checked yet: lighter text, a fainter stripe and card, a dashed outline, and a "?".
+        let waiting = it?.waiting == true
         return VStack(alignment: .leading, spacing: 1) {
                 CappedWidth(max: 112) {
-                    (Text(verbatim: it?.label ?? "") + Text(verbatim: it?.lowConfidence == true ? " ?" : "").foregroundStyle(Theme.secondary))
+                    (Text(verbatim: it?.label ?? "") + Text(verbatim: it?.lowConfidence == true || waiting ? " ?" : "").foregroundStyle(Theme.secondary))
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(it?.done == true ? Theme.secondary : Theme.text)
+                        .foregroundStyle(it?.done == true || waiting ? Theme.secondary : Theme.text)
                         .strikethrough(it?.done == true, color: Theme.secondary)
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
@@ -664,11 +669,17 @@ private struct MapLabel: View {
         }
         .padding(.leading, 14).padding(.trailing, 10).padding(.vertical, 7)
         .overlay(alignment: .leading) {
-            Capsule().fill(color).frame(width: 3).padding(.vertical, 8).padding(.leading, 6)
+            Capsule().fill(color.opacity(waiting ? 0.45 : 1)).frame(width: 3).padding(.vertical, 8).padding(.leading, 6)
         }
-        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(color, lineWidth: it?.isNew == true ? 1.5 : 0))
-        .shadow(color: shadow, radius: 8, y: 3)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card.opacity(waiting ? 0.6 : 1)))
+        .overlay {
+            if waiting {
+                RoundedRectangle(cornerRadius: 12).stroke(color.opacity(0.7), style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
+            } else {
+                RoundedRectangle(cornerRadius: 12).stroke(color, lineWidth: it?.isNew == true ? 1.5 : 0)
+            }
+        }
+        .shadow(color: shadow.opacity(waiting ? 0.5 : 1), radius: 8, y: 3)
     }
 
     private var more: some View {
@@ -699,7 +710,8 @@ struct BrainMapList: View {
                 Section {
                     ForEach(b.items, id: \.ref) { it in
                         Button { if let s = MapSelection.of(it, branch: b.kind) { onSelect(s) } } label: {
-                            MapListRow(label: it.label, branch: b.kind, lowConfidence: it.lowConfidence, done: it.done, count: it.count)
+                            MapListRow(label: it.label, branch: b.kind, lowConfidence: it.lowConfidence, done: it.done, count: it.count,
+                                       waiting: it.waiting)
                         }
                         .buttonStyle(.plain)
                     }
@@ -729,21 +741,31 @@ struct MapListRow: View {
     var done = false
     var count = 0
     var detail: String? = nil
+    /// Not checked yet: an open dashed point, lighter text, a "?" and the queue's words.
+    var waiting = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Circle().fill(MapStyle.color(branch)).frame(width: 9, height: 9)
-                .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-                .accessibilityHidden(true)
+            Group {
+                if waiting {
+                    Circle().stroke(MapStyle.color(branch), style: StrokeStyle(lineWidth: 1.5, dash: [2, 2]))
+                } else {
+                    Circle().fill(MapStyle.color(branch))
+                }
+            }
+            .frame(width: 9, height: 9)
+            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                (Text(verbatim: label) + Text(verbatim: lowConfidence ? " ?" : "").foregroundStyle(Theme.secondary))
+                (Text(verbatim: label) + Text(verbatim: lowConfidence || waiting ? " ?" : "").foregroundStyle(Theme.secondary))
                     .font(.body)
-                    .foregroundStyle(done ? Theme.secondary : Theme.text)
+                    .foregroundStyle(done || waiting ? Theme.secondary : Theme.text)
                     .strikethrough(done, color: Theme.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let detail, !detail.isEmpty {
                     Text(verbatim: detail).font(.subheadline).foregroundStyle(Theme.secondary).lineLimit(2)
                 }
+                if waiting { MapWaitingLine() }
             }
             Spacer(minLength: 8)
             if count > 0 { Text(verbatim: "\(count)").font(.subheadline.weight(.medium)).foregroundStyle(Theme.secondary) }
@@ -752,6 +774,14 @@ struct MapListRow: View {
         }
         .frame(minHeight: 44)
         .contentShape(Rectangle())
+    }
+}
+
+/// The review queue's words under a point that is not checked yet.
+struct MapWaitingLine: View {
+    var body: some View {
+        Label("Waiting for you to check", systemImage: "hourglass")
+            .font(.subheadline.weight(.medium)).foregroundStyle(Theme.caution)
     }
 }
 
@@ -975,9 +1005,10 @@ private struct TopicMemoriesList: View {
                     NavigationLink(value: MapSelection.Route.memory(m.id)) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(MemoryFormat.typeLabel(m.type)).font(.caption.weight(.semibold)).foregroundStyle(Theme.secondary)
-                            Text(verbatim: m.text).font(.body).foregroundStyle(Theme.text)
+                            Text(verbatim: m.text).font(.body).foregroundStyle(m.waitingForCheck ? Theme.secondary : Theme.text)
                                 .strikethrough(m.done, color: Theme.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if m.waitingForCheck { MapWaitingLine() }
                             ForEach(m.sources.prefix(2)) { s in sourceLine(s) }
                         }
                         .padding(.vertical, 4)
@@ -1033,6 +1064,7 @@ private struct MoreList: View {
         let label: String
         var lowConfidence = false
         var done = false
+        var waiting = false
         var id: String { "\(route)" }
     }
 
@@ -1044,7 +1076,7 @@ private struct MoreList: View {
                 if rows.isEmpty { Text("Nothing kept about this yet.").foregroundStyle(Theme.secondary).listRowBackground(Theme.card) }
                 ForEach(rows) { r in
                     NavigationLink(value: r.route) {
-                        MapListRow(label: r.label, branch: branch, lowConfidence: r.lowConfidence, done: r.done)
+                        MapListRow(label: r.label, branch: branch, lowConfidence: r.lowConfidence, done: r.done, waiting: r.waiting)
                     }
                     .listRowBackground(Theme.card)
                 }
@@ -1056,14 +1088,21 @@ private struct MoreList: View {
         .navigationTitle(Text(verbatim: MapStyle.title(branch)))
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await reload() } }
     }
 
     private func reload() async {
         if let type = MapStyle.memoryType(branch) {
-            // The map's own rule: checked memories, not waiting in the queue; strongest first.
-            let ms = await CoreEngine.shared.memories(MemoryFilter(noteID: noteID, types: [type], reviews: ["kept", "corrected"], queued: false))
-            rows = ms.sorted { $0.importance != $1.importance ? $0.importance > $1.importance : $0.id > $1.id }
-                .map { Row(route: .memory($0.id), label: $0.text, lowConfidence: $0.lowConfidence, done: $0.done) }
+            // The map's own rule (core memory_on_map): checked, or waiting in the queue; never a medicine's.
+            // The core leaves out wrong and superseded rows. Strongest first, checked before waiting.
+            let ms = await CoreEngine.shared.memories(MemoryFilter(noteID: noteID, types: [type]))
+                .filter { !$0.isMedicine && ($0.waitingForCheck || (!$0.queued && ($0.review == "kept" || $0.review == "corrected"))) }
+            rows = ms.sorted {
+                if $0.importance != $1.importance { return $0.importance > $1.importance }
+                if $0.waitingForCheck != $1.waitingForCheck { return !$0.waitingForCheck }
+                return $0.id > $1.id
+            }
+            .map { Row(route: .memory($0.id), label: $0.text, lowConfidence: $0.lowConfidence, done: $0.done, waiting: $0.waitingForCheck) }
         } else {
             let person = branch == "people"
             var topics = await CoreEngine.shared.topics(kind: person ? "person" : "topic")
