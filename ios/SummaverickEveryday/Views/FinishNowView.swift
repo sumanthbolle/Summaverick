@@ -5,8 +5,9 @@
 //
 // It lives in a window of its own above the app's, so it covers any sheet or cover without a presentation fight, and
 // it closes when the app goes to the background (locked, switched away): the work carries on there, nothing lost,
-// and the app lock's cover is never under it. The screen's brightness and the idle timer are set and given back by
-// FinishNowSession (ModelLogic): on leaving, on finishing, on going to the background and when the view goes away.
+// and the app lock's cover is never under it. The brightness is dimmed and given back by FinishNowSession (ModelLogic):
+// on leaving, on finishing, on going to the background, while the app is inactive and when the view goes away. The
+// screen stays on through ScreenAwake, the one owner of the idle timer (the mode or a notes run in front).
 import SwiftUI
 import UIKit
 
@@ -23,17 +24,24 @@ final class FinishNowController {
     }
 
     private(set) var target: Target?
-    /// The screen half of the mode; read by the view to show "Your notes are ready".
-    private(set) var session = FinishNowSession()
+    /// The brightness half of the mode; read by the view to show "Your notes are ready".
+    private(set) var session = FinishNowSession() { didSet { ScreenAwake.update() } }
 
     @ObservationIgnored private var window: UIWindow?
     @ObservationIgnored private weak var previousKey: UIWindow?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private var fallback: Task<Void, Never>?
 
     private init() {
-        observers.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
-                                                                object: nil, queue: .main) { _ in
+        let c = NotificationCenter.default
+        observers.append(c.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { FinishNowController.shared.wentToBackground() }
+        })
+        observers.append(c.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { FinishNowController.shared.resignedActive() }
+        })
+        observers.append(c.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { FinishNowController.shared.becameActive() }
         })
     }
 
@@ -42,33 +50,60 @@ final class FinishNowController {
     /// Opens the mode on a note.
     func start(noteID id: Int64) { open(.note(id)) }
 
-    /// Opens the mode after a Stop, before the note exists. newest: the newest note id before the recording.
-    func startAfterStop(newerThan newest: Int64) { open(.following(newerThan: newest)) }
+    /// Opens the mode after a Stop, before the note exists. newest: the highest note id before the recording. If no
+    /// new note run starts within FinishNow.followFallbackSeconds, it follows the newest note by id.
+    func startAfterStop(newerThan newest: Int64) {
+        open(.following(newerThan: newest))
+        fallback?.cancel()
+        fallback = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(FinishNow.followFallbackSeconds))
+            guard !Task.isCancelled, case .following(let n)? = self?.target else { return }
+            let id = await Self.highestNoteID()
+            guard id > n, case .following? = self?.target else { return }
+            NSLog("[sve] finish now: no run started after the Stop; following note %lld", id)
+            self?.latch(id)
+        }
+    }
+
+    /// The highest note id (ids only grow, so it is the newest note); 0 with none.
+    nonisolated static func highestNoteID() async -> Int64 {
+        await CoreEngine.shared.notes(limit: 200).map(\.id).max() ?? 0
+    }
 
     /// The note the pipeline started after a Stop: the mode is on it from now, and the note opens under the mode.
     func latch(_ id: Int64) {
         guard case .following = target else { return }
+        fallback?.cancel()
         target = .note(id)
         ReminderScheduler.shared.pendingRoute = .note(id: id, startSec: nil)
     }
 
-    /// The notes are ready: the screen comes back and may sleep again; the mode stays to say so.
-    func finished() { apply(session.finish()) }
+    /// The notes are ready: the brightness comes back and the screen may sleep (unless a run in front keeps it on).
+    func finished() { setBrightness(session.finish()) }
 
     /// Leave (or Done): back to the app; the notes go on being written, on the GPU while the app is in front.
     func close() {
-        apply(session.leave())
+        setBrightness(session.leave())
         tearDown()
     }
 
     /// The view went away by some other path (the window was torn down): give the screen back.
-    func viewGone() { apply(session.leave()) }
+    func viewGone() { setBrightness(session.leave()) }
 
     private func wentToBackground() {
         guard window != nil else { return }
         NSLog("[sve] finish now: the app went to the background; the work goes on there")
-        apply(session.background())
+        setBrightness(session.background())
         tearDown()
+    }
+
+    /// Control Center, a call, the app switcher: the person sees the phone at its own brightness.
+    private func resignedActive() { setBrightness(session.resignActive()) }
+
+    /// Back in front with the mode on: dim again.
+    private func becameActive() {
+        guard window != nil else { return }
+        setBrightness(session.becomeActive(brightness: currentBrightness))
     }
 
     private func open(_ t: Target) {
@@ -81,16 +116,25 @@ final class FinishNowController {
             w.overrideUserInterfaceStyle = .dark
             let host = UIHostingController(rootView: FinishNowView())
             host.view.backgroundColor = Theme.uiColor(.background)
+            host.view.accessibilityViewIsModal = true   // VoiceOver stays in the mode, not the app under it
             w.rootViewController = host
             previousKey = scene.keyWindow
             w.makeKeyAndVisible()
             window = w
         }
-        apply(session.enter(brightness: Double(window?.windowScene?.screen.brightness ?? 1)))
+        // Dimmed only in front; opened while inactive (a notification action), didBecomeActive dims it.
+        if UIApplication.shared.applicationState == .active {
+            setBrightness(session.enter(brightness: currentBrightness))
+        } else if session.phase != .on {
+            _ = session.enter(brightness: currentBrightness)   // on, not dimmed yet: nothing set
+            _ = session.resignActive()
+        }
         NSLog("[sve] finish now: on (%@)", String(describing: t))
     }
 
     private func tearDown() {
+        fallback?.cancel()
+        fallback = nil
         target = nil
         guard let w = window else { return }
         w.isHidden = true
@@ -100,10 +144,12 @@ final class FinishNowController {
         NSLog("[sve] finish now: off")
     }
 
-    private func apply(_ screen: FinishNowSession.Screen?) {
-        guard let screen else { return }
-        UIApplication.shared.isIdleTimerDisabled = screen.idleTimerDisabled
-        if let s = window?.windowScene?.screen ?? Self.scene?.screen { s.brightness = CGFloat(screen.brightness) }
+    private var screen: UIScreen? { window?.windowScene?.screen ?? Self.scene?.screen }
+    private var currentBrightness: Double { Double(screen?.brightness ?? 1) }
+
+    private func setBrightness(_ b: Double?) {
+        guard let b else { return }
+        screen?.brightness = CGFloat(b)
     }
 
     private static var scene: UIWindowScene? {
@@ -117,7 +163,8 @@ struct FinishNowView: View {
     @State private var pipeline = ProcessingPipeline.shared
     @State private var recording = RecordingController.shared
     @State private var note: Note?
-    @State private var percent = 0
+    /// Parts written of the parts the note will have: the one measure of the headline and the bar.
+    @State private var parts: (done: Int, total: Int) = (0, 0)
     @State private var heat: HeatLadder.Level = .full
 
     var body: some View {
@@ -153,7 +200,7 @@ struct FinishNowView: View {
         .task(id: noteID) { await load() }
         .task {
             while !Task.isCancelled {
-                percent = ContinuedWork.shared.percent
+                await readParts()
                 heat = HeatGovernor.shared.level
                 try? await Task.sleep(for: .seconds(2))
             }
@@ -184,7 +231,7 @@ struct FinishNowView: View {
         VStack(spacing: 14) {
             Text(headline).font(.title3.weight(.semibold)).multilineTextAlignment(.center)
                 .contentTransition(.numericText())
-            ProgressView(value: thisNote ? Double(percent) / 100 : 0)   // VoiceOver reads its percent
+            ProgressView(value: FinishNow.fraction(done: parts.done, total: parts.total))   // VoiceOver reads its percent
                 .tint(Theme.text)   // steel, as the app look (no blue)
             if !detail.isEmpty {
                 Text(detail).font(.subheadline).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
@@ -219,27 +266,34 @@ struct FinishNowView: View {
         return FinishNow.notesReady(stepsReady: steps?.ready.count, stepsTotal: steps?.total, hasNotes: hasNotes, writing: writing)
     }
 
-    /// "Writing your notes · 1 of 3" while this note's counted run is on; "Working on it…" before it starts.
+    /// "Writing your notes · 6 of 16 parts"; "Working on it…" before the note is known.
     private var headline: String {
-        if thisNote, let steps = pipeline.stepCount, steps.counts {
-            return String(localized: "Writing your notes · \(steps.ready.count) of \(steps.total)")
-        }
-        return String(localized: "Working on it…")
+        guard noteID != nil, parts.total > 0 else { return String(localized: "Working on it…") }
+        return String(localized: "Writing your notes · \(parts.done) of \(parts.total) parts")
     }
 
-    /// What is being done now (the stage), or why this note waits.
+    /// Only why this note is not moving: waiting behind another note, or paused (its line). Nothing while it is
+    /// being written, so the screen has one measure.
     private var detail: String {
-        guard noteID != nil else { return "" }
-        guard thisNote else {
-            return pipeline.isWorking ? ProcessingPipeline.queuedMessage : (noteID.flatMap { pipeline.lastFailure[$0] } ?? "")
-        }
-        if case .transcribing = pipeline.stage, let t = pipeline.transcribing,
-           let line = StepCount.transcribingLine(transcribedSeconds: t.done, durationSeconds: t.duration) { return line }
-        return pipeline.stage.label
+        guard let id = noteID, !writing else { return "" }
+        if pipeline.isWorking && !thisNote { return ProcessingPipeline.queuedMessage }
+        return pipeline.lastFailure[id] ?? ""
+    }
+
+    /// The parts from the store (sections and their outputs), as the pipeline's steps see them.
+    private func readParts() async {
+        guard let id = noteID, let n = note else { return }
+        let sections = await CoreEngine.shared.sections(id).count
+        let state = await CoreEngine.shared.sectionOutputsState(noteID: id, lang: n.lang) ?? []
+        let plan = NoteSteps.plan(sections: sections, state: state, hasSummary: true)
+        let p = FinishNow.partsProgress(sectionsUndone: FinishNow.sectionsUndone(plan), sectionsKnown: sections,
+                                        durationSeconds: Double(n.duration_seconds))
+        if p.done != parts.done || p.total != parts.total { parts = p }
     }
 
     private func load() async {
         guard let id = noteID else { note = nil; return }
         note = await CoreEngine.shared.note(id)
+        await readParts()
     }
 }

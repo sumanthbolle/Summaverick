@@ -2002,7 +2002,7 @@ final class ProcessingPipeline {
         guard !ids.isEmpty else { memoriesMayBeDue = false; return }
         guard !LiveTranscriber.shared.isRecording, !Task.isCancelled, !memoryStop.isSet else { return }
         beginBackground()
-        UIApplication.shared.isIdleTimerDisabled = false   // background work: the phone may lock (the GPU run stops)
+        ScreenAwake.pipeline(wants: false)   // background work: the phone may lock (the GPU run stops)
         defer { endBackground() }
         var allDone = ids.count < limit
         for id in ids {
@@ -2132,7 +2132,7 @@ final class ProcessingPipeline {
         abort.set(overnightOwnsRun.isSet && (overnightRun?.isSet ?? false))
         ContinuedWork.shared.startNote()   // lock-screen progress starts again for this note
         // Keep the screen on while the model works: a locked phone stops GPU work and the run fails.
-        UIApplication.shared.isIdleTimerDisabled = true
+        ScreenAwake.pipeline(wants: true)
         if backgroundObserver == nil {
             backgroundObserver = NotificationCenter.default.addObserver(
                 forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
@@ -2173,7 +2173,7 @@ final class ProcessingPipeline {
         }
         ContinuedWork.shared.endNote()   // a Stop or tap from here on finds this note's run over
         stoppedWhileNotActive = false   // this run's; a later run is not one stopped from the background
-        UIApplication.shared.isIdleTimerDisabled = false
+        ScreenAwake.pipeline(wants: false)   // the Finish now mode may still keep the screen on
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
         // A tap or a recording queued behind this run (or a paused note) goes next.
         if !(interrupted.isEmpty && queued.isEmpty && insightDue.isEmpty) && !resuming { Task { await self.resumeInterrupted() } }

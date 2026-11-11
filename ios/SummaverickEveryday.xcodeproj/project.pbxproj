@@ -125,6 +125,10 @@
 			isa = PBXBuildFile;
 			fileRef = 6F60E66F2FF8D363A05C6C95;
 		};
+		6A4AAC44A2B9990D006E4C28 = {
+			isa = PBXBuildFile;
+			fileRef = 7BBE0833144762A6B70A1FCF;
+		};
 		7145186EECA51AD6A675CA64 = {
 			isa = PBXBuildFile;
 			fileRef = 91B7437CBCDFB5FF9D4AD20B;
@@ -780,6 +784,13 @@
 			path = SummaverickEveryday/Views/Memory/MemoryReviewCard.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		7BBE0833144762A6B70A1FCF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ScreenAwake.swift;
+			path = SummaverickEveryday/Engine/ScreenAwake.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		7D622FF8905A1014A0F26E0A = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -1296,6 +1307,7 @@
 				B9675BF203CCF71683907580,
 				2E361774B975154A11567968,
 				FC685B2FB5E51229E33B1F2C,
+				7BBE0833144762A6B70A1FCF,
 				8A6F757330F3179FB40BD3E2,
 				0B08BF124CD0B2571A98FABA,
 			);
@@ -1599,6 +1611,7 @@
 				1794160D386E91967AC6CD24,
 				5809D5B858D8CE07F8518B8C,
 				74F26ED096628426F957DD0E,
+				6A4AAC44A2B9990D006E4C28,
 				408386E2C748923A7048D478,
 				C2AF1244993225350DDBDC94,
 				E38796377CD701DE27D4E42D,

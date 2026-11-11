@@ -1875,6 +1875,27 @@ enum FinishNow {
         Set(plan.compactMap { step -> Int? in if case .part(let idx, _) = step { return idx } else { return nil } }).count
     }
 
+    /// The offer after Stop is only for recordings at least this long (shorter ones finish soon anyway).
+    static let offerMinSeconds = 180.0
+    static func offersAfterStop(recordedSeconds: Double) -> Bool {
+        recordedSeconds.isFinite && recordedSeconds >= offerMinSeconds
+    }
+
+    /// The mode's one measure: parts written of the parts the note will have ("%d of %d parts", and the bar).
+    static func partsProgress(sectionsUndone: Int, sectionsKnown: Int, durationSeconds: Double) -> (done: Int, total: Int) {
+        let left = partsLeft(sectionsUndone: sectionsUndone, sectionsKnown: sectionsKnown, durationSeconds: durationSeconds)
+        let total = max(0, sectionsKnown) + left - min(max(0, sectionsUndone), max(0, sectionsKnown))
+        return (max(0, total - left), max(0, total))
+    }
+
+    /// 0…1 of partsProgress; 0 with no parts known.
+    static func fraction(done: Int, total: Int) -> Double {
+        total > 0 ? min(1, max(0, Double(done) / Double(total))) : 0
+    }
+
+    /// No new note run started this long after the Stop tap: the mode follows the newest note by id instead.
+    static let followFallbackSeconds = 30.0
+
     /// "The phone is warm, so I'm resting": the work goes at the heat ladder's pace (minimal rests, paused waits).
     static func resting(_ level: HeatLadder.Level) -> Bool { level >= .minimal }
 
@@ -1893,49 +1914,71 @@ enum FinishNow {
     }
 }
 
-/// The mode's screen as a state machine: enter dims it and keeps it awake; finishing, leaving and going to the
-/// background each give back the brightness saved at enter and let the screen sleep, exactly once.
+/// The mode's brightness as a state machine: enter dims the screen; finishing, leaving and going to the background
+/// give back the brightness saved when it was dimmed, exactly once. Leaving the front for a moment (Control Center, a
+/// call: willResignActive) gives it back too, and coming back while the mode is on dims it again. Each call returns
+/// the brightness to set, nil for none. The idle timer is not here: ScreenAwake owns it.
 struct FinishNowSession: Equatable {
     enum Phase: Equatable { case off, on, finished }
-    /// What to set on the screen.
-    struct Screen: Equatable {
-        var brightness: Double
-        var idleTimerDisabled: Bool
-    }
 
     private(set) var phase: Phase = .off
+    /// The brightness before dimming; set only while the screen is dimmed.
     private var saved: Double?
 
     var isOn: Bool { phase == .on }
+    var isDimmed: Bool { saved != nil }
 
-    /// The mode opens: dims to dimBrightness and keeps the screen on. nil when it is on already.
-    mutating func enter(brightness: Double) -> Screen? {
+    /// The mode opens: dims to dimBrightness. nil when it is on already.
+    mutating func enter(brightness: Double) -> Double? {
         guard phase != .on else { return nil }
-        saved = min(1, max(0, brightness.isFinite ? brightness : 1))
         phase = .on
-        return Screen(brightness: FinishNow.dimBrightness, idleTimerDisabled: true)
+        return dim(brightness)
     }
 
-    /// The notes are ready: the screen comes back and may sleep; the mode stays to say so.
-    mutating func finish() -> Screen? {
-        guard let s = restore() else { return nil }
+    /// The app left the front for a moment (inactive): the brightness comes back; the mode stays on.
+    mutating func resignActive() -> Double? {
+        guard phase == .on else { return nil }
+        return takeSaved()
+    }
+
+    /// Back in front with the mode on: dimmed again (the brightness now is saved).
+    mutating func becomeActive(brightness: Double) -> Double? {
+        guard phase == .on else { return nil }
+        return dim(brightness)
+    }
+
+    /// The notes are ready: the brightness comes back; the mode stays to say so.
+    mutating func finish() -> Double? {
+        guard phase == .on else { return nil }
         phase = .finished
-        return s
+        return takeSaved()
     }
 
-    /// Leave, or the view goes away: back to the app; the work goes on in the background, nothing lost.
-    mutating func leave() -> Screen? {
-        let s = restore()
+    /// Leave, or the view goes away: back to the app; the work goes on, nothing lost.
+    mutating func leave() -> Double? {
+        let b = phase == .on ? takeSaved() : nil
         phase = .off
-        return s
+        return b
     }
 
-    /// Locked or switched away: the same as leaving.
-    mutating func background() -> Screen? { leave() }
+    /// Locked or switched away: the same as leaving (the mode closes).
+    mutating func background() -> Double? { leave() }
 
-    private mutating func restore() -> Screen? {
-        guard phase == .on, let b = saved else { return nil }
-        saved = nil
-        return Screen(brightness: b, idleTimerDisabled: false)
+    private mutating func dim(_ brightness: Double) -> Double? {
+        guard saved == nil else { return nil }
+        saved = min(1, max(0, brightness.isFinite ? brightness : 1))
+        return FinishNow.dimBrightness
     }
+
+    private mutating func takeSaved() -> Double? {
+        defer { saved = nil }
+        return saved
+    }
+}
+
+/// Who keeps the screen on (UIApplication.isIdleTimerDisabled): one rule for both owners. The Finish now mode while it
+/// is on, and the pipeline while a notes run is in front (a locked phone stops GPU work). Neither turns it off while the
+/// other still wants it.
+enum ScreenAwakeRule {
+    static func idleTimerDisabled(modeOn: Bool, pipelineWants: Bool) -> Bool { modeOn || pipelineWants }
 }
