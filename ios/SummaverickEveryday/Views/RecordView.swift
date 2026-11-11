@@ -9,7 +9,7 @@ struct RecordView: View {
     @State private var stoppedHere = false
     /// The recording's length at Stop, for the estimate.
     @State private var stoppedSeconds: TimeInterval = 0
-    /// The newest note before this recording: the note it becomes is newer (FinishNow.followed).
+    /// The highest note id before this recording: the note it becomes is newer (FinishNow.followed).
     @State private var newestBefore: Int64 = 0
 
     var body: some View {
@@ -98,7 +98,7 @@ struct RecordView: View {
         .background(Theme.background)
         .interactiveDismissDisabled()
         .task { await begin() }
-        .task { newestBefore = await CoreEngine.shared.notes(limit: 1).first?.id ?? 0 }
+        .task { newestBefore = await FinishNowController.highestNoteID() }
         .onAppear { controller.recordScreenShown = true }
         .onDisappear { controller.recordScreenShown = false }
         // Stopped from the Live Activity, a shortcut or the control: this screen has nothing left to show.
@@ -166,8 +166,8 @@ struct RecordView: View {
     private func stopAndProcess() {
         // Synchronous, before anything awaits: claims the work and the background time right in the tap.
         let seconds = controller.elapsed
-        // Finish now only when the notes will be written now (the language pack is ready).
-        stoppedHere = ModelManager.shared.isReady
+        // Finish now only when the notes will be written now (the language pack is ready), for 3 minutes or more.
+        stoppedHere = ModelManager.shared.isReady && FinishNow.offersAfterStop(recordedSeconds: seconds)
         guard controller.stop() else { stoppedHere = false; return }
         stoppedSeconds = seconds
         if !stoppedHere { dismiss() }

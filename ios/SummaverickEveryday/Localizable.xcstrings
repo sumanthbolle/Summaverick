@@ -7072,16 +7072,16 @@
       },
       "comment": "Button; %lld is minutes until the notes are ready with the app open"
     },
-    "Writing your notes · %lld of %lld": {
+    "Writing your notes · %lld of %lld parts": {
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "మీ నోట్స్ రాస్తున్నాను · %2$lld లో %1$lld"
+            "value": "మీ నోట్స్ రాస్తున్నాను · %2$lld భాగాల్లో %1$lld"
           }
         }
       },
-      "comment": "Finish now screen; parts of the notes ready, total parts"
+      "comment": "Finish now screen; parts of the notes written, total parts"
     },
     "Keep Summaverick open. You can put the phone face-up on the desk.": {
       "localizations": {
