@@ -196,6 +196,8 @@ struct FinishNowView: View {
     @State private var job: FinishNow.Job?
     /// The bar as shown: it never goes back (FinishNow.shownFraction); starts again for another note.
     @State private var shown = 0.0
+    /// The job's units when the mode opened on this note (FinishNow.sinceOpen); nil until the first reading.
+    @State private var baseline: Double?
     @State private var heat: HeatLadder.Level = .full
 
     var body: some View {
@@ -228,7 +230,7 @@ struct FinishNowView: View {
         .preferredColorScheme(.dark)
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
-        .task(id: noteID) { shown = 0; job = nil; await load() }
+        .task(id: noteID) { shown = 0; job = nil; baseline = nil; await load() }
         .task {
             while !Task.isCancelled {
                 await readJob()
@@ -297,7 +299,7 @@ struct FinishNowView: View {
         return FinishNow.notesReady(stepsReady: steps?.ready.count, stepsTotal: steps?.total, hasNotes: hasNotes, writing: writing)
     }
 
-    /// "Writing down what was said · 58 of 172", "Summarising part 7 of 16", "Writing your notes · 6 of 16 parts";
+    /// "Writing down what was said · 58 of 172", "Summarising section 7 of 16", "Writing your notes · 6 of 16 parts";
     /// "Working on it…" before the note is known.
     private var headline: String {
         guard noteID != nil, let job, job.total > 0 else { return String(localized: "Working on it…") }
@@ -319,7 +321,9 @@ struct FinishNowView: View {
         let w = await FinishNowController.work(for: n)
         let j = FinishNow.job(w)
         if j != job { job = j }
-        let f = FinishNow.shownFraction(previous: shown, next: j.fraction, working: writing)
+        if baseline == nil { baseline = j.units }
+        let f = FinishNow.shownFraction(previous: shown, next: FinishNow.sinceOpen(j, baseline: baseline ?? 0),
+                                        working: writing, ready: ready)
         if f != shown { shown = f }
     }
 

@@ -347,15 +347,22 @@ enum StepBackend {
 
     enum Why: Equatable { case inFront, background, recording, warm, kept }
 
+    /// The warmest heat a step may use the GPU at: full for a transcript piece (the 2026-11-07 spike: GPU pieces
+    /// heat the phone to serious within a minute and are barely faster than the CPU), eased for the rest.
+    static func gpuHeatLimit(piece: Bool) -> HeatLadder.Level { piece ? .full : .eased }
+
     /// frontSeconds: how long the app has been in front since it last left the background. current: what is loaded.
+    /// piece: the step is a transcript piece.
     static func choose(state: ThreadChoice.AppState, frontSeconds: Double, heat: HeatLadder.Level, recording: Bool,
-                       current: ModelBackend?) -> (backend: ModelBackend, why: Why) {
+                       current: ModelBackend?, piece: Bool = false) -> (backend: ModelBackend, why: Why) {
         if state == .background { return (.cpu, .background) }
         if recording { return (.cpu, .recording) }
-        if heat > .eased { return (.cpu, .warm) }
+        if heat > gpuHeatLimit(piece: piece) { return (.cpu, .warm) }
         if state == .active, frontSeconds.isFinite, frontSeconds >= frontStintSeconds { return (.gpu, .inFront) }
-        // A moment in front, or inactive: nothing is moved. Nothing loaded yet: the CPU only for a moment in front
-        // that may end at once; inactive loads the CPU too (it is on the way to the background as often as back).
+        // In front with nothing loaded: the GPU at once (a CPU load first would cost a second load).
+        if state == .active, current == nil { return (.gpu, .inFront) }
+        // A moment in front, or inactive: nothing is moved. Inactive with nothing loaded: the CPU (it is on the way
+        // to the background as often as back).
         return (current ?? .cpu, .kept)
     }
 
@@ -1996,6 +2003,9 @@ enum FinishNow {
         var current: Int
         var total: Int
         var fraction: Double
+        /// Work done and all the work, in GPU seconds (fraction = units ÷ all), for the bar since the mode opened.
+        var units: Double = 0
+        var all: Double = 0
     }
 
     static func job(_ w: Work) -> Job {
@@ -2006,7 +2016,8 @@ enum FinishNow {
             + Double(m.parts.total) * gpuSecondsPerPart
         let f = all > 0 ? min(1, max(0, units / all)) : 0
         func at(_ s: Stage, _ c: (done: Int, total: Int)) -> Job {
-            Job(stage: s, current: c.total > 0 ? min(c.done + 1, c.total) : 0, total: c.total, fraction: f)
+            Job(stage: s, current: c.total > 0 ? min(c.done + 1, c.total) : 0, total: c.total, fraction: f,
+                units: units, all: all)
         }
         if !w.transcriptDone, m.pieces.done < m.pieces.total { return at(.transcript, m.pieces) }
         if m.summaries.done < m.summaries.total { return at(.summaries, m.summaries) }
@@ -2028,17 +2039,28 @@ enum FinishNow {
     static func headline(_ j: Job) -> String {
         switch j.stage {
         case .transcript: return String(localized: "Writing down what was said · \(j.current) of \(j.total)")
-        case .summaries: return String(localized: "Summarising part \(j.current) of \(j.total)")
+        case .summaries: return String(localized: "Summarising section \(j.current) of \(j.total)")
         case .parts: return String(localized: "Writing your notes · \(j.current) of \(j.total) parts")
         }
     }
 
-    /// The bar never goes back (a total that grows, the sections planned, the transcript stored) and, while the note is
-    /// being worked on, never shows empty.
+    /// The bar measures from where the job was when the mode opened (baseline: Job.units then), so a note whose
+    /// transcript was written live opens near 0, not near the end: (units − baseline) ÷ (all − baseline). Nothing left
+    /// at the open: 0 (the ready check finishes it).
+    static func sinceOpen(_ j: Job, baseline: Double) -> Double {
+        let b = max(0, baseline.isFinite ? baseline : 0)
+        guard j.all - b > 0 else { return 0 }
+        return min(1, max(0, (j.units - b) / (j.all - b)))
+    }
+
+    /// The bar never goes back (a total that grows, the sections planned, the transcript stored), while the note is
+    /// being worked on never shows empty, and stays below readyCap until the notes are ready (putting them together
+    /// comes after the last part).
     static let workingFloor = 0.02
-    static func shownFraction(previous: Double, next: Double, working: Bool) -> Double {
+    static let readyCap = 0.97
+    static func shownFraction(previous: Double, next: Double, working: Bool, ready: Bool = false) -> Double {
         let f = max(previous.isFinite ? previous : 0, next.isFinite ? next : 0)
-        return min(1, working ? max(workingFloor, f) : f)
+        return min(ready ? 1 : readyCap, working ? max(workingFloor, f) : f)
     }
 
     /// Parts still to write: the sections not done yet, plus the sections the recording will have that are not cut yet

@@ -7148,13 +7148,13 @@
         }
       }
     },
-    "Summarising part %lld of %lld": {
-      "comment": "Finish now screen; the part of the recording being summarised, total parts",
+    "Summarising section %lld of %lld": {
+      "comment": "Finish now screen; the section of the recording being summarised, total sections",
       "localizations": {
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "సారాంశం రాస్తున్నాను · %2$lld భాగాల్లో %1$lld"
+            "value": "సారాంశం రాస్తున్నాను · %2$lld విభాగాల్లో %1$lld"
           }
         }
       }

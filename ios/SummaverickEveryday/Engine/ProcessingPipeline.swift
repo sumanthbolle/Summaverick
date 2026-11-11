@@ -986,7 +986,7 @@ final class ProcessingPipeline {
         let (done, stop) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true,
                                                        shouldStop: { ContinuedWork.beat(); return Self.critical || abort.isSet },
                                                        backend: {
-                                                           let b: ModelBackend = StepBackend.piecesOnGPU ? await self.stepBackend() : .cpu
+                                                           let b: ModelBackend = StepBackend.piecesOnGPU ? await self.stepBackend(piece: true) : .cpu
                                                            self.stepOnGPU = b == .gpu
                                                            return b
                                                        },
@@ -1037,7 +1037,14 @@ final class ProcessingPipeline {
     /// The backend for the next step of a notes run (a piece, a section summary, a part, an output), picked at the step
     /// boundary and never during a step (StepBackend): the GPU once the app has been in front a few seconds with the
     /// heat full or eased, the CPU in the background, while recording or when warmer. A move is logged.
-    private func stepBackend() async -> ModelBackend {
+    private func stepBackend(piece: Bool = false) async -> ModelBackend {
+        let c = await stepChoice(piece: piece)
+        if let line = StepBackend.moveLine(from: c.current, to: c.backend, why: c.why) { NSLog("[sve] %@", line) }
+        return c.backend
+    }
+
+    /// StepBackend's choice for now, with what is loaded; not logged.
+    private func stepChoice(piece: Bool = false) async -> (backend: ModelBackend, why: StepBackend.Why, current: ModelBackend?) {
         let state: ThreadChoice.AppState
         switch UIApplication.shared.applicationState {
         case .active: state = .active
@@ -1048,9 +1055,8 @@ final class ProcessingPipeline {
         let current = await CoreEngine.shared.loadedBackend
         let c = StepBackend.choose(state: state, frontSeconds: frontSince.map { Date().timeIntervalSince($0) } ?? 0,
                                    heat: HeatGovernor.threads.currentLevel, recording: LiveTranscriber.shared.isRecording,
-                                   current: current)
-        if let line = StepBackend.moveLine(from: current, to: c.backend, why: c.why) { NSLog("[sve] %@", line) }
-        return c.backend
+                                   current: current, piece: piece)
+        return (c.backend, c.why, current)
     }
 
     /// One model step on the backend for right now (StepBackend: GPU in front, else CPU). A GPU run cut off by the
@@ -1981,11 +1987,15 @@ final class ProcessingPipeline {
         let memoryStop = self.memoryStop
         var retried = false
         while true {
-            var backend: ModelBackend = retried ? .cpu : await stepBackend()
+            let choice = retried ? (backend: ModelBackend.cpu, why: StepBackend.Why.background, current: ModelBackend?.none)
+                : await stepChoice()
+            var backend = choice.backend, why = choice.why
             if backend == .gpu {
                 leftFront.set(false)
-                if !appIsActive { backend = .cpu }   // left the front just now
+                if !appIsActive { backend = .cpu; why = .background }   // left the front just now
             }
+            // Logged after the override, so the line says where the memories really run.
+            if let line = StepBackend.moveLine(from: choice.current, to: backend, why: why) { NSLog("[sve] %@", line) }
             let gpu = backend == .gpu
             do {
                 try await ModelManager.shared.loadIntoCore(backend: backend)
