@@ -306,6 +306,16 @@ enum ModelBackend: Equatable {
     var threads: Int32 { self == .cpu ? 4 : 0 }
 }
 
+/// When Whisper writes the transcript (spec section 4): only with its model ready, and on the GPU, or on the CPU
+/// once the CPU is measured faster than the audio.
+enum WhisperChoice {
+    static let cpuFasterThanAudio = false
+
+    static func use(whisperReady: Bool, backend: ModelBackend) -> Bool {
+        whisperReady && (backend == .gpu || cpuFasterThanAudio)
+    }
+}
+
 enum ModelPurpose: Equatable {
     /// Recording -> text (live and after Stop).
     case transcription

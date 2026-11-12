@@ -87,7 +87,7 @@ enum TranscriptRun {
 
     /// The pieces as the note stores them.
     static func pieces(_ s: TranscriptSidecar) -> [TranscriptPiece] {
-        s.pieces.map { TranscriptPiece(startSec: $0.start_sec, text: $0.text, conf: $0.conf) }
+        s.pieces.filter { $0.pending != true }.map { TranscriptPiece(startSec: $0.start_sec, text: $0.text, conf: $0.conf) }
     }
 }
 

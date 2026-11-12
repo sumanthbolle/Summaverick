@@ -113,6 +113,10 @@ struct TranscriptSidecar: Codable, Equatable {
         var text: String
         /// Mean token probability of the piece (0...1); absent in sidecars from before and when unknown.
         var conf: Double?
+        /// Set while Gemma has the piece's audio and the text is still to come (Whisper wrote none); absent otherwise.
+        var pending: Bool?
+        /// Sample (16 kHz) the piece's audio ends at, kept with a pending piece.
+        var end_sample: Int64?
     }
 
     /// Next sample (16 kHz) to transcribe from.
@@ -127,7 +131,9 @@ struct TranscriptSidecar: Codable, Equatable {
 
     var transcribedSeconds: Double { Double(cursor_sample) / Self.sampleRate }
     /// Context for the next piece: the text of the last piece that had any.
-    var previousText: String? { pieces.last(where: { !$0.text.isEmpty })?.text }
+    var previousText: String? { pieces.last(where: { !$0.text.isEmpty && $0.pending != true })?.text }
+    /// Indices of the pieces whose text is still to come.
+    var pendingIndices: [Int] { pieces.indices.filter { pieces[$0].pending == true } }
 
     /// Adds a finished piece and moves the cursor. Empty text (silence) only moves the cursor.
     /// A piece that does not move the cursor forward is ignored.
@@ -135,7 +141,28 @@ struct TranscriptSidecar: Codable, Equatable {
         guard endSample > cursor_sample else { return }
         cursor_sample = endSample
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !t.isEmpty { pieces.append(Piece(start_sec: startSec, text: t, conf: conf)) }
+        if !t.isEmpty { pieces.append(Piece(start_sec: startSec, text: t, conf: conf, pending: nil, end_sample: nil)) }
+    }
+
+    /// Adds an empty piece marked pending, for text to be filled in later, and moves the cursor.
+    mutating func appendPending(startSec: Int, endSample: Int64) {
+        guard endSample > cursor_sample else { return }
+        cursor_sample = endSample
+        pieces.append(Piece(start_sec: startSec, text: "", conf: nil, pending: true, end_sample: endSample))
+    }
+
+    /// Sets a pending piece's text and clears the mark. Empty text removes the piece.
+    mutating func fill(_ index: Int, text: String, conf: Double?) {
+        guard pieces.indices.contains(index) else { return }
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty {
+            pieces.remove(at: index)
+        } else {
+            pieces[index].text = t
+            pieces[index].conf = conf
+            pieces[index].pending = nil
+            pieces[index].end_sample = nil
+        }
     }
 
     static func path(forAudio audioPath: String) -> String { audioPath + ".live.json" }
