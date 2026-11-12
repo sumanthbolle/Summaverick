@@ -1018,13 +1018,13 @@ final class ProcessingPipeline {
         func whisperBackend() -> ModelBackend? {
             let inBackground = UIApplication.shared.applicationState == .background
             if !inBackground { leftFront.set(false) }   // a move to the background from here on cuts the group short
-            return WhisperChoice.backend(whisperReady: ModelManager.shared.whisperReady && !whisperOff,
+            return WhisperChoice.backend(whisperReady: ModelManager.shared.whisperReady && WhisperSwitch.isOn() && !whisperOff,
                                          inBackground: inBackground, heatPaused: HeatGovernor.shared.level == .paused)
         }
         var lastLine: String?
         func logStep(_ line: String) {
             // Only with Whisper's model on the phone, so without it the log is as before.
-            guard ModelManager.shared.whisperReady, line != lastLine else { return }
+            guard ModelManager.shared.whisperReady, WhisperSwitch.isOn(), line != lastLine else { return }
             lastLine = line
             NSLog("[sve] note %lld transcript: %@", noteID, line)
         }
