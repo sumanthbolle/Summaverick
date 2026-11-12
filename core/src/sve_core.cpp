@@ -1297,6 +1297,8 @@ int sve_load_asr(sve_ctx *ctx, const char *path, int use_gpu, int n_threads) {
     // turns that off, to compare the text both ways on the phone.
     const char *reencode = getenv("SVE_WHISPER_REENCODE");
     whisper_set_encode_reuse_with_state(ctx->asr_state, !(reencode && reencode[0] == '1'));
+    const char *langtest = getenv("SVE_WHISPER_LANGTEST");
+    ctx->whisper_langtest = langtest && langtest[0] == '1';
     unsigned hw = std::thread::hardware_concurrency();
     ctx->whisper_threads = n_threads > 0 ? n_threads : (int)std::max(1u, std::min(hw, 4u));
     return 0;
@@ -1360,12 +1362,12 @@ static sve::LangChoice whisper_piece_lang(sve_ctx *ctx, const float *s, int64_t 
 // One Telugu piece: greedy, no timestamps (the fine-tune has none, and with them the first letter breaks), no
 // temperature fallback, no context, encoder sized to the piece. Adds its text tokens' probabilities to p_sum/p_n.
 static bool whisper_decode_piece(sve_ctx *ctx, const float *s, int64_t n, WhisperWatch &watch, std::string &text,
-                                 double &p_sum, int &p_n) {
+                                 double &p_sum, int &p_n, const char *lang = "te") {
     whisper_context *w = ctx->whisper;
     whisper_state *st = ctx->asr_state;
     whisper_full_params wp = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     wp.n_threads = ctx->whisper_threads;
-    wp.language = "te";
+    wp.language = lang;
     wp.detect_language = false;
     wp.translate = false;
     wp.no_context = true;
@@ -1443,7 +1445,10 @@ char *sve_whisper_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_s
             if (cb && cb("chunk", i, n, user)) return nullptr;
             const sve::Span &sp = g.spans[i];
             const auto t_lang = clk::now();
-            if (whisper_piece_lang(ctx, pcm.data() + sp.start, sp.end - sp.start) == sve::LangChoice::Gemma)
+            // Language test (DEBUG measurement): the check is logged but never sends the group to Gemma, and the
+            // piece is also decoded as English below, so te and en confidence can be compared on known recordings.
+            if (whisper_piece_lang(ctx, pcm.data() + sp.start, sp.end - sp.start) == sve::LangChoice::Gemma &&
+                !ctx->whisper_langtest)
                 return piece("", std::nan(""), true);
             const long lang_ms = ms_since(t_lang);
             WhisperWatch watch{cb, user, i, n, false};
@@ -1455,6 +1460,25 @@ char *sve_whisper_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_s
             if (!whisper_decode_piece(ctx, pcm.data() + sp.start, sp.end - sp.start, watch, text, s_sum, s_n)) {
                 if (!watch.cancelled) sve_logf(2, "whisper failed on a piece of %s", wav_path);
                 return nullptr;
+            }
+            if (ctx->whisper_langtest) {
+                std::string en_text;
+                double e_sum = 0;
+                int e_n = 0;
+                WhisperWatch en_watch{cb, user, i, n, false};
+                const auto t_en = clk::now();
+                if (whisper_decode_piece(ctx, pcm.data() + sp.start, sp.end - sp.start, en_watch, en_text, e_sum, e_n,
+                                         "en")) {
+                    auto head = [](const std::string &t) {   // about 80 bytes, cut on a UTF-8 boundary
+                        size_t k = std::min<size_t>(t.size(), 80);
+                        while (k < t.size() && (t[k] & 0xC0) == 0x80) ++k;
+                        return t.substr(0, k);
+                    };
+                    sve_logf(0, "whisper langtest %.1f s @%.0f s: te conf %.3f (%d tok) \"%s\" | en conf %.3f (%d tok, %ld ms) \"%s\"",
+                             (sp.end - sp.start) / (double)sve::kAudioRate,
+                             (start_sample + sp.start) / (double)sve::kAudioRate, s_n ? s_sum / s_n : 0.0, s_n,
+                             head(text).c_str(), e_n ? e_sum / e_n : 0.0, e_n, ms_since(t_en), head(en_text).c_str());
+                }
             }
             // For the device checks: language check and decode timed apart, and whether the encoder run was reused.
             sve_logf(0, "whisper piece %.1f s: lang %ld ms, decode %ld ms, encoder %s",

@@ -3032,7 +3032,13 @@ extension ProcessingPipeline {
             TranscriptSidecar.remove(audioPath: dst)
             try? fm.removeItem(atPath: dst)
             try? fm.removeItem(atPath: textPath)
-            do { try fm.copyItem(atPath: src, toPath: dst) } catch {
+            do {
+                if src.lowercased().hasSuffix(".m4a") {   // compressed once its notes were done
+                    try AudioCompressor.expandToWav(URL(fileURLWithPath: src), to: URL(fileURLWithPath: dst))
+                } else {
+                    try fm.copyItem(atPath: src, toPath: dst)
+                }
+            } catch {
                 NSLog("[sve] debug retranscribe: copy failed (%@)", String(describing: error))
                 return
             }

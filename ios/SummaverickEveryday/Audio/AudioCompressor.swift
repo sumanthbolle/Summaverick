@@ -49,6 +49,32 @@ enum AudioCompressor {
         }
     }
 
+    /// DEBUG tools: a compressed recording written back out as 16 kHz mono 16-bit WAV at `dst` (the m4a is 16 kHz
+    /// mono already; AVAudioFile converts the samples).
+    nonisolated static func expandToWav(_ src: URL, to dst: URL) throws {
+        let input = try AVAudioFile(forReading: src)
+        guard input.length > 0 else { throw Failure.empty }
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 16_000.0,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ]
+        var output: AVAudioFile? = try AVAudioFile(forWriting: dst, settings: settings,
+                                                   commonFormat: input.processingFormat.commonFormat,
+                                                   interleaved: input.processingFormat.isInterleaved)
+        let chunk: AVAudioFrameCount = 16_000 * 30
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: chunk) else { throw Failure.empty }
+        while input.framePosition < input.length {
+            try input.read(into: buffer, frameCount: chunk)
+            if buffer.frameLength == 0 { break }
+            try output?.write(from: buffer)
+        }
+        output = nil
+    }
+
     /// The WAV this .m4a was made from (same folder, same name).
     nonisolated static func wavSibling(ofM4A path: String) -> String {
         ((path as NSString).deletingPathExtension) + ".wav"

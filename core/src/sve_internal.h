@@ -100,5 +100,6 @@ struct sve_ctx {
     whisper_context *whisper = nullptr;    // loaded without its default state; asr_state is the only one
     whisper_state *asr_state = nullptr;
     int whisper_threads = 4;
+    bool whisper_langtest = false;   // SVE_WHISPER_LANGTEST=1: each piece decoded as te and en, both logged
 #endif
 };
