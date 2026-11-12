@@ -122,6 +122,10 @@ actor CoreEngine {
     private(set) var loadedBackend: ModelBackend?
     /// What the last loadModel asked for, so a run can switch backend itself (ensureBackend).
     private var lastLoad: (path: String, contextTokens: Int32, mmprojPath: String?)?
+    /// The backend of the last loadModel, so ensureGemmaLoaded loads Gemma back as its caller had it.
+    private var lastGemmaBackend: ModelBackend?
+    /// Whether Whisper freed Gemma since Gemma's last load (ensureGemmaLoaded).
+    private var slot = ModelSlot()
 
     /// Loads the model (and projector) on `backend`. A no-op when that is what is loaded; reloads
     /// (about 5 s) when the backend differs. Call between model runs, never during one.
@@ -131,12 +135,13 @@ actor CoreEngine {
         let swapStart: Date? = sve_asr_loaded(ctx) != 0 ? Date() : nil
         unloadWhisper()
         lastLoad = (path, contextTokens, mmprojPath)
+        lastGemmaBackend = backend
         // After a failed GPU run the Metal state stays broken (owner's iPhone: every later run failed at once with
         // "command buffer 0 failed with status 5", in front too), so the same backend is loaded again.
         let broken = sve_llm_needs_reload(ctx) != 0
         if broken { NSLog("[sve] a GPU run failed; loading the model again") }
         if !broken, loadedModelPath == path, loadedBackend == backend, sve_llm_loaded(ctx) != 0,
-           mmprojPath == nil || sve_audio_loaded(ctx) != 0 { applyHeatThreads(); return }
+           mmprojPath == nil || sve_audio_loaded(ctx) != 0 { slot.gemmaLoaded(); applyHeatThreads(); return }
         cpuThreads = nil
         let pair = CoreEngine.pairWriting
         sve_set_pair_enabled(ctx, pair ? 1 : 0)   // before the load: off loads the model with one sequence
@@ -148,6 +153,7 @@ actor CoreEngine {
         }
         loadedModelPath = path
         loadedBackend = backend
+        slot.gemmaLoaded()
         NSLog("[sve] model loaded on the %@", backend == .gpu ? "GPU" : "CPU")
         applyHeatThreads()   // before the projector: it loads with the batch threads, so it needs no second load
         if let mmprojPath, sve_load_audio(ctx, mmprojPath) != 0 {
@@ -189,9 +195,21 @@ actor CoreEngine {
         try loadModel(at: l.path, contextTokens: l.contextTokens, mmprojPath: l.mmprojPath, backend: backend)
     }
 
+    /// First thing in every call that runs Gemma, in the same actor turn as the run: when Whisper freed Gemma since
+    /// its caller loaded it (the caller's load and run are separate turns, and runWhisper's next piece may come in
+    /// between), Gemma is loaded again as last asked, which frees Whisper and logs the swap. A no-op when Gemma is
+    /// loaded, was never loaded, or was freed on purpose. Internal only because the Gemma calls span three files.
+    func ensureGemmaLoaded() throws {
+        guard slot.needsGemmaReload(gemmaLoaded: sve_llm_loaded(ctx) != 0),
+              let l = lastLoad, let b = lastGemmaBackend else { return }
+        NSLog("[sve] Gemma was freed for Whisper; loading it again for this run")
+        try loadModel(at: l.path, contextTokens: l.contextTokens, mmprojPath: l.mmprojPath, backend: b)
+    }
+
     /// Transcribes a 16 kHz WAV with the loaded audio-capable model. progress: (done pieces, total pieces).
     func transcribeAudio(path: String, onProgress: @escaping (Int, Int) -> Void = { _, _ in }) throws -> String {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
         let box = ProgressBox(onProgress: { _, d, t in onProgress(d, t) }, isCancelled: { Task.isCancelled })
         let user = Unmanaged.passUnretained(box).toOpaque()
@@ -201,7 +219,13 @@ actor CoreEngine {
         return out
     }
 
+    /// Frees Gemma on purpose: it is not loaded again by itself (ensureGemmaLoaded).
     func unloadModel() {
+        freeGemma()
+        slot.gemmaUnloaded()
+    }
+
+    private func freeGemma() {
         sve_unload_llm(ctx)
         loadedModelPath = nil
         loadedBackend = nil
@@ -224,7 +248,8 @@ actor CoreEngine {
         if sve_asr_loaded(ctx) != 0, loadedWhisperBackend == backend, sve_llm_loaded(ctx) == 0 { return }
         let start = Date()
         let swap = sve_llm_loaded(ctx) != 0
-        unloadModel()
+        slot.whisperLoading(gemmaWasLoaded: swap)   // its next run loads it back (ensureGemmaLoaded)
+        freeGemma()
         if sve_load_asr(ctx, path, backend == .gpu ? 1 : 0, backend.threads) != 0 {
             loadedWhisperBackend = nil
             throw CoreError.modelLoadFailed(path)
@@ -330,6 +355,7 @@ actor CoreEngine {
     func generate(transcript: String, kind: OutputKind, lang: String, shouldStop: @escaping () -> Bool = { false },
                   onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> String {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let out = take(sve_generate(ctx, transcript, kind.cKind, lang, CoreEngine.progressTrampoline, user)) else {
@@ -353,6 +379,7 @@ actor CoreEngine {
     func sectionOutputsPair(noteID: Int64, idx: Int, lang: String, shouldStop: @escaping () -> Bool = { false },
                             onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> Int {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         let stored = Int(sve_section_outputs_pair(ctx, noteID, Int32(idx), lang, CoreEngine.progressTrampoline, user))
@@ -362,6 +389,7 @@ actor CoreEngine {
 
     func ask(context: String, question: String, lang: String) throws -> String {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled })
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let out = take(sve_ask(ctx, context, question, lang, CoreEngine.progressTrampoline, user)) else {
@@ -373,12 +401,14 @@ actor CoreEngine {
     /// Whether `generate` takes the whole transcript in one prompt (no chunking). nil with no model.
     func transcriptFits(_ transcript: String, lang: String) -> Bool? {
         guard let ctx else { return nil }
+        try? ensureGemmaLoaded()
         let r = sve_transcript_fits(ctx, transcript, lang)
         return r < 0 ? nil : r == 1
     }
 
     func suggestTitle(transcript: String, lang: String) -> String? {
         guard let ctx else { return nil }
+        try? ensureGemmaLoaded()
         let t = take(sve_suggest_title(ctx, transcript, lang))?.trimmingCharacters(in: .whitespacesAndNewlines)
         return (t?.isEmpty ?? true) ? nil : t
     }

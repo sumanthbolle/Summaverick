@@ -26,6 +26,7 @@ extension CoreEngine {
     func memoriesFromSection(noteID: Int64, idx: Int, backend: ModelBackend? = nil,
                              shouldStop: @escaping () -> Bool = { false }) throws -> Int {
         guard let ctx else { throw MemoryError.unavailable }
+        try ensureGemmaLoaded()
         if let backend { try ensureBackend(backend) }
         let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()

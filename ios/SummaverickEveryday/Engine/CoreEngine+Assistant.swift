@@ -187,6 +187,7 @@ extension CoreEngine {
     func topicSummary(_ topicID: Int64, lang: String,
                       onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> TopicSummary {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         let box = progressBox(onProgress)
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let json = take(sve_topic_summary(ctx, topicID, lang, CoreEngine.progressTrampoline, user)) else {
@@ -210,6 +211,7 @@ extension CoreEngine {
 
     func ask(_ question: String, onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> AskAnswer {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         let box = progressBox(onProgress)
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let json = take(sve_assistant_ask(ctx, question, CoreEngine.progressTrampoline, user)) else {
@@ -316,6 +318,7 @@ extension CoreEngine {
               onKind: @escaping @MainActor (String) -> Void = { _ in },
               onText: @escaping @MainActor (String) -> Void = { _ in }) async throws -> AskAnswer {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         guard let json = encodeJSON(messages) else { throw AssistantError.badJSON }
         let text = TextBox(onText: onText, isCancelled: { Task.isCancelled })
         let box = progressBox { phase, _, _ in
@@ -344,6 +347,7 @@ extension CoreEngine {
     func extract(noteID: Int64, shouldStop: @escaping () -> Bool = { false },
                  onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> Int {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         let n = sve_extract(ctx, noteID, CoreEngine.progressTrampoline, user)
@@ -359,6 +363,7 @@ extension CoreEngine {
     /// At most one per calendar day; nil when there is nothing new, or when shouldStop cancelled it (nothing stored).
     /// Runs the model (this actor's context).
     func generateInsight(noteID: Int64, shouldStop: @escaping () -> Bool = { false }) -> Insight? {
+        try? ensureGemmaLoaded()
         let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         return decode(Insight.self, take(sve_insight_generate(ctx, noteID, CoreEngine.progressTrampoline, user)))
@@ -386,6 +391,7 @@ extension CoreEngine {
                           shouldStart: () -> Bool = { true },
                           shouldStop: @escaping () -> Bool = { false }) throws -> SectionSummary? {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         guard shouldStart() else { return nil }
         if let backend { try ensureBackend(backend) }
         guard let json = encodeJSON(pieces) else { throw AssistantError.badJSON }
@@ -413,6 +419,7 @@ extension CoreEngine {
                         backend: ModelBackend, shouldStart: () -> Bool,
                         shouldStop: @escaping () -> Bool) throws -> LiveWritten? {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         guard shouldStart() else { return nil }
         try ensureBackend(backend)
         guard let pj = encodeJSON(pieces), let sj = encodeJSON(summary) else { throw AssistantError.badJSON }
@@ -471,6 +478,7 @@ extension CoreEngine {
     func generateFromSections(noteID: Int64, kind: OutputKind, lang: String, shouldStop: @escaping () -> Bool = { false },
                               onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) -> String? {
         guard let ctx else { return nil }
+        try? ensureGemmaLoaded()
         let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         return take(sve_generate_from_sections(ctx, noteID, kind.cKind, lang, CoreEngine.progressTrampoline, user))
@@ -482,6 +490,7 @@ extension CoreEngine {
     func sectionOutput(noteID: Int64, idx: Int, kind: NoteSteps.Kind, lang: String, shouldStop: @escaping () -> Bool = { false },
                        onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> String {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let out = take(sve_section_output(ctx, noteID, Int32(idx), kind.outputKind.cKind, lang,
@@ -517,6 +526,7 @@ extension CoreEngine {
     /// A title from the section titles; nil when there are no sections or no model.
     func titleFromSections(noteID: Int64, lang: String) -> String? {
         guard let ctx else { return nil }
+        try? ensureGemmaLoaded()
         let t = take(sve_title_from_sections(ctx, noteID, lang))?.trimmingCharacters(in: .whitespacesAndNewlines)
         return (t?.isEmpty ?? true) ? nil : t
     }
@@ -528,6 +538,7 @@ extension CoreEngine {
     func transcribeAudioPieces(path: String, shouldStop: @escaping () -> Bool = { false },
                                onProgress: @escaping (Int, Int) -> Void = { _, _ in }) throws -> [TranscriptPiece] {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
         let box = ProgressBox(onProgress: { _, d, t in onProgress(d, t) }, isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
@@ -567,6 +578,7 @@ extension CoreEngine {
                              shouldStart: () -> Bool = { true },
                              shouldStop: @escaping () -> Bool = { false }) throws -> NextPiece {
         guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
         guard shouldStart() else { return .skipped }
         try ensureBackend(backend)
         guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }

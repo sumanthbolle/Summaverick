@@ -155,7 +155,8 @@ struct TranscriptSidecar: Codable, Equatable {
     }
 
     /// Sets a pending piece's text and clears the mark. Empty text removes the piece, which shifts the indices of
-    /// the later pieces: fill several in descending index order. A piece that is not pending is left alone.
+    /// the later pieces: fill several in descending index order, or re-read pendingIndices after each fill (as
+    /// TranscriptRun.fillPending does). A piece that is not pending is left alone.
     mutating func fill(_ index: Int, text: String, conf: Double?) {
         guard pieces.indices.contains(index), pieces[index].pending == true else { return }
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)

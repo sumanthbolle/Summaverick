@@ -994,9 +994,10 @@ final class ProcessingPipeline {
         var whisperOff = false
         var atEnd = false
         while true {
-            let onGPU: Bool
-            if atEnd { onGPU = false } else { onGPU = await pieceBackend() == .gpu }
-            let step = WhisperFlow.next(whisperReady: ModelManager.shared.whisperReady && !whisperOff, onGPU: onGPU,
+            let whisperReady = ModelManager.shared.whisperReady && !whisperOff
+            // The backend is asked here only when Whisper could run, so without Whisper the log is as before.
+            let onGPU = whisperReady && !atEnd ? await pieceBackend() == .gpu : false
+            let step = WhisperFlow.next(whisperReady: whisperReady, onGPU: onGPU,
                                         cursorAtEnd: atEnd, pending: done.pendingIndices.count)
             switch step {
             case .whisper:
@@ -1008,7 +1009,10 @@ final class ProcessingPipeline {
                     done = d
                     atEnd = true
                 } catch {
-                    if error is CancellationError || shouldStop() || Task.isCancelled { throw error }
+                    if error is CancellationError || shouldStop() || Task.isCancelled {
+                        await CoreEngine.shared.unloadWhisper()   // paused: its 1.1 GB is not held meanwhile
+                        throw error
+                    }
                     NSLog("[sve] whisper stopped (%@); Gemma goes on from the saved cursor", String(describing: error))
                     whisperOff = true
                     done = TranscriptSidecar.load(audioPath: audio.path)

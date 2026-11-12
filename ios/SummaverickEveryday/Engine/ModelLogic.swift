@@ -316,6 +316,20 @@ enum WhisperChoice {
     }
 }
 
+/// Whether Gemma must be loaded again before a Gemma run (CoreEngine.ensureGemmaLoaded). Only when Whisper freed it:
+/// a caller that loaded Gemma and runs it in a later actor turn may find Whisper took its place in between. Gemma
+/// never loaded, or freed on purpose (unloadModel), is left alone. The flag outlives Whisper's own unload.
+struct ModelSlot: Equatable {
+    private(set) var gemmaFreedByWhisper = false
+
+    mutating func gemmaLoaded() { gemmaFreedByWhisper = false }
+    mutating func gemmaUnloaded() { gemmaFreedByWhisper = false }
+    /// Before Whisper loads; gemmaWasLoaded: Gemma was in memory and is freed for it.
+    mutating func whisperLoading(gemmaWasLoaded: Bool) { if gemmaWasLoaded { gemmaFreedByWhisper = true } }
+
+    func needsGemmaReload(gemmaLoaded: Bool) -> Bool { !gemmaLoaded && gemmaFreedByWhisper }
+}
+
 /// The order of a note's transcript after Stop (spec sections 2-3): Whisper writes it from the cursor while it may
 /// (WhisperChoice), else Gemma goes on from the same cursor as today; once the cursor is at the end, Gemma fills the
 /// pieces Whisper left pending. One model at a time: CoreEngine frees one before loading the other.
