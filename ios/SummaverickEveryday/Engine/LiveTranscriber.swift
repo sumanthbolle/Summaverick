@@ -29,6 +29,8 @@ enum TranscriptRun {
         case wait
         /// `shouldContinue` said no before a piece.
         case yielded
+        /// Whisper only: it may not run the next group (the app went to the background); Gemma goes on from the cursor.
+        case handedOff
     }
 
     /// shouldStop is asked during a model run (any thread) and cancels it: the run throws and the piece is
@@ -86,23 +88,35 @@ enum TranscriptRun {
     }
 
     /// After Stop, Whisper from the sidecar's cursor to the end (the recording is final), the same loop as `run`: the
-    /// heat gate before each piece, the cursor saved after each. A piece that isn't clearly Telugu is kept pending for
-    /// Gemma (fillPending). Whisper is loaded before every piece, a no-op unless Ask or a recording freed it meanwhile.
-    /// A failed piece (a GPU refused in the background, a failed load) throws, with no second try on the CPU: the
-    /// caller goes on with Gemma from the saved cursor.
+    /// heat gate before each group, the cursor saved after each. A group that isn't clearly Telugu is kept pending for
+    /// Gemma (fillPending). backend: asked before every group, after the heat gate and right before any model call
+    /// (WhisperChoice); nil (the app went to the background) ends the run with `.handedOff`, Whisper's GPU never
+    /// started in the background, and Gemma goes on from the cursor. Whisper is loaded before every group, a no-op
+    /// unless Ask or a recording freed it meanwhile. cutShort (any thread; the app went to the background during the
+    /// load or a group) cancels the group in flight and also hands off. A failed group otherwise throws, with no
+    /// second try on the CPU: the caller goes on with Gemma from the saved cursor.
     static func runWhisper(audioPath: String,
                            shouldStop: @escaping () -> Bool,
-                           backend: ModelBackend = .gpu,
+                           backend: () async -> ModelBackend? = { .gpu },
+                           cutShort: @escaping () -> Bool = { false },
                            beforePiece: () async -> Bool = { true },
                            onPiece: (TranscriptSidecar) -> Void = { _ in }) async throws -> (TranscriptSidecar, Stop) {
         var progress = TranscriptSidecar.load(audioPath: audioPath)
         while true {
             if shouldStop() || Task.isCancelled { throw CancellationError() }
             if !(await beforePiece()) { return (progress, .yielded) }
+            guard let b = await backend() else { return (progress, .handedOff) }
             let model = ModelManager.shared.whisperPath
-            try await CoreEngine.shared.loadWhisper(path: model, backend: backend)
-            let next = try await CoreEngine.shared.whisperNextPiece(path: audioPath, startSample: progress.cursor_sample,
-                                                                    isFinal: true, shouldStop: shouldStop)
+            let next: CoreEngine.WhisperPiece
+            do {
+                try await CoreEngine.shared.loadWhisper(path: model, backend: b)
+                next = try await CoreEngine.shared.whisperNextPiece(path: audioPath, startSample: progress.cursor_sample,
+                                                                    isFinal: true, shouldStop: { shouldStop() || cutShort() })
+            } catch {
+                guard cutShort(), !shouldStop(), !Task.isCancelled else { throw error }
+                NSLog("[sve] whisper group cut short: the app went to the background; Gemma goes on from the cursor")
+                return (progress, .handedOff)
+            }
             switch next {
             case .end: return (progress, .end)
             case .wait: return (progress, .wait)
@@ -121,11 +135,12 @@ enum TranscriptRun {
     /// Gemma fills the pieces Whisper left pending, oldest first, saving after each. backend: asked before every
     /// piece (loading Gemma there frees Whisper); a GPU piece that fails is tried once more on the CPU, unless
     /// shouldStop says the run is over. beforePiece false (the heat gate) throws CancellationError; the pieces
-    /// filled so far are kept.
+    /// filled so far are kept. onPiece gets the progress after each fill (the bar counts a pending piece once filled).
     static func fillPending(audioPath: String,
                             shouldStop: @escaping () -> Bool,
                             backend: () async -> ModelBackend = { .cpu },
-                            beforePiece: () async -> Bool = { true }) async throws -> TranscriptSidecar {
+                            beforePiece: () async -> Bool = { true },
+                            onPiece: (TranscriptSidecar) -> Void = { _ in }) async throws -> TranscriptSidecar {
         var progress = TranscriptSidecar.load(audioPath: audioPath)
         // Re-read after each fill: an empty text removes its piece and moves the later ones down.
         while let i = progress.pendingIndices.first {
@@ -135,6 +150,7 @@ enum TranscriptRun {
             guard let start = p.start_sample, let end = p.end_sample, end > start else {
                 progress.fill(i, text: "", conf: nil)   // no span to hear (should not happen): dropped
                 progress.save(audioPath: audioPath)
+                onPiece(progress)
                 continue
             }
             let previous = progress.pieces[..<i].last(where: { !$0.text.isEmpty && $0.pending != true })?.text
@@ -152,6 +168,7 @@ enum TranscriptRun {
             }
             progress.fill(i, text: heard.0, conf: heard.1)
             progress.save(audioPath: audioPath)
+            onPiece(progress)
         }
         return progress
     }

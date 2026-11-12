@@ -215,6 +215,9 @@ final class ProcessingPipeline {
     /// Set when the app stops being active (read on any thread): cancels a memory run on the GPU before iOS refuses
     /// GPU work in the background, where a failed reply would mark the section done with no memories.
     @ObservationIgnored private let leftFront = AtomicFlag()
+    /// The app went to the background during a Whisper group (read on any thread): the group is cut short and Gemma
+    /// goes on from the cursor on the CPU. Cleared before each group while the app is not in the background.
+    @ObservationIgnored private let whisperLeftFront = AtomicFlag()
     @ObservationIgnored private var resignObserver: NSObjectProtocol?
     @ObservationIgnored private var activeObserver: NSObjectProtocol?
     /// Some note may still have sections without memories (unknown at launch): the overnight task is asked for.
@@ -402,7 +405,10 @@ final class ProcessingPipeline {
         if UIApplication.shared.applicationState == .active { frontSince = Date() }
         enterBackgroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.frontSince = nil }
+            MainActor.assumeIsolated {
+                self?.whisperLeftFront.set(true)   // Whisper's GPU never runs in the background
+                self?.frontSince = nil
+            }
         }
         let leftFront = self.leftFront
         resignObserver = NotificationCenter.default.addObserver(
@@ -415,6 +421,9 @@ final class ProcessingPipeline {
                 Task { await self.resumeInterrupted() }
             }
         }
+        #if DEBUG
+        debugWhisperRetranscribe()
+        #endif
     }
 
     /// The heat ladder at paused (critical heat, or almost no free memory): the note is paused and resumes once the
@@ -976,10 +985,13 @@ final class ProcessingPipeline {
         stepOnGPU = false
         let duration = Double(max(1, durationSeconds))
         func report(_ s: TranscriptSidecar) {
+            // Pending pieces count as not done until Gemma fills them (doneSeconds), so the bar and the Live
+            // Activity do not reach the end while Gemma still has their audio.
+            let doneSeconds = s.doneSeconds
             // The fraction and the pieces first: the stage change sends them to the recording's Live Activity.
-            ContinuedWork.shared.update(fraction: NotesProgress.fraction(transcribedSeconds: s.transcribedSeconds, durationSeconds: duration))
-            transcribing = (s.transcribedSeconds, duration)
-            stage = .transcribing(min(1, s.transcribedSeconds / duration))
+            ContinuedWork.shared.update(fraction: NotesProgress.fraction(transcribedSeconds: doneSeconds, durationSeconds: duration))
+            transcribing = (doneSeconds, duration)
+            stage = .transcribing(min(1, doneSeconds / duration))
         }
         var done = TranscriptSidecar.load(audioPath: audio.path)
         report(done)   // from where live transcription got to
@@ -990,23 +1002,48 @@ final class ProcessingPipeline {
             self.stepOnGPU = b == .gpu
             return b
         }
-        // Whisper writes first while it may (WhisperFlow); a failure with it leaves the rest of this note to Gemma.
+        // Whisper writes first while it may; a failure with it leaves the rest of this note to Gemma.
         var whisperOff = false
         var atEnd = false
+        let leftFront = whisperLeftFront
+        // Whisper's own choice (WhisperChoice, not Gemma's piece heat rule), asked before every group, so a note
+        // moves to Gemma in the background and back to Whisper in front.
+        func whisperBackend() -> ModelBackend? {
+            let inBackground = UIApplication.shared.applicationState == .background
+            if !inBackground { leftFront.set(false) }   // a move to the background from here on cuts the group short
+            return WhisperChoice.backend(whisperReady: ModelManager.shared.whisperReady && !whisperOff,
+                                         inBackground: inBackground, heatPaused: HeatGovernor.shared.level == .paused)
+        }
+        var lastLine: String?
+        func logStep(_ line: String) {
+            // Only with Whisper's model on the phone, so without it the log is as before.
+            guard ModelManager.shared.whisperReady, line != lastLine else { return }
+            lastLine = line
+            NSLog("[sve] note %lld transcript: %@", noteID, line)
+        }
         while true {
-            let whisperReady = ModelManager.shared.whisperReady && !whisperOff
-            // The backend is asked here only when Whisper could run, so without Whisper the log is as before.
-            let onGPU = whisperReady && !atEnd ? await pieceBackend() == .gpu : false
-            let step = WhisperFlow.next(whisperReady: whisperReady, onGPU: onGPU,
-                                        cursorAtEnd: atEnd, pending: done.pendingIndices.count)
+            let step = WhisperFlow.next(whisper: atEnd ? nil : whisperBackend(), cursorAtEnd: atEnd,
+                                        pending: done.pendingIndices.count)
             switch step {
-            case .whisper:
+            case .whisper(let b):
+                logStep(b == .gpu ? "whisper on the GPU" : "whisper on the CPU")
                 do {
                     let (d, stop) = try await TranscriptRun.runWhisper(audioPath: audio.path, shouldStop: shouldStop,
+                                                                      backend: {
+                                                                          let b = whisperBackend()
+                                                                          if let b { self.stepOnGPU = b == .gpu }
+                                                                          return b
+                                                                      },
+                                                                      cutShort: { leftFront.isSet },
                                                                       beforePiece: { await self.heatGate(noteID) },
                                                                       onPiece: { report($0) })
                     if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
                     done = d
+                    if stop == .handedOff {
+                        // In the background: Whisper is freed before any GPU call, and Gemma goes on from the cursor.
+                        await CoreEngine.shared.unloadWhisper()
+                        continue
+                    }
                     atEnd = true
                 } catch {
                     if error is CancellationError || shouldStop() || Task.isCancelled {
@@ -1018,18 +1055,28 @@ final class ProcessingPipeline {
                     done = TranscriptSidecar.load(audioPath: audio.path)
                 }
             case .gemmaRemainder:
+                logStep(whisperOff ? "gemma (whisper failed)" : "gemma (app in the background or heat paused)")
+                var backToWhisper = false
                 let (d, stop) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true, shouldStop: shouldStop,
                                                             backend: pieceBackend,
-                                                            beforePiece: { await self.heatGate(noteID) },
+                                                            beforePiece: {
+                                                                // Whisper may run again (back in front): it takes the
+                                                                // next group, after its own heat gate.
+                                                                if whisperBackend() != nil { backToWhisper = true; return false }
+                                                                return await self.heatGate(noteID)
+                                                            },
                                                             onPiece: { report($0) })
-                if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
                 done = d
+                if stop == .yielded, backToWhisper { continue }
+                if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
                 atEnd = true
             case .fillPending:
+                logStep("gemma fills the pieces whisper left")
                 await CoreEngine.shared.unloadWhisper()
                 done = try await TranscriptRun.fillPending(audioPath: audio.path, shouldStop: shouldStop,
                                                            backend: pieceBackend,
-                                                           beforePiece: { await self.heatGate(noteID) })
+                                                           beforePiece: { await self.heatGate(noteID) },
+                                                           onPiece: { report($0) })
             case .done:
                 await CoreEngine.shared.unloadWhisper()   // Gemma writes the rest of the note
                 return done
@@ -2939,3 +2986,94 @@ private final class CallbackCounter: @unchecked Sendable {
         return count
     }
 }
+
+#if DEBUG
+// MARK: Debug: Whisper alone over a note's audio (device checks; no UI)
+
+extension ProcessingPipeline {
+    /// SVE_WHISPER_RETRANSCRIBE=<note id>, optional SVE_WHISPER_BACKEND=gpu|cpu (default gpu): Whisper alone over a
+    /// copy of the note's audio in tmp, so the note and its own sidecar are never touched, with no Gemma fill. Logs
+    /// needs_gemma per group, the wall time, the real-time factor and the output paths; the transcript goes to tmp.
+    /// Waits for the model check at launch and for no run in flight. On the GPU it stops if the app goes to the
+    /// background; on the CPU it goes on (the locked-phone timing).
+    fileprivate func debugWhisperRetranscribe() {
+        let env = ProcessInfo.processInfo.environment
+        guard let raw = env["SVE_WHISPER_RETRANSCRIBE"] else { return }
+        guard let id = Int64(raw.trimmingCharacters(in: .whitespaces)) else {
+            NSLog("[sve] debug retranscribe: '%@' is not a note id", raw)
+            return
+        }
+        let backend: ModelBackend = env["SVE_WHISPER_BACKEND"]?.lowercased() == "cpu" ? .cpu : .gpu
+        let name = backend == .gpu ? "gpu" : "cpu"
+        Task { @MainActor in
+            var waited = 0
+            while !ModelManager.shared.whisperReady || self.isBusy {
+                if waited >= 300 {
+                    NSLog("[sve] debug retranscribe: whisper model not ready or a run in flight after 5 min; not run")
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                waited += 1
+            }
+            guard let note = await CoreEngine.shared.note(id), let src = AudioRecorder.existingAudioPath(note.audio_path) else {
+                NSLog("[sve] debug retranscribe: note %lld or its audio not found", id)
+                return
+            }
+            let fm = FileManager.default
+            let dst = fm.temporaryDirectory.appendingPathComponent("sve-retranscribe-\(id)-\(name).wav").path
+            let textPath = dst + ".txt"
+            TranscriptSidecar.remove(audioPath: dst)
+            try? fm.removeItem(atPath: dst)
+            try? fm.removeItem(atPath: textPath)
+            do { try fm.copyItem(atPath: src, toPath: dst) } catch {
+                NSLog("[sve] debug retranscribe: copy failed (%@)", String(describing: error))
+                return
+            }
+            NSLog("[sve] debug retranscribe: note %lld on the %@, audio copied to %@", id, name, dst)
+            let leftFront = self.whisperLeftFront
+            leftFront.set(false)
+            var groups = 0, gemmaGroups = 0
+            var lastCursor: Int64 = 0
+            var lastPending = 0
+            let start = Date()
+            var stop: TranscriptRun.Stop?
+            do {
+                let (_, s) = try await TranscriptRun.runWhisper(
+                    audioPath: dst, shouldStop: { Self.critical },
+                    backend: {
+                        if backend == .gpu, UIApplication.shared.applicationState == .background { return nil }
+                        return backend
+                    },
+                    cutShort: { backend == .gpu && leftFront.isSet },
+                    onPiece: { p in
+                        groups += 1
+                        let pending = p.pendingIndices.count
+                        let needsGemma = pending > lastPending
+                        if needsGemma { gemmaGroups += 1 }
+                        NSLog("[sve] debug retranscribe: group %d %.1f-%.1f s needs_gemma=%d", groups,
+                              Double(lastCursor) / TranscriptSidecar.sampleRate, p.transcribedSeconds, needsGemma ? 1 : 0)
+                        lastCursor = p.cursor_sample
+                        lastPending = pending
+                    })
+                stop = s
+            } catch {
+                NSLog("[sve] debug retranscribe: stopped (%@)", String(describing: error))
+            }
+            let wall = Date().timeIntervalSince(start)
+            await CoreEngine.shared.unloadWhisper()
+            let result = TranscriptSidecar.load(audioPath: dst)
+            let audioSeconds = max(0.001, result.transcribedSeconds)
+            let lines = result.pieces.map { p -> String in
+                let text = p.pending == true ? "[gemma]" : p.text
+                let conf = p.conf.map { String(format: " (conf %.2f)", $0) } ?? ""
+                return "[\(p.start_sec) s] \(text)\(conf)"
+            }
+            try? lines.joined(separator: "\n").write(toFile: textPath, atomically: true, encoding: .utf8)
+            NSLog("[sve] debug retranscribe: note %lld %@ (%@): %d groups, needs_gemma %d (%.0f%%), %.1f s audio in %.1f s, RTF %.2f",
+                  id, name, stop == .end ? "to the end" : "stopped early", groups, gemmaGroups,
+                  groups > 0 ? 100.0 * Double(gemmaGroups) / Double(groups) : 0, audioSeconds, wall, wall / audioSeconds)
+            NSLog("[sve] debug retranscribe: transcript %@, sidecar %@", textPath, TranscriptSidecar.path(forAudio: dst))
+        }
+    }
+}
+#endif

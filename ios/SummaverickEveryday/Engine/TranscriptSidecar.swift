@@ -132,6 +132,16 @@ struct TranscriptSidecar: Codable, Equatable {
     static let sampleRate: Double = 16_000
 
     var transcribedSeconds: Double { Double(cursor_sample) / Self.sampleRate }
+    /// The audio whose text is written, for progress: the cursor less the audio of pending pieces (Gemma has yet to
+    /// write them), so the bar does not reach the end while they wait. Never below 0.
+    var doneSamples: Int64 {
+        let waiting = pieces.reduce(Int64(0)) { sum, p in
+            guard p.pending == true, let s = p.start_sample, let e = p.end_sample, e > s else { return sum }
+            return sum + (e - s)
+        }
+        return max(0, cursor_sample - waiting)
+    }
+    var doneSeconds: Double { Double(doneSamples) / Self.sampleRate }
     /// Context for the next piece: the text of the last piece that had any.
     var previousText: String? { pieces.last(where: { !$0.text.isEmpty && $0.pending != true })?.text }
     /// Indices of the pieces whose text is still to come.

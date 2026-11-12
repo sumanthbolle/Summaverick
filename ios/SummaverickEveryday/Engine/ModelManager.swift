@@ -657,6 +657,11 @@ extension ModelManager {
             let v = Self.whisperVerdictOnDisk()
             switch v {
             case .ok:
+                // Out of iCloud backup (823 MB), also for a file copied on by hand; before the mark is taken.
+                var url = Self.fileURL(Self.whisperPart)
+                var rv = URLResourceValues()
+                rv.isExcludedFromBackup = true
+                try? url.setResourceValues(rv)
                 if let mark = Self.whisperMark() { UserDefaults.standard.set(mark, forKey: Keys.whisperVerified) }
             case .bad:
                 UserDefaults.standard.removeObject(forKey: Keys.whisperVerified)

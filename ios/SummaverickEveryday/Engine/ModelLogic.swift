@@ -306,13 +306,18 @@ enum ModelBackend: Equatable {
     var threads: Int32 { self == .cpu ? 4 : 0 }
 }
 
-/// When Whisper writes the transcript (spec section 4): only with its model ready, and on the GPU, or on the CPU
-/// once the CPU is measured faster than the audio.
+/// When Whisper writes the transcript (spec section 4), asked again before every group: its own rule, not Gemma's
+/// piece heat rule (Whisper on the GPU is far faster than Gemma, and a hot phone is what it is for). The GPU whenever
+/// the app is not in the background and the heat ladder is not at paused (the heat gate still rests before each
+/// group); in the background the CPU once it is measured faster than the audio, else Gemma's CPU path.
 enum WhisperChoice {
     static let cpuFasterThanAudio = false
 
-    static func use(whisperReady: Bool, backend: ModelBackend) -> Bool {
-        whisperReady && (backend == .gpu || cpuFasterThanAudio)
+    /// The backend for Whisper's next group; nil: Gemma goes on from the cursor instead.
+    static func backend(whisperReady: Bool, inBackground: Bool, heatPaused: Bool) -> ModelBackend? {
+        guard whisperReady, !heatPaused else { return nil }
+        if !inBackground { return .gpu }
+        return cpuFasterThanAudio ? .cpu : nil
     }
 }
 
@@ -330,16 +335,18 @@ struct ModelSlot: Equatable {
     func needsGemmaReload(gemmaLoaded: Bool) -> Bool { !gemmaLoaded && gemmaFreedByWhisper }
 }
 
-/// The order of a note's transcript after Stop (spec sections 2-3): Whisper writes it from the cursor while it may
-/// (WhisperChoice), else Gemma goes on from the same cursor as today; once the cursor is at the end, Gemma fills the
-/// pieces Whisper left pending. One model at a time: CoreEngine frees one before loading the other.
+/// The order of a note's transcript after Stop (spec sections 2-3), asked before every group: Whisper writes from the
+/// cursor while it may (WhisperChoice), else Gemma goes on from the same cursor as today (and hands back to Whisper
+/// once it may again); once the cursor is at the end, Gemma fills the pieces Whisper left pending. One model at a
+/// time: CoreEngine frees one before loading the other.
 enum WhisperFlow {
-    enum Step: Equatable { case whisper, gemmaRemainder, fillPending, done }
+    enum Step: Equatable { case whisper(ModelBackend), gemmaRemainder, fillPending, done }
 
-    /// whisperReady: its model is downloaded and nothing failed with it in this run. onGPU: this piece's backend.
-    static func next(whisperReady: Bool, onGPU: Bool, cursorAtEnd: Bool, pending: Int) -> Step {
+    /// whisper: WhisperChoice.backend for now (nil: Whisper may not run the next group).
+    static func next(whisper: ModelBackend?, cursorAtEnd: Bool, pending: Int) -> Step {
         if cursorAtEnd { return pending > 0 ? .fillPending : .done }
-        return WhisperChoice.use(whisperReady: whisperReady, backend: onGPU ? .gpu : .cpu) ? .whisper : .gemmaRemainder
+        if let whisper { return .whisper(whisper) }
+        return .gemmaRemainder
     }
 }
 

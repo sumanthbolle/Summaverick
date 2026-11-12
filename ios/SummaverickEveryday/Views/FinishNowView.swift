@@ -81,7 +81,7 @@ final class FinishNowController {
             if running, let t = pipeline.transcribing {
                 w.transcribedSeconds = t.done
             } else if let path = AudioRecorder.existingAudioPath(n.audio_path) {
-                w.transcribedSeconds = TranscriptSidecar.load(audioPath: path).transcribedSeconds
+                w.transcribedSeconds = TranscriptSidecar.load(audioPath: path).doneSeconds   // pending pieces not yet done
             }
         }
         w.sectionsDone = sections.count
