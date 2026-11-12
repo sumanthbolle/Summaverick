@@ -1,6 +1,6 @@
 # Telugu transcripts with Whisper — design
 
-Status: draft for the owner's approval (2026-11-12).
+Status: owner's questions answered 2026-11-12; awaiting approval of the whole design.
 
 ## Why
 
@@ -63,7 +63,7 @@ talk):
   background session.
   - Until it's present, transcripts use Gemma.
   - The setup screen counts it in the download size.
-- **Hosting:** see open question 1 below.
+- **Hosting:** a public repo on the owner's Hugging Face account (owner's answer 1).
 
 ### 2. How a recording is transcribed
 
@@ -74,7 +74,7 @@ talk):
    - Telugu pieces are decoded as `te`.
    - English pieces are marked for Gemma (step 5).
    - **This is unproven:** whether the fine-tune still detects English reliably. It's the first device check.
-     If it doesn't, the fallback is the recording's language setting (see open question 2).
+     When detection is unsure (or unreliable on the phone), the piece goes through Gemma (owner's answer 2).
 3. **Decoding settings:**
    - greedy decoding;
    - `no_timestamps = true` (the fine-tune was trained without them, and with them the first letter breaks);
@@ -139,8 +139,8 @@ talk):
 
 1. whisper.cpp in the core, plus `sve_whisper_transcribe` (pieces at pauses, cleanup, confidence), with C tests
    on a short WAV. The C tests run on the Mac with no model loaded, under the battery rule.
-2. The language check per piece, then device check 1. That check decides between auto-detect and the recording's
-   language.
+2. The language check per piece, then device check 1. That check sets the "unsure" margin; unsure pieces go to
+   Gemma.
 3. Pipeline: Whisper first, then English pieces through Gemma, one model at a time. Device checks 2, 3, 4, 5
    and 7.
 4. The download part and the setup screen size.
@@ -183,11 +183,9 @@ talk):
 9. **ggml:** the spike built whisper.cpp against the app's ggml (llama xcframework b12119) and ran on Metal with
    no missing ops. Whisper.cpp is pinned to the spike's version.
 
-## Open questions for the owner
+## Owner's answers (2026-11-12)
 
-1. **Hosting the converted model (823 MB):** on a Hugging Face account of yours (my suggestion: a public repo with
-   the Apache-2.0 notice and credit to vasista22), or converted on the phone from the original files? Converting on
-   the phone would mean a 1.5 GB download and a slow first run.
-2. **If language detection isn't reliable:** is a per-recording choice (Telugu / English / both) on the Record
-   screen fine, or should English always go through Gemma when unsure? Going through Gemma is slower but needs no
-   choice from the person.
+1. **Hosting:** a public repo on the owner's Hugging Face account, with the Apache-2.0 notice and credit to
+   vasista22. The owner uploads the 823 MB file once, and `ModelManager` downloads it from there.
+2. **English when detection is unsure:** those pieces go through Gemma, as today. The person chooses nothing, and
+   there's no new control on the Record screen.
