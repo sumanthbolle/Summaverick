@@ -1340,8 +1340,20 @@ static sve::LangChoice whisper_piece_lang(sve_ctx *ctx, const float *s, int64_t 
     }
     const sve::LangChoice c = sve::lang_choice(probs[te], probs[en]);
     // One line per piece checked, for tuning min_te/margin on the phone (a group stops at its first unsure piece).
-    sve_logf(0, "whisper lang p_te=%.2f p_en=%.2f → %s (piece %.1f s)", probs[te], probs[en],
-             c == sve::LangChoice::Telugu ? "te" : "gemma", n / (double)sve::kAudioRate);
+    // The three likeliest languages over all of Whisper's, to see where the probability goes on the fine-tune.
+    int top[3] = {-1, -1, -1};
+    for (int id = 0; id < (int)probs.size(); ++id)
+        for (int k = 0; k < 3; ++k)
+            if (top[k] < 0 || probs[id] > probs[top[k]]) {
+                for (int m = 2; m > k; --m) top[m] = top[m - 1];
+                top[k] = id;
+                break;
+            }
+    auto name = [](int id) { const char *l = id >= 0 ? whisper_lang_str(id) : nullptr; return l ? l : "?"; };
+    auto p_of = [&](int id) { return id >= 0 ? probs[id] : 0.0f; };
+    sve_logf(0, "whisper lang p_te=%.2f p_en=%.2f → %s (piece %.1f s; top %s %.2f, %s %.2f, %s %.2f)", probs[te],
+             probs[en], c == sve::LangChoice::Telugu ? "te" : "gemma", n / (double)sve::kAudioRate, name(top[0]),
+             p_of(top[0]), name(top[1]), p_of(top[1]), name(top[2]), p_of(top[2]));
     return c;
 }
 
