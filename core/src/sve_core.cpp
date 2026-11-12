@@ -1335,8 +1335,9 @@ static sve::LangChoice whisper_piece_lang(sve_ctx *ctx, const float *s, int64_t 
         return sve::LangChoice::Gemma;
     }
     const sve::LangChoice c = sve::lang_choice(probs[te], probs[en]);
-    sve_logf(0, "whisper piece %.1f s: te %.2f en %.2f -> %s", n / (double)sve::kAudioRate, probs[te], probs[en],
-             c == sve::LangChoice::Telugu ? "whisper" : "audio model");
+    // One line per piece checked, for tuning min_te/margin on the phone (a group stops at its first unsure piece).
+    sve_logf(0, "whisper lang p_te=%.2f p_en=%.2f → %s (piece %.1f s)", probs[te], probs[en],
+             c == sve::LangChoice::Telugu ? "te" : "gemma", n / (double)sve::kAudioRate);
     return c;
 }
 
@@ -1427,13 +1428,18 @@ char *sve_whisper_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_s
             const sve::Span &sp = g.spans[i];
             WhisperWatch watch{cb, user, i, n, false};
             std::string text;
-            if (!whisper_decode_piece(ctx, pcm.data() + sp.start, sp.end - sp.start, watch, text, p_sum, p_n)) {
+            double s_sum = 0;
+            int s_n = 0;
+            if (!whisper_decode_piece(ctx, pcm.data() + sp.start, sp.end - sp.start, watch, text, s_sum, s_n)) {
                 if (!watch.cancelled) sve_logf(2, "whisper failed on a piece of %s", wav_path);
                 return nullptr;
             }
-            // A piece that is nothing but a repeated word or phrase (a ticking loop) is dropped here.
+            // A piece that is nothing but a repeated word or phrase (a ticking loop) is dropped here, and its tokens
+            // (high-probability loop tokens) are left out of the group's conf.
             text = sve::collapse_repeats(text);
             if (text.empty()) continue;
+            p_sum += s_sum;
+            p_n += s_n;
             if (!joined.empty()) joined += ' ';
             joined += text;
         }
