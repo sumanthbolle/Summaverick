@@ -818,6 +818,14 @@ struct vad_time_mapping {
 };
 
 struct whisper_state {
+    // SVE: encoder reuse. When on, an encode with the same mel (by fingerprint), offset and audio_ctx as the last
+    // one is skipped, so whisper_full after whisper_lang_auto_detect_with_state does not run the encoder twice.
+    bool     sve_reuse_encode = false;
+    int      sve_enc_offset   = -1;
+    int      sve_enc_ctx      = -1;
+    uint64_t sve_enc_mel      = 0;
+    int32_t  sve_n_reused     = 0;
+
     int64_t t_sample_us = 0;
     int64_t t_encode_us = 0;
     int64_t t_decode_us = 0;
@@ -2523,6 +2531,45 @@ static bool whisper_encode_internal(
     return !(abort_callback && abort_callback(abort_callback_data));
 }
 
+// SVE: FNV-1a over the mel the encoder reads, so a reuse is only taken for the very same input.
+static uint64_t whisper_sve_mel_fingerprint(const whisper_mel & mel) {
+    uint64_t h = 1469598103934665603ULL;
+    auto mix = [&h](const void * p, size_t n) {
+        const unsigned char * b = static_cast<const unsigned char *>(p);
+        for (size_t i = 0; i < n; ++i) { h ^= b[i]; h *= 1099511628211ULL; }
+    };
+    mix(&mel.n_len, sizeof mel.n_len);
+    mix(&mel.n_len_org, sizeof mel.n_len_org);
+    mix(&mel.n_mel, sizeof mel.n_mel);
+    if (!mel.data.empty()) mix(mel.data.data(), mel.data.size() * sizeof(float));
+    return h;
+}
+
+// SVE: every encode goes through here. It records what was encoded (kv_cross holds its result), and with reuse on
+// skips an encode whose input matches the last one exactly. Any other encode, or a failed one, clears the record.
+static bool whisper_encode_sve(
+        whisper_context & wctx,
+          whisper_state & wstate,
+              const int   mel_offset,
+              const int   n_threads,
+    ggml_abort_callback   abort_callback,
+                   void * abort_callback_data) {
+    const uint64_t fp = whisper_sve_mel_fingerprint(wstate.mel);
+    if (wstate.sve_reuse_encode && wstate.sve_enc_offset == mel_offset &&
+        wstate.sve_enc_ctx == wstate.exp_n_audio_ctx && wstate.sve_enc_mel == fp) {
+        wstate.sve_n_reused++;
+        return true;
+    }
+    wstate.sve_enc_offset = -1;
+    if (!whisper_encode_internal(wctx, wstate, mel_offset, n_threads, abort_callback, abort_callback_data)) {
+        return false;
+    }
+    wstate.sve_enc_offset = mel_offset;
+    wstate.sve_enc_ctx    = wstate.exp_n_audio_ctx;
+    wstate.sve_enc_mel    = fp;
+    return true;
+}
+
 static struct ggml_cgraph * whisper_build_graph_decoder(
          whisper_context & wctx,
          whisper_state   & wstate,
@@ -4060,7 +4107,7 @@ int whisper_set_mel(
 }
 
 int whisper_encode_with_state(struct whisper_context * ctx, struct whisper_state * state, int offset, int n_threads) {
-    if (!whisper_encode_internal(*ctx, *state, offset, n_threads, nullptr, nullptr)) {
+    if (!whisper_encode_sve(*ctx, *state, offset, n_threads, nullptr, nullptr)) {
         WHISPER_LOG_ERROR("%s: failed to eval\n", __func__);
         return -1;
     }
@@ -4069,7 +4116,7 @@ int whisper_encode_with_state(struct whisper_context * ctx, struct whisper_state
 }
 
 int whisper_encode(struct whisper_context * ctx, int offset, int n_threads) {
-    if (!whisper_encode_internal(*ctx, *ctx->state, offset, n_threads, nullptr, nullptr)) {
+    if (!whisper_encode_sve(*ctx, *ctx->state, offset, n_threads, nullptr, nullptr)) {
         WHISPER_LOG_ERROR("%s: failed to eval\n", __func__);
         return -1;
     }
@@ -4184,7 +4231,7 @@ static int whisper_lang_auto_detect_internal(
     }
 
     // run the encoder
-    if (!whisper_encode_internal(*ctx, *state, seek, n_threads, abort_callback, abort_callback_data)) {
+    if (!whisper_encode_sve(*ctx, *state, seek, n_threads, abort_callback, abort_callback_data)) {
         WHISPER_LOG_ERROR("%s: failed to encode\n", __func__);
         return -6;
     }
@@ -4352,6 +4399,16 @@ int whisper_set_audio_ctx_with_state(struct whisper_context * ctx, struct whispe
     }
     state->exp_n_audio_ctx = audio_ctx;
     return 0;
+}
+
+void whisper_set_encode_reuse_with_state(struct whisper_state * state, int on) {
+    if (!state) return;
+    state->sve_reuse_encode = on != 0;
+    if (!on) state->sve_enc_offset = -1;
+}
+
+int whisper_n_encode_reused_from_state(struct whisper_state * state) {
+    return state ? state->sve_n_reused : 0;
 }
 
 int whisper_is_multilingual(struct whisper_context * ctx) {
@@ -7237,7 +7294,7 @@ int whisper_full_with_state(
         }
 
         // encode audio features starting at offset seek
-        if (!whisper_encode_internal(*ctx, *state, seek, params.n_threads, params.abort_callback, params.abort_callback_user_data)) {
+        if (!whisper_encode_sve(*ctx, *state, seek, params.n_threads, params.abort_callback, params.abort_callback_user_data)) {
             WHISPER_LOG_ERROR("%s: failed to encode\n", __func__);
             return -6;
         }

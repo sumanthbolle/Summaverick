@@ -400,6 +400,12 @@ extern "C" {
     // Returns 0, or -1 when out of range.
     WHISPER_API int whisper_set_audio_ctx_with_state(struct whisper_context * ctx, struct whisper_state * state, int audio_ctx);
 
+    // SVE: with reuse on, an encode whose mel (fingerprinted), offset and audio_ctx match the last encode is skipped;
+    // the cross-attention cache still holds that result. Lets whisper_full reuse whisper_lang_auto_detect_with_state's
+    // encode of the same piece. Off by default (stock behaviour). The count is for logs.
+    WHISPER_API void whisper_set_encode_reuse_with_state(struct whisper_state * state, int on);
+    WHISPER_API int  whisper_n_encode_reused_from_state(struct whisper_state * state);
+
     WHISPER_API int whisper_model_n_vocab      (struct whisper_context * ctx);
     WHISPER_API int whisper_model_n_audio_ctx  (struct whisper_context * ctx);
     WHISPER_API int whisper_model_n_audio_state(struct whisper_context * ctx);

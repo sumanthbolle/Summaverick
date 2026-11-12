@@ -1293,6 +1293,10 @@ int sve_load_asr(sve_ctx *ctx, const char *path, int use_gpu, int n_threads) {
     if (!ctx->whisper) return -2;
     ctx->asr_state = whisper_init_state(ctx->whisper);
     if (!ctx->asr_state) { whisper_free(ctx->whisper); ctx->whisper = nullptr; return -2; }
+    // The decode of a piece reuses its language check's encoder run (SVE patch in whisper.cpp). SVE_WHISPER_REENCODE=1
+    // turns that off, to compare the text both ways on the phone.
+    const char *reencode = getenv("SVE_WHISPER_REENCODE");
+    whisper_set_encode_reuse_with_state(ctx->asr_state, !(reencode && reencode[0] == '1'));
     unsigned hw = std::thread::hardware_concurrency();
     ctx->whisper_threads = n_threads > 0 ? n_threads : (int)std::max(1u, std::min(hw, 4u));
     return 0;
@@ -1413,27 +1417,37 @@ char *sve_whisper_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_s
                            {"needs_gemma", needs_gemma}};
             return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
         };
-        // Any piece not clearly Telugu sends the whole group to the audio model, undecoded.
-        for (int i = 0; i < n; ++i) {
-            if (cb && cb("chunk", i, n, user)) return nullptr;
-            const sve::Span &sp = g.spans[i];
-            if (whisper_piece_lang(ctx, pcm.data() + sp.start, sp.end - sp.start) == sve::LangChoice::Gemma)
-                return piece("", std::nan(""), true);
-        }
+        // Each piece is checked and then decoded at once, so the decode reuses the check's encoder run (the state
+        // keeps only the last encode). Any piece not clearly Telugu sends the whole group to the audio model, and the
+        // text decoded so far in the group is dropped.
+        using clk = std::chrono::steady_clock;
+        auto ms_since = [](clk::time_point t) {
+            return (long)std::chrono::duration_cast<std::chrono::milliseconds>(clk::now() - t).count();
+        };
         std::string joined;
         double p_sum = 0;
         int p_n = 0;
         for (int i = 0; i < n; ++i) {
             if (cb && cb("chunk", i, n, user)) return nullptr;
             const sve::Span &sp = g.spans[i];
+            const auto t_lang = clk::now();
+            if (whisper_piece_lang(ctx, pcm.data() + sp.start, sp.end - sp.start) == sve::LangChoice::Gemma)
+                return piece("", std::nan(""), true);
+            const long lang_ms = ms_since(t_lang);
             WhisperWatch watch{cb, user, i, n, false};
             std::string text;
             double s_sum = 0;
             int s_n = 0;
+            const int reused_before = whisper_n_encode_reused_from_state(ctx->asr_state);
+            const auto t_dec = clk::now();
             if (!whisper_decode_piece(ctx, pcm.data() + sp.start, sp.end - sp.start, watch, text, s_sum, s_n)) {
                 if (!watch.cancelled) sve_logf(2, "whisper failed on a piece of %s", wav_path);
                 return nullptr;
             }
+            // For the device checks: language check and decode timed apart, and whether the encoder run was reused.
+            sve_logf(0, "whisper piece %.1f s: lang %ld ms, decode %ld ms, encoder %s",
+                     (sp.end - sp.start) / (double)sve::kAudioRate, lang_ms, ms_since(t_dec),
+                     whisper_n_encode_reused_from_state(ctx->asr_state) > reused_before ? "reused" : "run again");
             // A piece that is nothing but a repeated word or phrase (a ticking loop) is dropped here, and its tokens
             // (high-probability loop tokens) are left out of the group's conf.
             text = sve::collapse_repeats(text);
