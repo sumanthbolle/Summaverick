@@ -2,6 +2,7 @@
 // The person never picks a model: it downloads by itself after install, in a background URLSession,
 // resumes after failures, and is checked for size before it is used. Download is the only time the
 // app uses the network. Model files are excluded from iCloud backup.
+import CryptoKit
 import Foundation
 import Network
 import Observation
@@ -31,6 +32,14 @@ struct ModelSpec: Hashable {
 enum ModelHost {
     static let projectorURL = URL(string: "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf")!
     static let projectorBytes: Int64 = 559_874_816
+}
+
+/// Where the Whisper Telugu model (ggml q8_0, converted from vasista22/whisper-telugu-medium) is downloaded from.
+/// The owner supplies the Hugging Face repo: replace OWNER_REPO. Until then nothing is downloaded, and a file
+/// copied onto the phone by hand is still checked and used.
+enum WhisperHost {
+    static let url = URL(string: "https://huggingface.co/OWNER_REPO/resolve/main/ggml-te-medium-q8_0.bin")!
+    static var isConfigured: Bool { !url.absoluteString.contains("OWNER_REPO") }
 }
 
 enum ModelCatalog {
@@ -97,6 +106,7 @@ final class ModelManager: NSObject {
 
     private enum Phase: Equatable { case idle, downloading, failed, noSpace(Int) }
     private var phase: Phase = .idle
+    @ObservationIgnored private var whisperChecking = false
     private var bytes: [String: (done: Int64, total: Int64)] = [:]
     private var wifi = true
     private var online = true
@@ -120,6 +130,7 @@ final class ModelManager: NSObject {
     private enum Keys {
         static let cellular = "model.cellular"
         static let removed = "model.userRemoved"
+        static let whisperVerified = "whisper.verified"
         static func expected(_ key: String) -> String { "model.expected.\(key)" }
     }
 
@@ -145,7 +156,18 @@ final class ModelManager: NSObject {
         (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int64
     }
 
-    private func present(_ part: ModelPart) -> Bool { (Self.size(Self.fileURL(part)) ?? 0) > 10_000_000 }
+    private func present(_ part: ModelPart) -> Bool {
+        if part.key == Self.whisperPart.key { return whisperReady }
+        return (Self.size(Self.fileURL(part)) ?? 0) > 10_000_000
+    }
+
+    /// Whisper is downloaded after Gemma, in the same session. It never counts toward Gemma's `.ready`.
+    nonisolated static let whisperPart = ModelPart(key: "whisper", fileName: "ggml-te-medium-q8_0.bin", url: WhisperHost.url,
+                                                   approxBytes: WhisperFile.expectedBytes)
+    /// Every file the session downloads (Whisper only once its address is known).
+    nonisolated static var downloadParts: [ModelPart] {
+        ModelCatalog.gemma.parts + (WhisperHost.isConfigured ? [whisperPart] : [])
+    }
 
     private func refreshReady() {
         // A phone below the memory line never uses the model, even one left from an older version.
@@ -206,7 +228,7 @@ final class ModelManager: NSObject {
 
     /// done/total per file: finished files count whole, running ones as reported, others not started.
     private var partSizes: [(done: Int64, total: Int64)] {
-        spec.parts.map { part in
+        Self.downloadParts.map { part in
             if present(part) { let s = Self.size(Self.fileURL(part)) ?? part.approxBytes; return (s, s) }
             let total = bytes[part.key]?.total ?? recordedSize(part) ?? part.approxBytes
             return (bytes[part.key]?.done ?? 0, total)
@@ -226,6 +248,7 @@ final class ModelManager: NSObject {
         guard !activated else { return }
         activated = true
         removeRetiredModels()
+        checkWhisperFile()
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let ok = path.status == .satisfied
             let wifi = ok && (path.usesInterfaceType(.wifi) || path.usesInterfaceType(.wiredEthernet))
@@ -268,7 +291,7 @@ final class ModelManager: NSObject {
                 .filter { $0.state == .running || $0.state == .suspended }
             Task { @MainActor in
                 for t in found {
-                    guard let key = t.taskDescription, self.spec.parts.contains(where: { $0.key == key }),
+                    guard let key = t.taskDescription, Self.downloadParts.contains(where: { $0.key == key }),
                           self.tasks[key] == nil else { t.cancel(); continue }
                     self.tasks[key] = t
                     if t.countOfBytesExpectedToReceive > 0 {
@@ -292,7 +315,9 @@ final class ModelManager: NSObject {
     func startIfNeeded(userInitiated: Bool = false) {
         guard Self.deviceSupported else { return }
         refreshReady()
-        guard !isReady else { return }
+        // Whisper comes after Gemma, and only when its address is known and no file is being checked.
+        let whisperWanted = isReady && WhisperHost.isConfigured && !whisperReady && !whisperChecking
+        guard !isReady || whisperWanted else { return }
         let d = UserDefaults.standard
         if userInitiated {
             d.set(false, forKey: Keys.removed)
@@ -303,7 +328,8 @@ final class ModelManager: NSObject {
         }
         guard attached, !restarting else { return }   // attach() / sessionGone() call this again
 
-        let missing = spec.parts.filter { !present($0) && tasks[$0.key] == nil }
+        let wanted = isReady ? [Self.whisperPart] : spec.parts
+        let missing = wanted.filter { !present($0) && tasks[$0.key] == nil }
         guard !missing.isEmpty else { return }
 
         let remaining = DownloadMath.remaining(partSizes)
@@ -344,7 +370,7 @@ final class ModelManager: NSObject {
         for t in running {
             group.enter()
             t.cancel { data in
-                if let data, let key = t.taskDescription, let part = ModelCatalog.gemma.parts.first(where: { $0.key == key }) {
+                if let data, let key = t.taskDescription, let part = Self.downloadParts.first(where: { $0.key == key }) {
                     try? data.write(to: Self.resumeURL(part), options: .atomic)
                 }
                 group.leave()
@@ -362,7 +388,8 @@ final class ModelManager: NSObject {
         for t in tasks.values { t.cancel() }
         tasks.removeAll()
         bytes.removeAll()
-        for part in spec.parts {
+        UserDefaults.standard.removeObject(forKey: Keys.whisperVerified)
+        for part in spec.parts + [Self.whisperPart] {
             try? FileManager.default.removeItem(at: Self.fileURL(part))
             try? FileManager.default.removeItem(at: Self.resumeURL(part))
         }
@@ -374,7 +401,7 @@ final class ModelManager: NSObject {
 
     private func progressed(key: String, done: Int64, total: Int64) {
         bytes[key] = (done, total)
-        if let part = spec.parts.first(where: { $0.key == key }), recordedSize(part) != total {
+        if let part = Self.downloadParts.first(where: { $0.key == key }), recordedSize(part) != total {
             UserDefaults.standard.set(total, forKey: Keys.expected(key))
         }
         let all = bytes.values.reduce(Int64(0)) { $0 + $1.done }
@@ -401,9 +428,9 @@ final class ModelManager: NSObject {
     private func finished(key: String, taskID: Int) {
         forget(key, taskID: taskID)
         bytes[key] = nil
-        if let part = spec.parts.first(where: { $0.key == key }) { try? FileManager.default.removeItem(at: Self.resumeURL(part)) }
+        if let part = Self.downloadParts.first(where: { $0.key == key }) { try? FileManager.default.removeItem(at: Self.resumeURL(part)) }
         refreshReady()
-        if !isReady && tasks.isEmpty && retryTask == nil { startIfNeeded() }
+        if tasks.isEmpty && retryTask == nil { startIfNeeded() }
     }
 
     /// `cancelled`: stopped by us (Remove, mobile-data change). `systemCancelled`: stopped by iOS, for
@@ -411,7 +438,7 @@ final class ModelManager: NSObject {
     private func failed(key: String, taskID: Int, message: String, resumeData: Data?, cancelled: Bool, systemCancelled: Bool = false) {
         let current = tasks[key]?.taskIdentifier == taskID
         forget(key, taskID: taskID)
-        if let part = spec.parts.first(where: { $0.key == key }) {
+        if let part = Self.downloadParts.first(where: { $0.key == key }) {
             if let resumeData {
                 if !current, let running = tasks[key] {
                     // Late resume data for a file that is already downloading again.
@@ -488,7 +515,7 @@ extension ModelManager: URLSessionDownloadDelegate {
 
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let key = downloadTask.taskDescription,
-              let part = ModelCatalog.gemma.parts.first(where: { $0.key == key }) else { return }
+              let part = Self.downloadParts.first(where: { $0.key == key }) else { return }
         // Move synchronously: `location` is deleted when this method returns.
         let http = downloadTask.response as? HTTPURLResponse
         let status = http?.statusCode ?? 0
@@ -521,6 +548,15 @@ extension ModelManager: URLSessionDownloadDelegate {
         if let problem {
             // A wrong or broken file: never resume from it.
             Task { @MainActor in self.failed(key: key, taskID: id, message: problem, resumeData: nil, cancelled: false) }
+        } else if key == Self.whisperPart.key {
+            // The file is whole by size; its checksum is computed once, off the main actor.
+            Task { @MainActor in
+                if await self.verifyWhisper() == .ok {
+                    self.finished(key: key, taskID: id)
+                } else {
+                    self.failed(key: key, taskID: id, message: "checksum", resumeData: nil, cancelled: false)
+                }
+            }
         } else {
             Task { @MainActor in self.finished(key: key, taskID: id) }
         }
@@ -574,11 +610,72 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-// STUB (Task 5 replaces this): Whisper's model is not downloaded yet, so whisperReady is false and every note is
-// transcribed by Gemma as before. Task 5 adds Whisper as a ModelPart and these read its file.
+// MARK: Whisper model file
+
 extension ModelManager {
-    /// Whisper's model file is on disk and usable.
-    var whisperReady: Bool { false }
+    /// Whisper's model file is on disk, passed the size and checksum check, and is unchanged since.
+    var whisperReady: Bool {
+        guard let mark = Self.whisperMark() else { return false }
+        return UserDefaults.standard.string(forKey: Keys.whisperVerified) == mark
+    }
     /// Where Whisper's model file lives.
-    var whisperPath: String { Self.modelsDirectory.appendingPathComponent("whisper-te-medium-q8_0.bin").path }
+    var whisperPath: String { Self.fileURL(Self.whisperPart).path }
+
+    /// Size and modification date of the file now on disk, as the text remembered once it has been checked.
+    nonisolated private static func whisperMark() -> String? {
+        guard let a = try? FileManager.default.attributesOfItem(atPath: fileURL(whisperPart).path),
+              let size = a[.size] as? Int64, let date = a[.modificationDate] as? Date else { return nil }
+        return "\(size):\(date.timeIntervalSince1970)"
+    }
+
+    /// Hashes the file in 8 MB reads. A wrong size is bad without hashing.
+    nonisolated private static func whisperVerdictOnDisk() -> WhisperFile.Verdict {
+        let url = fileURL(whisperPart)
+        let size = Self.size(url)
+        guard size == WhisperFile.expectedBytes, let handle = try? FileHandle(forReadingFrom: url) else {
+            return WhisperFile.verdict(size: size, sha: nil)
+        }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while true {
+            let more: Bool = autoreleasepool {
+                guard let chunk = try? handle.read(upToCount: 8 * 1024 * 1024), !chunk.isEmpty else { return false }
+                hasher.update(data: chunk)
+                return true
+            }
+            if !more { break }
+        }
+        let hex = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return WhisperFile.verdict(size: size, sha: hex)
+    }
+
+    /// Checks the file off the main actor: `.ok` is remembered, `.bad` is deleted.
+    fileprivate func verifyWhisper() async -> WhisperFile.Verdict {
+        whisperChecking = true
+        defer { whisperChecking = false }
+        let verdict = await Task.detached(priority: .utility) { () -> WhisperFile.Verdict in
+            let v = Self.whisperVerdictOnDisk()
+            switch v {
+            case .ok:
+                if let mark = Self.whisperMark() { UserDefaults.standard.set(mark, forKey: Keys.whisperVerified) }
+            case .bad:
+                UserDefaults.standard.removeObject(forKey: Keys.whisperVerified)
+                try? FileManager.default.removeItem(at: Self.fileURL(Self.whisperPart))
+                NSLog("[sve] whisper model failed its check; deleted")
+            case .missing:
+                UserDefaults.standard.removeObject(forKey: Keys.whisperVerified)
+            }
+            return v
+        }.value
+        return verdict
+    }
+
+    /// At app start: a file that is there but not yet remembered as checked (for example copied on by hand)
+    /// is checked once. A bad one is deleted and downloaded again when the address is known.
+    func checkWhisperFile() {
+        guard !whisperChecking, !whisperReady, Self.whisperMark() != nil else { return }
+        Task {
+            if await verifyWhisper() == .bad { startIfNeeded() }
+        }
+    }
 }

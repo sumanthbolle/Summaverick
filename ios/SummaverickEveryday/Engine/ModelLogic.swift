@@ -2279,3 +2279,18 @@ struct FinishNowSession: Equatable {
 enum ScreenAwakeRule {
     static func idleTimerDisabled(modeOn: Bool, pipelineWants: Bool) -> Bool { modeOn || pipelineWants }
 }
+
+/// The Whisper Telugu model file: its size and SHA-256 decide whether it can be used.
+enum WhisperFile {
+    static let expectedBytes: Int64 = 823_369_779
+    static let sha256 = "0f71156c1c043ae209d1ef1405e5d88df1c1ab7c13a4e9b7640df477a698c3ad"
+
+    enum Verdict: Equatable { case ok, missing, bad }
+
+    /// `size` nil: no file. A wrong size is bad without needing the hash (`sha` may be nil then).
+    static func verdict(size: Int64?, sha: String?) -> Verdict {
+        guard let size else { return .missing }
+        guard size == expectedBytes, let sha, sha.lowercased() == sha256 else { return .bad }
+        return .ok
+    }
+}
