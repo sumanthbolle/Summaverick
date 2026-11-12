@@ -3015,8 +3015,8 @@ extension ProcessingPipeline {
         Task { @MainActor in
             var waited = 0
             while !ModelManager.shared.whisperReady || self.isBusy {
-                if waited >= 300 {
-                    NSLog("[sve] debug retranscribe: whisper model not ready or a run in flight after 5 min; not run")
+                if waited >= 3600 {
+                    NSLog("[sve] debug retranscribe: whisper model not ready or a run in flight after 60 min; not run")
                     return
                 }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
