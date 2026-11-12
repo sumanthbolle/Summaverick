@@ -62,10 +62,41 @@ TEST(whisper_collapse_repeats) {
     CHECK_EQ(collapse_repeats("a b a b a b a b c"), std::string("a b c"));
     CHECK_EQ(collapse_repeats("one one one two"), std::string("one one one two"));
     CHECK_EQ(collapse_repeats("టిక్ టిక్ టిక్ టిక్ టిక్"), std::string(""));
+    CHECK_EQ(collapse_repeats("ఇది టిక్ టిక్ టిక్ టిక్ టిక్"), std::string("ఇది టిక్"));
+    CHECK_EQ(collapse_repeats("a a a a b b b b"), std::string("a b"));
 }
 
 TEST(whisper_lang_choice) {
     CHECK(lang_choice(0.9f, 0.05f) == LangChoice::Telugu);
     CHECK(lang_choice(0.55f, 0.4f) == LangChoice::Gemma);
     CHECK(lang_choice(0.7f, 0.45f) == LangChoice::Gemma);
+}
+
+TEST(whisper_non_final_piece_and_wait_boundary) {
+    std::vector<float> pcm(40 * R, 0.0f);
+    Group g = plan_group(pcm.data(), pcm.size(), 0, false);
+    CHECK(g.status == Group::Piece);
+    CHECK(g.end_sample <= 28 * R);
+    std::vector<float> a(10 * R + 31 * R, 0.0f), b(10 * R + 31 * R - 1, 0.0f);
+    CHECK(plan_group(a.data(), a.size(), 10 * R, false).status == Group::Piece);
+    CHECK(plan_group(b.data(), b.size(), 10 * R, false).status == Group::Wait);
+}
+
+TEST(whisper_group_from_mid_recording_matches_truncated_buffer) {
+    std::vector<float> pcm(120 * R);
+    unsigned x = 12345;
+    for (size_t i = 0; i < pcm.size(); i++) {
+        x = x * 1664525u + 1013904223u;
+        float amp = (i / (3 * R)) % 2 ? 0.05f : 0.5f;   // loud and quiet stretches
+        pcm[i] = amp * ((x >> 8) / 8388608.0f - 1.0f);
+    }
+    int64_t start = 47 * R + 123;
+    Group full = plan_group(pcm.data(), pcm.size(), start, true);
+    Group cut = plan_group(pcm.data(), start + 29 * R, start, true);
+    CHECK(full.status == Group::Piece && cut.status == Group::Piece);
+    CHECK_EQ(full.spans.size(), cut.spans.size());
+    for (size_t i = 0; i < full.spans.size() && i < cut.spans.size(); i++) {
+        CHECK_EQ(full.spans[i].start, cut.spans[i].start);
+        CHECK_EQ(full.spans[i].end, cut.spans[i].end);
+    }
 }

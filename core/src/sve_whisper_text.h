@@ -19,8 +19,8 @@ struct Group {
 // moment between 4 s and 10 s. Not final: Wait until 31 s are available. Final: End when under 0.5 s is left.
 Group plan_group(const float *pcm, int64_t n_samples, int64_t start_sample, bool is_final);
 
-// A word or phrase (1-3 words) repeated more than max_repeat times in a row is cut to one copy; if the run
-// ends the text it is dropped entirely (a trailing loop). Words are joined with single spaces.
+// A word or phrase (1-3 words) repeated more than max_repeat times in a row is cut to one copy; text that is
+// nothing but one such run becomes empty. Words are joined with single spaces.
 std::string collapse_repeats(const std::string &text, int max_repeat = 3);
 
 enum class LangChoice { Telugu, Gemma };

@@ -18,7 +18,8 @@ Group plan_group(const float *pcm, int64_t n, int64_t start, bool is_final) {
         return g;
     }
     // Loudness per 20 ms frame (relative to start), smoothed over 300 ms, so a cut lands in a pause.
-    int64_t n_fr = left / kFrame;
+    // Only the window a group can use is measured (28 s plus the smoothing reach), so long recordings stay linear.
+    int64_t n_fr = std::min(left / kFrame, kGroupMax / kFrame + 8);
     std::vector<float> en(n_fr, 0.0f), sm(n_fr, 0.0f);
     for (int64_t i = 0; i < n_fr; i++) {
         double a = 0;
@@ -70,9 +71,9 @@ std::string collapse_repeats(const std::string &text, int max_repeat) {
                 while (i + (runs + 1) * p <= w.size() &&
                        std::equal(w.begin() + i, w.begin() + i + p, w.begin() + i + runs * p)) runs++;
                 if (runs > (size_t)max_repeat) {
-                    // A run in the middle keeps one copy; a run that ends the text is a loop and goes entirely.
-                    bool at_end = i + runs * p == w.size();
-                    w.erase(w.begin() + i + (at_end ? 0 : p), w.begin() + i + runs * p);
+                    // A run is cut to one copy; a text that is nothing but one over-limit run becomes empty.
+                    bool whole = i == 0 && runs * p == w.size();
+                    w.erase(w.begin() + i + (whole ? 0 : p), w.begin() + i + runs * p);
                     changed = true;
                 }
             }
