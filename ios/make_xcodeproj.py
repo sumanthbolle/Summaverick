@@ -119,8 +119,13 @@ objects[product_ref] = ("PBXFileReference", {
     "isa": "PBXFileReference", "explicitFileType": "wrapper.application", "includeInIndex": "0",
     "path": f"{APP}.app", "sourceTree": "BUILT_PRODUCTS_DIR"})
 
+# whisper's token sampling runs on the CPU in this file; at Debug -O0 with libc++ debug hardening it is ~10x slower
+# (measured on the phone in the spike). Always optimise it.
+FAST_CPP = {"COMPILER_FLAGS": "-O3 -DNDEBUG -U_LIBCPP_HARDENING_MODE -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_NONE"}
+FAST_FILES = ("whisper.cpp",)
 source_builds = [build_file(r, "sources") for r in swift_refs] + \
-                [build_file(r, "sources") for r, p in zip(core_refs, core_files) if p.endswith(".cpp")] + \
+                [build_file(r, "sources", FAST_CPP if os.path.basename(p) in FAST_FILES else None)
+                 for r, p in zip(core_refs, core_files) if p.endswith(".cpp")] + \
                 [build_file(r, "sources") for r in shared_refs]
 widget_product_ref = uid("ref:product:" + WIDGETS)
 objects[widget_product_ref] = ("PBXFileReference", {
@@ -269,7 +274,12 @@ target_settings = {
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": info_plist,
     "CODE_SIGN_ENTITLEMENTS": f"{SWIFT_DIR}/SummaverickEveryday.entitlements",
-    "HEADER_SEARCH_PATHS": ["$(inherited)", "$(SRCROOT)/../core/include", "$(SRCROOT)/../core/src"],
+    # whisper.h includes "ggml.h": the copy Xcode makes of llama.framework (the one <llama/ggml.h> finds), so a file
+    # that includes both reads ggml.h once (the xcframework's own copy is a second file and redefines it).
+    "HEADER_SEARCH_PATHS": ["$(inherited)", "$(SRCROOT)/../core/include", "$(SRCROOT)/../core/src",
+                            "$(BUILT_PRODUCTS_DIR)/llama.framework/Headers"],
+    # The core's Whisper calls (sve_load_asr, sve_whisper_next_piece) are built in; DEBUG=1 comes from the project.
+    "GCC_PREPROCESSOR_DEFINITIONS": ["$(inherited)", "SVE_WITH_WHISPER=1"],
     "LD_RUNPATH_SEARCH_PATHS": ["$(inherited)", "@executable_path/Frameworks"],
     "OTHER_LDFLAGS": ["$(inherited)", "-lsqlite3"],
     "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID,

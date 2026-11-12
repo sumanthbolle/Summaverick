@@ -97,7 +97,8 @@ struct sve_ctx {
     int audio_threads = 0;        // the encoder's CPU threads since its load
 #endif
 #ifdef SVE_WITH_WHISPER
-    whisper_context *whisper = nullptr;
+    whisper_context *whisper = nullptr;    // loaded without its default state; asr_state is the only one
+    whisper_state *asr_state = nullptr;
     int whisper_threads = 4;
 #endif
 };

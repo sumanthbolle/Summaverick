@@ -5,9 +5,9 @@ project(sve_core LANGUAGES C CXX)
 #  - On Linux/ARM (the device) this builds libsvecore + the sve CLI, with the whisper ASR backend.
 #  - On iOS the same sources are compiled inside the Xcode target (see ios/project.yml); this file is not used there.
 #
-# Dependencies are expected as sibling checkouts or via -DLLAMA_DIR / -DWHISPER_DIR:
+# llama.cpp is expected as a sibling checkout or via -DLLAMA_DIR:
 #   git clone https://github.com/ggml-org/llama.cpp   ../deps/llama.cpp
-#   git clone https://github.com/ggml-org/whisper.cpp ../deps/whisper.cpp
+# whisper.cpp is vendored in src/whisper.cpp (with include/whisper.h) and built on llama's ggml, as on iOS.
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,7 +19,6 @@ option(SVE_WITH_WHISPER "Build the whisper.cpp speech-recognition backend (devic
 option(SVE_BUILD_CLI "Build the sve command-line tool" ON)
 
 set(LLAMA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../deps/llama.cpp" CACHE PATH "llama.cpp checkout")
-set(WHISPER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../deps/whisper.cpp" CACHE PATH "whisper.cpp checkout")
 
 # llama.cpp (brings ggml). Keep the build lean: no examples, tests, tools or server.
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -28,16 +27,6 @@ set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 set(LLAMA_CURL OFF CACHE BOOL "" FORCE)
 add_subdirectory(${LLAMA_DIR} ${CMAKE_BINARY_DIR}/llama EXCLUDE_FROM_ALL)
-
-if(SVE_WITH_WHISPER)
-  # whisper.cpp must reuse llama's ggml, otherwise two copies of ggml get linked.
-  set(WHISPER_USE_SYSTEM_GGML OFF CACHE BOOL "" FORCE)
-  set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-  set(WHISPER_CURL OFF CACHE BOOL "" FORCE)
-  # whisper.cpp's CMake checks for an existing ggml target and reuses it when present.
-  add_subdirectory(${WHISPER_DIR} ${CMAKE_BINARY_DIR}/whisper EXCLUDE_FROM_ALL)
-endif()
 
 find_package(SQLite3 REQUIRED)
 
@@ -53,12 +42,15 @@ add_library(svecore STATIC
   src/sve_learn.cpp
   src/sve_store.cpp
   src/sve_audio.cpp
+  src/sve_whisper_text.cpp
 )
 target_include_directories(svecore PUBLIC include PRIVATE src)
 target_link_libraries(svecore PUBLIC llama SQLite::SQLite3)
 if(SVE_WITH_WHISPER)
+  # The vendored whisper.cpp reuses llama's ggml, so only one copy of ggml is linked.
+  target_sources(svecore PRIVATE src/whisper.cpp src/sve_whisper_stubs.cpp)
   target_compile_definitions(svecore PUBLIC SVE_WITH_WHISPER=1)
-  target_link_libraries(svecore PUBLIC whisper)
+  target_link_libraries(svecore PUBLIC ggml)
 endif()
 if(UNIX AND NOT APPLE)
   target_link_libraries(svecore PUBLIC pthread)

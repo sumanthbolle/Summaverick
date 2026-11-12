@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
     if (cmd == "transcribe") {
 #ifdef SVE_WITH_WHISPER
         if (asr.empty() || pos.empty()) { usage(); return 1; }
-        if (sve_load_asr(ctx, asr.c_str(), threads) != 0) { fprintf(stderr, "asr load failed\n"); return 3; }
+        if (sve_load_asr(ctx, asr.c_str(), 0, threads) != 0) { fprintf(stderr, "asr load failed\n"); return 3; }
         char *t = sve_transcribe_wav(ctx, pos[0].c_str(), lang == "auto" ? "auto" : lang.c_str(), progress, nullptr);
         fprintf(stderr, "\n");
         if (!t) { fprintf(stderr, "transcription failed\n"); return 4; }

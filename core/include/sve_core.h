@@ -143,6 +143,14 @@ char *sve_transcribe_audio_pieces(sve_ctx *ctx, const char *wav_path, sve_progre
 char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,
                                 const char *prev_text, sve_progress_cb cb, void *user);
 
+/* The audio model (Gemma) on exactly [start_sample, end_sample) of a finished WAV (at most 28 s): the same prompt,
+ * vocabulary line, previous-text context (prev_text, may be NULL) and second hearing under 0.80 as
+ * sve_transcribe_next_piece, without planning a cut. For the pieces sve_whisper_next_piece marks needs_gemma.
+ * Returns {"text":"…","conf":F} (conf NaN when no token), or NULL on bad input, a span past the end of the file,
+ * no audio model, failure or cancel. */
+char *sve_transcribe_span(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int64_t end_sample,
+                          const char *prev_text, sve_progress_cb cb, void *user);
+
 /* ---- notes store ------------------------------------------------------- */
 
 /* Creates a note. audio_path/transcript may be NULL. Returns new id (>0) or negative error. */
@@ -499,14 +507,36 @@ char *sve_search_json(sve_ctx *ctx, const char *query, int limit);
 int   sve_setting_set(sve_ctx *ctx, const char *key, const char *value);
 char *sve_setting_get(sve_ctx *ctx, const char *key); /* NULL if unset */
 
-/* ---- speech recognition (device build only) ---------------------------- */
-#ifdef SVE_WITH_WHISPER
-int   sve_load_asr(sve_ctx *ctx, const char *whisper_model_path, int n_threads);
+/* ---- speech recognition: Whisper (whisper.cpp, built with SVE_WITH_WHISPER) ---- */
+/* Always declared. Without SVE_WITH_WHISPER: sve_load_asr returns -1, sve_asr_loaded 0, and
+ * sve_whisper_next_piece / sve_transcribe_wav return NULL. */
+
+/* Loads a whisper.cpp model (ggml .bin). use_gpu: 1 runs it on Metal, 0 on the CPU (the GPU is not usable in the
+ * background). Flash attention is on. n_threads <= 0: up to 4. Loading again replaces the loaded model.
+ * Returns 0, -1 on bad input or no whisper in this build, -2 when the model does not load. */
+int   sve_load_asr(sve_ctx *ctx, const char *whisper_model_path, int use_gpu, int n_threads);
 void  sve_unload_asr(sve_ctx *ctx);
-/* 16 kHz mono 16‑bit PCM WAV. lang "auto" lets whisper detect. Returns transcript. */
+/* 1 when a Whisper model is loaded, else 0 (also for NULL). */
+int   sve_asr_loaded(sve_ctx *ctx);
+
+/* The next group of Whisper pieces of a WAV that may still be being written (same WAV rules as
+ * sve_transcribe_next_piece). From start_sample, pieces of 4-10 s are cut at the quietest moment, up to 28 s in all.
+ * Each piece's language is detected between Telugu and English: when any piece is not clearly Telugu, nothing is
+ * decoded and the group is returned with needs_gemma true and text "" (give its samples to sve_transcribe_span).
+ * Otherwise each piece is decoded as Telugu (greedy, no timestamps, no context, encoder sized to the piece), the
+ * texts are joined with spaces, and a word or short phrase repeated more than 3 times in a row is cut to one.
+ * Returns JSON:
+ *   {"status":"piece","start_sec":N,"end_sample":N,"text":"…","conf":F,"needs_gemma":B}  continue from end_sample
+ *   {"status":"wait"}  not final and under 28 s + 3 s recorded after start_sample: call again later
+ *   {"status":"end"}   nothing left (final: under 0.5 s left)
+ * conf: mean token probability over the text tokens, NaN when none. start_sec: start_sample / 16000 (whole s).
+ * NULL on failure, with no model loaded, or on cancel (cb returning non-zero). */
+char *sve_whisper_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,
+                             sve_progress_cb cb, void *user);
+
+/* 16 kHz mono 16‑bit PCM WAV, whole file. lang "auto" lets whisper detect. Returns transcript. */
 char *sve_transcribe_wav(sve_ctx *ctx, const char *wav_path, const char *lang,
                          sve_progress_cb cb, void *user);
-#endif
 
 /* ---- memory ------------------------------------------------------------ */
 void sve_free_string(char *s);

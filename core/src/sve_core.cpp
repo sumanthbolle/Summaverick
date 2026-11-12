@@ -10,6 +10,7 @@
 #include "sve_assemble.h"
 #include "sve_budget.h"
 #include "sve_threads.h"
+#include "sve_whisper_text.h"
 
 #include <algorithm>
 #include <chrono>
@@ -929,6 +930,15 @@ static bool hear_piece(sve_ctx *ctx, const float *samples, size_t n, const std::
     return true;
 }
 
+// The shared core of sve_transcribe_next_piece and sve_transcribe_span: these samples with the transcription prompt,
+// the vocabulary line (words the person fixed earlier) and the previous text, heard twice when conf is low.
+static bool hear_samples(sve_ctx *ctx, const float *samples, size_t n, const char *prev_text, sve_progress_cb cb,
+                         void *user, int label, bool live, std::string &text, double &conf, bool &reheard) {
+    const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
+    return hear_piece(ctx, samples, n, prev_text ? prev_text : "", vocab, cb, user, 0, 1, label, text, conf, live,
+                      reheard);
+}
+
 static bool audio_ready(sve_ctx *ctx) {
     if (!ctx || !ctx->llm || !ctx->mtmd) return false;
     const int rate = mtmd_get_audio_sample_rate(ctx->mtmd);
@@ -1075,13 +1085,12 @@ char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t star
             return dup_str("{\"status\":\"end\"}");
         }
         if (cb && cb("chunk", 0, 1, user)) return nullptr;
-        const std::string vocab = sve::transcription_vocab_line(*ctx->store, 400);
         std::string text;
         double conf = std::nan("");
         // Live (is_final 0): heard once; after Stop the pieces still to do may be heard twice (R-N7-g).
         bool again = false;
-        if (!hear_piece(ctx, pcm.data() + (plan.start - start), plan.stop - plan.start, prev_text ? prev_text : "",
-                        vocab, cb, user, 0, 1, (int)(plan.start / sve::kAudioRate), text, conf, is_final == 0, again))
+        if (!hear_samples(ctx, pcm.data() + (plan.start - start), plan.stop - plan.start, prev_text, cb, user,
+                          (int)(plan.start / sve::kAudioRate), is_final == 0, text, conf, again))
             return nullptr;
         auto &h = ctx->hearings[wav_path];
         h.first += 1;
@@ -1094,6 +1103,42 @@ char *sve_transcribe_next_piece(sve_ctx *ctx, const char *wav_path, int64_t star
         return nullptr;
     } catch (...) {
         sve_logf(2, "transcribe failed");
+        return nullptr;
+    }
+}
+
+char *sve_transcribe_span(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int64_t end_sample,
+                          const char *prev_text, sve_progress_cb cb, void *user) {
+    try {
+        if (!wav_path || start_sample < 0 || end_sample <= start_sample ||
+            end_sample - start_sample > (int64_t)sve::kPieceTarget || !audio_ready(ctx))
+            return nullptr;
+        sve::WavInfo info;
+        if (sve::wav_probe(wav_path, info) != sve::WavProbe::ok) {
+            sve_logf(2, "%s is not a readable 16 kHz 16-bit WAV", wav_path);
+            return nullptr;
+        }
+        const uint64_t n = (uint64_t)(end_sample - start_sample);
+        if ((uint64_t)end_sample > info.frames) { sve_logf(2, "span ends past the end of %s", wav_path); return nullptr; }
+        std::vector<float> pcm;
+        if (!sve::wav_read(wav_path, info, (uint64_t)start_sample, n, pcm) || pcm.size() != n) {
+            sve_logf(2, "could not read %s", wav_path);
+            return nullptr;
+        }
+        if (cb && cb("chunk", 0, 1, user)) return nullptr;
+        std::string text;
+        double conf = std::nan("");
+        bool again = false;   // after Stop (Whisper is unloaded first), so a low conf is heard twice
+        if (!hear_samples(ctx, pcm.data(), pcm.size(), prev_text, cb, user, (int)(start_sample / sve::kAudioRate),
+                          false, text, conf, again))
+            return nullptr;
+        sve::json j = {{"text", text}, {"conf", conf}};
+        return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
+    } catch (const std::exception &e) {
+        sve_logf(2, "transcribe span failed: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        sve_logf(2, "transcribe span failed");
         return nullptr;
     }
 }
@@ -1234,27 +1279,178 @@ char *sve_setting_get(sve_ctx *ctx, const char *key) {
 
 void sve_free_string(char *s) { free(s); }
 
-// ---------------------------------------------------------------- whisper (device build)
+// ---------------------------------------------------------------- whisper
 #ifdef SVE_WITH_WHISPER
 
-int sve_load_asr(sve_ctx *ctx, const char *path, int n_threads) {
+int sve_load_asr(sve_ctx *ctx, const char *path, int use_gpu, int n_threads) {
     if (!ctx || !path) return -1;
     sve_unload_asr(ctx);
-    whisper_context_params wp = whisper_context_default_params();
-    wp.use_gpu = false;
-    ctx->whisper = whisper_init_from_file_with_params(path, wp);
+    whisper_context_params cp = whisper_context_default_params();
+    cp.use_gpu = use_gpu != 0;
+    cp.flash_attn = true;
+    // No default state: asr_state is the only one, so the language check and the decode share it.
+    ctx->whisper = whisper_init_from_file_with_params_no_state(path, cp);
     if (!ctx->whisper) return -2;
+    ctx->asr_state = whisper_init_state(ctx->whisper);
+    if (!ctx->asr_state) { whisper_free(ctx->whisper); ctx->whisper = nullptr; return -2; }
     unsigned hw = std::thread::hardware_concurrency();
     ctx->whisper_threads = n_threads > 0 ? n_threads : (int)std::max(1u, std::min(hw, 4u));
     return 0;
 }
 
 void sve_unload_asr(sve_ctx *ctx) {
-    if (ctx && ctx->whisper) { whisper_free(ctx->whisper); ctx->whisper = nullptr; }
+    if (!ctx) return;
+    if (ctx->asr_state) { whisper_free_state(ctx->asr_state); ctx->asr_state = nullptr; }
+    if (ctx->whisper) { whisper_free(ctx->whisper); ctx->whisper = nullptr; }
+}
+
+int sve_asr_loaded(sve_ctx *ctx) { return ctx && ctx->whisper && ctx->asr_state ? 1 : 0; }
+
+// A cancel from the host's progress callback stops whisper_full (checked after each encoder and decoder pass).
+struct WhisperWatch { sve_progress_cb cb; void *user; int done, total; bool cancelled; };
+static bool whisper_watch_abort(void *u) {
+    auto *w = static_cast<WhisperWatch *>(u);
+    if (!w->cancelled && w->cb && w->cb("chunk", w->done, w->total, w->user)) w->cancelled = true;
+    return w->cancelled;
+}
+
+// The encoder sized to the piece: 50 frames per second plus 64, at most the model's 1500.
+static int whisper_piece_ctx(whisper_context *w, int64_t n) {
+    return (int)std::min<int64_t>(std::min(1500, whisper_n_audio_ctx(w)), n * 50 / (int64_t)sve::kAudioRate + 64);
+}
+
+// Whether one piece is decoded by Whisper (Telugu) or left to Gemma: Whisper's language detection, the encoder sized
+// to the piece, compared on te and en only (sve::lang_choice). A detection that fails goes to Gemma.
+static sve::LangChoice whisper_piece_lang(sve_ctx *ctx, const float *s, int64_t n) {
+    whisper_context *w = ctx->whisper;
+    whisper_state *st = ctx->asr_state;
+    const int te = whisper_lang_id("te"), en = whisper_lang_id("en");
+    std::vector<float> probs(whisper_lang_max_id() + 1, 0.0f);
+    // whisper_lang_auto_detect_with_state runs the encoder itself (with the audio_ctx set here), then one decoder
+    // step; a separate whisper_encode_with_state would encode the piece twice.
+    if (te < 0 || en < 0 || whisper_pcm_to_mel_with_state(w, st, s, (int)n, ctx->whisper_threads) != 0 ||
+        whisper_set_audio_ctx_with_state(w, st, whisper_piece_ctx(w, n)) != 0 ||
+        whisper_lang_auto_detect_with_state(w, st, 0, ctx->whisper_threads, probs.data()) < 0) {
+        sve_logf(1, "whisper language check failed: piece left to the audio model");
+        return sve::LangChoice::Gemma;
+    }
+    const sve::LangChoice c = sve::lang_choice(probs[te], probs[en]);
+    sve_logf(0, "whisper piece %.1f s: te %.2f en %.2f -> %s", n / (double)sve::kAudioRate, probs[te], probs[en],
+             c == sve::LangChoice::Telugu ? "whisper" : "audio model");
+    return c;
+}
+
+// One Telugu piece: greedy, no timestamps (the fine-tune has none, and with them the first letter breaks), no
+// temperature fallback, no context, encoder sized to the piece. Adds its text tokens' probabilities to p_sum/p_n.
+static bool whisper_decode_piece(sve_ctx *ctx, const float *s, int64_t n, WhisperWatch &watch, std::string &text,
+                                 double &p_sum, int &p_n) {
+    whisper_context *w = ctx->whisper;
+    whisper_state *st = ctx->asr_state;
+    whisper_full_params wp = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    wp.n_threads = ctx->whisper_threads;
+    wp.language = "te";
+    wp.detect_language = false;
+    wp.translate = false;
+    wp.no_context = true;
+    wp.no_timestamps = true;
+    wp.temperature_inc = 0.0f;
+    wp.audio_ctx = whisper_piece_ctx(w, n);
+    wp.print_progress = false;
+    wp.print_realtime = false;
+    wp.print_timestamps = false;
+    wp.print_special = false;
+    wp.abort_callback = whisper_watch_abort;
+    wp.abort_callback_user_data = &watch;
+    if (whisper_full_with_state(w, st, wp, s, (int)n) != 0 || watch.cancelled) return false;
+    text.clear();
+    const whisper_token eot = whisper_token_eot(w);   // ids from eot up are special tokens
+    const int n_seg = whisper_full_n_segments_from_state(st);
+    for (int i = 0; i < n_seg; ++i) {
+        if (const char *t = whisper_full_get_segment_text_from_state(st, i)) text += t;
+        const int n_tok = whisper_full_n_tokens_from_state(st, i);
+        for (int k = 0; k < n_tok; ++k) {
+            if (whisper_full_get_token_id_from_state(st, i, k) >= eot) continue;
+            p_sum += whisper_full_get_token_p_from_state(st, i, k);
+            ++p_n;
+        }
+    }
+    return true;
+}
+
+char *sve_whisper_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_sample, int is_final,
+                             sve_progress_cb cb, void *user) {
+    try {
+        if (!sve_asr_loaded(ctx) || !wav_path || start_sample < 0) return nullptr;
+        sve::WavInfo info;
+        switch (sve::wav_probe(wav_path, info)) {
+            case sve::WavProbe::ok: break;
+            case sve::WavProbe::incomplete:
+            case sve::WavProbe::bad:
+                // While recording, a header not (fully) written yet, or still zeroed, is not an error.
+                if (!is_final) return dup_str("{\"status\":\"wait\"}");
+                sve_logf(2, "%s is not a readable 16 kHz 16-bit WAV", wav_path);
+                return nullptr;
+        }
+        const uint64_t start = (uint64_t)start_sample, total = info.frames;
+        // A group is up to 28 s; the planner waits for 28 s + 3 s, and with more audio after the group it may cut
+        // the last piece at a pause, so 31 s are read (checked first to skip the read).
+        const uint64_t window = sve::kPieceTarget + sve::kPieceSearch;
+        if (!is_final && (total <= start || total - start < window)) return dup_str("{\"status\":\"wait\"}");
+        std::vector<float> pcm;
+        if (start < total && !sve::wav_read(wav_path, info, start, window, pcm)) {
+            sve_logf(2, "could not read %s", wav_path);
+            return nullptr;
+        }
+        // Planned in the window's own sample numbers; a short read (I/O error) is planned with what was read.
+        const sve::Group g = sve::plan_group(pcm.data(), (int64_t)pcm.size(), 0, is_final != 0);
+        if (g.status == sve::Group::Wait) return dup_str("{\"status\":\"wait\"}");
+        if (g.status == sve::Group::End) return dup_str("{\"status\":\"end\"}");
+        const int n = (int)g.spans.size();
+        auto piece = [&](const std::string &text, double conf, bool needs_gemma) {
+            sve::json j = {{"status", "piece"}, {"start_sec", start_sample / (int64_t)sve::kAudioRate},
+                           {"end_sample", start_sample + g.end_sample}, {"text", text}, {"conf", conf},
+                           {"needs_gemma", needs_gemma}};
+            return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
+        };
+        // Any piece not clearly Telugu sends the whole group to the audio model, undecoded.
+        for (int i = 0; i < n; ++i) {
+            if (cb && cb("chunk", i, n, user)) return nullptr;
+            const sve::Span &sp = g.spans[i];
+            if (whisper_piece_lang(ctx, pcm.data() + sp.start, sp.end - sp.start) == sve::LangChoice::Gemma)
+                return piece("", std::nan(""), true);
+        }
+        std::string joined;
+        double p_sum = 0;
+        int p_n = 0;
+        for (int i = 0; i < n; ++i) {
+            if (cb && cb("chunk", i, n, user)) return nullptr;
+            const sve::Span &sp = g.spans[i];
+            WhisperWatch watch{cb, user, i, n, false};
+            std::string text;
+            if (!whisper_decode_piece(ctx, pcm.data() + sp.start, sp.end - sp.start, watch, text, p_sum, p_n)) {
+                if (!watch.cancelled) sve_logf(2, "whisper failed on a piece of %s", wav_path);
+                return nullptr;
+            }
+            // A piece that is nothing but a repeated word or phrase (a ticking loop) is dropped here.
+            text = sve::collapse_repeats(text);
+            if (text.empty()) continue;
+            if (!joined.empty()) joined += ' ';
+            joined += text;
+        }
+        // Again over the whole group, for a run that goes on across two pieces.
+        joined = sve::collapse_repeats(joined);
+        return piece(joined, p_n > 0 ? p_sum / p_n : std::nan(""), false);
+    } catch (const std::exception &e) {
+        sve_logf(2, "whisper transcribe failed: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        sve_logf(2, "whisper transcribe failed");
+        return nullptr;
+    }
 }
 
 char *sve_transcribe_wav(sve_ctx *ctx, const char *wav_path, const char *lang, sve_progress_cb cb, void *user) {
-    if (!ctx || !ctx->whisper || !wav_path) return nullptr;
+    if (!sve_asr_loaded(ctx) || !wav_path) return nullptr;
     std::vector<float> pcm;
     if (!read_wav16k(wav_path, pcm)) return nullptr;
 
@@ -1282,15 +1478,24 @@ char *sve_transcribe_wav(sve_ctx *ctx, const char *wav_path, const char *lang, s
             return p->cb("chunk", -1, 100, p->user) != 0;
         };
     }
-    if (whisper_full(ctx->whisper, wp, pcm.data(), (int)pcm.size()) != 0) return nullptr;
+    if (whisper_full_with_state(ctx->whisper, ctx->asr_state, wp, pcm.data(), (int)pcm.size()) != 0) return nullptr;
 
     std::string out;
-    int n = whisper_full_n_segments(ctx->whisper);
+    int n = whisper_full_n_segments_from_state(ctx->asr_state);
     for (int i = 0; i < n; ++i) {
-        const char *t = whisper_full_get_segment_text(ctx->whisper, i);
+        const char *t = whisper_full_get_segment_text_from_state(ctx->asr_state, i);
         if (t) { out += t; out += "\n"; }
     }
     if (cb) cb("final", 1, 1, user);
     return dup_str(out);
 }
+
+#else  // no whisper in this build
+
+int sve_load_asr(sve_ctx *, const char *, int, int) { return -1; }
+void sve_unload_asr(sve_ctx *) {}
+int sve_asr_loaded(sve_ctx *) { return 0; }
+char *sve_whisper_next_piece(sve_ctx *, const char *, int64_t, int, sve_progress_cb, void *) { return nullptr; }
+char *sve_transcribe_wav(sve_ctx *, const char *, const char *, sve_progress_cb, void *) { return nullptr; }
+
 #endif
