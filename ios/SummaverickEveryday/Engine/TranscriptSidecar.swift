@@ -117,6 +117,8 @@ struct TranscriptSidecar: Codable, Equatable {
         var pending: Bool?
         /// Sample (16 kHz) the piece's audio ends at, kept with a pending piece.
         var end_sample: Int64?
+        /// Sample (16 kHz) the piece's audio starts at, kept with a pending piece.
+        var start_sample: Int64?
     }
 
     /// Next sample (16 kHz) to transcribe from.
@@ -141,19 +143,21 @@ struct TranscriptSidecar: Codable, Equatable {
         guard endSample > cursor_sample else { return }
         cursor_sample = endSample
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !t.isEmpty { pieces.append(Piece(start_sec: startSec, text: t, conf: conf, pending: nil, end_sample: nil)) }
+        if !t.isEmpty { pieces.append(Piece(start_sec: startSec, text: t, conf: conf, pending: nil, end_sample: nil, start_sample: nil)) }
     }
 
     /// Adds an empty piece marked pending, for text to be filled in later, and moves the cursor.
     mutating func appendPending(startSec: Int, endSample: Int64) {
         guard endSample > cursor_sample else { return }
+        let start = cursor_sample
         cursor_sample = endSample
-        pieces.append(Piece(start_sec: startSec, text: "", conf: nil, pending: true, end_sample: endSample))
+        pieces.append(Piece(start_sec: startSec, text: "", conf: nil, pending: true, end_sample: endSample, start_sample: start))
     }
 
-    /// Sets a pending piece's text and clears the mark. Empty text removes the piece.
+    /// Sets a pending piece's text and clears the mark. Empty text removes the piece, which shifts the indices of
+    /// the later pieces: fill several in descending index order. A piece that is not pending is left alone.
     mutating func fill(_ index: Int, text: String, conf: Double?) {
-        guard pieces.indices.contains(index) else { return }
+        guard pieces.indices.contains(index), pieces[index].pending == true else { return }
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if t.isEmpty {
             pieces.remove(at: index)
@@ -162,6 +166,7 @@ struct TranscriptSidecar: Codable, Equatable {
             pieces[index].conf = conf
             pieces[index].pending = nil
             pieces[index].end_sample = nil
+            pieces[index].start_sample = nil
         }
     }
 
