@@ -85,6 +85,77 @@ enum TranscriptRun {
         }
     }
 
+    /// After Stop, Whisper from the sidecar's cursor to the end (the recording is final), the same loop as `run`: the
+    /// heat gate before each piece, the cursor saved after each. A piece that isn't clearly Telugu is kept pending for
+    /// Gemma (fillPending). Whisper is loaded before every piece, a no-op unless Ask or a recording freed it meanwhile.
+    /// A failed piece (a GPU refused in the background, a failed load) throws, with no second try on the CPU: the
+    /// caller goes on with Gemma from the saved cursor.
+    static func runWhisper(audioPath: String,
+                           shouldStop: @escaping () -> Bool,
+                           backend: ModelBackend = .gpu,
+                           beforePiece: () async -> Bool = { true },
+                           onPiece: (TranscriptSidecar) -> Void = { _ in }) async throws -> (TranscriptSidecar, Stop) {
+        var progress = TranscriptSidecar.load(audioPath: audioPath)
+        while true {
+            if shouldStop() || Task.isCancelled { throw CancellationError() }
+            if !(await beforePiece()) { return (progress, .yielded) }
+            let model = ModelManager.shared.whisperPath
+            try await CoreEngine.shared.loadWhisper(path: model, backend: backend)
+            let next = try await CoreEngine.shared.whisperNextPiece(path: audioPath, startSample: progress.cursor_sample,
+                                                                    isFinal: true, shouldStop: shouldStop)
+            switch next {
+            case .end: return (progress, .end)
+            case .wait: return (progress, .wait)
+            case .piece(let startSec, let endSample, let text, let conf, let needsGemma):
+                if needsGemma {
+                    progress.appendPending(startSec: startSec, endSample: endSample)
+                } else {
+                    progress.append(startSec: startSec, endSample: endSample, text: text, conf: conf)
+                }
+                progress.save(audioPath: audioPath)
+                onPiece(progress)
+            }
+        }
+    }
+
+    /// Gemma fills the pieces Whisper left pending, oldest first, saving after each. backend: asked before every
+    /// piece (loading Gemma there frees Whisper); a GPU piece that fails is tried once more on the CPU, unless
+    /// shouldStop says the run is over. beforePiece false (the heat gate) throws CancellationError; the pieces
+    /// filled so far are kept.
+    static func fillPending(audioPath: String,
+                            shouldStop: @escaping () -> Bool,
+                            backend: () async -> ModelBackend = { .cpu },
+                            beforePiece: () async -> Bool = { true }) async throws -> TranscriptSidecar {
+        var progress = TranscriptSidecar.load(audioPath: audioPath)
+        // Re-read after each fill: an empty text removes its piece and moves the later ones down.
+        while let i = progress.pendingIndices.first {
+            if shouldStop() || Task.isCancelled { throw CancellationError() }
+            if !(await beforePiece()) { throw CancellationError() }
+            let p = progress.pieces[i]
+            guard let start = p.start_sample, let end = p.end_sample, end > start else {
+                progress.fill(i, text: "", conf: nil)   // no span to hear (should not happen): dropped
+                progress.save(audioPath: audioPath)
+                continue
+            }
+            let previous = progress.pieces[..<i].last(where: { !$0.text.isEmpty && $0.pending != true })?.text
+            let b = await backend()
+            try await ModelManager.shared.loadIntoCore(backend: b)
+            let heard: (String, Double?)
+            do {
+                heard = try await CoreEngine.shared.transcribeSpan(path: audioPath, start: start, end: end,
+                                                                   previousText: previous, backend: b, shouldStop: shouldStop)
+            } catch {
+                guard b == .gpu, !shouldStop(), !Task.isCancelled else { throw error }
+                NSLog("[sve] a GPU span stopped (%@); this span again on the CPU", String(describing: error))
+                heard = try await CoreEngine.shared.transcribeSpan(path: audioPath, start: start, end: end,
+                                                                   previousText: previous, backend: .cpu, shouldStop: shouldStop)
+            }
+            progress.fill(i, text: heard.0, conf: heard.1)
+            progress.save(audioPath: audioPath)
+        }
+        return progress
+    }
+
     /// The pieces as the note stores them.
     static func pieces(_ s: TranscriptSidecar) -> [TranscriptPiece] {
         s.pieces.filter { $0.pending != true }.map { TranscriptPiece(startSec: $0.start_sec, text: $0.text, conf: $0.conf) }

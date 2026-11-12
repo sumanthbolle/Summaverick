@@ -127,6 +127,9 @@ actor CoreEngine {
     /// (about 5 s) when the backend differs. Call between model runs, never during one.
     func loadModel(at path: String, contextTokens: Int32 = 4096, mmprojPath: String? = nil, backend: ModelBackend = .gpu) throws {
         guard let ctx else { throw CoreError.initFailed }
+        // One model at a time (spec section 3): Whisper is freed before Gemma loads, here for every caller.
+        let swapStart: Date? = sve_asr_loaded(ctx) != 0 ? Date() : nil
+        unloadWhisper()
         lastLoad = (path, contextTokens, mmprojPath)
         // After a failed GPU run the Metal state stays broken (owner's iPhone: every later run failed at once with
         // "command buffer 0 failed with status 5", in front too), so the same backend is loaded again.
@@ -150,6 +153,7 @@ actor CoreEngine {
         if let mmprojPath, sve_load_audio(ctx, mmprojPath) != 0 {
             throw CoreError.modelLoadFailed(mmprojPath)
         }
+        if let swapStart { NSLog("[sve] model swap: whisper→gemma %.1fs", Date().timeIntervalSince(swapStart)) }
         // The heat ladder's memory input is log-only until measured on the phone (R-N6-b).
         NSLog("[sve] heat: memory after load %d MB", Int32(clamping: HeatGovernor.availableMemoryMB))
     }
@@ -202,6 +206,107 @@ actor CoreEngine {
         loadedModelPath = nil
         loadedBackend = nil
         cpuThreads = nil
+    }
+
+    // MARK: Whisper (speech to text; never in memory together with Gemma)
+
+    /// What the last loadWhisper asked for, so a piece can load Whisper again when Ask or a recording freed it.
+    private var lastWhisper: (path: String, backend: ModelBackend)?
+    private var loadedWhisperBackend: ModelBackend?
+
+    var isWhisperLoaded: Bool { sve_asr_loaded(ctx) != 0 }
+
+    /// Loads Whisper on `backend`, freeing Gemma first (the one-model rule). A no-op when it is already loaded
+    /// there with Gemma out. Call between runs, never during one.
+    func loadWhisper(path: String, backend: ModelBackend) throws {
+        guard let ctx else { throw CoreError.initFailed }
+        lastWhisper = (path, backend)
+        if sve_asr_loaded(ctx) != 0, loadedWhisperBackend == backend, sve_llm_loaded(ctx) == 0 { return }
+        let start = Date()
+        let swap = sve_llm_loaded(ctx) != 0
+        unloadModel()
+        if sve_load_asr(ctx, path, backend == .gpu ? 1 : 0, backend.threads) != 0 {
+            loadedWhisperBackend = nil
+            throw CoreError.modelLoadFailed(path)
+        }
+        loadedWhisperBackend = backend
+        let secs = Date().timeIntervalSince(start)
+        NSLog("[sve] whisper loaded on the %@ in %.1f s", backend == .gpu ? "GPU" : "CPU", secs)
+        if swap { NSLog("[sve] model swap: gemma→whisper %.1fs", secs) }
+        NSLog("[sve] heat: memory after whisper load %d MB", Int32(clamping: HeatGovernor.availableMemoryMB))
+    }
+
+    func unloadWhisper() {
+        guard sve_asr_loaded(ctx) != 0 else { return }
+        sve_unload_asr(ctx)
+        loadedWhisperBackend = nil
+        NSLog("[sve] whisper freed")
+    }
+
+    /// One step of Whisper's transcript (sve_whisper_next_piece).
+    enum WhisperPiece: Equatable {
+        /// [start, endSample) heard; needsGemma: not clearly Telugu, so Gemma transcribes it (text "").
+        case piece(startSec: Int, endSample: Int64, text: String, conf: Double?, needsGemma: Bool)
+        case wait
+        case end
+    }
+
+    private struct WhisperPieceJSON: Decodable {
+        let status: String
+        let start_sec: Int?
+        let end_sample: Int64?
+        let text: String?
+        let conf: Double?
+        let needs_gemma: Bool?
+    }
+
+    /// The next group of Whisper pieces from `startSample` of the WAV at `path`. Loads Whisper again first (in the
+    /// same actor turn) when another caller freed it since loadWhisper. Throws on failure; cancels (throws) when
+    /// `shouldStop` turns true during the run.
+    func whisperNextPiece(path: String, startSample: Int64, isFinal: Bool,
+                          shouldStop: @escaping () -> Bool = { false }) throws -> WhisperPiece {
+        guard let ctx else { throw CoreError.initFailed }
+        if sve_asr_loaded(ctx) == 0 || sve_llm_loaded(ctx) != 0 {
+            guard let w = lastWhisper else { throw CoreError.audioModelNotLoaded }
+            try loadWhisper(path: w.path, backend: w.backend)
+        }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_whisper_next_piece(ctx, path, startSample, isFinal ? 1 : 0,
+                                                     CoreEngine.progressTrampoline, user)),
+              let r = decode(WhisperPieceJSON.self, json) else {
+            throw CoreError.transcriptionFailed
+        }
+        switch r.status {
+        case "wait": return .wait
+        case "end": return .end
+        case "piece":
+            guard let end = r.end_sample, end > startSample else { throw CoreError.transcriptionFailed }
+            return .piece(startSec: r.start_sec ?? Int(startSample / 16_000), endSample: end, text: r.text ?? "",
+                          conf: r.conf, needsGemma: r.needs_gemma ?? false)
+        default: throw CoreError.transcriptionFailed
+        }
+    }
+
+    private struct SpanJSON: Decodable {
+        let text: String
+        let conf: Double?
+    }
+
+    /// Gemma on exactly [start, end) of a finished WAV (a piece Whisper left pending), on `backend` (switched here,
+    /// which frees Whisper). Throws on failure; cancels (throws) when `shouldStop` turns true during the run.
+    func transcribeSpan(path: String, start: Int64, end: Int64, previousText: String?, backend: ModelBackend,
+                        shouldStop: @escaping () -> Bool = { false }) throws -> (String, Double?) {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureBackend(backend)
+        guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_transcribe_span(ctx, path, start, end, previousText, CoreEngine.progressTrampoline, user)),
+              let r = decode(SpanJSON.self, json) else {
+            throw CoreError.transcriptionFailed
+        }
+        return (r.text, r.conf)
     }
 
     // MARK: generation

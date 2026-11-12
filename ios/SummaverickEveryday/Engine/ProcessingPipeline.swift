@@ -981,19 +981,56 @@ final class ProcessingPipeline {
             transcribing = (s.transcribedSeconds, duration)
             stage = .transcribing(min(1, s.transcribedSeconds / duration))
         }
-        report(TranscriptSidecar.load(audioPath: audio.path))   // from where live transcription got to
+        var done = TranscriptSidecar.load(audioPath: audio.path)
+        report(done)   // from where live transcription got to
         let abort = self.abort
-        let (done, stop) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true,
-                                                       shouldStop: { ContinuedWork.beat(); return Self.critical || abort.isSet },
-                                                       backend: {
-                                                           let b: ModelBackend = StepBackend.piecesOnGPU ? await self.stepBackend(piece: true) : .cpu
-                                                           self.stepOnGPU = b == .gpu
-                                                           return b
-                                                       },
-                                                       beforePiece: { await self.heatGate(noteID) },
-                                                       onPiece: { report($0) })
-        if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
-        return done
+        let shouldStop: () -> Bool = { ContinuedWork.beat(); return Self.critical || abort.isSet }
+        let pieceBackend: () async -> ModelBackend = {
+            let b: ModelBackend = StepBackend.piecesOnGPU ? await self.stepBackend(piece: true) : .cpu
+            self.stepOnGPU = b == .gpu
+            return b
+        }
+        // Whisper writes first while it may (WhisperFlow); a failure with it leaves the rest of this note to Gemma.
+        var whisperOff = false
+        var atEnd = false
+        while true {
+            let onGPU: Bool
+            if atEnd { onGPU = false } else { onGPU = await pieceBackend() == .gpu }
+            let step = WhisperFlow.next(whisperReady: ModelManager.shared.whisperReady && !whisperOff, onGPU: onGPU,
+                                        cursorAtEnd: atEnd, pending: done.pendingIndices.count)
+            switch step {
+            case .whisper:
+                do {
+                    let (d, stop) = try await TranscriptRun.runWhisper(audioPath: audio.path, shouldStop: shouldStop,
+                                                                      beforePiece: { await self.heatGate(noteID) },
+                                                                      onPiece: { report($0) })
+                    if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
+                    done = d
+                    atEnd = true
+                } catch {
+                    if error is CancellationError || shouldStop() || Task.isCancelled { throw error }
+                    NSLog("[sve] whisper stopped (%@); Gemma goes on from the saved cursor", String(describing: error))
+                    whisperOff = true
+                    done = TranscriptSidecar.load(audioPath: audio.path)
+                }
+            case .gemmaRemainder:
+                let (d, stop) = try await TranscriptRun.run(audioPath: audio.path, isFinal: true, shouldStop: shouldStop,
+                                                            backend: pieceBackend,
+                                                            beforePiece: { await self.heatGate(noteID) },
+                                                            onPiece: { report($0) })
+                if stop == .yielded { throw CancellationError() }   // paused for heat; the cursor is kept
+                done = d
+                atEnd = true
+            case .fillPending:
+                await CoreEngine.shared.unloadWhisper()
+                done = try await TranscriptRun.fillPending(audioPath: audio.path, shouldStop: shouldStop,
+                                                           backend: pieceBackend,
+                                                           beforePiece: { await self.heatGate(noteID) })
+            case .done:
+                await CoreEngine.shared.unloadWhisper()   // Gemma writes the rest of the note
+                return done
+            }
+        }
     }
 
     /// A finished transcription into the note: pieces, transcript, and the sections written while recording

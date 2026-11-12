@@ -573,3 +573,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
 }
+
+// STUB (Task 5 replaces this): Whisper's model is not downloaded yet, so whisperReady is false and every note is
+// transcribed by Gemma as before. Task 5 adds Whisper as a ModelPart and these read its file.
+extension ModelManager {
+    /// Whisper's model file is on disk and usable.
+    var whisperReady: Bool { false }
+    /// Where Whisper's model file lives.
+    var whisperPath: String { Self.modelsDirectory.appendingPathComponent("whisper-te-medium-q8_0.bin").path }
+}

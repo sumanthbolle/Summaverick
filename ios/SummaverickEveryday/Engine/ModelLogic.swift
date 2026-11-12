@@ -316,6 +316,19 @@ enum WhisperChoice {
     }
 }
 
+/// The order of a note's transcript after Stop (spec sections 2-3): Whisper writes it from the cursor while it may
+/// (WhisperChoice), else Gemma goes on from the same cursor as today; once the cursor is at the end, Gemma fills the
+/// pieces Whisper left pending. One model at a time: CoreEngine frees one before loading the other.
+enum WhisperFlow {
+    enum Step: Equatable { case whisper, gemmaRemainder, fillPending, done }
+
+    /// whisperReady: its model is downloaded and nothing failed with it in this run. onGPU: this piece's backend.
+    static func next(whisperReady: Bool, onGPU: Bool, cursorAtEnd: Bool, pending: Int) -> Step {
+        if cursorAtEnd { return pending > 0 ? .fillPending : .done }
+        return WhisperChoice.use(whisperReady: whisperReady, backend: onGPU ? .gpu : .cpu) ? .whisper : .gemmaRemainder
+    }
+}
+
 enum ModelPurpose: Equatable {
     /// Recording -> text (live and after Stop).
     case transcription
