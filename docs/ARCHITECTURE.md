@@ -1,6 +1,6 @@
 # Summaverick Everyday: architecture
 
-Written 2026-11-12 from the code and the specs in `docs/superpowers/`. Where a spec and the code disagree, this file follows the code. The plan checkboxes in `docs/superpowers/plans/` are all unticked, so they say nothing about status. Use the table in section 8.
+Written 2026-11-12 from the code and the specs in `docs/superpowers/`; updated the same day after the Whisper build (commits `569508a`..`d115f17`). Section 9 is the history, day by day, and section 10 lists what is still open. Where a spec and the code disagree, this file follows the code. The plan checkboxes in `docs/superpowers/plans/` are all unticked, so they say nothing about status. Use the table in section 8.
 
 ## 1. What the app is, and its hard rules
 
@@ -14,7 +14,7 @@ Hard rules. Each one is enforced in code, not just policy.
 | No AI wording in the UI. A person advising, not a machine. | `docs/superpowers/2026-11-09-voice-guide.md`; strings in `Localizable.xcstrings`; `ios/tools/check_strings.py` checks every string has a Telugu value |
 | Medicine and health answers are built in code. The model may not write them. | `core/src/sve_medcheck.cpp`, `sve_health.cpp`, `sve_chat.cpp` (medicine sentences are held back from model text and quoted from the recording) |
 | Nothing is saved or rings until the person taps Yes. | `suggestions` table, `sve_suggestion_accept/reject`, `Views/Today/SuggestionCard.swift` |
-| One model in memory at a time. | `CoreEngine.swift` loads/unloads Gemma (`sve_load_llm`, `sve_unload_llm`). The embedder is the one planned CPU-only exception (section 5). |
+| One model in memory at a time. | `CoreEngine.swift`: loading Whisper frees Gemma and loading Gemma frees Whisper (`ModelSlot`); `ensureGemmaLoaded()` brings Gemma back for any caller. Whisper (~1.1 GB) and Gemma (~4.9 GB) do not fit together on 8 GB. The embedder is the one planned CPU-only exception (section 5). |
 | No model on the Mac for testing. | Core tests use only `clang++` and SQLite, and the model-free API check. Model runs happen on the phone. |
 | Plain voice for medicine, privacy, consent, "Delete everything". | Voice guide, "Where the voice stays plain" |
 
@@ -48,6 +48,8 @@ Other privacy rules: audio is deleted after a retention window (7 days default),
 |  sve_extract, sve_suggest, sve_medcheck, sve_health, sve_learn           |
 |  sve_memory, sve_consolidate, sve_brain, sve_brainmap                    |
 |  sve_chat, sve_textmatch, sve_embed, sve_context, sve_budget, sve_threads|
+|  sve_whisper_text (pause cuts, groups, repeat cleanup, language choice)  |
+|  whisper.cpp (vendored, MIT, -O3 always) built against llama's ggml      |
 +--------------------------------------------------------------------------+
 | llama.cpp / ggml  ios/Frameworks/llama.xcframework (Metal, prebuilt)     |
 | mtmd (audio projector)   SQLite (system lib)                             |
@@ -66,8 +68,12 @@ Key points:
 
 1. **Record.** `Audio/RecordingController.swift` and `AudioRecorder.swift` write a 16 kHz mono WAV in the app sandbox. The audio session keeps the app alive with the phone locked. A Live Activity (`SummaverickWidgets/RecordingLiveActivity.swift`) and a Record control start and stop it. `Views/Components/RecordingPulseView.swift` and `ScreenAwake.swift` handle the screen. A note row is created with `sve_note_create`.
 2. **Stop.** Recording ends. The recording is compressed later (`AudioCompressor.swift`). Transcription continues from the saved cursor.
-3. **Sidecar.** Progress sits next to the audio in `<audio>.live.json` (`Engine/TranscriptSidecar.swift`): `cursor_sample`, finished `pieces` (`start_sec`, `text`), finished `sections`, and `parts`. It is written atomically after every piece, section or part. Any interruption (crash, kill, heat pause) resumes from the cursor. The sidecar is deleted with the audio after the transcript is saved to the note.
-4. **Transcript pieces.** `TranscriptRun` (in `LiveTranscriber.swift`) cuts the audio into pieces of about 28 s and sends each one to Gemma 4 E4B through its audio projector (`sve_load_audio`, `sve_set_audio_threads`). Gemma listens to the audio itself, so Telugu, English and mixed speech come out as text. Transcribing while still recording is off by default (commit `83a7603`); every piece is written after Stop unless live transcription is turned on in settings (`LiveTranscribe` in `ModelLogic.swift`).
+3. **Sidecar.** Progress sits next to the audio in `<audio>.live.json` (`Engine/TranscriptSidecar.swift`): `cursor_sample`, finished `pieces` (`start_sec`, `text`, and for Whisper's unsure groups `pending` with `start_sample`/`end_sample`), finished `sections`, and `parts`. It is written atomically after every piece, section or part. Any interruption (crash, kill, heat pause) resumes from the cursor. The sidecar is deleted with the audio after the transcript is saved to the note.
+4. **Transcript pieces.** Two engines, decided in `ProcessingPipeline.transcribe` by `WhisperFlow.next(...)`:
+   - **Whisper first** (when the model file is present and verified). `TranscriptRun.runWhisper` calls `sve_whisper_next_piece` group by group (up to 28 s, cut at pauses). Each group is either Whisper text, or marked `needs_gemma` and saved as a *pending* piece in the sidecar. Details in section 6.
+   - **Gemma fills the rest.** Whisper is freed, Gemma loads, and `TranscriptRun.fillPending` sends each pending piece's exact samples to `sve_transcribe_span`, with the previous piece's text as context.
+   - **Gemma only** (no Whisper file, or the app in the background): `TranscriptRun` cuts ~28 s pieces and sends each to Gemma 4 E4B through its audio projector (`sve_load_audio`, `sve_set_audio_threads`). Gemma listens to the audio itself, so Telugu, English and mixed speech come out as text. In the background a Whisper run hands off cleanly to this path from its cursor.
+   - Transcribing while still recording is off by default (commit `83a7603`); every piece is written after Stop unless live transcription is turned on in settings (`LiveTranscribe` in `ModelLogic.swift`). Live transcription always uses Gemma.
 5. **Sections.** The pieces are grouped into sections (`core/src/sve_sections.cpp`, `sve_section_summarize`). Each section gets a title, a topic, points with `start_sec`, terms and hints (`SectionSummary` in the sidecar file). Very long recordings become many sections.
 6. **Outputs.** `sve_assemble` and `sve_section_output_put` write the notes (kind 1) and revision questions (kind 2) part by part, then the short summary, in small saved steps (`step_attempts` records tries). `Views/ChaptersView.swift` and `NoteDetailView.swift` show them. A part that already exists for the same language and piece range is not redone.
 7. **Extraction.** `sve_extract` reads the transcript for reminders, tasks, medicines and facts. They become `suggestions`, shown as cards on Today. `sve_medcheck` compares medicines with the doctor's exact words and the person's profile.
@@ -154,7 +160,7 @@ Files on disk:
 | Gemma 4 E4B, Q4_K_M | Listens to audio, writes transcript, sections, notes, memories, answers | `gemma-4-E4B-it-Q4_K_M.gguf` (unsloth), about 5 GB with the projector | In use |
 | Audio projector (mmproj) | Lets Gemma hear the audio | `mmproj-gemma-4-E4B-it-Q8_0.gguf` (ggml-org, about 560 MB; a slimmer file is planned, see `ios/tools/model/`) | In use |
 | EmbeddingGemma (256 dims) | Meaning search | not downloaded by the app yet | Core ready, not wired on iOS |
-| Whisper te-medium | Telugu transcript pieces | none merged | Design and plan only, see below |
+| Whisper te-medium (vasista22, Apache-2.0), ggml q8_0 | Telugu transcript pieces | `ggml-te-medium-q8_0.bin`, 823,369,779 bytes | Built in; inactive until the file is on the phone |
 | Qwen3 0.6B / 1.7B | Old summariser | retired (`ModelCatalog.retiredFilePrefixes` deletes old files) | Gone from the app. Still referenced in the root README and `core/README.md` (stale) |
 
 - **Download.** `ModelManager` downloads by itself after install, in a background URLSession (`com.summaverick.everyday.model`), resumes after failure, checks size and free space, and posts `.aiReady`. The person never picks a model. `DeviceGate` refuses phones without enough memory.
@@ -162,9 +168,40 @@ Files on disk:
 - **Contexts.** `ModelSpec.contextTokens` is 8192 for Gemma. `CoreEngine.loadModel` defaults to 4096 when not told. Long transcripts are cut by section and by part so no single call needs more than the context. `sve_transcript_fits` tells whether a text fits.
 - **One model at a time.** Gemma is unloaded and reloaded when the backend changes (CPU to GPU) via `lastLoad` in `CoreEngine`.
 
-### Whisper Telugu plan (in progress, nothing merged)
+### Whisper Telugu transcripts (built 2026-11-12, not yet tested on the phone)
 
-`docs/superpowers/specs/2026-11-12-whisper-telugu-transcripts-design.md` and `docs/superpowers/plans/2026-11-12-whisper-telugu-transcripts.md`. Reason: Gemma transcription takes about as long as the audio or longer on the iPhone 16e and sometimes loops. A spike (branch `spike/whisper-telugu`, not merged) showed Whisper te-medium doing 10 minutes of audio in 3.5 to 6.2 minutes with cleaner Telugu. Problems found: English comes out in Telugu letters, and Whisper loops on ticking noise. The design therefore uses Whisper for Telugu pieces, and Gemma when the piece is English or Whisper is unsure. The spec status is "owner's questions answered; awaiting approval". The plan has 5 tasks, starting with pure helpers in the core. Today `SVE_WITH_WHISPER` is only used in the CMake / device build, not in the iOS target.
+Why: Gemma transcription took about as long as the audio or longer on the iPhone 16e and sometimes looped. Spec `docs/superpowers/specs/2026-11-12-whisper-telugu-transcripts-design.md`, plan `docs/superpowers/plans/2026-11-12-whisper-telugu-transcripts.md`.
+
+**Engine.** whisper.cpp (MIT) vendored into `core/src` (`whisper.cpp`, `whisper-arch.h`, `whisper-logging.h`, `core/include/whisper.h`), compiled into the app against the ggml inside `llama.xcframework`, so there is one ggml. `ios/make_xcodeproj.py` defines `SVE_WITH_WHISPER=1`, finds `ggml.h` under `$(BUILT_PRODUCTS_DIR)/llama.framework/Headers`, and compiles `whisper.cpp` at -O3 even in Debug (Debug -O0 was about 10x slower). The Neural Engine path is stubbed (`sve_whisper_stubs.cpp`). One small SVE patch adds `whisper_set_audio_ctx_with_state` so the language check only encodes the real length of a piece; it must be re-applied when whisper.cpp is updated.
+
+**Pure helpers** (`core/src/sve_whisper_text.h/.cpp`, tested in `core/tests/test_whisper_text.cpp`):
+- `plan_group`: 20 ms loudness frames, smoothed over +/-7 frames; spans of 4-10 s cut at the quietest frame; spans joined into groups of at most 28 s. It waits when the recording is still growing and less than 31 s is available, and ends when final with under 0.5 s left.
+- `collapse_repeats`: a word or short phrase repeated more than 3 times in a row is cut to one copy (the ticking-noise loops); text that is only such a run becomes empty.
+- `lang_choice`: Telugu if p_te >= 0.6 and p_te - p_en >= 0.3, otherwise Gemma.
+
+**C API** (`sve_core.h`):
+- `sve_load_asr(ctx, path, use_gpu, n_threads)`, `sve_unload_asr`, `sve_asr_loaded`.
+- `sve_whisper_next_piece(ctx, wav, start_sample, is_final, cb, user)` returns JSON: `{"status":"piece","start_sec","end_sample","text","conf","needs_gemma"}`, or `wait` / `end`. Each span is language-checked; if any span in a group is unsure the whole group is `needs_gemma`. `conf` is the mean token probability over kept spans (null when none).
+- `sve_transcribe_span(ctx, wav, start, end, prev_text, cb, user)` is Gemma on an exact sample range, returning `{"text","conf"}`.
+- Decoding: greedy, `no_timestamps=true` (timestamp mode broke the first letter of every piece), temperature fallback off, `no_context=true`, `audio_ctx = min(1500, samples*50/16000 + 64)`, language `te`.
+
+**Swift side:**
+- `ModelLogic.swift`: `WhisperChoice` (GPU whenever the app is in front and heat is not `paused`, re-decided per group; CPU speed in the background is not measured, so `cpuFasterThanAudio=false` sends background work to Gemma), `WhisperFlow.next` (`.whisper(backend)`, `.gemmaRemainder`, `.fillPending`, `.done`), `ModelSlot`, `WhisperFile` (size + SHA-256 verdict: ok / missing / bad), and progress that leaves pending audio out until Gemma fills it.
+- `CoreEngine.swift`: `loadWhisper`, `unloadWhisper`, `whisperNextPiece`, `transcribeSpan`, `ensureGemmaLoaded()`; logs `[sve] model swap: whisper->gemma N s`.
+- `TranscriptSidecar.swift`: `appendPending`, `pendingIndices`, `fill` (empty text removes the piece); `previousText` skips pending pieces.
+- `ModelManager.swift`: a second `ModelPart` "whisper", downloaded after Gemma in the same background session; verified once by size and SHA-256 `0f71156c...98c3ad` (cached as `whisper.verified` = size:mtime), excluded from backup. A bad file is deleted and fetched again. `WhisperHost.url` holds an `OWNER_REPO` placeholder, so nothing downloads until the owner's Hugging Face repo is set. Model card for the upload: `tools/model/whisper-te-README.md`.
+- DEBUG hook: launch with `SVE_WHISPER_RETRANSCRIBE=<note id>` (optional `SVE_WHISPER_BACKEND=gpu|cpu`) to re-run one note through Whisper on a temporary copy of its WAV; the note is not changed.
+
+**Spike measurements** (branch `spike/whisper-telugu`, note 25 = 10 min Telugu, note 22 = 10 min English, hot phone; "clean chars" leaves out loop lines; Gemma wrote 3729):
+
+| Setting | Clean chars | Time per audio second |
+|---|---|---|
+| 10 s pieces, full encoder | 4080 | 0.62 |
+| 10 s pieces, encoder sized to piece | 3341 | 0.41 |
+| 16 s pieces, sized | 3034 | 0.35 |
+| 16 s pieces, full | 2917 | 0.49 |
+
+Rejected along the way: stock whisper large-v3-turbo (garbage on Telugu), 15 s fixed chunks with timestamps (broken first letters, ~60% of Gemma's text). Found: English comes out in Telugu letters with `lang=te`, hence the language check and Gemma fallback.
 
 ## 7. Build and test
 
@@ -175,7 +212,7 @@ Files on disk:
 **Device build.** Open the project in Xcode 16+, set the Team under Signing & Capabilities, pick a connected iPhone (iOS 17+), Run. Do not add capabilities; a personal team will fail signing. Background continued processing needs iOS 26.
 
 **Core tests (no phone, no model).**
-- `bash core/tests/run.sh` compiles each `core/tests/test_*.cpp` with the pure core sources using `clang++ -std=c++17 -DSVE_TEST_MAIN` and `-lsqlite3`, runs them and prints a TOTAL line. Covers store, extraction, medicine checks, learning, sections, memory, brain map, consolidation, chat, assemble, embed, budget, threads.
+- `bash core/tests/run.sh` compiles each `core/tests/test_*.cpp` with the pure core sources using `clang++ -std=c++17 -DSVE_TEST_MAIN` and `-lsqlite3`, runs them and prints a TOTAL line. Covers store, extraction, medicine checks, learning, sections, memory, brain map, consolidation, chat, assemble, embed, budget, threads, Whisper text helpers. Last run 2026-11-12: 395 passed, 0 failed.
 - `bash core/tests/smoke_gemma.sh api` checks the C API with no model.
 - `smoke_gemma.sh extract` and `transcribe` need Gemma and run on a machine with llama.cpp. These contradict the "no model on the Mac" rule for day-to-day work; use them only if the owner agrees.
 
@@ -207,7 +244,7 @@ Built means present in code. "Verified on phone" is not claimed here; I did not 
 | Look, guided setup, voice wording | Built | `Views/Setup/`, voice guide, `Brand.swift` |
 | Meaning search (embeddings) in Ask | Core built, iOS not wired | no `sve_load_embedder` call in `ios/`, no embedder in `ModelCatalog` |
 | 3D animated knowledge graph | Planned | owner request, second-brain Task 17 |
-| Whisper Telugu transcripts | In progress: design awaiting approval, plan written, nothing merged | spec and plan dated 2026-11-12; spike branch unmerged |
+| Whisper Telugu transcripts | Built (Tasks 1-5), inactive until the model file is on the phone; device checks (Task 6) pending | commits `569508a`..`d115f17`; section 6 |
 | Piece speed work | Notes only | `docs/superpowers/2026-11-09-piece-speed.md` |
 | Import audio files and any-mic live recording | Planned (spec approved 2026-11-10) | `specs/2026-11-10-import-and-any-mic-design.md`; no importer in `ios/` |
 | Opt-in cloud connectors, richer onboarding | Planned | owner memory only; on-device stays default |
@@ -215,3 +252,33 @@ Built means present in code. "Verified on phone" is not claimed here; I did not 
 | Slim mmproj hosted by owner | Planned | `ModelHost` comment in `ModelManager.swift` |
 
 Known stale docs: the root `README.md` and `core/README.md` still describe Apple Speech and Qwen3 as the iPhone path. The code uses Gemma 4 E4B for audio and text. Fix those before sharing the repo.
+
+## 9. How we got here (history, 258 commits, 2026-11-06 to 2026-11-12)
+
+Each feature went the same way: design in `docs/superpowers/specs/`, owner approval, plan in `docs/superpowers/plans/`, build task by task with a review after each task and a whole-branch review at the end, then checks on the owner's iPhone 16e. All work is on `feature/personal-assistant`, not pushed.
+
+**2026-11-06, personal assistant (61 commits).** Spec `2026-11-06-personal-assistant-design.md`. Core: assistant tables, extraction prompt with a tolerant JSON parser, the code-enforced medicine check (fractions, ranges, windowed name match, ambiguous doses; five review rounds), learning from repeated edits, the memory context assembler, the assistant C API. iOS: Today screen and suggestion cards with Yes / Edit / No, local reminders (once, daily, weekly), Deep dive (topics, people, timeline), Ask with sources and voice questions, profile and learned memory, Delete everything, the English + Telugu string catalog.
+
+**2026-11-07, model download and live transcription (14).** The app downloads Gemma by itself; Qwen and Apple Speech removed (Apple has no on-device Telugu). Pure rules for download, memory and heat. Live transcription while recording (`sve` incremental pieces from a WAV still being written), resume after locking, the Stop hand-over.
+
+**2026-11-08, long recordings and the second brain (34).** Recordings planned into ~5 minute sections with section summaries; notes, titles and chapters built from them. Overnight finishing while charging, recording compression, a slimmer projector tool. Regenerate / Undo / Try again. Second-brain design: Telugu-aware text matching, memory tables, grounding check (names must be said, real quotes), health flag and importance, per-piece transcript confidence.
+
+**2026-11-09, finishing without the app open (63).** Memories written after the notes, in the background and overnight; memory review cards; the memory accuracy test set. Recording Live Activity; start/stop from Shortcuts, Siri, the Action button and Control Center; auto-stop after quiet. Separate store connection so screens never wait behind the model. Background tasks with progress every 10 s; notes say per stage when they are ready. The heat ladder (ease off with rests and fewer threads instead of stop-start). Faster pieces (prefill and audio encoder on up to 8 threads). Notes accuracy fixes from the owner's audit of note 19 (vocabulary as spelling only, `[unclear]` pieces). Ask becomes a streaming chat that remembers the conversation, answers in the language asked, routes by kind of question, and never sends a health question to the model. The voice guide: no AI wording.
+
+**2026-11-10, look, setup, engine v2 (33).** New look (light grey and black, the owner's logo, Appearance setting) and guided first-run setup. "1 of 3 ready" notices. Background CPU thread caps; asking for background time at Record. Pure map builder; same-person questions and merges; memory consolidation across recordings. Notes and questions written one part at a time. Meaning-search vectors fused with keyword search, EmbeddingGemma support in the core. Engine v2 design and plan; import/any-mic design (draft).
+
+**2026-11-11, engine v2 and the map (39).** Notes written in small saved steps so a cut-off costs one step; failures counted only when real. Silent notes notices at night. The 3D knowledge-graph map with actions on every memory, waiting points marked "?", health memories and conflicts kept off it. A part's notes and questions written together. Finish now (dim screen, minutes, an estimate that counts the transcript). Notes written while recording. Live transcription paced by heat, then turned off by default (`83a7603`) because it heated the phone to thermal state 2 in about 10 minutes.
+
+**2026-11-11/12, Whisper spike.** The owner reported transcription was still too slow. Stock large-v3-turbo failed on Telugu. The Telugu fine-tune worked; fixes found by testing on the phone: -O3 for whisper.cpp, pauses instead of fixed cuts, `no_timestamps` for the broken first letters, `audio_ctx` for speed, a repeat filter for ticking loops, and a language check because English came out in Telugu letters.
+
+**2026-11-12, Whisper build (14).** Design approved with the owner's answers (host the model on the owner's Hugging Face with credit to vasista22; unsure pieces go to Gemma, no new control). Plan of 6 tasks; Tasks 1-5 built and reviewed: pure helpers (`569508a`, `f5c239c`), whisper.cpp and the C calls (`2bed677`), pending sidecar pieces (`b167f64`, `67b3ecb`), the pipeline (`fa9efb9`, `b847eee`), the download (`9a1bdc8`), final-review fixes (`377ae0e`, `d115f17`). This architecture file (`87c8105`).
+
+## 10. Open items
+
+- **Whisper device checks (Task 6):** copy the model to the phone, run notes 22 and 25 through the DEBUG hook (language detection 95%+ right), a 30-minute class within 14 min hot / 12 min warm, mixed speech, ticking noise, model missing, memory peak, CPU speed while locked; then tune `lang_choice` and the `[unclear]` threshold.
+- **Owner:** upload `ggml-te-medium-q8_0.bin` with `tools/model/whisper-te-README.md` to Hugging Face and give the repo so `WhisperHost.url` can be set.
+- **Known minor Whisper gaps** (accepted for now): a quick background blip reloads Whisper; one Gemma GPU piece may run after a long rest; overlapping verifies can hash twice; a bad hosted file is retried 3 times; the Linux CMake build with vendored whisper is untested.
+- **Ask is keyword-only on the phone:** `sve_load_embedder` is never called from iOS. The owner rates retrieval for Ask as top priority.
+- **Stale docs:** root `README.md` and `core/README.md` still describe Apple Speech and Qwen3.
+- **Planned:** import audio files and any-mic recording; richer 3D map styling; opt-in cloud connectors; Android and the pocket device on the same C API.
+
