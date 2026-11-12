@@ -444,24 +444,31 @@ final class ProcessingPipeline {
     /// short by an abort or a cooler phone), then go on, so progress is always made, at a lower duty cycle; CPU runs
     /// also take fewer threads (CoreEngine). Paused: pause the note (false), quietly; it resumes by itself.
     /// A recording running: the run steps aside (stepsAside, false), also when it starts during the rest.
+    /// When the heat gate last let a step through (HeatGovernor.now), to size the next rest at minimal.
+    private var heatGatePassed: TimeInterval?
+
     private func heatGate(_ id: Int64) async -> Bool {
         if parkedForNight(id) { return false }
         if stepsAside(id) { return false }
         let heat = HeatGovernor.shared
         let level = heat.level
         if level == .paused { return !pausedForHeat(id) }
-        guard HeatLadder.showsCooling(level) else { return true }   // full: no rest
+        guard HeatLadder.showsCooling(level) else { heatGatePassed = HeatGovernor.now; return true }   // full: no rest
         let before = stage
         stage = .cooling
-        NSLog("[sve] note %lld: heat %@, resting %.0f s", id, level.name, HeatLadder.restSeconds(level))
         let start = HeatGovernor.now
-        while !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now), !abort.isSet,
-              !LiveTranscriber.shared.liveRunning {
+        // The step since the last gate let it through: at minimal the rest matches it (HeatLadder.restSeconds).
+        let lastWork = heatGatePassed.map { start - $0 } ?? 0
+        NSLog("[sve] note %lld: heat %@, resting %.0f s", id, level.name,
+              HeatLadder.restSeconds(level, lastWork: lastWork))
+        while !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now, lastWork: lastWork),
+              !abort.isSet, !LiveTranscriber.shared.liveRunning {
             do { try await Task.sleep(nanoseconds: 500_000_000) } catch { break }
         }
         if pausedForHeat(id) { return false }
         if stepsAside(id) { return false }
         stage = before
+        heatGatePassed = HeatGovernor.now
         return true
     }
 

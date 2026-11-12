@@ -152,20 +152,29 @@ enum HeatLadder {
         }
     }
 
+    /// Longest rest at minimal, and the longest step counted as work (a longer gap was idle time, not work).
+    static let minimalRestCap: Double = 180
+    static let workCountedUpTo: Double = 600
+
     /// Rest before each piece, section or output. Paused has no end: the work waits until the level is below paused.
-    static func restSeconds(_ l: Level) -> Double {
+    /// At minimal (thermal serious) the rest is as long as the step before it took (`lastWork`, 20...180 s), so the
+    /// phone works at most half the time: a fixed 20 s after a 2-minute step kept the owner's phone hot
+    /// (2026-11-12, note 29).
+    static func restSeconds(_ l: Level, lastWork: Double = 0) -> Double {
         switch l {
         case .full: return 0
         case .eased: return 5
-        case .minimal: return 20
+        case .minimal:
+            let work = lastWork > 0 && lastWork <= workCountedUpTo ? lastWork : 0
+            return min(minimalRestCap, max(20, work))
         case .paused: return .infinity
         }
     }
 
     /// A rest that began at `started` is over: its seconds at the current level have passed, the phone is back
     /// at full, or it is paused (the gate pauses the work instead).
-    static func restOver(level: Level, started: TimeInterval, now: TimeInterval) -> Bool {
-        level == .paused || now - started >= restSeconds(level)
+    static func restOver(level: Level, started: TimeInterval, now: TimeInterval, lastWork: Double = 0) -> Bool {
+        level == .paused || now - started >= restSeconds(level, lastWork: lastWork)
     }
 
     /// Decode threads for CPU runs (GPU runs keep the GPU and only rest).
@@ -1292,6 +1301,14 @@ struct TaskProgress: Equatable {
         noteFraction = 0
         notesFraction = 0
         notesDone = false
+        // The bar may already be past this base: a note that ran on after a recording band was rebased onto the
+        // band's small rest (seen 2026-11-12: the next note's heartbeats stood at 1028/1041 for 4 minutes, and iOS
+        // ended the task as the app left the screen). Start from where the bar is, with a full note's units ahead.
+        if completedUnits > noteBase || totalUnits - noteBase < Self.noteUnits / 2 {
+            noteBase = max(noteBase, completedUnits)
+            if totalUnits - noteBase < Self.noteUnits / 2 { totalUnits = noteBase + Self.noteUnits }
+            noteSpan = totalUnits - noteBase
+        }
         completedUnits = max(completedUnits, noteBase)
     }
 
