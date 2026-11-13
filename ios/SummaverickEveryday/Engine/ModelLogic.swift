@@ -592,6 +592,26 @@ enum LiveLag {
     }
 }
 
+/// What a note's run writes first after the reminders (owner, 2026-11-13: note 39 spent 5 of its 16 minutes on
+/// section summaries before its notes appeared). A note that takes the one pass and has no section summaries yet
+/// gets its notes first, then its sections, memories and insight; any other note keeps the sections first.
+enum NotesOrder {
+    enum Order: Equatable { case notesFirst, sectionsFirst }
+
+    static func order(onePassEligible: Bool, sectionsStored: Bool) -> Order {
+        onePassEligible && !sectionsStored ? .notesFirst : .sectionsFirst
+    }
+
+    /// The lock-screen progress after the notes (ContinuedWork afterNotes, 0…1): the sections (notes first only),
+    /// then the memories, then the insight.
+    static func afterNotes(_ order: Order) -> (sections: ClosedRange<Double>?, memories: ClosedRange<Double>, insight: Double) {
+        switch order {
+        case .sectionsFirst: return (nil, 0...0.5, 0.5)
+        case .notesFirst: return (0...0.4, 0.4...0.8, 0.8)
+        }
+    }
+}
+
 enum NotesProgress {
     /// Share of the work after Stop that is transcription; the rest is reminders, title and the three outputs.
     static let transcriptionShare = 0.7

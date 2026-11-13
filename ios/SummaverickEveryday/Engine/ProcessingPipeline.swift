@@ -1394,25 +1394,42 @@ final class ProcessingPipeline {
         // come from them; written again when they read as another language). The title comes from the transcript
         // whenever it fits one prompt, else from the sections; the summary, notes and questions are written in steps
         // from the sections (writeInSteps), and from the transcript only when the sections could not be written.
-        let refill = partsRetry.contains(id)   // Try again on parts that were left: only those, then put together
-        await rewriteSectionsIfOtherLanguage(id, lang: lang)
-        guard let covered = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
-        if covered { await markRewrittenSections(id, lang: lang) }
-        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
-        let material = Self.notesMaterial(await engine.pieces(id), transcript: transcript)
-        let fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
-        if setTitle, !(await heatGate(id)) { return }
-
         // One pass: when the transcript fits one prompt, the title, summary, notes and questions come from one
-        // generation (the section summaries above stay). Not for a refill, a resumed run with some outputs stored,
-        // or a title that is not to be set; a reply that does not split falls back to the steps below.
-        var onePassDone = false
+        // generation. Not for a refill, a resumed run with some outputs stored, or a title that is not to be set; a
+        // reply that does not split falls back to the steps below. A note that takes it and has no section summaries
+        // yet gets its notes first, its sections after (NotesOrder); one with sections stored keeps them first.
+        let refill = partsRetry.contains(id)   // Try again on parts that were left: only those, then put together
+        let material = Self.notesMaterial(await engine.pieces(id), transcript: transcript)
         let storedNow = await engine.note(id).map { n in OutputKind.allCases.map { n.output($0) } }
             ?? OutputKind.allCases.map { _ in nil }
-        if setTitle, !refill, WaitingNotes.outputsToWrite(stored: storedNow).allSatisfy({ $0 }), Self.onePassAllowed,
-           ((try? await onBackend({ await engine.allFits(material) })) ?? false) {
+        var onePassEligible = false
+        if setTitle, !refill, WaitingNotes.outputsToWrite(stored: storedNow).allSatisfy({ $0 }), Self.onePassAllowed {
+            onePassEligible = (try? await onBackend({ await engine.allFits(material) })) ?? false
+        }
+        let order = NotesOrder.order(onePassEligible: onePassEligible, sectionsStored: !(await engine.sections(id)).isEmpty)
+        var onePassDone = false
+        if order == .notesFirst {
+            NSLog("[sve] note %lld: notes first, sections after", id)
+            if !(await heatGate(id)) { return }
             onePassDone = await writeAllInOnePass(noteID: id, transcript: material, lang: lang, steps: steps)
             if !onePassDone, abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }
+            // Not split: the sections are written and the steps run, as for any other note.
+        }
+
+        var covered = false, fromSections = false
+        if !onePassDone {
+            await rewriteSectionsIfOtherLanguage(id, lang: lang)
+            guard let c = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
+            covered = c
+            if covered { await markRewrittenSections(id, lang: lang) }
+            ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
+            fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
+            if setTitle, !(await heatGate(id)) { return }
+            // Sections first (stored already, e.g. written while recording): the one pass after them, as before.
+            if order == .sectionsFirst, onePassEligible {
+                onePassDone = await writeAllInOnePass(noteID: id, transcript: material, lang: lang, steps: steps)
+                if !onePassDone, abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }
+            }
         }
 
         if !onePassDone, setTitle, let t = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections) {
@@ -1469,11 +1486,23 @@ final class ProcessingPipeline {
         notifyStage(id, NotifyRule.notes) { NotesNotifier.notesReady(noteID: id, title: $0, step: step, hold: $1) }
         RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
         notesStored = true   // from here an expiry only stops the run (TaskLifecycle.expiryCutsOff)
+        // Notes first: the section summaries now (the memories come from them), after the notes and like the
+        // memories: a stop or failure never touches the notes, and what is left is finished later (sectionsDue).
+        let after = NotesOrder.afterNotes(onePassDone && order == .notesFirst ? .notesFirst : .sectionsFirst)
+        memoryStop.set(false)
+        if let span = after.sections {
+            await rewriteSectionsIfOtherLanguage(id, lang: lang)
+            if await writeSections(noteID: id, lang: lang, quiet: true, afterNotes: span) == true {
+                await markRewrittenSections(id, lang: lang)
+            } else {
+                NSLog("[sve] note %lld: sections stopped after the notes; the notes stay, the rest is finished later", id)
+                markSectionsDue(id)
+            }
+        }
         // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
-        memoryStop.set(false)
-        _ = await writeMemories(noteID: id, quiet: false)
-        ContinuedWork.shared.update(afterNotes: 0.5)   // the insight: the note's last part, under the same task
+        _ = await writeMemories(noteID: id, quiet: false, span: after.memories)
+        ContinuedWork.shared.update(afterNotes: after.insight)   // the insight: the note's last part, under the same task
         if !refill { await writeInsight(id) }   // a part written again does not change the insight
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
@@ -1642,6 +1671,27 @@ final class ProcessingPipeline {
         get { Set((UserDefaults.standard.array(forKey: "partsRetry") as? [NSNumber] ?? []).map(\.int64Value)) }
         set { UserDefaults.standard.set(newValue.sorted().map { NSNumber(value: $0) }, forKey: "partsRetry") }
     }
+
+    /// Notes-first notes whose section summaries were stopped after their notes were stored (NotesOrder): their
+    /// sections, then their memories, are finished by the memory backfill (idle in front, overnight), or when the
+    /// note is opened (backfillSections). On disk, so a kill keeps them; removed once the sections cover the note.
+    private var sectionsDue: Set<Int64> {
+        get { Set((UserDefaults.standard.array(forKey: Self.sectionsDueKey) as? [NSNumber] ?? []).map(\.int64Value)) }
+        set { UserDefaults.standard.set(newValue.sorted().map { NSNumber(value: $0) }, forKey: Self.sectionsDueKey) }
+    }
+    nonisolated private static let sectionsDueKey = "sectionsDue"
+
+    /// Tried once per launch by the backfill (a note whose sections keep failing waits for the next launch).
+    @ObservationIgnored private var sectionsTried: Set<Int64> = []
+
+    /// A notes-first note's sections were stopped after its notes: finished later (sectionsDue).
+    private func markSectionsDue(_ id: Int64) {
+        sectionsDue.insert(id)
+        memoriesMayBeDue = true   // the overnight task is asked for while they are left
+    }
+
+    /// Sections due that the backfill may take in this launch, newest first.
+    private var sectionsDueNow: [Int64] { sectionsDue.subtracting(sectionsTried).sorted(by: >) }
 
     /// Under a part's heading while that part is not written.
     static var notWrittenYet: String { String(localized: "(not written yet)") }
@@ -1894,6 +1944,8 @@ final class ProcessingPipeline {
         UserDefaults.standard.removeObject(forKey: rewriteMarkKey(id))
         let retry = (UserDefaults.standard.array(forKey: "partsRetry") as? [NSNumber] ?? []).filter { $0.int64Value != id }
         UserDefaults.standard.set(retry, forKey: "partsRetry")
+        let due = (UserDefaults.standard.array(forKey: sectionsDueKey) as? [NSNumber] ?? []).filter { $0.int64Value != id }
+        UserDefaults.standard.set(due, forKey: sectionsDueKey)
     }
 
     /// The parts of a note that failed 3 times for a real reason, in either notes language, cleared so the next run
@@ -1922,23 +1974,37 @@ final class ProcessingPipeline {
     /// left, or the phone got warm, and nothing is shown or queued. Otherwise whether the sections now cover
     /// every piece (false after a failure: the notes then come from the transcript, as before sections).
     /// quiet (backfill when an older note is opened): no failure banner, no pause queue, stops at critical.
-    private func writeSections(noteID id: Int64, lang: String, quiet: Bool) async -> Bool? {
+    /// afterNotes (with quiet; a notes-first note's own run, its notes stored): the heartbeat and the lock-screen
+    /// progress go on in this span of what follows the notes, and the person asking for something stops it, as it
+    /// stops the memories (memoryWork, yieldMemories).
+    private func writeSections(noteID id: Int64, lang: String, quiet: Bool, afterNotes: ClosedRange<Double>? = nil) async -> Bool? {
         let engine = CoreEngine.shared
         let pieces = await engine.pieces(id)
         guard !pieces.isEmpty else { return false }
         let existing = await engine.sections(id)
-        if SectionWriter.coversAll(existing, pieceCount: pieces.count) { return true }
+        if SectionWriter.coversAll(existing, pieceCount: pieces.count) { sectionsDue.remove(id); return true }
         let duration = await engine.note(id)?.duration_seconds ?? 0
         let from = NoteSection.covered(NoteSection.validPrefix(existing, pieceCount: pieces.count))
         let total = SectionWriter.plan(pieces: Array(pieces[from...]), endSec: duration, isFinal: true).count
-        let abort = self.abort, recording = LiveTranscriber.shared.recordingNow
+        let abort = self.abort, recording = LiveTranscriber.shared.recordingNow, memoryStop = self.memoryStop
+        let afterNotesRun = afterNotes != nil, beats = !quiet || afterNotesRun
+        let yields = quiet && (afterNotesRun || memoryWork)   // with the memories: stops when the person asks
         var written = 0, gone = false, stopped = false
+        let wasMemoryWork = memoryWork
+        if afterNotesRun { memoryWork = true }   // after the notes: the person's action goes first
+        defer { memoryWork = wasMemoryWork }
         /// The lock-screen progress inside the sections step: one share per section.
         func reportSections() {
             let part = Double(written) / Double(max(total, 1))
-            ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.sectionsStep, part: part, outputsTotal: Self.notesSteps))
+            if let span = afterNotes {
+                ContinuedWork.shared.update(afterNotes: span.lowerBound + (span.upperBound - span.lowerBound) * part)
+            } else if !quiet {
+                ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.sectionsStep, part: part, outputsTotal: Self.notesSteps))
+            }
         }
-        func stop() -> Bool { abort.isSet || (quiet && LiveTranscriber.shared.isRecording) || Task.isCancelled }
+        func stop() -> Bool {
+            abort.isSet || (quiet && LiveTranscriber.shared.isRecording) || Task.isCancelled || (yields && memoryStop.isSet)
+        }
         do {
             let done = try await SectionWriter.writeDue(
                 pieces: pieces, existing: existing, isFinal: true, lang: lang, endSec: duration,
@@ -1950,21 +2016,21 @@ final class ProcessingPipeline {
                         stopped = true; return false
                     }
                     stage = .sections(written, total)
-                    if !quiet { reportSections() }
+                    reportSections()
                     return true
                 },
                 summarize: { ps, lang in
                     try await onBackend {
                         try await engine.sectionSummarize(pieces: ps, lang: lang, shouldStop: {
-                            if !quiet { ContinuedWork.beat() }
-                            return abort.isSet || Self.critical || (quiet && recording.isSet)
+                            if beats { ContinuedWork.beat() }
+                            return abort.isSet || Self.critical || (quiet && recording.isSet) || (yields && memoryStop.isSet)
                         })
                     }
                 },
                 onSection: { secs in
                     guard await engine.setSections(id, secs) else { gone = true; return false }
                     written += 1
-                    if !quiet { reportSections() }
+                    reportSections()
                     NotificationCenter.default.post(name: .notesChanged, object: nil)   // chapters appear as they come
                     return true
                 })
@@ -1988,7 +2054,10 @@ final class ProcessingPipeline {
                 return nil
             }
             let covers = SectionWriter.coversAll(done, pieceCount: pieces.count)
-            if covers { Self.setSectionFailures(id, 0) }
+            if covers {
+                Self.setSectionFailures(id, 0)
+                sectionsDue.remove(id)
+            }
             return covers
         } catch {
             if quiet {
@@ -2083,7 +2152,8 @@ final class ProcessingPipeline {
     /// run ends quietly); .failed when a section's model call failed (-3: the note is skipped for the rest of this
     /// launch, other notes go on); .stopped for a real stop, or no model (the sections left are done later).
     @discardableResult
-    private func writeMemories(noteID id: Int64, quiet: Bool) async -> MemoryPass.Outcome {
+    /// span: where the memories sit in what follows the notes on the lock-screen progress (the note's own run).
+    private func writeMemories(noteID id: Int64, quiet: Bool, span: ClosedRange<Double> = 0...0.5) async -> MemoryPass.Outcome {
         let engine = CoreEngine.shared
         let due = await engine.memorySectionsDue(id)
         guard !due.isEmpty else { return .finished }
@@ -2111,7 +2181,10 @@ final class ProcessingPipeline {
                 finished = done
                 stage = .memories(done, due.count)
                 // The note's own run: its memories are the first half of what follows its notes on the task.
-                if !quiet { ContinuedWork.shared.update(afterNotes: 0.5 * Double(done) / Double(due.count)) }
+                if !quiet {
+                    let part = Double(done) / Double(due.count)
+                    ContinuedWork.shared.update(afterNotes: span.lowerBound + (span.upperBound - span.lowerBound) * part)
+                }
                 NotificationCenter.default.post(name: .assistantChanged, object: nil)
             })
         switch outcome {
@@ -2207,19 +2280,49 @@ final class ProcessingPipeline {
         let limit = PersonFirst.backfillNotes(inFront: overnightRun == nil)
         let needing = await CoreEngine.shared.notesNeedingMemories(limit: limit + memoryFailed.count)
         let ids = MemoryPass.backfillNotes(needing, skipping: memoryFailed, limit: limit)
-        guard !ids.isEmpty else { memoriesMayBeDue = false; return }
+        let sectionNotes = Array(sectionsDueNow.prefix(limit))
+        guard !ids.isEmpty || !sectionNotes.isEmpty else { memoriesMayBeDue = false; return }
         guard !LiveTranscriber.shared.isRecording, !Task.isCancelled, !memoryStop.isSet else { return }
         beginBackground()
         ScreenAwake.pipeline(wants: false)   // background work: the phone may lock (the GPU run stops)
         defer { endBackground() }
-        var allDone = ids.count < limit
-        for id in ids {
+        // First the sections stopped after a notes-first note's notes (sectionsDue), each note's memories after them.
+        for id in sectionNotes {
+            guard await finishDueSections(id) else { stage = .idle; return }
+        }
+        // Still one note per pass in front: a note whose sections were written takes a memory note's place.
+        let memoryIDs = Array(ids.prefix(max(0, limit - sectionNotes.count)))
+        var allDone = memoryIDs.count == ids.count && ids.count < limit && sectionsDueNow.isEmpty
+        for id in memoryIDs {
             activeNoteID = id
             // A failed note is skipped (memoryFailed) and the next goes on; a real stop ends the backfill.
             guard MemoryPass.backfillGoesOn(after: await writeMemories(noteID: id, quiet: true)) else { allDone = false; break }
         }
         if allDone { memoriesMayBeDue = false }
         stage = .idle
+    }
+
+    /// A notes-first note's sections left after its notes (sectionsDue), then its memories, quietly in the memory
+    /// backfill. False when the backfill should stop (a stop; nothing is lost, the rest stays due). A note whose
+    /// sections fail for a real reason is not tried again in this launch.
+    private func finishDueSections(_ id: Int64) async -> Bool {
+        let engine = CoreEngine.shared
+        guard let note = await engine.note(id) else { sectionsDue.remove(id); return true }   // deleted
+        activeNoteID = id
+        NSLog("[sve] note %lld: the sections left after its notes are written now", id)
+        guard await writeSections(noteID: id, lang: note.lang, quiet: true) != nil else {
+            let stopped = abort.isSet || memoryStop.isSet || LiveTranscriber.shared.isRecording || Task.isCancelled
+                || Self.critical || HeatGovernor.shared.level == .paused
+            if await engine.note(id) == nil { sectionsDue.remove(id); return true }
+            if !stopped {
+                NSLog("[sve] note %lld: its sections could not be written; tried again next launch", id)
+                sectionsTried.insert(id)
+                return true
+            }
+            return false
+        }
+        if sectionsDue.contains(id) { sectionsTried.insert(id) }   // ran through without covering: next launch
+        return MemoryPass.backfillGoesOn(after: await writeMemories(noteID: id, quiet: true))
     }
 
     /// The person asked for something (Ask, Regenerate, Try again, Generate notes, a topic summary): memory work
@@ -2937,7 +3040,7 @@ final class ProcessingPipeline {
         var memoriesLeft = memoriesMayBeDue
         if !expired.isSet {   // notes whose memory call failed in this launch do not count: they wait for the next one
             let needing = await CoreEngine.shared.notesNeedingMemories(limit: 1 + memoryFailed.count)
-            memoriesLeft = !MemoryPass.backfillNotes(needing, skipping: memoryFailed, limit: 1).isEmpty
+            memoriesLeft = !MemoryPass.backfillNotes(needing, skipping: memoryFailed, limit: 1).isEmpty || !sectionsDueNow.isEmpty
         }
         return !overnight.isEmpty || !interrupted.isEmpty || !queued.isEmpty || !insightDue.isEmpty || memoriesLeft
     }
