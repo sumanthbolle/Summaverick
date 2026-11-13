@@ -3,7 +3,7 @@ import SherpaOnnxC
 
 /// Telugu speech recognizer on the CPU (sherpa-onnx, Moonshine-style files in the bundle's Shruti folder).
 /// Safe to call from any thread: one serial queue guards the recognizer.
-final class ShrutiRecognizer {
+final class ShrutiRecognizer: @unchecked Sendable {
     enum Failure: Error { case notLoaded, filesMissing, loadFailed }
 
     static let shared = ShrutiRecognizer()
@@ -13,6 +13,8 @@ final class ShrutiRecognizer {
     private var recognizer: OpaquePointer?
     private var loadedThreads = 0
     private var readyCache: Bool?
+    /// Set while a recognizer is held; read without the queue, so a caller can skip unload without waiting.
+    private let loadedFlag = AtomicFlag()
 
     /// The five files are in the bundle's Shruti folder at the right sizes. Checked once per launch.
     var ready: Bool {
@@ -26,6 +28,9 @@ final class ShrutiRecognizer {
     }
 
     var isLoaded: Bool { queue.sync { recognizer != nil } }
+
+    /// Lock-free: false means nothing is loaded (no wait behind a decode in flight).
+    var mayBeLoaded: Bool { loadedFlag.isSet }
 
     private static var folder: URL? { Bundle.main.url(forResource: "Shruti", withExtension: nil) }
 
@@ -41,22 +46,26 @@ final class ShrutiRecognizer {
 
     /// Loads the recognizer with this many threads. No-op when it is already loaded with the same count.
     func load(threads: Int) throws {
-        try queue.sync {
-            if recognizer != nil && loadedThreads == threads { return }
-            if let old = recognizer {
-                SherpaOnnxDestroyOfflineRecognizer(old)
-                recognizer = nil
-            }
-            guard let dir = ShrutiRecognizer.folder?.path else { throw Failure.filesMissing }
-            let started = Date()
-            guard let r = ShrutiRecognizer.makeRecognizer(dir: dir, threads: threads) else {
-                NSLog("[sve] shruti load failed (threads %d)", threads)
-                throw Failure.loadFailed
-            }
-            recognizer = r
-            loadedThreads = threads
-            NSLog("[sve] shruti loaded in %.1f s (threads %d)", Date().timeIntervalSince(started), threads)
+        try queue.sync { try loadOnQueue(threads: threads) }
+    }
+
+    private func loadOnQueue(threads: Int) throws {
+        if recognizer != nil && loadedThreads == threads { return }
+        if let old = recognizer {
+            SherpaOnnxDestroyOfflineRecognizer(old)
+            recognizer = nil
+            loadedFlag.set(false)
         }
+        guard let dir = ShrutiRecognizer.folder?.path else { throw Failure.filesMissing }
+        let started = Date()
+        guard let r = ShrutiRecognizer.makeRecognizer(dir: dir, threads: threads) else {
+            NSLog("[sve] shruti load failed (threads %d)", threads)
+            throw Failure.loadFailed
+        }
+        recognizer = r
+        loadedThreads = threads
+        loadedFlag.set(true)
+        NSLog("[sve] shruti loaded in %.1f s (threads %d)", Date().timeIntervalSince(started), threads)
     }
 
     func unload() {
@@ -65,7 +74,21 @@ final class ShrutiRecognizer {
             SherpaOnnxDestroyOfflineRecognizer(r)
             recognizer = nil
             loadedThreads = 0
+            loadedFlag.set(false)
             NSLog("[sve] shruti unloaded")
+        }
+    }
+
+    /// Loads (a no-op at the same thread count) and decodes in one turn of the queue, so an unload from elsewhere
+    /// can never land between the two: after one, the next piece loads again.
+    func decode(_ samples: [Float], threads: Int) throws -> String {
+        try queue.sync {
+            try loadOnQueue(threads: threads)
+            guard let r = recognizer else { throw Failure.notLoaded }
+            return samples.withUnsafeBufferPointer { buf -> String in
+                guard let base = buf.baseAddress else { return "" }
+                return ShrutiRecognizer.decode(r, base, buf.count)
+            }
         }
     }
 

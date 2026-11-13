@@ -241,8 +241,7 @@ enum ShrutiPieceRun {
         guard count >= 0 else { throw Failure.unreadableAudio }
         let samples = raw.map { Array(UnsafeBufferPointer(start: $0, count: Int(count))) } ?? []
         let peak = samples.reduce(Float(0)) { max($0, abs($1)) }
-        try ShrutiRecognizer.shared.load(threads: threads)
-        let text = try ShrutiRecognizer.shared.decode(samples)
+        let text = try ShrutiRecognizer.shared.decode(samples, threads: threads)   // loads in the same turn
         return .piece(end: end, text: text, peak: peak)
     }
 }

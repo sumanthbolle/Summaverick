@@ -201,7 +201,11 @@ final class ModelManager: NSObject {
     }
 
     func loadIntoCore(backend: ModelBackend) async throws {
-        ShrutiRecognizer.shared.unload()   // one speech model in memory at a time; logs only when it was loaded
+        // One speech model in memory at a time: Shruti is freed before Gemma loads. Off the main actor (the unload
+        // waits behind a decode in flight), and skipped without any wait when nothing is loaded.
+        if ShrutiRecognizer.shared.mayBeLoaded {
+            await Task.detached(priority: .userInitiated) { ShrutiRecognizer.shared.unload() }.value
+        }
         try await CoreEngine.shared.loadModel(at: Self.fileURL(spec.weights).path, contextTokens: spec.contextTokens,
                                               mmprojPath: Self.fileURL(spec.projector).path, backend: backend)
     }
