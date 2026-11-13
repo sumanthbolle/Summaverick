@@ -264,6 +264,38 @@ recognizer setup in `ShrutiBench.swift` (`makeRecognizer`, `decode`). Do not tak
 - [ ] **Step 4: Run** the checks, the core tests and the device build. Expected: all pass.
 - [ ] **Step 5: Commit.** `feat(ios): Shruti can transcribe while recording (off until checked on the phone)`
 
+### Task 7: Notes first, sections and memories after (owner, 2026-11-13)
+
+Owner, 2026-11-13: "yes, defer sections and memories, go ahead" (after note 39 took 16 min from Stop to notes,
+5 min of it section summaries). This overrides ruling 2 for notes that take the one pass.
+
+**Files:**
+- Modify: `ios/SummaverickEveryday/Engine/ProcessingPipeline.swift` (`generateOutputs`)
+- Modify: `ios/SummaverickEveryday/Engine/ModelLogic.swift` (pure `enum NotesOrder`)
+- Test: extend `scratchpad/shruti_check/main.swift`
+
+**Interfaces:**
+- Consumes: Task 4's one-pass gate inputs (`allFits`, all three outputs still to write, `setTitle`, `!refill`,
+  `onePassAllowed`) and `writeAll`.
+- Produces:
+  - `enum NotesOrder { enum Order: Equatable { case notesFirst, sectionsFirst }; static func order(onePassEligible: Bool, sectionsStored: Bool) -> Order }`:
+    `.notesFirst` when eligible and the note has no stored sections yet; else `.sectionsFirst` (today's order).
+  - With `.notesFirst`, `generateOutputs` runs: extract (unchanged, first), the one pass, store and the
+    summary-ready and notes-ready notices, Live Activity ready, `notesStored = true`; then the section summaries
+    (`writeSections` and what follows it today: chapters, `markRewrittenSections`), then memories and insight, then done.
+  - If the one pass fails on the `.notesFirst` path, the sections are written and the stepped path runs exactly as
+    today (the note never ends with no notes).
+  - A cut-off or expiry after the notes are stored leaves sections and memories due, picked up by the existing
+    resume / idle / overnight work (the same path that finishes memories today).
+  - Log `[sve] note %lld: notes first, sections after` when `.notesFirst` is taken.
+
+- [ ] **Step 1: Extend the check:** `order(onePassEligible: true, sectionsStored: false) == .notesFirst`;
+  `(true, true) == .sectionsFirst`; `(false, false) == .sectionsFirst`.
+- [ ] **Step 2: Run** the check. Expected: `NotesOrder` undefined.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run** the checks, the core tests and the device build. Expected: all pass.
+- [ ] **Step 5: Commit.** `feat(ios): notes first, sections and memories after, for one-pass notes`
+
 ### Task 6: Device checks on the iPhone 16e (owner present)
 
 **Files:** fixes where a check fails; `docs/ARCHITECTURE.md` (Shruti section, history entry, credit);
