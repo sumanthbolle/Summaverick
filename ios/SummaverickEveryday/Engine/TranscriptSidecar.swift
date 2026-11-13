@@ -128,6 +128,12 @@ struct TranscriptSidecar: Codable, Equatable {
     var sections: [NoteSection] = []
     /// Notes and questions of `sections` written while recording.
     var parts: [LivePart] = []
+    /// The loudest sample peak of any piece Shruti heard for this recording (live and after Stop), 0 before any
+    /// (ShrutiPiece.retryWithGemma).
+    var shruti_peak: Float = 0
+    /// Set when Gemma transcribes the recording again from the start (Shruti heard nothing in it): Shruti stays off
+    /// for the rest of the note, and it is not restarted a second time. Absent otherwise.
+    var gemma_from_start: Bool?
 
     static let sampleRate: Double = 16_000
 
@@ -146,6 +152,16 @@ struct TranscriptSidecar: Codable, Equatable {
     var previousText: String? { pieces.last(where: { !$0.text.isEmpty && $0.pending != true })?.text }
     /// Indices of the pieces whose text is still to come.
     var pendingIndices: [Int] { pieces.indices.filter { pieces[$0].pending == true } }
+
+    /// Keeps the loudest Shruti piece's peak.
+    mutating func noteShrutiPeak(_ peak: Float) { shruti_peak = max(shruti_peak, peak) }
+
+    /// A fresh start for Gemma over the whole recording (cursor 0, no pieces), marked gemma_from_start.
+    static func gemmaFromStart() -> TranscriptSidecar {
+        var s = TranscriptSidecar()
+        s.gemma_from_start = true
+        return s
+    }
 
     /// Adds a finished piece and moves the cursor. Empty text (silence) only moves the cursor.
     /// A piece that does not move the cursor forward is ignored.
@@ -217,6 +233,8 @@ extension TranscriptSidecar {
         pieces = try c.decode([Piece].self, forKey: .pieces)
         sections = (try? c.decodeIfPresent([NoteSection].self, forKey: .sections)) ?? []
         parts = (try? c.decodeIfPresent([LivePart].self, forKey: .parts)) ?? []
+        shruti_peak = (try? c.decodeIfPresent(Float.self, forKey: .shruti_peak)) ?? 0
+        gemma_from_start = try? c.decodeIfPresent(Bool.self, forKey: .gemma_from_start)
     }
 
     /// The parts written for `section` as it is now in lang.

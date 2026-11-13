@@ -1017,8 +1017,10 @@ final class ProcessingPipeline {
             self.stepOnGPU = b == .gpu
             return b
         }
-        // Shruti writes first while it may; a failure with it leaves the rest of this note to Gemma.
-        var shrutiOff = false
+        // Shruti writes first while it may; a failure with it leaves the rest of this note to Gemma, and so does a
+        // restart from the start (gemma_from_start, kept across pauses).
+        var shrutiOff = done.gemma_from_start == true
+        var restarted = false
         var atEnd = false
         // Asked before every group (ShrutiChoice): CPU only, so the background does not matter.
         func shrutiMay() -> Bool {
@@ -1052,7 +1054,7 @@ final class ProcessingPipeline {
                     atEnd = true
                 } catch {
                     if error is CancellationError || shouldStop() || Task.isCancelled {
-                        ShrutiRecognizer.shared.unload()   // paused: its memory is not held meanwhile
+                        await ShrutiRecognizer.unloadOffMain()   // paused: its memory is not held meanwhile
                         throw error
                     }
                     NSLog("[sve] shruti stopped (%@); Gemma goes on from the saved cursor", String(describing: error))
@@ -1077,13 +1079,28 @@ final class ProcessingPipeline {
                 atEnd = true
             case .fillPending:
                 logStep("gemma fills the pieces shruti left")
-                ShrutiRecognizer.shared.unload()
+                await ShrutiRecognizer.unloadOffMain()
                 done = try await TranscriptRun.fillPending(audioPath: audio.path, shouldStop: shouldStop,
                                                            backend: pieceBackend,
                                                            beforePiece: { await self.heatGate(noteID) },
                                                            onPiece: { report($0) })
             case .done:
-                ShrutiRecognizer.shared.unload()   // Gemma writes the rest of the note
+                // Shruti heard no text in the whole recording, though some of it was not silent: quiet speech may
+                // be there (below needsGemma's peak), so Gemma transcribes the recording from the start, once.
+                let empty = Self.joined(TranscriptRun.pieces(done)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                if !restarted, done.gemma_from_start != true,
+                   ShrutiPiece.retryWithGemma(transcriptEmpty: empty, maxPeak: done.shruti_peak) {
+                    NSLog("[sve] note %lld: shruti heard no text (loudest piece %.4f); gemma from the start",
+                          noteID, Double(done.shruti_peak))
+                    restarted = true
+                    shrutiOff = true
+                    atEnd = false
+                    done = TranscriptSidecar.gemmaFromStart()
+                    done.save(audioPath: audio.path)   // the Gemma run reads the sidecar: cursor 0
+                    report(done)
+                    continue
+                }
+                await ShrutiRecognizer.unloadOffMain()   // Gemma writes the rest of the note
                 return done
             }
         }
@@ -3195,7 +3212,7 @@ extension ProcessingPipeline {
                 }
                 await self.debugRetranscribe(id)
             }
-            ShrutiRecognizer.shared.unload()
+            await ShrutiRecognizer.unloadOffMain()
         }
     }
 

@@ -2410,4 +2410,11 @@ enum ShrutiPiece {
     static func needsGemma(text: String, peak: Float) -> Bool {
         text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && peak >= 0.02
     }
+
+    /// A first pass that ended with no text at all, though some Shruti piece was louder than 1e-3 (maxPeak, the
+    /// loudest across the note's Shruti pieces): quiet speech below needsGemma's 0.02 may be in it, so Gemma
+    /// transcribes the recording from the start rather than the note ending with no transcript.
+    static func retryWithGemma(transcriptEmpty: Bool, maxPeak: Float) -> Bool {
+        transcriptEmpty && maxPeak > 0.001
+    }
 }

@@ -160,6 +160,7 @@ enum TranscriptRun {
             case .piece(let end, let text, let peak):
                 n += 1
                 let startSec = Int(start / Int64(ShrutiRecognizer.sampleRate))
+                progress.noteShrutiPeak(peak)   // ShrutiPiece.retryWithGemma, when the note ends with no text
                 if ShrutiPiece.needsGemma(text: text, peak: peak) {
                     progress.appendPending(startSec: startSec, endSample: end)
                 } else {

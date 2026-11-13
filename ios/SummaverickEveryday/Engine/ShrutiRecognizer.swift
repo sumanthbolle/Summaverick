@@ -81,6 +81,13 @@ final class ShrutiRecognizer: @unchecked Sendable {
         }
     }
 
+    /// unload() off the calling actor (it waits behind a decode in flight on the queue), skipped without any wait
+    /// when nothing is loaded. For callers on the main actor.
+    static func unloadOffMain() async {
+        guard shared.mayBeLoaded else { return }
+        await Task.detached(priority: .userInitiated) { shared.unload() }.value
+    }
+
     /// Loads (a no-op at the same thread count) and decodes in one turn of the queue, so an unload from elsewhere
     /// can never land between the two: after one, the next piece loads again.
     func decode(_ samples: [Float], threads: Int) throws -> String {
