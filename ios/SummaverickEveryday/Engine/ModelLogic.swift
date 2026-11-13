@@ -171,6 +171,17 @@ enum HeatLadder {
         }
     }
 
+    /// Rest before a Shruti piece (a light, quick decode): as long as the piece before took, with no 20 s floor,
+    /// up to 5 s at eased and minimalRestCap at minimal. Paused still waits. The Gemma ladder is restSeconds.
+    static func lightRestSeconds(_ l: Level, lastWork: Double) -> Double {
+        switch l {
+        case .full: return 0
+        case .eased: return min(5, lastWork)
+        case .minimal: return min(minimalRestCap, lastWork)
+        case .paused: return .infinity
+        }
+    }
+
     /// A rest that began at `started` is over: its seconds at the current level have passed, the phone is back
     /// at full, or it is paused (the gate pauses the work instead).
     static func restOver(level: Level, started: TimeInterval, now: TimeInterval, lastWork: Double = 0) -> Bool {
@@ -2325,5 +2336,41 @@ enum WhisperFile {
         guard let size else { return .missing }
         guard size == expectedBytes, let sha, sha.lowercased() == sha256 else { return .bad }
         return .ok
+    }
+}
+
+/// The five speech files in the app bundle's Shruti folder, and whether they are all there at the right size.
+enum ShrutiFiles {
+    enum Verdict { case ok, missing, bad }
+
+    static let names = ["preprocess.onnx", "encode.onnx", "uncached_decode.onnx", "cached_decode.onnx", "tokens.txt"]
+    static let bytes: [String: Int64] = [
+        "preprocess.onnx": 912310,
+        "encode.onnx": 19637087,
+        "uncached_decode.onnx": 421454,
+        "cached_decode.onnx": 32801767,
+        "tokens.txt": 120752,
+    ]
+
+    /// Any file without a size is missing (that wins); any size that is not the expected one is bad.
+    static func verdict(sizes: [String: Int64?]) -> Verdict {
+        var bad = false
+        for n in names {
+            guard let entry = sizes[n], let size = entry else { return .missing }
+            if size != bytes[n] { bad = true }
+        }
+        return bad ? .bad : .ok
+    }
+}
+
+/// CPU threads for Shruti: 4 at full and eased, 2 at minimal and paused.
+enum ShrutiThreads {
+    static func count(_ level: HeatLadder.Level) -> Int { level >= .minimal ? 2 : 4 }
+}
+
+/// A piece Shruti heard nothing in, though the audio was not silent, goes to Gemma instead.
+enum ShrutiPiece {
+    static func needsGemma(text: String, peak: Float) -> Bool {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && peak >= 0.02
     }
 }

@@ -21,6 +21,10 @@ WIDGETS_DIR = "SummaverickWidgets"
 SHARED_DIR = "Shared"
 CORE_SRC = "../core/src"
 XCFRAMEWORK = "Frameworks/llama.xcframework"
+# sherpa-onnx 2.0.1 with onnxruntime inside, runs the Shruti speech files. Fetch it with ./get-sherpa-onnx-xcframework.sh.
+SHERPA_XCFRAMEWORK = "Frameworks/SherpaOnnxC.xcframework"
+# The Shruti speech files, bundled as a folder (fetch them with ./get-shruti-model.sh).
+SHRUTI_DIR = f"{SWIFT_DIR}/Resources/Shruti"
 
 
 def uid(key: str) -> str:
@@ -66,6 +70,11 @@ if not any(f.endswith("sve_core.cpp") for f in core_files):
     sys.exit("core/src/sve_core.cpp not found; run this script from ios/")
 if not os.path.isdir(XCFRAMEWORK):
     print("warning: Frameworks/llama.xcframework not found — run ./get-llama-xcframework.sh first", file=sys.stderr)
+
+if not os.path.isdir(SHERPA_XCFRAMEWORK):
+    print("warning: Frameworks/SherpaOnnxC.xcframework not found — run ./get-sherpa-onnx-xcframework.sh first", file=sys.stderr)
+if not os.path.isfile(f"{SHRUTI_DIR}/encode.onnx"):
+    print("warning: Resources/Shruti/*.onnx not found — run ./get-shruti-model.sh first", file=sys.stderr)
 
 bridging = f"{SWIFT_DIR}/Bridging.h"
 assets = f"{SWIFT_DIR}/Assets.xcassets"
@@ -114,6 +123,9 @@ widget_refs = [file_ref(p, "sourcecode.swift", name=os.path.basename(p)) for p i
 widget_plist = f"{WIDGETS_DIR}/Info.plist"
 widget_plist_ref = file_ref(widget_plist, "text.plist.xml", name="Info.plist")
 xcf_ref = file_ref(XCFRAMEWORK, "wrapper.xcframework", name="llama.xcframework")
+sherpa_ref = file_ref(SHERPA_XCFRAMEWORK, "wrapper.xcframework", name="SherpaOnnxC.xcframework")
+shruti_ref = file_ref(SHRUTI_DIR, "folder", name="Shruti")
+shruti_build = build_file(shruti_ref, "resources")
 product_ref = uid("ref:product")
 objects[product_ref] = ("PBXFileReference", {
     "isa": "PBXFileReference", "explicitFileType": "wrapper.application", "includeInIndex": "0",
@@ -138,6 +150,8 @@ widget_resource_builds = [build_file(r, "widget-resources") for r, p in zip(xcst
 embed_widget_build = build_file(widget_product_ref, "embed-extensions", settings={"ATTRIBUTES": ["RemoveHeadersOnCopy"]})
 link_build = build_file(xcf_ref, "frameworks")
 embed_build = build_file(xcf_ref, "embed", settings={"ATTRIBUTES": ["CodeSignOnCopy", "RemoveHeadersOnCopy"]})
+sherpa_link_build = build_file(sherpa_ref, "frameworks")
+sherpa_embed_build = build_file(sherpa_ref, "embed", settings={"ATTRIBUTES": ["CodeSignOnCopy", "RemoveHeadersOnCopy"]})
 
 # groups (name-only groups; every file is referenced by its SOURCE_ROOT path, so nothing is in two groups)
 def group(key, name, children, path=None):
@@ -161,13 +175,13 @@ for d in sorted(by_dir):
         swift_children.extend(by_dir[d])
     else:
         swift_children.append(group("swift/" + d, d, by_dir[d]))
-swift_children += [bridging_ref, plist_ref, assets_ref] + xcstrings_refs
+swift_children += [bridging_ref, plist_ref, assets_ref, shruti_ref] + xcstrings_refs
 
 app_group = group("app", APP, swift_children)
 shared_group = group("shared", SHARED_DIR, shared_refs)
 widgets_group = group("widgets", WIDGETS, widget_refs + [widget_plist_ref])
 core_group = group("core", "Core", core_refs)
-fw_group = group("frameworks", "Frameworks", [xcf_ref])
+fw_group = group("frameworks", "Frameworks", [xcf_ref, sherpa_ref])
 products_group = group("products", "Products", [product_ref, widget_product_ref])
 main_group = group("main", None, [app_group, shared_group, widgets_group, core_group, fw_group, products_group])
 
@@ -178,16 +192,16 @@ objects[sources_phase] = ("PBXSourcesBuildPhase", {
     "runOnlyForDeploymentPostprocessing": "0"})
 frameworks_phase = uid("phase:frameworks")
 objects[frameworks_phase] = ("PBXFrameworksBuildPhase", {
-    "isa": "PBXFrameworksBuildPhase", "buildActionMask": "2147483647", "files": [link_build],
+    "isa": "PBXFrameworksBuildPhase", "buildActionMask": "2147483647", "files": [link_build, sherpa_link_build],
     "runOnlyForDeploymentPostprocessing": "0"})
 resources_phase = uid("phase:resources")
 objects[resources_phase] = ("PBXResourcesBuildPhase", {
-    "isa": "PBXResourcesBuildPhase", "buildActionMask": "2147483647", "files": [assets_build] + xcstrings_builds,
+    "isa": "PBXResourcesBuildPhase", "buildActionMask": "2147483647", "files": [assets_build, shruti_build] + xcstrings_builds,
     "runOnlyForDeploymentPostprocessing": "0"})
 embed_phase = uid("phase:embed")
 objects[embed_phase] = ("PBXCopyFilesBuildPhase", {
     "isa": "PBXCopyFilesBuildPhase", "buildActionMask": "2147483647", "dstPath": "",
-    "dstSubfolderSpec": "10", "files": [embed_build], "name": "Embed Frameworks",
+    "dstSubfolderSpec": "10", "files": [embed_build, sherpa_embed_build], "name": "Embed Frameworks",
     "runOnlyForDeploymentPostprocessing": "0"})
 
 embed_ext_phase = uid("phase:embed-extensions")

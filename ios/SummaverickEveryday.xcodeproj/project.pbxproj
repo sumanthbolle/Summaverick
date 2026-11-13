@@ -11,6 +11,10 @@
 			isa = PBXBuildFile;
 			fileRef = 647DAFDDC9793F2E68970D6F;
 		};
+		0265346915ED5E206E1A6538 = {
+			isa = PBXBuildFile;
+			fileRef = D93A42C45E9E61B243ADE3F8;
+		};
 		02B6E8042D07B8525DD08CA0 = {
 			isa = PBXBuildFile;
 			fileRef = 1E7DCC7C328B39763C50AB6C;
@@ -62,6 +66,10 @@
 		2DE36113806377CB352E5A8E = {
 			isa = PBXBuildFile;
 			fileRef = D84ADCB93009100271D599EA;
+		};
+		2ED95E8479D9CD965A84AD5D = {
+			isa = PBXBuildFile;
+			fileRef = 25C0B7015E31FCB834431FF0;
 		};
 		2FD15473B6B920BB015E30EC = {
 			isa = PBXBuildFile;
@@ -136,6 +144,16 @@
 		74F26ED096628426F957DD0E = {
 			isa = PBXBuildFile;
 			fileRef = FC685B2FB5E51229E33B1F2C;
+		};
+		78FEF39F0157E95D1536473C = {
+			isa = PBXBuildFile;
+			fileRef = 25C0B7015E31FCB834431FF0;
+			settings = {
+				ATTRIBUTES = (
+					CodeSignOnCopy,
+					RemoveHeadersOnCopy,
+				);
+			};
 		};
 		7930BD02F74FE1E998D43E14 = {
 			isa = PBXBuildFile;
@@ -378,6 +396,10 @@
 			isa = PBXBuildFile;
 			fileRef = 65E363A7B54CBC6FC72BFA66;
 		};
+		F537C5DA2B9ED38A363F872D = {
+			isa = PBXBuildFile;
+			fileRef = 287ECA324ED50C0FEF7A6604;
+		};
 		F5DF4BFB0174304CA2197095 = {
 			isa = PBXBuildFile;
 			fileRef = 4E9F0134C12B9B82D2B2A856;
@@ -432,6 +454,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				2FD15473B6B920BB015E30EC,
+				78FEF39F0157E95D1536473C,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -514,6 +537,20 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = whisper.cpp;
 			path = ../core/src/whisper.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		25C0B7015E31FCB834431FF0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = wrapper.xcframework;
+			name = SherpaOnnxC.xcframework;
+			path = Frameworks/SherpaOnnxC.xcframework;
+			sourceTree = SOURCE_ROOT;
+		};
+		287ECA324ED50C0FEF7A6604 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder;
+			name = Shruti;
+			path = SummaverickEveryday/Resources/Shruti;
 			sourceTree = SOURCE_ROOT;
 		};
 		29A1CD6197C4EBF318C20726 = {
@@ -1118,6 +1155,13 @@
 			path = ../core/src/sve_chat.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
+		D93A42C45E9E61B243ADE3F8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ShrutiRecognizer.swift;
+			path = SummaverickEveryday/Engine/ShrutiRecognizer.swift;
+			sourceTree = SOURCE_ROOT;
+		};
 		D9FD28DA2706A5CCE79B0A3D = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -1273,6 +1317,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A14D701700FCEA89C5B0F439,
+				2ED95E8479D9CD965A84AD5D,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1358,6 +1403,7 @@
 			isa = PBXGroup;
 			children = (
 				C30CC5397DAA09FBACA85197,
+				25C0B7015E31FCB834431FF0,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -1384,6 +1430,7 @@
 				FC685B2FB5E51229E33B1F2C,
 				7BBE0833144762A6B70A1FCF,
 				8A6F757330F3179FB40BD3E2,
+				D93A42C45E9E61B243ADE3F8,
 				0B08BF124CD0B2571A98FABA,
 			);
 			name = Engine;
@@ -1408,6 +1455,7 @@
 				29A1CD6197C4EBF318C20726,
 				8C247BC7003BBE5F71E1479C,
 				FC581254F5C135DB22FD9C42,
+				287ECA324ED50C0FEF7A6604,
 				69021175FE455DA46F1832CA,
 				892E4DF51BC5A1D8EB706A7A,
 			);
@@ -1638,6 +1686,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				334316FE5AD49DBFE79A28C1,
+				F537C5DA2B9ED38A363F872D,
 				E1A865BA6F70AD42A421A43D,
 				B939673027A07B580BF6B7A1,
 			);
@@ -1696,6 +1745,7 @@
 				74F26ED096628426F957DD0E,
 				6A4AAC44A2B9990D006E4C28,
 				408386E2C748923A7048D478,
+				0265346915ED5E206E1A6538,
 				C2AF1244993225350DDBDC94,
 				E38796377CD701DE27D4E42D,
 				ECB5419178B062460383B28A,

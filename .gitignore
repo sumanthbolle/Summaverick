@@ -10,3 +10,6 @@ tools/model/testset/*
 
 # Owner recordings, copies of the database, sheets and marks for the memory accuracy test
 tools/memory/private/
+ios/Frameworks/SherpaOnnxC.xcframework/
+ios/SummaverickEveryday/Resources/Shruti/*.onnx
+ios/SummaverickEveryday/Resources/Shruti/tokens.txt
