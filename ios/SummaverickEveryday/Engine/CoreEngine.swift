@@ -422,7 +422,7 @@ actor CoreEngine {
         try ensureGemmaLoaded()
         let counter = ProgressCounter()
         let box = ProgressBox(onProgress: { _, _, _ in
-                                  progress(OutputProgress.part(done: 0, total: 1, callbacks: counter.next(), expectedTokens: 1100))
+                                  progress(OutputProgress.part(done: 0, total: 1, callbacks: counter.next(), expectedTokens: 2400))  // kAllMaxOut (sve_budget.h)
                               },
                               isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()

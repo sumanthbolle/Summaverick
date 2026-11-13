@@ -221,7 +221,13 @@ char *sve_generate_all(sve_ctx *ctx, const char *transcript, const char *lang_c,
         const std::string notes = finish_output_cut(parts->notes, "## Topic", sve::kAllMaxOut, text, false);
         const std::string questions = finish_output_cut(parts->questions, "", sve::kAllMaxOut, text, cut);
         if (title.empty() || summary.empty() || notes.empty() || questions.empty()) return nullptr;
-        if (sve::count_questions(questions) == 0) return nullptr;   // as the stepped path (check_part): no readable question
+        // Fewer questions than the stepped questions prompt asks for (a reply cut inside them, or a short list):
+        // the stepped outputs are written instead, so one pass never gives fewer questions than the steps.
+        if (!sve::onepass_questions_enough(questions)) {
+            sve_logf(1, "one-pass reply has %d questions, fewer than %d", sve::count_questions(questions),
+                     sve::kRevisionQuestions);
+            return nullptr;
+        }
         sve::json j = {{"title", title}, {"summary", summary}, {"notes", notes}, {"questions", questions}};
         return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
     } catch (...) {

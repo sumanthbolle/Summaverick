@@ -30,7 +30,9 @@ inline bool notes_material_fits(int material_tokens, int n_ctx, int sys_tokens) 
 
 // One-pass notes (title, summary, notes and questions in one reply): output tokens, and the prompt around the
 // material (the three output prompts' instructions and rules plus the title's, about 650 tokens, and the template).
-constexpr int kAllMaxOut = 1100;
+// The output cap is above one stepped output's (notes_max_out, 1400 at n_ctx 8192): the reply holds all four
+// outputs, and Telugu notes alone can use most of 1400 (was 1100, which cut Telugu notes before the questions).
+constexpr int kAllMaxOut = 2400;
 constexpr int kAllScaffold = 800;
 // True when a one-pass prompt takes material of material_tokens as it is: the same room rule as notes_material_fits,
 // with the one-pass output and scaffolding.

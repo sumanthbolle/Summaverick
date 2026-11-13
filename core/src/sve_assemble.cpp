@@ -171,6 +171,8 @@ int section_output_max_out(SectionOutputKind kind) { return kind == SectionOutpu
 
 int count_questions(const std::string &reply) { return (int)questions_of(strip_unclear_tags(reply)).size(); }
 
+bool onepass_questions_enough(const std::string &questions) { return count_questions(questions) >= kRevisionQuestions; }
+
 std::string section_prompt_shared(const std::string &material, const std::string &guide, int part, int total,
                                   bool from_bullets) {
     // total 0: a part written while the recording goes on, when nobody knows yet how many parts there will be.
@@ -195,12 +197,13 @@ std::string section_prompt_suffix(SectionOutputKind kind) {
                "## Dates and numbers mentioned\n- …\n\n"
                "## Open questions\n- things left unresolved\n\n"
                "Use only what is in the text.\n" + faithful_rules(true) + "\n## Topic";
-    return "Write 6 revision questions a student could use to test themselves on the text above, from easy to hard. "
+    return "Write " + std::to_string(kRevisionQuestions) + " revision questions a student could use to test "
+           "themselves on the text above, from easy to hard. "
            "Every answer must come from the text; do not invent anything.\n" + faithful_rules(false) +
            "Use exactly this format, with a blank line between questions:\n\n"
            "Q1. <question about the text>\nA1. <answer taken from the text>\n\n"
            "Q2. <question about the text>\nA2. <answer taken from the text>\n\n"
-           "(continue to Q6)";
+           "(continue to Q" + std::to_string(kRevisionQuestions) + ")";
 }
 
 std::string section_output_prompt(SectionOutputKind kind, const std::string &material, const std::string &guide,

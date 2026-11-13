@@ -67,6 +67,9 @@ std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json 
 // How many whole questions (with an answer) assemble_questions finds in one part's reply. Labels may be "Q1.",
 // "Q 1)", "**Q1.**", "### Q1:", or a bare "1." in a reply without Q labels; answers "A1.", "A.", "Answer:".
 int count_questions(const std::string &reply);
+// True when a one-pass questions part has at least as many questions as the stepped questions prompt asks for
+// (kRevisionQuestions): sve_generate_all uses the one-pass reply only then.
+bool onepass_questions_enough(const std::string &questions);
 
 std::string assemble_questions(const nlohmann::json &outputs, int max = 12);
 
