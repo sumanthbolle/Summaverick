@@ -12,19 +12,21 @@ final class ShrutiRecognizer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.summaverick.shruti")
     private var recognizer: OpaquePointer?
     private var loadedThreads = 0
+    /// Guards readyCache only (never the decode queue), so `ready` does not wait behind a decode.
+    private let readyLock = NSLock()
     private var readyCache: Bool?
     /// Set while a recognizer is held; read without the queue, so a caller can skip unload without waiting.
     private let loadedFlag = AtomicFlag()
 
     /// The five files are in the bundle's Shruti folder at the right sizes. Checked once per launch.
     var ready: Bool {
-        queue.sync {
-            if let readyCache { return readyCache }
-            let ok = ShrutiRecognizer.checkFiles() == .ok
-            readyCache = ok
-            NSLog("[sve] shruti files %@", ok ? "ok" : "not ready")
-            return ok
-        }
+        readyLock.lock()
+        defer { readyLock.unlock() }
+        if let readyCache { return readyCache }
+        let ok = ShrutiRecognizer.checkFiles() == .ok
+        readyCache = ok
+        NSLog("[sve] shruti files %@", ok ? "ok" : "not ready")
+        return ok
     }
 
     var isLoaded: Bool { queue.sync { recognizer != nil } }
