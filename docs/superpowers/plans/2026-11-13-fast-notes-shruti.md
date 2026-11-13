@@ -219,7 +219,7 @@ recognizer setup in `ShrutiBench.swift` (`makeRecognizer`, `decode`). Do not tak
     followed by its part. Text before the first header is ignored. Any header missing, out of order, or followed
     by an empty part gives `nullopt`. Parts are trimmed.
   - `int sve_all_fits(sve_ctx *ctx, const char *transcript);`: 1 when the transcript plus an output budget of
-    1100 tokens fits the same context budget `sve_generate` uses, 0 otherwise, -1 with no model.
+    2400 tokens (raised from 1100 by the final review) fits the same context budget `sve_generate` uses, 0 otherwise, -1 with no model.
   - `char *sve_generate_all(sve_ctx *ctx, const char *transcript, const char *lang, <the same progress and stop callbacks as sve_generate>);`
     returns JSON `{"title":…,"summary":…,"notes":…,"questions":…}` or NULL when `split_all` fails. The prompt
     asks for the same content and language rules as the three existing output prompts, under the four headers.
