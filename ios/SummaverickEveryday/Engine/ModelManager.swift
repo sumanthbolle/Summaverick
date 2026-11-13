@@ -201,6 +201,7 @@ final class ModelManager: NSObject {
     }
 
     func loadIntoCore(backend: ModelBackend) async throws {
+        ShrutiRecognizer.shared.unload()   // one speech model in memory at a time; logs only when it was loaded
         try await CoreEngine.shared.loadModel(at: Self.fileURL(spec.weights).path, contextTokens: spec.contextTokens,
                                               mmprojPath: Self.fileURL(spec.projector).path, backend: backend)
     }

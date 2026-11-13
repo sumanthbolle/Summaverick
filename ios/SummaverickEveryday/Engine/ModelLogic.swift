@@ -355,27 +355,31 @@ struct ModelSlot: Equatable {
     func needsGemmaReload(gemmaLoaded: Bool) -> Bool { !gemmaLoaded && gemmaFreedByWhisper }
 }
 
-/// The order of a note's transcript after Stop (spec sections 2-3), asked before every group: Whisper writes from the
-/// cursor while it may (WhisperChoice), else Gemma goes on from the same cursor as today (and hands back to Whisper
-/// once it may again); once the cursor is at the end, Gemma fills the pieces Whisper left pending. One model at a
-/// time: CoreEngine frees one before loading the other.
 /// Whisper for transcripts is off (owner, 2026-11-12: waiting, heat, "everything went off"). On the phone the Telugu
 /// fine-tune's language check never chose Telugu, so every note paid for Whisper and was still written by Gemma.
-/// SVE_WHISPER=1 turns it on for device tests; the debug retranscribe runs regardless.
+/// Whisper stays in the build, uncalled from the pipeline; SVE_WHISPER=1 is kept for device tests of the old path.
 enum WhisperSwitch {
     static func isOn(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
         environment["SVE_WHISPER"] == "1"
     }
 }
 
-enum WhisperFlow {
-    enum Step: Equatable { case whisper(ModelBackend), gemmaRemainder, fillPending, done }
+/// Whether Shruti writes the next piece after Stop: its files are ready and the heat ladder is not at paused. No
+/// background check: Shruti runs on the CPU only, which iOS allows with the phone locked.
+enum ShrutiChoice {
+    static func use(shrutiReady: Bool, heatPaused: Bool) -> Bool { shrutiReady && !heatPaused }
+}
 
-    /// whisper: WhisperChoice.backend for now (nil: Whisper may not run the next group).
-    static func next(whisper: ModelBackend?, cursorAtEnd: Bool, pending: Int) -> Step {
+/// The order of a note's transcript after Stop, asked before every group: Shruti writes from the cursor while it may
+/// (ShrutiChoice), else Gemma goes on from the same cursor; once the cursor is at the end, Gemma fills the pieces
+/// Shruti left pending (ShrutiPiece.needsGemma).
+enum FirstPassFlow {
+    enum Step: Equatable { case shruti, gemmaRemainder, fillPending, done }
+
+    /// shruti: ShrutiChoice.use for now (false: Shruti may not run the next group).
+    static func next(shruti: Bool, cursorAtEnd: Bool, pending: Int) -> Step {
         if cursorAtEnd { return pending > 0 ? .fillPending : .done }
-        if let whisper { return .whisper(whisper) }
-        return .gemmaRemainder
+        return shruti ? .shruti : .gemmaRemainder
     }
 }
 

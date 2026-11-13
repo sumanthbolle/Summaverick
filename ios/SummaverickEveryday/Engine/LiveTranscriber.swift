@@ -132,6 +132,48 @@ enum TranscriptRun {
         }
     }
 
+    /// After Stop, Shruti from the sidecar's cursor, the `runWhisper` loop shape: the heat gate before each piece, the
+    /// cursor saved after each. Pieces are planned like Gemma's (sve_plan_next_piece, at most 28 s). A piece Shruti
+    /// heard nothing in though it was not silent (ShrutiPiece.needsGemma) is kept pending for Gemma (fillPending).
+    /// threads: asked before every piece (the heat ladder's count); loading is a no-op at the same count. The read and
+    /// the decode run off the main actor; a decode is not cut short, shouldStop is asked between pieces. A failed
+    /// read or load throws: the caller goes on with Gemma from the saved cursor.
+    static func runShruti(audioPath: String, isFinal: Bool,
+                          shouldStop: @escaping () -> Bool,
+                          threads: () -> Int,
+                          beforePiece: () async -> Bool = { true },
+                          onPiece: (TranscriptSidecar) -> Void = { _ in }) async throws -> (TranscriptSidecar, Stop) {
+        var progress = TranscriptSidecar.load(audioPath: audioPath)
+        var n = 0
+        while true {
+            if shouldStop() || Task.isCancelled { throw CancellationError() }
+            if !(await beforePiece()) { return (progress, .yielded) }
+            if shouldStop() || Task.isCancelled { throw CancellationError() }
+            let start = progress.cursor_sample, count = threads()
+            let began = Date()
+            let heard = try await Task.detached(priority: .userInitiated) {
+                try ShrutiPieceRun.next(audioPath: audioPath, start: start, isFinal: isFinal, threads: count)
+            }.value
+            switch heard {
+            case .end: return (progress, .end)
+            case .wait: return (progress, .wait)
+            case .piece(let end, let text, let peak):
+                n += 1
+                let startSec = Int(start / Int64(ShrutiRecognizer.sampleRate))
+                if ShrutiPiece.needsGemma(text: text, peak: peak) {
+                    progress.appendPending(startSec: startSec, endSample: end)
+                } else {
+                    progress.append(startSec: startSec, endSample: end, text: text, conf: nil)
+                }
+                NSLog("[sve] shruti piece %d: %.1f s audio in %.0f ms, %d chars", n,
+                      Double(end - start) / Double(ShrutiRecognizer.sampleRate),
+                      Date().timeIntervalSince(began) * 1000, text.count)
+                progress.save(audioPath: audioPath)   // skipped when the audio was deleted meanwhile
+                onPiece(progress)
+            }
+        }
+    }
+
     /// Gemma fills the pieces Whisper left pending, oldest first, saving after each. backend: asked before every
     /// piece (loading Gemma there frees Whisper); a GPU piece that fails is tried once more on the CPU, unless
     /// shouldStop says the run is over. beforePiece false (the heat gate) throws CancellationError; the pieces
@@ -176,6 +218,32 @@ enum TranscriptRun {
     /// The pieces as the note stores them.
     static func pieces(_ s: TranscriptSidecar) -> [TranscriptPiece] {
         s.pieces.filter { $0.pending != true }.map { TranscriptPiece(startSec: $0.start_sec, text: $0.text, conf: $0.conf) }
+    }
+}
+
+/// One Shruti piece, off the main actor: plan it, read its samples, decode them.
+enum ShrutiPieceRun {
+    enum Failure: Error { case unreadableAudio, planDidNotMove }
+    enum Heard { case wait, end, piece(end: Int64, text: String, peak: Float) }
+
+    static func next(audioPath: String, start: Int64, isFinal: Bool, threads: Int) throws -> Heard {
+        var end: Int64 = 0
+        switch sve_plan_next_piece(audioPath, start, isFinal ? 1 : 0, &end) {
+        case 0: break
+        case 1: return .wait
+        case 2: return .end
+        default: throw Failure.unreadableAudio
+        }
+        guard end > start else { throw Failure.planDidNotMove }   // should not happen; Gemma goes on
+        var raw: UnsafeMutablePointer<Float>?
+        let count = sve_read_samples(audioPath, start, end, &raw)
+        defer { if let raw { sve_free_samples(raw) } }
+        guard count >= 0 else { throw Failure.unreadableAudio }
+        let samples = raw.map { Array(UnsafeBufferPointer(start: $0, count: Int(count))) } ?? []
+        let peak = samples.reduce(Float(0)) { max($0, abs($1)) }
+        try ShrutiRecognizer.shared.load(threads: threads)
+        let text = try ShrutiRecognizer.shared.decode(samples)
+        return .piece(end: end, text: text, peak: peak)
     }
 }
 
