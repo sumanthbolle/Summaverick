@@ -1412,7 +1412,7 @@ final class ProcessingPipeline {
         if setTitle, !refill, WaitingNotes.outputsToWrite(stored: storedNow).allSatisfy({ $0 }), Self.onePassAllowed,
            ((try? await onBackend({ await engine.allFits(material) })) ?? false) {
             onePassDone = await writeAllInOnePass(noteID: id, transcript: material, lang: lang, steps: steps)
-            if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }
+            if !onePassDone, abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }
         }
 
         if !onePassDone, setTitle, let t = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections) {

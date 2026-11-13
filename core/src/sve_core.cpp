@@ -221,6 +221,7 @@ char *sve_generate_all(sve_ctx *ctx, const char *transcript, const char *lang_c,
         const std::string notes = finish_output_cut(parts->notes, "## Topic", sve::kAllMaxOut, text, false);
         const std::string questions = finish_output_cut(parts->questions, "", sve::kAllMaxOut, text, cut);
         if (title.empty() || summary.empty() || notes.empty() || questions.empty()) return nullptr;
+        if (sve::count_questions(questions) == 0) return nullptr;   // as the stepped path (check_part): no readable question
         sve::json j = {{"title", title}, {"summary", summary}, {"notes", notes}, {"questions", questions}};
         return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
     } catch (...) {
@@ -819,14 +820,7 @@ char *sve_suggest_title(sve_ctx *ctx, const char *transcript, const char *lang_c
     std::string out;
     if (!ctx->llm->complete(prompt, 24, out, nullptr, nullptr, "final", 0, 1)) return nullptr;
     out = strip_thinking(out);
-    // first line only, strip quotes
-    size_t nl = out.find('\n');
-    if (nl != std::string::npos) out.resize(nl);
-    for (const char *lead : {"Title:", "title:", "Title -", "Title"}) {
-        if (out.rfind(lead, 0) == 0) { out.erase(0, strlen(lead)); break; }
-    }
-    while (!out.empty() && (out.front() == '"' || out.front() == '\'' || out.front() == ' ')) out.erase(0, 1);
-    while (!out.empty() && (out.back() == '"' || out.back() == '\'' || out.back() == ' ' || out.back() == '.')) out.pop_back();
+    out = clean_title(out);   // first line only, quotes taken off
     return dup_str(out);
 }
 

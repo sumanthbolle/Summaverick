@@ -58,3 +58,11 @@ TEST(onepass_prompt_has_four_headers_in_order) {
     CHECK(a != std::string::npos && a < b && b < c && c < d);
     CHECK(p.find("hello") != std::string::npos);
 }
+
+#include "sve_assemble.h"
+
+TEST(onepass_questions_need_a_question) {
+    // sve_generate_all returns NULL when count_questions is 0 (as the stepped path's check_part).
+    CHECK_EQ(sve::count_questions("These are notes with no question in them."), 0);
+    CHECK(sve::count_questions("Q1. What was decided?\nA1. To wait.") > 0);
+}

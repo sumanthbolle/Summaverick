@@ -421,7 +421,9 @@ actor CoreEngine {
         guard let ctx else { throw CoreError.initFailed }
         try ensureGemmaLoaded()
         let counter = ProgressCounter()
-        let box = ProgressBox(onProgress: { _, _, _ in progress(min(0.95, Double(counter.next()) / 1100.0)) },
+        let box = ProgressBox(onProgress: { _, _, _ in
+                                  progress(OutputProgress.part(done: 0, total: 1, callbacks: counter.next(), expectedTokens: 1100))
+                              },
                               isCancelled: { Task.isCancelled || shouldStop() })
         let user = Unmanaged.passUnretained(box).toOpaque()
         guard let json = take(sve_generate_all(ctx, transcript, lang, CoreEngine.progressTrampoline, user)) else {
