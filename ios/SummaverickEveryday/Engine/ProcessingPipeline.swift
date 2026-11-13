@@ -1494,7 +1494,7 @@ final class ProcessingPipeline {
             await rewriteSectionsIfOtherLanguage(id, lang: lang)
             if await writeSections(noteID: id, lang: lang, quiet: true, afterNotes: span) == true {
                 await markRewrittenSections(id, lang: lang)
-            } else {
+            } else if !(await engine.pieces(id)).isEmpty {   // no pieces: no sections to finish later
                 NSLog("[sve] note %lld: sections stopped after the notes; the notes stay, the rest is finished later", id)
                 markSectionsDue(id)
             }
@@ -1980,7 +1980,7 @@ final class ProcessingPipeline {
     private func writeSections(noteID id: Int64, lang: String, quiet: Bool, afterNotes: ClosedRange<Double>? = nil) async -> Bool? {
         let engine = CoreEngine.shared
         let pieces = await engine.pieces(id)
-        guard !pieces.isEmpty else { return false }
+        guard !pieces.isEmpty else { sectionsDue.remove(id); return false }   // nothing to write sections from
         let existing = await engine.sections(id)
         if SectionWriter.coversAll(existing, pieceCount: pieces.count) { sectionsDue.remove(id); return true }
         let duration = await engine.note(id)?.duration_seconds ?? 0
@@ -1990,6 +1990,9 @@ final class ProcessingPipeline {
         let afterNotesRun = afterNotes != nil, beats = !quiet || afterNotesRun
         let yields = quiet && (afterNotesRun || memoryWork)   // with the memories: stops when the person asks
         var written = 0, gone = false, stopped = false
+        // Inside a note's own run (after its notes) the stage stays a working one until that run ends (.done): an
+        // idle stage would let other model work start while its memories and insight are still to run.
+        func idleUnlessInRun() { if !afterNotesRun { stage = .idle } }
         let wasMemoryWork = memoryWork
         if afterNotesRun { memoryWork = true }   // after the notes: the person's action goes first
         defer { memoryWork = wasMemoryWork }
@@ -2036,12 +2039,12 @@ final class ProcessingPipeline {
                 })
             if gone {
                 NSLog("[sve] note %lld is gone; not writing its sections", id)
-                stage = .idle
+                idleUnlessInRun()
                 return nil
             }
             if stopped {
                 if quiet {
-                    stage = .idle
+                    idleUnlessInRun()
                 } else if case .paused = stage {
                     // paused for heat: heatGate set the stage and queued the note
                 } else if parked.contains(id) {
@@ -2062,7 +2065,7 @@ final class ProcessingPipeline {
         } catch {
             if quiet {
                 NSLog("[sve] section backfill stopped: %@", String(describing: error))
-                stage = .idle
+                idleUnlessInRun()
                 return nil
             }
             if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription, error: error); return nil }
