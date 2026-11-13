@@ -492,6 +492,17 @@ enum LiveTranscribe {
     }
 }
 
+/// Live Shruti while recording (CPU only; replaces Gemma's live pieces when on). Off until it is checked on the phone.
+enum LiveShruti {
+    static let key = "live.shruti"
+    static func isOn(shrutiReady: Bool, defaults: UserDefaults = .standard,
+                     environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        guard shrutiReady else { return false }
+        if let e = environment["SVE_LIVE_SHRUTI"] { return e == "1" }
+        return defaults.object(forKey: key) as? Bool ?? false
+    }
+}
+
 enum LivePace {
     /// Rest before a live piece or section at eased (the ladder's own is 5 s): a locked CPU piece takes about 20-27 s,
     /// so the CPU works about half the time.

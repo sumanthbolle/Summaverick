@@ -259,6 +259,8 @@ final class LiveSession {
     /// Live parts (LiveParts): stopped tries per section, and sections left for after Stop (a try failed).
     var partCancels: [Int: Int] = [:]
     var partsLeft: Set<Int> = []
+    /// LiveShruti: Shruti writes the pieces while recording (Gemma is not used by the live path).
+    var usesShruti = false
     init(audioPath: String) { self.audioPath = audioPath }
 }
 
@@ -362,10 +364,12 @@ final class LiveTranscriber {
         transcribedSeconds = 0
         self.elapsed = elapsed
         TranscriptSidecar.remove(audioPath: audio.path)   // a new recording always starts at 0
+        // Shruti while recording (LiveShruti, off by default): its pieces are final; Gemma is never loaded here.
+        session.usesShruti = LiveShruti.isOn(shrutiReady: ShrutiRecognizer.shared.ready)
         // isReady also means the phone is supported.
-        guard ModelManager.shared.isReady else { status = .later; return }
+        guard session.usesShruti || ModelManager.shared.isReady else { status = .later; return }
         // Off by default (LiveTranscribe): the recording stays cool and the transcript is written after Stop.
-        guard LiveTranscribe.isOn() else {
+        guard session.usesShruti || LiveTranscribe.isOn() else {
             NSLog("[sve] live: off, every piece is written after Stop")
             status = .later
             return
@@ -377,7 +381,7 @@ final class LiveTranscriber {
         let earlier = running.values.filter { $0 !== session }.compactMap(\.task)
         session.task = Task {
             for t in earlier { await t.value }
-            await self.loop(session)
+            if session.usesShruti { await self.loopShruti(session) } else { await self.loop(session) }
             self.ended(session)
         }
     }
@@ -454,6 +458,85 @@ final class LiveTranscriber {
         } else {
             show(s, .writing)
         }
+    }
+
+    /// Before each live Shruti piece: rest as long as the last piece worked (HeatLadder.lightRestSeconds, no floor);
+    /// Stop, Cancel or a paused ladder cut it short. False when paused (the loop pauses instead).
+    private func shrutiGate(_ s: LiveSession, lastWork: Double) async -> Bool {
+        let heat = HeatGovernor.shared
+        let rest = HeatLadder.lightRestSeconds(heat.level, lastWork: lastWork)
+        if rest == .infinity { return false }
+        if rest > 0 {
+            show(s, .cooling)
+            let start = HeatGovernor.now
+            while !s.finishing.isSet, heat.level != .paused, HeatGovernor.now - start < rest {
+                do { try await Task.sleep(nanoseconds: 250_000_000) } catch { break }
+            }
+            if heat.level == .paused { return false }
+            refresh(s)
+        }
+        return true
+    }
+
+    /// The live loop with Shruti: the pieces are final (the cursor they leave is where the pipeline goes on after
+    /// Stop). No sections or live parts here: transcription only.
+    private func loopShruti(_ s: LiveSession) async {
+        var failures = 0
+        var lastWork: Double = 0
+        var pieces = 0
+        var lastLog = 0
+        var pieceStart = Date()
+        let finishing = s.finishing, abort = s.abort
+        while !finishing.isSet, !Task.isCancelled {
+            if let p = pauseReason() {
+                show(s, p == .heat ? .pausedHeat : .pausedBattery)
+                await nap(3, s)
+                continue
+            }
+            refresh(s)
+            do {
+                let (_, stop) = try await TranscriptRun.runShruti(
+                    audioPath: s.audioPath, isFinal: false,
+                    shouldStop: { abort.isSet || finishing.isSet || Heat.cancelsRun(ProcessInfo.processInfo.thermalState) },
+                    threads: { min(2, ShrutiThreads.count(HeatGovernor.shared.level)) },
+                    beforePiece: {
+                        guard self.pauseReason() == nil else { return false }
+                        let go = await self.shrutiGate(s, lastWork: lastWork)
+                        pieceStart = Date()
+                        return go
+                    },
+                    onPiece: { p in
+                        pieces += 1
+                        lastWork = Date().timeIntervalSince(pieceStart)
+                        guard self.current === s else { return }
+                        self.lines = p.pieces.map(\.text)
+                        self.transcribedSeconds = p.transcribedSeconds
+                        self.refresh(s)
+                        let minutes = Int(self.elapsed() / 300)
+                        if minutes > lastLog {
+                            lastLog = minutes
+                            NSLog("[sve] live shruti: thermal %ld, %d pieces, lag %.0f s",
+                                  ProcessInfo.processInfo.thermalState.rawValue, Int32(pieces),
+                                  max(0, self.elapsed() - p.transcribedSeconds))
+                        }
+                    })
+                failures = 0
+                if stop == .wait { await nap(3, s) }
+            } catch {
+                if abort.isSet || finishing.isSet || Task.isCancelled { break }
+                if Heat.cancelsRun(ProcessInfo.processInfo.thermalState) { continue }
+                failures += 1
+                NSLog("[sve] live shruti failed (%ld): %@", failures, String(describing: error))
+                if failures >= 3 {
+                    show(s, .later)
+                    await nap(Self.failureBackoff, s)
+                    failures = 0
+                } else {
+                    await nap(3, s)
+                }
+            }
+        }
+        if abort.isSet { await Task.detached { ShrutiRecognizer.shared.unload() }.value }
     }
 
     private func loop(_ s: LiveSession) async {
