@@ -92,6 +92,18 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
  * Notes and title come from the transcript when it fits, from the section summaries only when it does not. */
 int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang);
 
+/* One-pass notes: 1 when the transcript plus an output budget of 1100 tokens fits the same context budget
+ * sve_generate uses, 0 when not, -1 with no model or bad input. */
+int sve_all_fits(sve_ctx *ctx, const char *transcript);
+
+/* The title, short summary, detailed notes and revision questions in one generation (same content and language
+ * rules as the three output prompts and the title prompt). Returns a malloc'd JSON string
+ * {"title":...,"summary":...,"notes":...,"questions":...}, or NULL when the transcript does not fit, the run is
+ * cancelled, or the reply does not split under the four headers or a part comes out empty after the output checks
+ * (the caller then writes the outputs in steps). */
+char *sve_generate_all(sve_ctx *ctx, const char *transcript, const char *lang,
+                       sve_progress_cb cb, void *user);
+
 /* The text to give sve_generate and sve_transcript_fits for a note (N7 rev 1): its pieces
  * ([{"start_sec","text","conf"?}], as sve_note_pieces returns them) joined by newlines and trimmed, a piece heard
  * with conf < 0.80 starting with "[unclear] " (the notes prompts say not to state it as fact). With no such piece it

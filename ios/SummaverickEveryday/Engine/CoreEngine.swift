@@ -406,6 +406,39 @@ actor CoreEngine {
         return r < 0 ? nil : r == 1
     }
 
+    /// Whether the title, summary, notes and questions fit one prompt for this transcript (writeAll). False with no model.
+    func allFits(_ transcript: String) async -> Bool {
+        guard let ctx else { return false }
+        try? ensureGemmaLoaded()
+        return sve_all_fits(ctx, transcript) == 1
+    }
+
+    /// The title, summary, detailed notes and questions from one generation. nil when the reply did not split (or
+    /// the transcript does not fit); throws when cancelled (shouldStop) or no model. progress: 0...1, an estimate
+    /// from the tokens written so far.
+    func writeAll(transcript: String, lang: String, shouldStop: @escaping () -> Bool,
+                  progress: @escaping (Double) -> Void) async throws -> (title: String, summary: String, notes: String, questions: String)? {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        let counter = ProgressCounter()
+        let box = ProgressBox(onProgress: { _, _, _ in progress(min(0.95, Double(counter.next()) / 1100.0)) },
+                              isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_generate_all(ctx, transcript, lang, CoreEngine.progressTrampoline, user)) else {
+            if Task.isCancelled || shouldStop() { throw CoreError.generationFailed }
+            return nil
+        }
+        struct All: Decodable { let title, summary, notes, questions: String }
+        guard let data = json.data(using: .utf8), let a = try? JSONDecoder().decode(All.self, from: data) else { return nil }
+        return (a.title, a.summary, a.notes, a.questions)
+    }
+
+    private final class ProgressCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var n = 0
+        func next() -> Int { lock.lock(); defer { lock.unlock() }; n += 1; return n }
+    }
+
     func suggestTitle(transcript: String, lang: String) -> String? {
         guard let ctx else { return nil }
         try? ensureGemmaLoaded()

@@ -1403,12 +1403,24 @@ final class ProcessingPipeline {
         let fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
         if setTitle, !(await heatGate(id)) { return }
 
-        if setTitle, let t = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections) {
+        // One pass: when the transcript fits one prompt, the title, summary, notes and questions come from one
+        // generation (the section summaries above stay). Not for a refill, a resumed run with some outputs stored,
+        // or a title that is not to be set; a reply that does not split falls back to the steps below.
+        var onePassDone = false
+        let storedNow = await engine.note(id).map { n in OutputKind.allCases.map { n.output($0) } }
+            ?? OutputKind.allCases.map { _ in nil }
+        if setTitle, !refill, WaitingNotes.outputsToWrite(stored: storedNow).allSatisfy({ $0 }), Self.onePassAllowed,
+           ((try? await onBackend({ await engine.allFits(material) })) ?? false) {
+            onePassDone = await writeAllInOnePass(noteID: id, transcript: material, lang: lang, steps: steps)
+            if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }
+        }
+
+        if !onePassDone, setTitle, let t = await writeTitle(noteID: id, transcript: transcript, lang: lang, fromSections: fromSections) {
             await engine.setTitle(id, t)
             noteTitles[id] = t
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
-        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3, outputsTotal: steps))
+        if !onePassDone { ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3, outputsTotal: steps)) }
 
         // A resumed run writes only what is not stored yet: a summary already announced is not rewritten or announced again.
         let stored = await engine.note(id).map { n in OutputKind.allCases.map { n.output($0) } }
@@ -1416,14 +1428,16 @@ final class ProcessingPipeline {
         let toWrite = WaitingNotes.outputsToWrite(stored: stored)
         // Every note with sections (a short recording has one) is written in small saved steps, so a cut-off costs
         // one step. The whole-transcript path below is kept only for a note whose sections could not be written.
-        if covered {
+        if onePassDone {
+            NSLog("[sve] note %lld: notes from one pass; no steps to write", id)
+        } else if covered {
             if refill, await clearPartsLeft(id) { NSLog("[sve] note %lld: the parts that were left are tried again", id) }
             guard await writeInSteps(noteID: id, lang: lang, material: material, toWrite: toWrite, refill: refill) else { return }
             partsRetry.remove(id)
         } else {
             NSLog("[sve] note %lld: no sections to write from; the notes come from the whole transcript", id)
         }
-        for (i, kind) in OutputKind.allCases.enumerated() where !covered {
+        for (i, kind) in OutputKind.allCases.enumerated() where !covered && !onePassDone {
             guard toWrite[i] else {
                 NSLog("[sve] note %lld: %@ already stored; not written again", id, kind.title)
                 ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: Self.firstOutputStep + 1 + i, outputsTotal: steps))
@@ -1464,6 +1478,58 @@ final class ProcessingPipeline {
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         stage = .done
         Task { await self.compressAudio(noteID: id) }   // the notes are done; the WAV can shrink
+    }
+
+    /// False only in a debug build launched with SVE_ONEPASS=0 (device check: the steps without the one pass).
+    private static var onePassAllowed: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["SVE_ONEPASS"] != "0"
+        #else
+        return true
+        #endif
+    }
+
+    /// The title and the three outputs from one generation, stored as soon as written, with the notices the stepped
+    /// path posts. False when the reply did not split or the run was stopped (the caller then writes in steps, or
+    /// stops on the abort flag); nothing is stored then.
+    private func writeAllInOnePass(noteID id: Int64, transcript: String, lang: String, steps: Int) async -> Bool {
+        let engine = CoreEngine.shared
+        let abort = self.abort
+        let started = Date()
+        stage = .generating(.shortSummary, "final", 0, 1)
+        let from = NotesProgress.fraction(outputsDone: 2, outputsTotal: steps)
+        let to = NotesProgress.fraction(outputsDone: steps, outputsTotal: steps)
+        let all: (title: String, summary: String, notes: String, questions: String)?
+        do {
+            all = try await onBackend {
+                try await engine.writeAll(transcript: transcript, lang: lang, shouldStop: { ContinuedWork.beat(); return abort.isSet },
+                                          progress: { p in
+                    ContinuedWork.beat()
+                    Task { @MainActor in ContinuedWork.shared.update(fraction: from + (to - from) * p) }
+                })
+            }
+        } catch {
+            if !abort.isSet { NSLog("[sve] note %lld: one pass stopped: %@", id, String(describing: error)) }
+            return false
+        }
+        guard let all else {
+            NSLog("[sve] note %lld: one pass did not split; notes in steps", id)
+            return false
+        }
+        guard await engine.note(id) != nil else { NSLog("[sve] note %lld is gone; its notes are dropped", id); return false }
+        await engine.setTitle(id, all.title)
+        noteTitles[id] = all.title
+        await engine.setOutput(id, .shortSummary, all.summary)
+        setStreak(id, .notes, nil)
+        NotificationCenter.default.post(name: .notesChanged, object: nil)
+        let step = partStored(.summary)
+        notifyStage(id, NotifyRule.summary) { NotesNotifier.summaryReady(noteID: id, title: $0, step: step, hold: $1) }
+        await engine.setOutput(id, .detailedNotes, all.notes)
+        await engine.setOutput(id, .revisionQuestions, all.questions)
+        NotificationCenter.default.post(name: .notesChanged, object: nil)
+        ContinuedWork.shared.update(fraction: to)
+        NSLog("[sve] note %lld: notes in one pass, %.0f s", id, Date().timeIntervalSince(started))
+        return true
     }
 
     /// The note's insight, after its notes and memories, on the backend for right now. The model calls back while it

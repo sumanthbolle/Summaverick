@@ -11,6 +11,7 @@
 #include "sve_budget.h"
 #include "sve_threads.h"
 #include "sve_whisper_text.h"
+#include "sve_onepass.h"
 
 #include <algorithm>
 #include <chrono>
@@ -168,6 +169,62 @@ int sve_transcript_fits(sve_ctx *ctx, const char *transcript, const char *lang_c
         return sve::notes_material_fits(llm.count_tokens(text), llm.n_ctx, sys_tokens) ? 1 : 0;
     } catch (...) {
         return -1;
+    }
+}
+
+int sve_all_fits(sve_ctx *ctx, const char *transcript) {
+    try {
+        if (!ctx || !ctx->llm || !transcript) return -1;
+        sve::Llm &llm = *ctx->llm;
+        const std::string text(transcript);
+        if (strip_thinking(text).empty()) return 1;
+        const int sys_tokens = llm.count_tokens(notes_system(ctx, "en", text));
+        return sve::all_material_fits(llm.count_tokens(text), llm.n_ctx, sys_tokens) ? 1 : 0;
+    } catch (...) {
+        return -1;
+    }
+}
+
+// The title as sve_suggest_title leaves it: the first line, "Title:" and quotes taken off.
+static std::string clean_title(std::string out) {
+    size_t nl = out.find('\n');
+    if (nl != std::string::npos) out.resize(nl);
+    for (const char *lead : {"Title:", "title:", "Title -", "Title"}) {
+        if (out.rfind(lead, 0) == 0) { out.erase(0, strlen(lead)); break; }
+    }
+    while (!out.empty() && (out.front() == '"' || out.front() == '\'' || out.front() == ' ')) out.erase(0, 1);
+    while (!out.empty() && (out.back() == '"' || out.back() == '\'' || out.back() == ' ' || out.back() == '.')) out.pop_back();
+    return out;
+}
+
+char *sve_generate_all(sve_ctx *ctx, const char *transcript, const char *lang_c, sve_progress_cb cb, void *user) {
+    try {
+        if (!ctx || !ctx->llm || !transcript) return nullptr;
+        sve::Llm &llm = *ctx->llm;
+        const std::string lang = lang_c ? lang_c : "en";
+        const std::string text(transcript);
+        if (strip_thinking(text).empty()) return nullptr;
+        const std::string sys = notes_system(ctx, lang, text);
+        if (!sve::all_material_fits(llm.count_tokens(text), llm.n_ctx, llm.count_tokens(sys))) return nullptr;
+        // The reply starts after the last header of the prompt, so it is put back before splitting.
+        const std::string prompt = llm.apply_template(sys, sve::all_outputs_prompt(text));
+        std::string out;
+        if (!llm.complete(prompt, sve::kAllMaxOut, out, cb, user, "final", 0, 1)) return nullptr;
+        const bool cut = llm.last_cut;
+        out = strip_thinking(out);
+        if (out.find("### TITLE") == std::string::npos) out = "### TITLE\n" + out;
+        auto parts = sve::split_all(out);
+        if (!parts) { sve_logf(1, "one-pass reply did not split into four parts"); return nullptr; }
+        // The checks of sve_generate on each part; a reply cut at the cap trims its last part (the questions).
+        const std::string title = clean_title(strip_thinking(sve::strip_unclear_tags(parts->title)));
+        const std::string summary = finish_output_cut(parts->summary, "", sve::kAllMaxOut, text, false);
+        const std::string notes = finish_output_cut(parts->notes, "## Topic", sve::kAllMaxOut, text, false);
+        const std::string questions = finish_output_cut(parts->questions, "", sve::kAllMaxOut, text, cut);
+        if (title.empty() || summary.empty() || notes.empty() || questions.empty()) return nullptr;
+        sve::json j = {{"title", title}, {"summary", summary}, {"notes", notes}, {"questions", questions}};
+        return dup_str(j.dump(-1, ' ', false, sve::json::error_handler_t::replace));
+    } catch (...) {
+        return nullptr;
     }
 }
 

@@ -28,4 +28,15 @@ inline bool notes_material_fits(int material_tokens, int n_ctx, int sys_tokens) 
     return material_tokens <= fit_budget(n_ctx, sys_tokens, notes_budget(n_ctx, sys_tokens));
 }
 
+// One-pass notes (title, summary, notes and questions in one reply): output tokens, and the prompt around the
+// material (the three output prompts' instructions and rules plus the title's, about 650 tokens, and the template).
+constexpr int kAllMaxOut = 1100;
+constexpr int kAllScaffold = 800;
+// True when a one-pass prompt takes material of material_tokens as it is: the same room rule as notes_material_fits,
+// with the one-pass output and scaffolding.
+inline bool all_material_fits(int material_tokens, int n_ctx, int sys_tokens) {
+    const int final_budget = n_ctx - kAllMaxOut - kAllScaffold - sys_tokens;
+    return material_tokens <= fit_budget(n_ctx, sys_tokens, final_budget);
+}
+
 } // namespace sve

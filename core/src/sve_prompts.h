@@ -111,4 +111,29 @@ inline std::string title_prompt(const std::string &excerpt) {
            excerpt + "\n\"\"\"\n\nTitle:";
 }
 
+// Title, short summary, detailed notes and revision questions in one reply (one-pass notes), under four headers
+// that sve::split_all reads. The content rules are those of the three prompts and the title prompt above.
+inline std::string all_outputs_prompt(const std::string &material) {
+    return "Below is a transcript of a recording. Write four things from it, in this order, each under its own "
+           "header line, exactly as shown below. Write the header lines exactly as shown, and nothing before the "
+           "first one.\n\n"
+           "### TITLE\nA title of at most 8 words. The title only.\n\n"
+           "### SUMMARY\nA short summary of at most 6 sentences that a person could read to remember what happened. "
+           "Mention who/what it was about, the main points, and any decisions or next steps.\n\n"
+           "### NOTES\nOrganised notes using exactly this structure (keep the headings, leave a heading as 'None' if "
+           "nothing applies):\n"
+           "## Topic\n(one line)\n\n"
+           "## Key points\n- bullet points, grouped by sub-topic, keep every definition, number, name and date\n\n"
+           "## Decisions and instructions\n- anything that was decided, prescribed, assigned or promised\n\n"
+           "## Action items\n- [ ] task — who — when (only if stated; only what a speaker asked for or committed to)\n\n"
+           "## Dates and numbers mentioned\n- …\n\n"
+           "## Open questions\n- things left unresolved\n\n"
+           "### QUESTIONS\n6 revision questions a student could use to test themselves on this material, from easy to "
+           "hard, in this format with a blank line between questions:\n"
+           "Q1. <question about the text>\nA1. <answer taken from the text>\n\n"
+           "(continue to Q6)\n\n"
+           "Use only what is in the text; every answer must come from the text; do not invent anything.\n" +
+           faithful_rules(true) + "\n\"\"\"\n" + material + "\n\"\"\"\n\n### TITLE";
+}
+
 } // namespace sve

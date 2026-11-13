@@ -47,6 +47,10 @@
 			isa = PBXBuildFile;
 			fileRef = 13A63ABDA892EF2D8A1A560A;
 		};
+		23A9062ED9C13C47A0044495 = {
+			isa = PBXBuildFile;
+			fileRef = 319F1F8813F1FD9E2E508A64;
+		};
 		23C44AF0CB03B5875E813B5F = {
 			isa = PBXBuildFile;
 			fileRef = C9899E0B799571C7B3ED48D8;
@@ -588,6 +592,13 @@
 			path = SummaverickEveryday/Views/ChaptersView.swift;
 			sourceTree = SOURCE_ROOT;
 		};
+		319F1F8813F1FD9E2E508A64 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_onepass.cpp;
+			path = ../core/src/sve_onepass.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
 		32B4ECFC6F6AC631FDE8CCFB = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -1041,6 +1052,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = sve_extract.h;
 			path = ../core/src/sve_extract.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		B891D708008B28F0B0C18AF3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_onepass.h;
+			path = ../core/src/sve_onepass.h;
 			sourceTree = SOURCE_ROOT;
 		};
 		B9675BF203CCF71683907580 = {
@@ -1561,6 +1579,8 @@
 				6013C41549784B5FC55E61C4,
 				7098A4559C0419D83AAB1B2A,
 				428A09CCDB67F6F77A72F81A,
+				319F1F8813F1FD9E2E508A64,
+				B891D708008B28F0B0C18AF3,
 				2F4911A292E905F157B99F3B,
 				A2C4910B70238965992017BD,
 				DB74CF4044569BF171D6037F,
@@ -1790,6 +1810,7 @@
 				02B6E8042D07B8525DD08CA0,
 				DACFC767C169503E4AB3CA4F,
 				98CC0908F97C13DBC19A09B5,
+				23A9062ED9C13C47A0044495,
 				DC72AABB07924C733D349BA4,
 				FA89EFDB7CFDC888DE748CAB,
 				CE05B940BCBE599A11AE22E8,
