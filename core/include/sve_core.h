@@ -538,6 +538,17 @@ char *sve_whisper_next_piece(sve_ctx *ctx, const char *wav_path, int64_t start_s
 char *sve_transcribe_wav(sve_ctx *ctx, const char *wav_path, const char *lang,
                          sve_progress_cb cb, void *user);
 
+/* ---- pieces of a WAV for a speech model run outside the core (always declared, no model needed) ---- */
+/* Plans the next piece (up to 28 s, cut at a quiet moment) of a 16 kHz 16-bit WAV from start_sample, with the same
+ * planner as sve_whisper_next_piece. Returns 0 piece (*piece_end = where the next piece starts), 1 wait (not final
+ * and under 28 s + 3 s after start_sample), 2 end (final and under 0.5 s left), -1 unreadable. A WAV still being
+ * written is read at its size at call time. */
+int sve_plan_next_piece(const char *wav_path, int64_t start_sample, int is_final, int64_t *piece_end);
+/* Samples [start, end) as mono floats in [-1, 1), clamped to the file. Returns the count (free *out with
+ * sve_free_samples), -1 when not a 16 kHz 16-bit WAV. */
+int64_t sve_read_samples(const char *wav_path, int64_t start, int64_t end, float **out);
+void sve_free_samples(float *p);
+
 /* ---- memory ------------------------------------------------------------ */
 void sve_free_string(char *s);
 

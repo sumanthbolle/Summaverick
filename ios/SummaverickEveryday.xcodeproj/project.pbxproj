@@ -330,6 +330,10 @@
 			isa = PBXBuildFile;
 			fileRef = FDA9E084D501D8D1690658ED;
 		};
+		DC72AABB07924C733D349BA4 = {
+			isa = PBXBuildFile;
+			fileRef = 2F4911A292E905F157B99F3B;
+		};
 		DD6F72C30ED5F9B5F7BCA8E3 = {
 			isa = PBXBuildFile;
 			fileRef = C0100A508E690127735ED8DF;
@@ -531,6 +535,13 @@
 			lastKnownFileType = sourcecode.swift;
 			name = ProcessingPipeline.swift;
 			path = SummaverickEveryday/Engine/ProcessingPipeline.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		2F4911A292E905F157B99F3B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_pieces.cpp;
+			path = ../core/src/sve_pieces.cpp;
 			sourceTree = SOURCE_ROOT;
 		};
 		3127CE4AFD13AD5C3FEDC05B = {
@@ -1502,6 +1513,7 @@
 				6013C41549784B5FC55E61C4,
 				7098A4559C0419D83AAB1B2A,
 				428A09CCDB67F6F77A72F81A,
+				2F4911A292E905F157B99F3B,
 				A2C4910B70238965992017BD,
 				DB74CF4044569BF171D6037F,
 				CCB0BF21AAE2BA7678F1B398,
@@ -1728,6 +1740,7 @@
 				02B6E8042D07B8525DD08CA0,
 				DACFC767C169503E4AB3CA4F,
 				98CC0908F97C13DBC19A09B5,
+				DC72AABB07924C733D349BA4,
 				FA89EFDB7CFDC888DE748CAB,
 				CE05B940BCBE599A11AE22E8,
 				DC70A4770243CC1CA714EEB5,
