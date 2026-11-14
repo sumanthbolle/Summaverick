@@ -570,7 +570,7 @@ body[data-nav-open] { overflow: hidden; }
   right: 0;
   bottom: 0;
   height: 3px;
-  background: var(--grad-cyan);
+  background: var(--c-text);
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -696,7 +696,7 @@ body[data-nav-open] { overflow: hidden; }
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--grad-cyan);
+  background: var(--c-accent-fill);
 }
 .mk-spin { border: 2px solid transparent; }
 .mk-spin::after,
@@ -707,7 +707,7 @@ body[data-nav-open] { overflow: hidden; }
   top: 3.5px;
   width: 4px;
   height: 8px;
-  border: solid var(--c-white);
+  border: solid var(--c-on-accent);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -725,13 +725,13 @@ body[data-nav-open] { overflow: hidden; }
 .mk-checks li { position: relative; padding-left: 28px; color: var(--c-text); }
 .mk-checks li::before,
 .mk-checks li::after { content: ""; position: absolute; top: 50%; }
-.mk-checks li::before { left: 0; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: var(--grad-cyan); }
+.mk-checks li::before { left: 0; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: var(--c-accent-fill); }
 .mk-checks li::after {
   left: 6.5px;
   width: 4px;
   height: 8px;
   margin-top: -6px;
-  border: solid var(--c-white);
+  border: solid var(--c-on-accent);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -796,12 +796,12 @@ body[data-nav-open] { overflow: hidden; }
 }
 .mk-doc--hit,
 .mk-doc--src {
-  border-color: transparent;
-  background:
-    linear-gradient(var(--c-surface), var(--c-surface)) padding-box,
-    var(--grad-cyan) border-box;
+  border-color: var(--c-line-strong);
+  background: var(--c-surface);
   color: var(--c-text);
 }
+/* The source line reads the same wherever an answer cites its page. */
+.mk-doc--src { font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-mute); }
 .mk-answer p { margin: 0; color: var(--c-text); }
 .mk-answer .mk-source { margin-top: 10px; }
 .mk-mini { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
@@ -813,7 +813,8 @@ body[data-nav-open] { overflow: hidden; }
   font-size: 0.76rem;
   color: var(--c-text-dim);
 }
-.mk-mini i { display: block; width: var(--v); height: 8px; border-radius: 4px; background: var(--grad-cyan); }
+.mk-mini i { display: block; width: var(--v); height: 8px; border-radius: 4px; background: var(--c-line-strong); }
+.mk-mini li:first-child i { background: var(--c-text); }
 .mk-mini b { color: var(--c-text); text-align: right; }
 
 /* The story column: the same three beats in words, then the difference. */
@@ -852,17 +853,15 @@ body[data-nav-open] { overflow: hidden; }
 .demo__compare { margin-top: auto; padding-top: var(--space-5); border-top: 1px solid var(--c-line); }
 .demo__compare-title {
   margin: 0 0 12px;
-  font-size: 0.72rem;
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
   color: var(--c-text-mute);
 }
 .demo__row { margin: 0 0 12px; }
 .demo__row p { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 6px; font-size: 0.84rem; color: var(--c-text-dim); }
 .demo__row b { color: var(--c-text); font-weight: var(--weight-semibold); text-align: right; }
 .demo__fill { display: block; width: var(--w); min-width: 10px; height: 10px; border-radius: 5px; background: var(--c-line-strong); }
-.demo__row--with .demo__fill { background: var(--grad-cyan); }
+.demo__row--with .demo__fill { background: var(--c-text); }
 .demo__note { margin: 4px 0 0; font-size: 0.8rem; color: var(--c-text-dim); }
 .demo__replay { display: none; }
 .demo.is-enhanced .demo__replay {

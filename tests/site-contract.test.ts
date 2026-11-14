@@ -140,7 +140,8 @@ describe("Homepage public contract", () => {
     const accepted = text("src/routes/contact.ts");
 
     const rag = home.slice(home.indexOf('id="rag"'), home.indexOf('id="build"'));
-    expect(rag).toContain("Discover and implement next-generation");
+    expect(rag).toContain("Next-generation RAG assistants");
+    expect(rag).toContain("answer from your own data");
     expect(rag).toContain("RAG assistants");
     expect(rag).toContain("for founders and CTOs");
     expect(rag).toContain("lightweight");
