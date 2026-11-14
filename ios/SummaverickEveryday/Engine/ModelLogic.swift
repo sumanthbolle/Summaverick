@@ -248,11 +248,6 @@ enum WaitingNotes {
     /// whitespace-only output has no text (RegenerateRules.accepts) and is written.
     static func outputsToWrite(stored: [String?]) -> [Bool] { stored.map { !($0.map(RegenerateRules.accepts) ?? false) } }
 
-    /// Reminders, tasks and profile changes are extracted only when the note was not extracted yet (the core marks it
-    /// only after a successful run, so one cut off mid-extraction runs again). Extracting twice would give an accepted
-    /// card a second pending copy and bring a rejected one back.
-    static func extracts(alreadyExtracted: Bool) -> Bool { !alreadyExtracted }
-
     struct Candidate: Equatable {
         let id: Int64
         let hasAudio: Bool
@@ -592,9 +587,28 @@ enum LiveLag {
     }
 }
 
-/// What a note's run writes first after the reminders (owner, 2026-11-13: note 39 spent 5 of its 16 minutes on
-/// section summaries before its notes appeared). A note that takes the one pass and has no section summaries yet
-/// gets its notes first, then its sections, memories and insight; any other note keeps the sections first.
+/// Reminders, tasks and profile changes come after a note's notes, never before them (owner, 2026-11-14: note 41's
+/// extract ran 47 minutes before its summary and found nothing). A cut-off or stopped extract is queued again (the
+/// find-reminders queue), never lost.
+enum ExtractAfterNotes {
+    enum Action: Equatable { case skip, run, queue }
+
+    /// skip: extracted already (the core marks a note only after a successful run, so one cut off mid-extraction runs
+    /// again; extracting twice would give an accepted card a second pending copy and bring a rejected one back).
+    /// queue: a live recording is running (one model call per chunk, no place to step aside): it runs after Stop.
+    static func action(alreadyExtracted: Bool, recordingLive: Bool) -> Action {
+        if alreadyExtracted { return .skip }
+        return recordingLive ? .queue : .run
+    }
+
+    /// An extract that threw: queued again when the run was stopped or cut off; a real failure is only logged.
+    static func afterStop(stopped: Bool) -> Bool { stopped }
+}
+
+/// What a note's run writes first (owner, 2026-11-13: note 39 spent 5 of its 16 minutes on section summaries before
+/// its notes appeared). A note that takes the one pass and has no section summaries yet gets its notes first, then
+/// its reminders, sections, memories and insight; any other note keeps the sections first, its reminders after the
+/// notes (ExtractAfterNotes).
 enum NotesOrder {
     enum Order: Equatable { case notesFirst, sectionsFirst }
 
@@ -602,12 +616,13 @@ enum NotesOrder {
         onePassEligible && !sectionsStored ? .notesFirst : .sectionsFirst
     }
 
-    /// The lock-screen progress after the notes (ContinuedWork afterNotes, 0…1): the sections (notes first only),
-    /// then the memories, then the insight.
-    static func afterNotes(_ order: Order) -> (sections: ClosedRange<Double>?, memories: ClosedRange<Double>, insight: Double) {
+    /// The lock-screen progress after the notes (ContinuedWork afterNotes, 0…1): the reminders and tasks, the sections
+    /// (notes first only), then the memories, then the insight.
+    static func afterNotes(_ order: Order)
+        -> (extract: ClosedRange<Double>, sections: ClosedRange<Double>?, memories: ClosedRange<Double>, insight: Double) {
         switch order {
-        case .sectionsFirst: return (nil, 0...0.5, 0.5)
-        case .notesFirst: return (0...0.4, 0.4...0.8, 0.8)
+        case .sectionsFirst: return (0...0.3, nil, 0.3...0.7, 0.7)
+        case .notesFirst: return (0...0.25, 0.25...0.5, 0.5...0.8, 0.8)
         }
     }
 }
