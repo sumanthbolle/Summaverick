@@ -697,6 +697,11 @@ final class ProcessingPipeline {
                                      outputs: OutputKind.allCases.map { note.output($0) != nil }) || partsRetry.contains(noteID) else {
             lastFailure[noteID] = nil   // nothing to say: it is done (a cut-off line here read as "couldn't finish")
             RecordingActivities.shared.update(noteID: noteID, .ready, line: note.title, percent: 100)
+            // Its notes are stored, but a kill during the extract after them left it never extracted: queued now.
+            if ExtractAfterNotes.queueOnResume(outputsStored: OutputKind.allCases.allSatisfy { note.output($0) != nil },
+                                               alreadyExtracted: await CoreEngine.shared.noteExtracted(noteID)) {
+                requeueFindReminders(noteID)
+            }
             return
         }
         beginBackground()
@@ -1524,18 +1529,24 @@ final class ProcessingPipeline {
             NSLog("[sve] note %lld: reminders and tasks wait for the recording", id)
             requeueFindReminders(id)
         case .run:
+            // Too warm: queued, it runs by itself once cooler (the notes are stored already).
+            guard await quietHeatGate({ abort.isSet }), !Self.critical else {
+                NSLog("[sve] note %lld: reminders and tasks wait for the phone to cool", id)
+                requeueFindReminders(id)
+                return
+            }
             stage = .extracting
             ContinuedWork.shared.update(afterNotes: span.lowerBound)
             let started = Date()
             do {
                 let n = try await onBackend {
-                    try await engine.extract(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
+                    try await engine.extract(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet || Self.critical })
                 }
                 NSLog("[sve] note %lld: extract after the notes added %d suggestions in %.0f s", id, n,
                       Date().timeIntervalSince(started))
             } catch {
                 NSLog("[sve] extract failed: %@", String(describing: error))
-                if ExtractAfterNotes.afterStop(stopped: abort.isSet) { requeueFindReminders(id) }
+                if ExtractAfterNotes.afterStop(stopped: abort.isSet, hot: Self.critical) { requeueFindReminders(id) }
             }
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
             ContinuedWork.shared.update(afterNotes: span.upperBound)
@@ -2405,6 +2416,11 @@ final class ProcessingPipeline {
         starting = true
         defer { starting = false }
         guard ModelManager.shared.isReady else { lastFailure[noteID] = Self.waitingMessage; return }
+        // A queued tap and a person's tap on the same note: the second finds it extracted and does nothing.
+        guard ExtractAfterNotes.tapRuns(alreadyExtracted: await CoreEngine.shared.noteExtracted(noteID)) else {
+            NSLog("[sve] note %lld: reminders and tasks already extracted; not extracted again", noteID)
+            return
+        }
         if LiveFirst.yields(recording: LiveTranscriber.shared.liveRunning, runIsLive: false) {
             // One model call with no boundary inside: it waits for the recording, queued (it runs after Stop).
             NSLog("[sve] note %lld steps aside for the recording", noteID)

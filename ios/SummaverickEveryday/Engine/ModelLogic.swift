@@ -601,8 +601,17 @@ enum ExtractAfterNotes {
         return recordingLive ? .queue : .run
     }
 
-    /// An extract that threw: queued again when the run was stopped or cut off; a real failure is only logged.
-    static func afterStop(stopped: Bool) -> Bool { stopped }
+    /// An extract that threw: queued again when the run was stopped or cut off, or the phone was too hot; a real
+    /// failure is only logged.
+    static func afterStop(stopped: Bool, hot: Bool = false) -> Bool { stopped || hot }
+
+    /// A resume that finds every output stored has no notes run to extract in: a note never extracted (the app was
+    /// killed during its extract after the notes) is queued for it instead, so it is not lost.
+    static func queueOnResume(outputsStored: Bool, alreadyExtracted: Bool) -> Bool { outputsStored && !alreadyExtracted }
+
+    /// A find-reminders run (a tap, or one queued by a run): nothing to do on a note extracted already, so a queued
+    /// tap and a person's tap never extract the same note twice.
+    static func tapRuns(alreadyExtracted: Bool) -> Bool { !alreadyExtracted }
 }
 
 /// What a note's run writes first (owner, 2026-11-13: note 39 spent 5 of its 16 minutes on section summaries before
@@ -1298,7 +1307,8 @@ enum TapQueue {
 
 /// The progress of one continued-processing task. Each note run in the task has its own 1000 units: the first
 /// note's are the task's first 1000, and each note that joins later adds 1000 to the total. The completed units
-/// never go back. Inside a note, its notes fill units 0...900 and its memories and insight 900...990; a heartbeat
+/// never go back. Inside a note, its notes fill units 0...600 and its reminders, memories and insight 600...990
+/// (about an hour of heartbeats: note 41's reminders alone took 47 minutes, 2026-11-14); a heartbeat
 /// moves the note's units up to 990, so it can always move while that note's work is alive, however many notes
 /// the task runs. Done (the total) is shown only when the task finishes.
 /// A task asked for at Record starts with the recording (startRecording): each heartbeat then adds one unit and
@@ -1307,7 +1317,7 @@ enum TapQueue {
 struct TaskProgress: Equatable {
     static let noteUnits: Int64 = 1000
     /// Where the note's notes end and its memories and insight start (of its own 0...1).
-    static let notesShare = 0.9
+    static let notesShare = 0.6
     /// While recording the bar stays under this (1 / recordingSpread).
     static let recordingShare = 0.05
     static let recordingSpread: Int64 = 20
@@ -1384,7 +1394,7 @@ struct TaskProgress: Equatable {
         completedUnits = max(completedUnits, noteBase)
     }
 
-    /// The note's notes 0...1: units 0...900 of the note.
+    /// The note's notes 0...1: units 0...600 of the note.
     mutating func notes(_ fraction: Double) {
         let f = min(1, max(0, fraction))
         notesFraction = max(notesFraction, f)
@@ -1392,7 +1402,7 @@ struct TaskProgress: Equatable {
         move(to: f * Self.notesShare)
     }
 
-    /// After the notes: memories and the insight, 0...1 of what is left, units 900...990 of the note.
+    /// After the notes: reminders, memories and the insight, 0...1 of what is left, units 600...990 of the note.
     mutating func afterNotes(_ part: Double) {
         notesFraction = 1
         notesDone = true
