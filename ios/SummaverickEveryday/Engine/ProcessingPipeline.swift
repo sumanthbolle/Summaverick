@@ -1358,10 +1358,11 @@ final class ProcessingPipeline {
         notify(id) { NotesNotifier.failed(noteID: id, title: $0, line: line, hold: $1) }
     }
 
-    /// Steps after transcription, for the lock-screen progress: reminders, sections, title, the three outputs.
-    private static let notesSteps = 3 + OutputKind.allCases.count
-    private static let sectionsStep = 1
-    private static let firstOutputStep = 3
+    /// Steps after transcription and before the notes are stored, for the lock-screen progress: sections, title, the
+    /// three outputs. The reminders come after the notes (ExtractAfterNotes), in the after-notes progress.
+    private static let notesSteps = 2 + OutputKind.allCases.count
+    private static let sectionsStep = 0
+    private static let firstOutputStep = 2
 
     private func generateOutputs(noteID id: Int64, transcript: String, lang: String, setTitle: Bool) async {
         let engine = CoreEngine.shared
@@ -1378,34 +1379,16 @@ final class ProcessingPipeline {
             return
         }
 
-        // Reminders, tasks and profile changes first, so they are ready even if note writing is interrupted.
-        // A failure here never fails the notes.
+        // The notes first; reminders, tasks and profile changes after them (ExtractAfterNotes), so the summary never
+        // waits behind them.
         let abort = self.abort
-        let steps = Self.notesSteps   // reminders, sections, title, three outputs
+        let steps = Self.notesSteps   // sections, title, three outputs
         ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 0, outputsTotal: steps))
-        do {
-            if await engine.pieces(id).isEmpty {   // note from before pieces existed
-                let dur = await engine.note(id)?.duration_seconds ?? 0
-                await engine.setPieces(id, PiecesBackfill.pieces(transcript: transcript, durationSeconds: dur))
-            }
-            if WaitingNotes.extracts(alreadyExtracted: await engine.noteExtracted(id)) {
-                stage = .extracting
-                do {
-                    let n = try await onBackend {
-                        try await engine.extract(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
-                    }
-                    NSLog("[sve] extract added %d suggestions", n)
-                } catch {
-                    NSLog("[sve] extract failed: %@", String(describing: error))
-                }
-                NotificationCenter.default.post(name: .assistantChanged, object: nil)
-            } else {
-                // A resumed run: extracted already (its cards may be accepted or rejected); the step counts as done.
-                NSLog("[sve] note %lld: reminders and tasks already extracted; not extracted again", id)
-            }
+        if await engine.pieces(id).isEmpty {   // note from before pieces existed
+            let dur = await engine.note(id)?.duration_seconds ?? 0
+            await engine.setPieces(id, PiecesBackfill.pieces(transcript: transcript, durationSeconds: dur))
         }
         if abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }   // cut off (aborted)
-        ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
 
         // Section summaries the note does not have yet (all of them for a note from before sections; the chapters
         // come from them; written again when they read as another language). The title comes from the transcript
@@ -1439,7 +1422,7 @@ final class ProcessingPipeline {
             guard let c = await writeSections(noteID: id, lang: lang, quiet: false) else { return }
             covered = c
             if covered { await markRewrittenSections(id, lang: lang) }
-            ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps))
+            ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 1, outputsTotal: steps))
             fromSections = await notesFromSections(covered: covered, transcript: material, lang: lang)
             if setTitle, !(await heatGate(id)) { return }
             // Sections first (stored already, e.g. written while recording): the one pass after them, as before.
@@ -1454,7 +1437,7 @@ final class ProcessingPipeline {
             noteTitles[id] = t
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         }
-        if !onePassDone { ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 3, outputsTotal: steps)) }
+        if !onePassDone { ContinuedWork.shared.update(fraction: NotesProgress.fraction(outputsDone: 2, outputsTotal: steps)) }
 
         // A resumed run writes only what is not stored yet: a summary already announced is not rewritten or announced again.
         let stored = await engine.note(id).map { n in OutputKind.allCases.map { n.output($0) } }
@@ -1503,9 +1486,10 @@ final class ProcessingPipeline {
         notifyStage(id, NotifyRule.notes) { NotesNotifier.notesReady(noteID: id, title: $0, step: step, hold: $1) }
         RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
         notesStored = true   // from here an expiry only stops the run (TaskLifecycle.expiryCutsOff)
+        let after = NotesOrder.afterNotes(onePassDone && order == .notesFirst ? .notesFirst : .sectionsFirst)
+        await extractAfterNotes(id, span: after.extract)
         // Notes first: the section summaries now (the memories come from them), after the notes and like the
         // memories: a stop or failure never touches the notes, and what is left is finished later (sectionsDue).
-        let after = NotesOrder.afterNotes(onePassDone && order == .notesFirst ? .notesFirst : .sectionsFirst)
         memoryStop.set(false)
         if let span = after.sections {
             await rewriteSectionsIfOtherLanguage(id, lang: lang)
@@ -1526,6 +1510,38 @@ final class ProcessingPipeline {
         Task { await self.compressAudio(noteID: id) }   // the notes are done; the WAV can shrink
     }
 
+    /// Reminders, tasks and profile changes, after the note's notes are stored (ExtractAfterNotes). A failure never
+    /// touches the notes; a stop or cut-off queues it again (find reminders), so it runs later by itself.
+    private func extractAfterNotes(_ id: Int64, span: ClosedRange<Double>) async {
+        let engine = CoreEngine.shared
+        let abort = self.abort
+        switch ExtractAfterNotes.action(alreadyExtracted: await engine.noteExtracted(id),
+                                        recordingLive: LiveTranscriber.shared.liveRunning) {
+        case .skip:
+            // A resumed run or a refill: extracted already (its cards may be accepted or rejected).
+            NSLog("[sve] note %lld: reminders and tasks already extracted; not extracted again", id)
+        case .queue:
+            NSLog("[sve] note %lld: reminders and tasks wait for the recording", id)
+            requeueFindReminders(id)
+        case .run:
+            stage = .extracting
+            ContinuedWork.shared.update(afterNotes: span.lowerBound)
+            let started = Date()
+            do {
+                let n = try await onBackend {
+                    try await engine.extract(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet })
+                }
+                NSLog("[sve] note %lld: extract after the notes added %d suggestions in %.0f s", id, n,
+                      Date().timeIntervalSince(started))
+            } catch {
+                NSLog("[sve] extract failed: %@", String(describing: error))
+                if ExtractAfterNotes.afterStop(stopped: abort.isSet) { requeueFindReminders(id) }
+            }
+            NotificationCenter.default.post(name: .assistantChanged, object: nil)
+            ContinuedWork.shared.update(afterNotes: span.upperBound)
+        }
+    }
+
     /// False only in a debug build launched with SVE_ONEPASS=0 (device check: the steps without the one pass).
     private static var onePassAllowed: Bool {
         #if DEBUG
@@ -1543,7 +1559,7 @@ final class ProcessingPipeline {
         let abort = self.abort
         let started = Date()
         stage = .generating(.shortSummary, "final", 0, 1)
-        let from = NotesProgress.fraction(outputsDone: 2, outputsTotal: steps)
+        let from = NotesProgress.fraction(outputsDone: 1, outputsTotal: steps)
         let to = NotesProgress.fraction(outputsDone: steps, outputsTotal: steps)
         let all: (title: String, summary: String, notes: String, questions: String)?
         do {
