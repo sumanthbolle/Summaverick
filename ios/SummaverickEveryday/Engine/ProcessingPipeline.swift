@@ -423,6 +423,7 @@ final class ProcessingPipeline {
         }
         #if DEBUG
         debugRetranscribe()
+        debugReplay()
         #endif
     }
 
@@ -3289,4 +3290,85 @@ extension ProcessingPipeline {
               thermalBefore, ProcessInfo.processInfo.thermalState.rawValue)
     }
 }
+
+// MARK: Debug: replay (Replay in ModelLogic, ReplayMode in CoreEngine)
+
+extension ProcessingPipeline {
+    /// SVE_REPLAY=<id,id>: each note's audio, copied, goes through recordingStopped as if just stopped, one after the
+    /// other, each starting once the one before has settled and the phone is at heat level full. Logs one line per
+    /// replay start and end; the steps' own lines carry the timings.
+    fileprivate func debugReplay() {
+        guard ReplayMode.active else { return }
+        let ids = Replay.ids(ProcessInfo.processInfo.environment[Replay.environmentKey])
+        Task { @MainActor in
+            NSLog("[sve] replay: notes %@ on a copy of the notes file", ids.map(String.init).joined(separator: ","))
+            var waited = 0
+            while !ModelManager.shared.isReady || !ShrutiRecognizer.shared.ready {
+                if waited >= 600 { NSLog("[sve] replay: the models are not ready after 10 min; not run"); return }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                waited += 1
+            }
+            let started = Date()
+            for (i, id) in ids.enumerated() {
+                await self.replaySettle()
+                await self.replayCool()
+                await self.replayOne(id, index: i + 1, of: ids.count)
+            }
+            await self.replaySettle()
+            NSLog("[sve] replay: all %d done in %.0f s", ids.count, Date().timeIntervalSince(started))
+        }
+    }
+
+    /// The screen stays on while a replay waits; the pipeline's own rule may turn it off between runs.
+    private func replayAwake() {
+        if !UIApplication.shared.isIdleTimerDisabled { UIApplication.shared.isIdleTimerDisabled = true }
+    }
+
+    private func replaySettle() async {
+        var idleSince: TimeInterval?
+        while true {
+            replayAwake()
+            let now = Date().timeIntervalSince1970
+            if isBusy || isWorking || memoryWork { idleSince = nil } else if idleSince == nil { idleSince = now }
+            if Replay.settled(idleSince: idleSince, now: now) { return }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+    }
+
+    /// Each replay starts on a cool phone (at most 20 min of waiting), so one run's heat is not the next one's.
+    private func replayCool() async {
+        guard HeatGovernor.shared.level != .full else { return }
+        let start = Date()
+        NSLog("[sve] replay: waiting for heat level full")
+        while HeatGovernor.shared.level != .full, Date().timeIntervalSince(start) < 1200 {
+            replayAwake()
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+        NSLog("[sve] replay: heat %@ after %.0f s of waiting", HeatGovernor.shared.level.name, Date().timeIntervalSince(start))
+    }
+
+    private func replayOne(_ id: Int64, index: Int, of count: Int) async {
+        guard let note = await CoreEngine.shared.note(id), let src = AudioRecorder.existingAudioPath(note.audio_path) else {
+            NSLog("[sve] replay %d of %d: note %lld or its audio not found", index, count, id)
+            return
+        }
+        let fm = FileManager.default
+        try? fm.createDirectory(at: ReplayMode.audioFolder, withIntermediateDirectories: true)
+        let dst = ReplayMode.audioFolder.appendingPathComponent("replay-\(id)-\(Int(Date().timeIntervalSince1970)).wav")
+        do {
+            if src.lowercased().hasSuffix(".m4a") {
+                try AudioCompressor.expandToWav(URL(fileURLWithPath: src), to: dst)
+            } else {
+                try fm.copyItem(atPath: src, toPath: dst.path)
+            }
+        } catch {
+            NSLog("[sve] replay %d of %d: note %lld copy failed (%@)", index, count, id, String(describing: error))
+            return
+        }
+        NSLog("[sve] replay %d of %d: note %lld (%lld s audio), Stop (heat %@, battery %.2f)", index, count, id,
+              note.duration_seconds, HeatGovernor.shared.level.name, UIDevice.current.batteryLevel)
+        recordingStopped(audio: dst, duration: note.duration_seconds)
+    }
+}
 #endif
+

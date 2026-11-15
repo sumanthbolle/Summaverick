@@ -2443,3 +2443,45 @@ enum ShrutiPiece {
         transcriptEmpty && maxPeak > 0.001
     }
 }
+
+// MARK: Replay (debug device checks over the person's own recordings)
+
+/// SVE_REPLAY=<id,id> in a debug launch: each note's audio goes through the whole run again as if just stopped, on a
+/// copy of the notes file, so the person's notes, memories and map never change. Replay notes get ids from idFloor
+/// up, so the pipeline's per-note marks never meet a real note's; the app's settings are put back on the next normal
+/// launch (restored).
+enum Replay {
+    static let idFloor: Int64 = 1_000_000
+    static let environmentKey = "SVE_REPLAY"
+    /// Seconds of no work before the next replay starts (the run's memories and insight follow the notes).
+    static let settleSeconds: TimeInterval = 30
+
+    /// The note ids, in order, without duplicates; replay notes themselves are never replayed.
+    static func ids(_ raw: String?) -> [Int64] {
+        guard let raw else { return [] }
+        var out: [Int64] = []
+        for part in raw.split(separator: ",") {
+            guard let id = Int64(part.trimmingCharacters(in: .whitespaces)), id > 0, id < idFloor, !out.contains(id) else { continue }
+            out.append(id)
+        }
+        return out
+    }
+
+    static func isOn(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        !ids(environment[environmentKey]).isEmpty
+    }
+
+    /// The settings put back after a replay: the snapshot taken before it, except the AI download's own keys
+    /// ("model."), which keep what they are now (a download finished during the replay stays finished).
+    static func restored(snapshot: [String: Any], current: [String: Any]) -> [String: Any] {
+        var out = snapshot.filter { !$0.key.hasPrefix("model.") }
+        for (k, v) in current where k.hasPrefix("model.") { out[k] = v }
+        return out
+    }
+
+    /// No work for settleSeconds: the replay before has finished all its steps.
+    static func settled(idleSince: TimeInterval?, now: TimeInterval) -> Bool {
+        guard let idleSince else { return false }
+        return now - idleSince >= settleSeconds
+    }
+}

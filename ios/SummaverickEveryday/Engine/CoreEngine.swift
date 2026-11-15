@@ -1,6 +1,9 @@
 // Swift wrapper over the portable C core (sve_core.h).
 // Everything here is thin: the real logic lives in core/, so it moves to Android and the device unchanged.
 import Foundation
+#if DEBUG
+import SQLite3
+#endif
 
 enum OutputKind: Int, CaseIterable, Identifiable {
     case shortSummary = 0, detailedNotes = 1, revisionQuestions = 2
@@ -82,6 +85,9 @@ actor CoreEngine {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Summaverick", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        #if DEBUG
+        if ReplayMode.active { ReplayMode.prepare(); return ReplayMode.database }
+        #endif
         return dir.appendingPathComponent("notes.sqlite")
     }
 
@@ -511,3 +517,58 @@ extension NoteSteps.Kind {
         }
     }
 }
+
+#if DEBUG
+// MARK: Debug: replay of the person's own recordings on a copy of the notes file (Replay in ModelLogic)
+
+enum ReplayMode {
+    static let active = Replay.isOn()
+    static var folder: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Summaverick", isDirectory: true)
+    }
+    static var database: URL { folder.appendingPathComponent("replay.sqlite") }
+    static var audioFolder: URL { folder.appendingPathComponent("replay-audio", isDirectory: true) }
+    private static var snapshot: URL { folder.appendingPathComponent("replay-settings.plist") }
+    private static let prepared: Void = { active ? begin() : putSettingsBack() }()
+
+    /// Once per launch, before the notes file is opened: a replay launch copies the notes file fresh and keeps the
+    /// settings as they were; a normal launch puts back the settings a replay launch kept.
+    static func prepare() { _ = prepared }
+
+    private static func begin() {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        // An older snapshot is kept: a replay launch after a replay launch must not keep the test settings.
+        if !fm.fileExists(atPath: snapshot.path), let id = Bundle.main.bundleIdentifier,
+           let domain = UserDefaults.standard.persistentDomain(forName: id),
+           let data = try? PropertyListSerialization.data(fromPropertyList: domain, format: .binary, options: 0) {
+            try? data.write(to: snapshot)
+        }
+        let real = folder.appendingPathComponent("notes.sqlite").path
+        for ext in ["", "-wal", "-shm"] {
+            try? fm.removeItem(atPath: database.path + ext)
+            if fm.fileExists(atPath: real + ext) { try? fm.copyItem(atPath: real + ext, toPath: database.path + ext) }
+        }
+        var db: OpaquePointer?
+        if sqlite3_open(database.path, &db) == SQLITE_OK {
+            let sql = "UPDATE sqlite_sequence SET seq = MAX(seq, \(Replay.idFloor - 1)) WHERE name = 'notes'"
+            let rc = sqlite3_exec(db, sql, nil, nil, nil)
+            NSLog("[sve] replay: notes copied (ids from %lld, %d)", Replay.idFloor, rc)
+        } else {
+            NSLog("[sve] replay: the copy could not be opened")
+        }
+        sqlite3_close(db)
+    }
+
+    private static func putSettingsBack() {
+        guard let data = try? Data(contentsOf: snapshot),
+              let saved = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let id = Bundle.main.bundleIdentifier else { return }
+        let now = UserDefaults.standard.persistentDomain(forName: id) ?? [:]
+        UserDefaults.standard.setPersistentDomain(Replay.restored(snapshot: saved, current: now), forName: id)
+        try? FileManager.default.removeItem(at: snapshot)
+        NSLog("[sve] replay: settings put back after a replay")
+    }
+}
+#endif

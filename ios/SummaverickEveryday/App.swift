@@ -9,6 +9,9 @@ struct SummaverickEverydayApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        #if DEBUG
+        ReplayMode.prepare()   // first: a replay launch copies the notes file; a normal launch puts the settings back
+        #endif
         // Must be set before launch finishes so a tap that cold-starts the app is delivered.
         UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
         QuietNotifier.registerCategory()   // Keep recording on Stop when quiet's warning; Finish now on notes notices
