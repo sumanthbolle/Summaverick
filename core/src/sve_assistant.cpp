@@ -471,6 +471,10 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
             if (!llm.complete(prompt, max_new, out, cb, user, "chunk", i, total, true)) return -2;
             sve::Extracted e = sve::parse_extraction(sve::strip_thinking(out));
             if (!e.ok) sve_logf(1, "extract: window %d/%d gave no usable JSON", i + 1, total);
+            else  // counts only, never the text: the log shows whether the model proposed anything at all
+                sve_logf(1, "extract: window %d/%d: %zu reminders, %zu tasks, %zu profile, %zu facts, %zu people",
+                         i + 1, total, e.reminders.size(), e.tasks.size(), e.profile.size(), e.facts.size(),
+                         e.people.size());
             parts.push_back(std::move(e));
         }
         sve::Extracted merged = sve::merge_extracted(parts);
