@@ -530,7 +530,9 @@ enum ReplayMode {
     static var database: URL { folder.appendingPathComponent("replay.sqlite") }
     static var audioFolder: URL { folder.appendingPathComponent("replay-audio", isDirectory: true) }
     private static var snapshot: URL { folder.appendingPathComponent("replay-settings.plist") }
-    private static let prepared: Void = { active ? begin() : putSettingsBack() }()
+    private static let prepared: Void = {
+        if active { begin() } else { putSettingsBack(); keepRealRecordings() }
+    }()
 
     /// Once per launch, before the notes file is opened: a replay launch copies the notes file fresh and keeps the
     /// settings as they were; a normal launch puts back the settings a replay launch kept.
@@ -559,6 +561,47 @@ enum ReplayMode {
             NSLog("[sve] replay: the copy could not be opened")
         }
         sqlite3_close(db)
+    }
+
+    /// A normal launch after a replay launch: a recording the person made during the replay was saved as a note in the
+    /// copy, not in their notes. Its audio is handed to the unfinished-recordings recovery, which makes it a note in
+    /// their own notes file and processes it there. The copy is then set aside (never read again).
+    private static func keepRealRecordings() {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: database.path) else { return }
+        var db: OpaquePointer?
+        var paths: [String] = []
+        if sqlite3_open_v2(database.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK {
+            var st: OpaquePointer?
+            let sql = "SELECT audio_path FROM notes WHERE id >= \(Replay.idFloor) AND audio_path IS NOT NULL"
+            if sqlite3_prepare_v2(db, sql, -1, &st, nil) == SQLITE_OK {
+                while sqlite3_step(st) == SQLITE_ROW {
+                    if let c = sqlite3_column_text(st, 0) { paths.append(String(cString: c)) }
+                }
+            }
+            sqlite3_finalize(st)
+        }
+        sqlite3_close(db)
+        for stored in paths where !stored.contains("/replay-audio/") {
+            guard let path = AudioRecorder.existingAudioPath(stored) else {
+                NSLog("[sve] replay: a recording made during the replay has no audio left (%@)", (stored as NSString).lastPathComponent)
+                continue
+            }
+            var wav = path
+            if path.lowercased().hasSuffix(".m4a") {   // compressed during the replay: back to a recording file
+                wav = (path as NSString).deletingPathExtension + ".wav"
+                do { try AudioCompressor.expandToWav(URL(fileURLWithPath: path), to: URL(fileURLWithPath: wav)) } catch {
+                    NSLog("[sve] replay: a recording made during the replay could not be expanded (%@)", String(describing: error))
+                    continue
+                }
+            }
+            UnfinishedRecordings.add(wav)
+            NSLog("[sve] replay: recording %@ made during the replay goes to the person's notes", (wav as NSString).lastPathComponent)
+        }
+        let stamp = Int(Date().timeIntervalSince1970)
+        for ext in ["", "-wal", "-shm"] where fm.fileExists(atPath: database.path + ext) {
+            try? fm.moveItem(atPath: database.path + ext, toPath: folder.appendingPathComponent("replay-done-\(stamp).sqlite\(ext)").path)
+        }
     }
 
     private static func putSettingsBack() {

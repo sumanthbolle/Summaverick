@@ -3300,6 +3300,7 @@ extension ProcessingPipeline {
     fileprivate func debugReplay() {
         guard ReplayMode.active else { return }
         let ids = Replay.ids(ProcessInfo.processInfo.environment[Replay.environmentKey])
+        if ProcessInfo.processInfo.environment["SVE_REPLAY_EXTRACT_ONLY"] == "1" { debugExtractOnly(ids); return }
         Task { @MainActor in
             NSLog("[sve] replay: notes %@ on a copy of the notes file", ids.map(String.init).joined(separator: ","))
             var waited = 0
@@ -3316,6 +3317,27 @@ extension ProcessingPipeline {
             }
             await self.replaySettle()
             NSLog("[sve] replay: all %d done in %.0f s", ids.count, Date().timeIntervalSince(started))
+        }
+    }
+
+    /// SVE_REPLAY_EXTRACT_ONLY=1: only reminders and tasks again on the copies of these notes (with SVE_EXTRACT_WINDOW
+    /// to try another window size), each on a cool phone; the copy's suggestions change, the person's never.
+    private func debugExtractOnly(_ ids: [Int64]) {
+        Task { @MainActor in
+            var waited = 0
+            while !ModelManager.shared.isReady {
+                if waited >= 600 { NSLog("[sve] replay extract: the model is not ready after 10 min; not run"); return }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                waited += 1
+            }
+            for id in ids {
+                await self.replaySettle()
+                await self.replayCool()
+                let start = Date()
+                let added = (try? await self.onBackend { try await CoreEngine.shared.extract(noteID: id) }) ?? -1
+                NSLog("[sve] replay extract: note %lld added %d suggestions in %.0f s", id, added, Date().timeIntervalSince(start))
+            }
+            NSLog("[sve] replay extract: all %d done", ids.count)
         }
     }
 

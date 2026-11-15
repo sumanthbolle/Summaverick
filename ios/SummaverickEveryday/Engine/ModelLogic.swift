@@ -2473,9 +2473,15 @@ enum Replay {
 
     /// The settings put back after a replay: the snapshot taken before it, except the AI download's own keys
     /// ("model."), which keep what they are now (a download finished during the replay stays finished).
+    /// The recordings still waiting to become notes (UnfinishedRecordings) are both lists, the snapshot's first: a
+    /// recording made during the replay is never dropped.
     static func restored(snapshot: [String: Any], current: [String: Any]) -> [String: Any] {
         var out = snapshot.filter { !$0.key.hasPrefix("model.") }
         for (k, v) in current where k.hasPrefix("model.") { out[k] = v }
+        let key = "recording.unfinished"
+        var paths = snapshot[key] as? [String] ?? []
+        for p in current[key] as? [String] ?? [] where !paths.contains(p) { paths.append(p) }
+        out[key] = paths.isEmpty ? nil : paths
         return out
     }
 

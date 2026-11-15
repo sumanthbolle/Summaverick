@@ -13,6 +13,7 @@
 #include "sve_suggest.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <functional>
@@ -460,7 +461,10 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         const int max_new = 900;
         // Each window's transcript must fit next to the prompt, the always block and the reply.
         int scaffold = llm.count_tokens(llm.apply_template(sys, sve::extraction_prompt(ab, "", today)));
-        int budget = std::max(256, std::min(4500, llm.n_ctx - max_new - scaffold - 64));
+        int cap = 4500;
+        if (const char *e = getenv("SVE_EXTRACT_WINDOW")) cap = std::max(256, atoi(e));  // device checks only
+        int budget = std::max(256, std::min(cap, llm.n_ctx - max_new - scaffold - 64));
+        sve_logf(1, "extract: note %lld, window budget %d tokens", (long long)note_id, budget);
         std::vector<json> windows = sve::group_windows(pieces, budget, [&](const std::string &s) { return llm.count_tokens(s); });
 
         std::vector<sve::Extracted> parts;
