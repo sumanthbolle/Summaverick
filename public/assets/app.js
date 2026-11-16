@@ -1,20 +1,13 @@
 // Shared chrome, API helper, and tiny DOM utils for every summaverick page.
 
 export const LINKS = [
-  { href: "/", id: "home", label: "Home" },
-  { href: "/learn", id: "learn", label: "Learn" },
-  { href: "/quiz", id: "quiz", label: "Quiz" },
-  { href: "/tools", id: "tools", label: "Tools" },
+  { href: "/", id: "home", label: "Home", icon: "home" },
+  { href: "/learn", id: "learn", label: "Guides", icon: "learn" },
+  { href: "/ask-summaverick", id: "ask", label: "Meet Summaverick", icon: "ask" },
+  { href: "/research", id: "research", label: "Research", icon: "research" },
 ];
 
-const TOOL_LINKS = [
-  { href: "/ask-summaverick", label: "Meet Summaverick" },
-  { href: "/research", label: "Research" },
-  { href: "/flights", label: "SkyFare" },
-  { href: "/metals", label: "Metals" },
-  { href: "/upsc", label: "UPSC" },
-  { href: "/advocate", label: "Advocate" },
-];
+const CONTACT_HREF = "/#contact";
 
 export const $ = (id) => document.getElementById(id);
 
@@ -75,10 +68,8 @@ function icon(name) {
   const paths = {
     home: "M4 12 L12 4 L20 12 V20 H15 V14 H9 V20 H4 Z",
     learn: "M4 7 L12 4 L20 7 V17 L12 20 L4 17 Z M12 4 V20",
-    quiz: "M8 6 H16 V10 H8 Z M8 13 H16 V18 H8 Z",
-    tools: "M7 7 H11 V11 H7 Z M13 7 H17 V11 H13 Z M7 13 H11 V17 H7 Z M13 13 H17 V17 H13 Z",
-    account: "M12 12 a4 4 0 1 0 0-8 a4 4 0 0 0 0 8 M5 20 c0-4 3-6 7-6 s7 2 7 6",
-    search: "M11 11 m-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0 M15 15 L20 20",
+    ask: "M4 5 H20 V16 H10 L6 20 V16 H4 Z",
+    research: "M11 11 m-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0 M15 15 L20 20",
   };
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
@@ -104,28 +95,8 @@ function currentPath() {
 
 function isActive(href, path) {
   if (href === "/") return path === "/";
-  if (href === "/learn") return path === "/learn" || path === "/interviews" || path.startsWith("/article");
-  if (href === "/tools") {
-    return [
-      "/tools",
-      "/research",
-      "/ask-summaverick",
-      "/flights",
-      "/metals",
-      "/upsc",
-      "/advocate",
-    ].includes(path);
-  }
+  if (href === "/learn") return path === "/learn" || path.startsWith("/article");
   return path === href || path.startsWith(href + "/");
-}
-
-export async function currentUser() {
-  try {
-    const data = await api("/api/me");
-    return data.user || null;
-  } catch {
-    return null;
-  }
 }
 
 export function mountChrome({ active } = {}) {
@@ -163,40 +134,18 @@ export function mountChrome({ active } = {}) {
       links.append(a);
     }
     const end = el("div", { class: "nav-end" });
-    const search = el("a", { class: "nav-search", href: "/search" });
-    search.append(icon("search"), el("span", { text: "Search" }));
-    search.setAttribute("aria-label", "Search");
-    const searchM = el("a", { class: "icon-btn nav-search-m", href: "/search" });
-    searchM.append(icon("search"));
-    searchM.setAttribute("aria-label", "Search");
-    const account = el("a", { class: "icon-btn", href: "/signin", attrs: { id: "nav-account", "aria-label": "Sign in" } });
-    account.append(icon("account"));
-    end.append(search, searchM, account);
+    end.append(el("a", { class: "btn primary", href: CONTACT_HREF, text: "Build with us" }));
     header.append(brand, links, end);
-
-    currentUser().then((user) => {
-      if (!user) return;
-      account.href = "/signin";
-      account.setAttribute("aria-label", user.displayName || user.email || "Account");
-      account.title = user.displayName || user.email || "Signed in";
-    });
   }
 
   if (tabbar && !tabbar.dataset.ready) {
     tabbar.className = "tabbar";
     tabbar.dataset.ready = "1";
     tabbar.setAttribute("aria-label", "Primary");
-    const tabs = [
-      { href: "/", id: "home", label: "Home", icon: "home" },
-      { href: "/learn", id: "learn", label: "Learn", icon: "learn" },
-      { href: "/quiz", id: "quiz", label: "Quiz", icon: "quiz" },
-      { href: "/tools", id: "tools", label: "Tools", icon: "tools" },
-      { href: "/signin", id: "account", label: "Account", icon: "account" },
-    ];
-    for (const t of tabs) {
+    for (const t of LINKS) {
       const a = el("a", { href: t.href });
       if (isActive(t.href, path) || active === t.id) a.setAttribute("aria-current", "page");
-      a.append(icon(t.icon), el("span", { text: t.label }));
+      a.append(icon(t.icon), el("span", { text: t.id === "ask" ? "Summaverick" : t.label }));
       tabbar.append(a);
     }
   }
@@ -205,14 +154,14 @@ export function mountChrome({ active } = {}) {
     footer.className = "site-foot";
     footer.dataset.ready = "1";
     const nav = el("nav", { attrs: { "aria-label": "Footer" } });
-    for (const l of [...LINKS, ...TOOL_LINKS, { href: "/signin", label: "Sign in" }]) {
+    for (const l of [...LINKS, { href: CONTACT_HREF, label: "Build with us" }]) {
       nav.append(el("a", { href: l.href, text: l.label }));
     }
     footer.append(
       nav,
       el("p", {
         class: "copy",
-        text: "Summaverick — ServiceNow products, AI systems, and learning tools.",
+        text: "© SUMMAVERICK LLP. Personal assistants and enterprise agents for mobile, web, and business platforms.",
       })
     );
   }

@@ -97,7 +97,6 @@ successful deployment run. A secret in a different repo is not visible here.
 
 ```bash
 npx wrangler d1 migrations apply summaverick --remote           # T3
-node scripts/seed-quiz.ts --remote                              # T6  -> 1318 questions
 node scripts/seed-content.ts --remote                           # T8  -> 52 posts + 57 interviews (D1 + R2)
 ```
 
@@ -105,7 +104,6 @@ node scripts/seed-content.ts --remote                           # T8  -> 52 post
 > takes a few minutes. Both seeds are idempotent (safe to re-run).
 
 **Checks:**
-- `npx wrangler d1 execute summaverick --remote --command "SELECT category_id, COUNT(*) FROM questions GROUP BY category_id"` → csa 1020, csa_dumps_live 100, csm 66, cis_df 55, grc 21, architecture 17, scripting 15, modules 12, fundamentals 12.
 - `... "SELECT kind, COUNT(*) FROM content GROUP BY kind"` → post 52, interview 57.
 
 ## 4. Deploy + custom domain
@@ -119,9 +117,8 @@ npx wrangler deploy
 
 **Checks (the remote DoDs):**
 - **T1** `curl https://summaverick.com/api/health` → `{"ok":true,"ts":...,"db":"ok"}`; `curl https://summaverick.com/` → HTML.
-- **T7** open `https://summaverick.com/quiz.html` with an empty cache; DevTools Network shows < 60 KB before the first question (measured locally at ~18 KB raw / ~5.8 KB gzip). Answer 3, hard-refresh, confirm it resumes at Q4 with the same option order.
-- **T8** `curl "https://summaverick.com/api/search?q=GlideAjax"` → ≥ 3 ranked hits with snippets; `GET /api/content/<slug>` returns a body from R2.
-- **T9** `curl -sI "https://summaverick.com/api/trending?country=IN" | grep -i summaverick-cache` → `MISS` then `HIT`. (Requires `PERPLEXITY_API_KEY`.) Diff `/api/flights` JSON keys against a saved response from the old worker.
+- **T8** `GET /api/content/<slug>` returns an essay body from R2.
+- **T9** `curl -sI "https://summaverick.com/api/trending?country=IN" | grep -i summaverick-cache` → `MISS` then `HIT`. (Requires `PERPLEXITY_API_KEY`.)
 - **T12** submit a ServiceNow question at `https://summaverick.com/research.html`; confirm the answer + trace (classification, layers hit, candidate counts, per-claim verification).
 
 ## 5. Backups (T4) — do before real writes
@@ -216,12 +213,11 @@ on `wrangler d1 migrations apply` means the token can talk to Cloudflare but
 3. `wrangler.jsonc` `database_id` belongs to a different Cloudflare account.
    Recreate with `pnpm exec wrangler d1 create summaverick --location apac`.
 
-Until D1 works, the Worker still deploys. Quiz/library APIs stay empty (503);
-the product pages and `/advocate` do not need D1. After D1 Edit is granted and
-migrations apply, seed production:
+Until D1 works, the Worker still deploys. The library API stays empty (503);
+the product pages do not need D1. After D1 Edit is granted and migrations
+apply, seed production:
 
 ```
-pnpm run seed:quiz:remote
 pnpm run seed:content:remote
 ```
 

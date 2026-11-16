@@ -15,8 +15,6 @@
     "test:watch": "vitest",
     "migrate:local": "wrangler d1 migrations apply summaverick --local",
     "migrate:remote": "wrangler d1 migrations apply summaverick --remote",
-    "seed:quiz:local": "node scripts/seed-quiz.ts --local",
-    "seed:quiz:remote": "node scripts/seed-quiz.ts --remote",
     "seed:content:local": "node scripts/seed-content.ts --local",
     "seed:content:remote": "node scripts/seed-content.ts --remote",
     "build:library": "node scripts/build-library.mjs",

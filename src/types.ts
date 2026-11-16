@@ -27,8 +27,6 @@ export interface Env {
   PERPLEXITY_WIRE?: string;
   UPSC_PUBLISH_TOKEN?: string;
   SESSION_SECRET?: string;
-  AMADEUS_CLIENT_ID?: string;
-  AMADEUS_CLIENT_SECRET?: string;
   RESEND_API_KEY?: string;
 }
 

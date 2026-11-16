@@ -2,17 +2,15 @@
  * Static library builder.
  *
  * Reads scripts/data/posts.json (52 essays, copied from the portfolio site)
- * and scripts/data/interviews.json (57 tech interviews) and pre-renders the
- * Writing section into public/:
+ * and pre-renders the Writing section into public/:
  *
  *   public/learn.html            essay index with search + topic filter
- *   public/interviews.html       interview index with search + topic filter
- *   public/article/<slug>.html   one full page per essay and interview
+ *   public/article/<slug>.html   one full page per essay
  *   public/sitemap.xml           every public URL, articles included
  *   public/robots.txt            allow-all + sitemap pointer
  *
  * Slugs follow scripts/seed-content.ts exactly (uniqueId minus trailing
- * timestamp for posts, slugified question for interviews, -<id> on clash),
+ * timestamp, -<id> on clash),
  * so the static files and the /api/content rows address the same slugs and
  * the Worker can serve the static file first and fall back to the API.
  *
@@ -68,29 +66,6 @@ function stripTags(html) {
     .replace(/&gt;/g, ">")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-/* Interview questions carry a little inline markup (<strong>, one <pre>) and
-   literal "<" in prose ("<50 records"), so only those tags are recognised —
-   a generic tag pattern would swallow the text after a bare "<". */
-const QUESTION_TAGS = /<\/?(strong|em|b|i|code|pre)>/gi;
-
-function questionText(q) {
-  return String(q ?? "").replace(QUESTION_TAGS, "").replace(/\s+/g, " ").trim();
-}
-
-/** The question as safe HTML: everything escaped, then its own tags restored. */
-function questionHtml(q) {
-  return esc(String(q ?? "").trim()).replace(/&lt;(\/?)(strong|em|b|i|code|pre)&gt;/gi, "<$1$2>");
-}
-
-/* Scenario questions run to a thousand characters; as a page title they fill
-   a phone screen. The headline is the opening sentence, cut on a word. */
-function headline(text, max = 110) {
-  const first = text.split(/(?<=[.?!])\s+(?=[A-Z0-9"'(])/)[0] ?? text;
-  if (first.length <= max) return first;
-  const cut = first.lastIndexOf(" ", max - 1);
-  return (cut > max * 0.6 ? first.slice(0, cut) : first.slice(0, max - 1)).replace(/[\s,;:–—-]+$/, "") + "…";
 }
 
 /** Bodies are our own published prose; still, no scripts or handlers ship. */
@@ -207,7 +182,7 @@ function header(active) {
       <a href="/#platforms">Platforms</a>
       <a href="/#about">About</a>
       <a href="/learn">Guides</a>
-      <a href="/interviews">Interview questions</a>
+      <a href="/ask-summaverick">Meet Summaverick</a>
       <a href="/research">ServiceNow research</a>
       <a href="/#contact">Build with us</a>
     </nav>
@@ -215,7 +190,7 @@ function header(active) {
 }
 
 function footer() {
-  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark">${BRAND_MARK(30, 32)}<span>Summaverick Group</span></div><p>Personal assistants and enterprise agents, built for mobile, web, and business platforms.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#build">What we build</a></li><li><a href="/#examples">Examples</a></li><li><a href="/#how-we-work">How we work</a></li><li><a href="/#about">About</a></li></ul></div><div><p class="footer-head">Resources</p><ul><li><a href="/learn">Guides</a></li><li><a href="/interviews">Interview questions</a></li><li><a href="/research">ServiceNow research</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Build with us</a></li><li><a href="/#about">Company information</a></li><li><a href="/signin">Sign in</a></li></ul></div></div><div class="container footer-legal"><p>© <span data-year>2026</span> SUMMAVERICK LLP. Summaverick Group · LLPIN ADC-1832.</p></div></footer>
+  return `  <footer class="footer"><div class="container footer-cols"><div class="footer-brand"><div class="footer-brand__mark">${BRAND_MARK(30, 32)}<span>Summaverick Group</span></div><p>Personal assistants and enterprise agents, built for mobile, web, and business platforms.</p></div><div><p class="footer-head">Explore</p><ul><li><a href="/#build">What we build</a></li><li><a href="/#examples">Examples</a></li><li><a href="/#how-we-work">How we work</a></li><li><a href="/#about">About</a></li></ul></div><div><p class="footer-head">Resources</p><ul><li><a href="/learn">Guides</a></li><li><a href="/ask-summaverick">Meet Summaverick</a></li><li><a href="/research">ServiceNow research</a></li></ul></div><div><p class="footer-head">Company</p><ul><li><a href="/#contact">Build with us</a></li><li><a href="/#about">Company information</a></li></ul></div></div><div class="container footer-legal"><p>© <span data-year>2026</span> SUMMAVERICK LLP. Summaverick Group · LLPIN ADC-1832.</p></div></footer>
 
   <script type="module" src="/assets/js/boot.js"></script>
 </body>
@@ -259,7 +234,7 @@ const FILTER_SCRIPT = `<script>
 </script>`;
 
 function card(item) {
-  const search = [item.searchText || item.title, item.excerpt, item.categoryLabel, item.meta]
+  const search = [item.title, item.excerpt, item.categoryLabel, item.meta]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
@@ -272,7 +247,7 @@ function card(item) {
       </a>`;
 }
 
-function listingPage({ kicker, title, lead, stats, placeholder, filters, cards, canonical, description, crumb }) {
+function listingPage({ kicker, title, lead, stats, placeholder, filters, cards, canonical, description }) {
   const pills = [`<button class="chip" type="button" data-filter-pill="all" aria-pressed="true">Everything</button>`]
     .concat(filters.map((f) => `<button class="chip" type="button" data-filter-pill="${esc(f.value)}" aria-pressed="false">${esc(f.label)}</button>`))
     .join("\n          ");
@@ -305,7 +280,6 @@ ${stats.map((s) => `          <div><strong>${esc(s.n)}</strong><span>${esc(s.lab
 ${cards.map(card).join("\n")}
       </div>
       <p class="lib-empty" data-empty hidden>Nothing matches that search. Try fewer words, or a different topic.</p>
-      <p class="lib-empty">${esc(crumb)}</p>
     </div>
   </main>
 ${footer()}
@@ -340,7 +314,7 @@ function articlePage({ item, prev, next }) {
   const pager = (rel, other, caption) =>
     other
       ? `<a href="/article/${esc(other.slug)}" rel="${rel}"><small>${caption}</small><strong>${esc(other.title)}</strong></a>`
-      : `<a href="${item.kind === "interview" ? "/interviews" : "/learn"}"><small>${caption}</small><strong>Back to the collection</strong></a>`;
+      : `<a href="/learn"><small>${caption}</small><strong>Back to the collection</strong></a>`;
   return `${head({
     title: `${item.title} — Summaverick`,
     description: item.excerpt,
@@ -351,15 +325,11 @@ ${header("learn")}
     <div class="reading-progress" aria-hidden="true"><span data-progress></span></div>
     <div class="container article-wrap">
       <article class="article-inner">
-        <p><a class="article-back" href="${item.kind === "interview" ? "/interviews" : "/learn"}">‹ ${item.kind === "interview" ? "All interview questions" : "All essays"}</a></p>
+        <p><a class="article-back" href="/learn">‹ All essays</a></p>
         <p class="kicker">${esc(item.kicker)}</p>
         <h1>${esc(item.title)}</h1>
         <p class="article-meta">${esc(item.meta)}</p>
-${item.question ? `        <section class="article-question" aria-label="The question">
-          <p class="article-question__label">The question</p>
-          <div class="article-question__body">${item.question}</div>
-        </section>
-` : ""}        <div class="prose">
+        <div class="prose">
 ${item.body}
         </div>
         <nav class="article-pager" aria-label="More in this collection">
@@ -395,7 +365,6 @@ Sitemap: ${ORIGIN}/sitemap.xml
 // --- main --------------------------------------------------------------------------
 function main() {
   const posts = JSON.parse(readFileSync(join(DATA, "posts.json"), "utf8"));
-  const interviews = JSON.parse(readFileSync(join(DATA, "interviews.json"), "utf8"));
 
   const usedSlugs = new Set();
   const uniqueSlug = (base, id) => {
@@ -409,7 +378,6 @@ function main() {
     const numId = String(p.id);
     const excerpt = p.excerpt || snip(p.content);
     return {
-      kind: "post",
       numId,
       slug: uniqueSlug(postSlug(p), numId),
       title: p.title,
@@ -423,27 +391,6 @@ function main() {
     };
   });
 
-  const qas = interviews.map((iv) => {
-    const numId = String(iv.id);
-    const text = questionText(iv.question);
-    const title = headline(text);
-    return {
-      kind: "interview",
-      numId,
-      slug: uniqueSlug(slugify(iv.question), numId),
-      title,
-      question: title === text ? "" : questionHtml(iv.question),
-      searchText: text,
-      kicker: iv.category || "Interview",
-      category: iv.category || "interview",
-      categoryLabel: iv.category || "Interview",
-      excerpt: snip(iv.answer ?? ""),
-      meta: metaLine([iv.difficulty, iv.company, fmtDate(iv.dateISO)]),
-      body: sanitizeBody(iv.answer ?? ""),
-      dateISO: iv.dateISO || "",
-    };
-  });
-
   mkdirSync(ARTICLE_DIR, { recursive: true });
   const writeArticle = (item, i, arr) => {
     const prev = i > 0 ? arr[i - 1] : null;
@@ -451,14 +398,12 @@ function main() {
     writeFileSync(join(ARTICLE_DIR, `${item.slug}.html`), articlePage({ item, prev, next }), "utf8");
   };
   essays.forEach(writeArticle);
-  qas.forEach(writeArticle);
 
   const topicCount = (arr) => new Set(arr.map((i) => i.category)).size;
   const essayFilters = [...new Set(essays.map((e) => e.category))].map((c) => ({
     value: c,
     label: label(c),
   }));
-  const qaFilters = [...new Set(qas.map((q) => q.category))].map((c) => ({ value: c, label: c }));
 
   writeFileSync(
     join(ROOT, "public", "learn.html"),
@@ -469,47 +414,23 @@ function main() {
       stats: [
         { n: String(essays.length), label: "Essays and guides" },
         { n: String(topicCount(essays)), label: "Topics" },
-        { n: String(qas.length), label: "Interview questions" },
       ],
       placeholder: "Search essays — try “Fluent” or “CSDM”…",
       filters: essayFilters,
       cards: essays,
       canonical: `${ORIGIN}/learn`,
       description: "Essays and guides on ServiceNow, AI systems, architecture, and career — the Summaverick writing library.",
-      crumb: `Looking for interview prep? There are ${qas.length} answered questions next door.`,
     }),
     "utf8"
   );
 
-  writeFileSync(
-    join(ROOT, "public", "interviews.html"),
-    listingPage({
-      kicker: "Writing · Interviews",
-      title: "Interview questions, answered.",
-      lead: "Real ServiceNow interview questions with senior-level answers — what the interviewer is listening for, and the detail that shows you have done the work.",
-      stats: [
-        { n: String(qas.length), label: "Answered questions" },
-        { n: String(topicCount(qas)), label: "Topics" },
-        { n: String(essays.length), label: "Essays and guides" },
-      ],
-      placeholder: "Search questions — try “ACL” or “GlideRecord”…",
-      filters: qaFilters,
-      cards: qas,
-      canonical: `${ORIGIN}/interviews`,
-      description: "ServiceNow interview questions with senior-level answers — the Summaverick interview library.",
-      crumb: `Want the longer version? The essay library holds ${essays.length} pieces behind these answers.`,
-    }),
-    "utf8"
-  );
-
-  const urls = ["/", "/ask-summaverick", "/research", "/learn", "/interviews", "/quiz", "/tools", "/search", "/flights", "/metals", "/upsc", "/advocate", "/signin"]
-    .concat(essays.map((e) => `/article/${e.slug}`))
-    .concat(qas.map((q) => `/article/${q.slug}`));
+  const urls = ["/", "/ask-summaverick", "/research", "/learn"]
+    .concat(essays.map((e) => `/article/${e.slug}`));
   writeFileSync(join(ROOT, "public", "sitemap.xml"), sitemapXml(urls), "utf8");
   writeFileSync(join(ROOT, "public", "robots.txt"), ROBOTS, "utf8");
 
-  console.log(`library: ${essays.length} essays + ${qas.length} interviews -> public/article/*.html (${essays.length + qas.length} pages)`);
-  console.log(`library: learn.html, interviews.html, sitemap.xml (${urls.length} urls), robots.txt`);
+  console.log(`library: ${essays.length} essays -> public/article/*.html`);
+  console.log(`library: learn.html, sitemap.xml (${urls.length} urls), robots.txt`);
 }
 
 function label(category) {

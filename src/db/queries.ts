@@ -6,17 +6,12 @@
  * All time values are epoch-ms integers. Callers pass numbers, get numbers.
  */
 import type {
-  AttemptRow,
   ContentRow,
   CredentialRow,
   LeadRow,
   MagicLinkRow,
-  MetalsDailyRow,
   ProgressRow,
   PublishRunRow,
-  QuestionRow,
-  QuizCategoryRow,
-  ResponseRow,
   SessionRow,
   UpscNoteRow,
   UpscReviewRow,
@@ -240,210 +235,6 @@ export async function consumeMagicLink(
 }
 
 // ---------------------------------------------------------------------------
-// Quiz categories & questions
-// ---------------------------------------------------------------------------
-
-export async function listCategoriesWithCounts(
-  db: D1Database
-): Promise<Array<QuizCategoryRow & { count: number }>> {
-  const r = await db
-    .prepare(
-      `SELECT c.*, COUNT(q.id) AS count
-         FROM quiz_categories c
-         LEFT JOIN questions q
-           ON q.category_id = c.id AND q.retired_at IS NULL
-        GROUP BY c.id
-        ORDER BY c.sort_order, c.name`
-    )
-    .all<QuizCategoryRow & { count: number }>();
-  return r.results ?? [];
-}
-
-export async function getCategory(
-  db: D1Database,
-  id: string
-): Promise<QuizCategoryRow | null> {
-  return db
-    .prepare(`SELECT * FROM quiz_categories WHERE id = ?`)
-    .bind(id)
-    .first<QuizCategoryRow>();
-}
-
-export async function countQuestionsByCategory(
-  db: D1Database
-): Promise<Array<{ category_id: string; n: number }>> {
-  const r = await db
-    .prepare(
-      `SELECT category_id, COUNT(*) AS n FROM questions
-        WHERE retired_at IS NULL GROUP BY category_id ORDER BY category_id`
-    )
-    .all<{ category_id: string; n: number }>();
-  return r.results ?? [];
-}
-
-/**
- * Select candidate question ids for an attempt. Filtering by difficulty/kind is
- * applied in SQL; final count + shuffle is done in the domain layer so option
- * permutations can be persisted.
- */
-export async function selectCandidateQuestions(
-  db: D1Database,
-  categoryId: string,
-  opts: { difficulty?: string; kind?: string }
-): Promise<QuestionRow[]> {
-  let sql = `SELECT * FROM questions WHERE category_id = ? AND retired_at IS NULL`;
-  const binds: unknown[] = [categoryId];
-  if (opts.difficulty) {
-    sql += ` AND difficulty = ?`;
-    binds.push(opts.difficulty);
-  }
-  if (opts.kind) {
-    sql += ` AND kind = ?`;
-    binds.push(opts.kind);
-  }
-  const r = await db
-    .prepare(sql)
-    .bind(...binds)
-    .all<QuestionRow>();
-  return r.results ?? [];
-}
-
-export async function getQuestionsByIds(
-  db: D1Database,
-  ids: string[]
-): Promise<QuestionRow[]> {
-  if (ids.length === 0) return [];
-  const placeholders = ids.map(() => "?").join(",");
-  const r = await db
-    .prepare(`SELECT * FROM questions WHERE id IN (${placeholders})`)
-    .bind(...ids)
-    .all<QuestionRow>();
-  return r.results ?? [];
-}
-
-export async function getQuestionById(
-  db: D1Database,
-  id: string
-): Promise<QuestionRow | null> {
-  return db
-    .prepare(`SELECT * FROM questions WHERE id = ?`)
-    .bind(id)
-    .first<QuestionRow>();
-}
-
-// ---------------------------------------------------------------------------
-// Attempts & responses
-// ---------------------------------------------------------------------------
-
-export async function createAttempt(
-  db: D1Database,
-  a: AttemptRow
-): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO attempts
-         (id, user_id, device_id, category_id, mode, question_ids, started_at, finished_at, score)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      a.id,
-      a.user_id,
-      a.device_id,
-      a.category_id,
-      a.mode,
-      a.question_ids,
-      a.started_at,
-      a.finished_at,
-      a.score
-    )
-    .run();
-}
-
-export async function getAttempt(
-  db: D1Database,
-  id: string
-): Promise<AttemptRow | null> {
-  return db
-    .prepare(`SELECT * FROM attempts WHERE id = ?`)
-    .bind(id)
-    .first<AttemptRow>();
-}
-
-export async function finishAttempt(
-  db: D1Database,
-  id: string,
-  finishedAt: number,
-  score: number
-): Promise<void> {
-  await db
-    .prepare(`UPDATE attempts SET finished_at = ?, score = ? WHERE id = ?`)
-    .bind(finishedAt, score, id)
-    .run();
-}
-
-export async function listAttempts(
-  db: D1Database,
-  who: { userId: string | null; deviceId: string },
-  limit = 50
-): Promise<AttemptRow[]> {
-  // Prefer user scope when authenticated, else device scope.
-  if (who.userId) {
-    const r = await db
-      .prepare(
-        `SELECT * FROM attempts WHERE user_id = ? ORDER BY started_at DESC LIMIT ?`
-      )
-      .bind(who.userId, limit)
-      .all<AttemptRow>();
-    return r.results ?? [];
-  }
-  const r = await db
-    .prepare(
-      `SELECT * FROM attempts WHERE device_id = ? AND user_id IS NULL
-        ORDER BY started_at DESC LIMIT ?`
-    )
-    .bind(who.deviceId, limit)
-    .all<AttemptRow>();
-  return r.results ?? [];
-}
-
-export async function insertResponse(
-  db: D1Database,
-  r: ResponseRow
-): Promise<void> {
-  // Unique on (attempt_id, question_id): first answer wins, re-answers ignored.
-  await db
-    .prepare(
-      `INSERT INTO responses
-         (id, attempt_id, question_id, chosen_json, correct, ms_taken, answered_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(attempt_id, question_id) DO NOTHING`
-    )
-    .bind(
-      r.id,
-      r.attempt_id,
-      r.question_id,
-      r.chosen_json,
-      r.correct,
-      r.ms_taken,
-      r.answered_at
-    )
-    .run();
-}
-
-export async function getResponsesForAttempt(
-  db: D1Database,
-  attemptId: string
-): Promise<ResponseRow[]> {
-  const r = await db
-    .prepare(
-      `SELECT * FROM responses WHERE attempt_id = ? ORDER BY answered_at ASC`
-    )
-    .bind(attemptId)
-    .all<ResponseRow>();
-  return r.results ?? [];
-}
-
-// ---------------------------------------------------------------------------
 // Events (telemetry) — batched writes only
 // ---------------------------------------------------------------------------
 
@@ -516,42 +307,6 @@ export async function getContentBySlugAny(
     .prepare(`SELECT * FROM content WHERE slug = ? LIMIT 1`)
     .bind(slug)
     .first<ContentRow>();
-}
-
-export interface SearchHit {
-  content_id: string;
-  kind: string;
-  slug: string;
-  title: string;
-  snippet: string;
-  rank: number;
-}
-
-export async function searchContent(
-  db: D1Database,
-  query: string,
-  limit = 20
-): Promise<SearchHit[]> {
-  // bm25() lower = better; snippet() highlights matches. Join back to content
-  // for kind/slug and to filter to published items only.
-  const r = await db
-    .prepare(
-      `SELECT f.content_id AS content_id,
-              c.kind AS kind,
-              c.slug AS slug,
-              c.title AS title,
-              snippet(content_fts, 2, '<mark>', '</mark>', ' … ', 12) AS snippet,
-              bm25(content_fts) AS rank
-         FROM content_fts f
-         JOIN content c ON c.id = f.content_id
-        WHERE content_fts MATCH ?
-          AND c.status = 'published'
-        ORDER BY rank
-        LIMIT ?`
-    )
-    .bind(query, limit)
-    .all<SearchHit>();
-  return r.results ?? [];
 }
 
 export async function upsertProgress(
@@ -773,43 +528,6 @@ export async function deleteNotesByIds(
     .bind(...ids)
     .run();
   return r.meta.changes ?? 0;
-}
-
-// ---------------------------------------------------------------------------
-// Metals daily series
-// ---------------------------------------------------------------------------
-
-export async function upsertMetalDaily(
-  db: D1Database,
-  rows: MetalsDailyRow[]
-): Promise<void> {
-  if (rows.length === 0) return;
-  const stmt = db.prepare(
-    `INSERT INTO metals_daily (day, base, quote, rate, fetched_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(day, base, quote) DO UPDATE SET
-       rate = excluded.rate, fetched_at = excluded.fetched_at`
-  );
-  await db.batch(
-    rows.map((r) => stmt.bind(r.day, r.base, r.quote, r.rate, r.fetched_at))
-  );
-}
-
-export async function getMetalSeries(
-  db: D1Database,
-  base: string,
-  quote: string,
-  sinceDay: string
-): Promise<MetalsDailyRow[]> {
-  const r = await db
-    .prepare(
-      `SELECT * FROM metals_daily
-        WHERE base = ? AND quote = ? AND day >= ?
-        ORDER BY day ASC`
-    )
-    .bind(base, quote, sinceDay)
-    .all<MetalsDailyRow>();
-  return r.results ?? [];
 }
 
 // ---------------------------------------------------------------------------

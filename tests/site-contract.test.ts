@@ -33,7 +33,7 @@ describe("Homepage public contract", () => {
   });
 
   it("points every icon slot at the current mark", () => {
-    for (const page of ["public/index.html", "public/research.html", "public/learn.html", "public/quiz.html"]) {
+    for (const page of ["public/index.html", "public/research.html", "public/learn.html", "public/404.html"]) {
       const html = text(page);
       expect(html, `${page} favicon`).toContain('href="/assets/favicon.svg"');
       expect(html, `${page} apple touch icon`).toContain('href="/assets/apple-touch-icon.png"');
@@ -269,7 +269,7 @@ describe("Homepage public contract", () => {
   });
 
   it("lists Research in the primary menu on every page with the company header", () => {
-    for (const page of ["public/index.html", "public/research.html", "public/learn.html", "public/interviews.html"]) {
+    for (const page of ["public/index.html", "public/research.html", "public/learn.html"]) {
       const nav = text(page).match(/<nav class="nav-links"[\s\S]*?<\/nav>/)?.[0] ?? "";
       expect(nav, page).toMatch(/href="\/research"/);
     }
@@ -376,7 +376,7 @@ describe("Homepage public contract", () => {
     );
 
     const articleSample = "public/article/ai-agents-servicenow-beginner.html";
-    for (const page of ["public/index.html", "public/research.html", "public/learn.html", "public/interviews.html", articleSample]) {
+    for (const page of ["public/index.html", "public/research.html", "public/learn.html", articleSample]) {
       const anchors = [...text(page).matchAll(/href="\/?#([^"]+)"/g)].map(
         (m) => m[1] as string
       );
@@ -426,7 +426,7 @@ describe("Homepage public contract", () => {
     expect(chrome).not.toContain("summaverick-uncontained-sum.svg");
   });
 
-  it("ships the full writing library as static pages", () => {
+  it("ships the essay library as static pages and retires the interview pages", () => {
     // Slug scheme mirrors scripts/build-library.mjs (which itself mirrors
     // scripts/seed-content.ts): posts use uniqueId minus trailing timestamp,
     // interviews use the slugified question, -<id> breaks clashes.
@@ -454,21 +454,24 @@ describe("Homepage public contract", () => {
       id: number | string;
       question: string;
     }>;
-    const slugs = [
-      ...posts.map((p) => {
-        const flat = String(p.uniqueId ?? "").replace(/\//g, "-");
-        return unique(flat ? flat.replace(/-\d{10,}$/, "") : slugify(p.title), String(p.id));
-      }),
-      ...qas.map((q) => unique(slugify(q.question), String(q.id))),
-    ];
+    const essaySlugs = posts.map((p) => {
+      const flat = String(p.uniqueId ?? "").replace(/\//g, "-");
+      return unique(flat ? flat.replace(/-\d{10,}$/, "") : slugify(p.title), String(p.id));
+    });
+    const interviewSlugs = qas.map((q) => unique(slugify(q.question), String(q.id)));
 
     expect(posts).toHaveLength(52);
-    expect(qas).toHaveLength(57);
-    for (const slug of slugs) {
+    for (const slug of essaySlugs) {
       expect(existsSync(resolve(root, `public/article/${slug}.html`)), slug).toBe(true);
     }
+    expect(existsSync(resolve(root, "public/interviews.html"))).toBe(false);
+    const retired = text("src/retired-articles.ts");
+    for (const slug of interviewSlugs) {
+      expect(existsSync(resolve(root, `public/article/${slug}.html`)), slug).toBe(false);
+      expect(retired, slug).toContain(`"${slug}"`);
+    }
 
-    // Listing pages carry every title and need no API to render. Titles
+    // The listing page carries every title and needs no API to render. Titles
     // are HTML-escaped in the markup, so compare the escaped form.
     const esc = (s: string) =>
       String(s ?? "")
@@ -477,23 +480,17 @@ describe("Homepage public contract", () => {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
     const learn = text("public/learn.html");
-    const interviews = text("public/interviews.html");
     expect(learn).not.toContain("/api/content");
-    expect(interviews).not.toContain("/api/content");
     for (const p of posts) expect(learn, p.title).toContain(esc(p.title));
-    // Interview questions carry inline <strong> markup; listings show the
-    // words, never the tags.
-    const plain = (s: string) => s.replace(/<\/?(strong|em|b|i|code|pre)>/gi, "").replace(/\s+/g, " ").trim();
-    for (const q of qas) {
-      const opening = plain(q.question).split(/(?<=[.?!])\s+/)[0] ?? "";
-      expect(interviews, q.question).toContain(esc(opening.slice(0, 60)));
-    }
-    expect(interviews).not.toMatch(/&lt;\/?strong&gt;/);
 
     const sitemap = text("public/sitemap.xml");
-    for (const slug of slugs) {
+    for (const slug of essaySlugs) {
       // Slugs with & are XML-escaped in the sitemap, as the builder writes.
       expect(sitemap, slug).toContain(`/article/${slug.replace(/&/g, "&amp;")}`);
+    }
+    for (const slug of interviewSlugs) expect(sitemap, slug).not.toContain(`/article/${slug}<`);
+    for (const page of ["/interviews", "/quiz", "/tools", "/search", "/flights", "/metals", "/upsc", "/advocate", "/signin"]) {
+      expect(sitemap, page).not.toContain(`summaverick.com${page}<`);
     }
     expect(text("public/robots.txt")).toContain("Sitemap: https://summaverick.com/sitemap.xml");
   });
