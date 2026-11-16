@@ -1,16 +1,22 @@
 /**
  * Preflight for wrangler in GitHub Actions. Distinguishes "token missing"
  * from Cloudflare 7403 (token cannot use D1 / wrong account id / Zone ID
- * pasted as Account ID) so the deploy job can still ship the Worker.
+ * pasted as Account ID), and checks that the token may manage the Worker
+ * named in wrangler.jsonc — listing scripts can succeed without that.
  *
- *   node scripts/check-cloudflare-auth.mjs
+ *   node scripts/check-cloudflare-auth.mjs [--require-worker]
  *
  * Reads CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Never prints the token.
- * Exits 1 only when Worker deploy cannot succeed. D1-only failures are warnings.
+ * Writes `d1_ok` and `worker_access` to GITHUB_OUTPUT. Exits 1 when the token
+ * or account id is unusable; missing Worker access is fatal only with
+ * --require-worker (a real `wrangler deploy`). D1-only failures are warnings.
  */
 import { readFileSync, appendFileSync } from "node:fs";
 
 const CF = "https://api.cloudflare.com/client/v4";
+const REQUIRE_WORKER = process.argv.includes("--require-worker");
+/** Cloudflare's answer for a Worker name that does not exist in the account. */
+const WORKER_NOT_FOUND = 10090;
 
 function gh(kind, message) {
   console.log(`::${kind}::${message.replace(/\n/g, "%0A")}`);
@@ -36,6 +42,7 @@ function output(kv) {
 function wranglerIds() {
   const raw = readFileSync("wrangler.jsonc", "utf8");
   return {
+    workerName: raw.match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? null,
     databaseId: raw.match(/"database_id"\s*:\s*"([^"]+)"/)?.[1] ?? null,
   };
 }
@@ -82,12 +89,13 @@ async function verifyToken(token, accountId) {
 async function main() {
   const token = (process.env.CLOUDFLARE_API_TOKEN ?? "").trim();
   const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID ?? "").trim();
-  const { databaseId } = wranglerIds();
+  const { workerName, databaseId } = wranglerIds();
 
   const lines = ["## Cloudflare deploy preflight", ""];
   let fatal = 0;
   let d1Ok = false;
-  let workersOk = false;
+  let workerAccess = false;
+  const workerProblems = [];
 
   if (!token) {
     gh(
@@ -96,7 +104,7 @@ async function main() {
     );
     lines.push("- Token: **missing**");
     summary(lines);
-    output({ d1_ok: "false", workers_ok: "false" });
+    output({ d1_ok: "false", worker_access: "false" });
     process.exit(1);
   }
   console.log(`CLOUDFLARE_API_TOKEN is present (${token.length} chars)`);
@@ -109,7 +117,7 @@ async function main() {
     );
     lines.push("- Account ID: **missing**");
     summary(lines);
-    output({ d1_ok: "false", workers_ok: "false" });
+    output({ d1_ok: "false", worker_access: "false" });
     process.exit(1);
   }
   console.log(`CLOUDFLARE_ACCOUNT_ID is present (${accountId.length} chars)`);
@@ -119,7 +127,7 @@ async function main() {
     gh("error", "CLOUDFLARE_ACCOUNT_ID must be the 32-character hexadecimal Account ID from the Workers overview.");
     lines.push("- Account ID: **invalid format**");
     summary(lines);
-    output({ d1_ok: "false", workers_ok: "false" });
+    output({ d1_ok: "false", worker_access: "false" });
     process.exit(1);
   }
 
@@ -134,7 +142,7 @@ async function main() {
     );
     lines.push(`- Token verify (${verify.type}): **failed** — ${reason}`);
     summary(lines);
-    output({ d1_ok: "false", workers_ok: "false" });
+    output({ d1_ok: "false", worker_access: "false" });
     process.exit(1);
   }
   console.log(`Token verify: ok (${verify.type} token)`);
@@ -152,7 +160,7 @@ async function main() {
       `- Account ID: **this is the Zone ID for ${zoneName}**. Real account id: \`${realAccount}\`.`
     );
     summary(lines);
-    output({ d1_ok: "false", workers_ok: "false" });
+    output({ d1_ok: "false", worker_access: "false" });
     process.exit(1);
   }
 
@@ -191,16 +199,37 @@ async function main() {
 
   const workers = await cf(token, `/accounts/${accountId}/workers/scripts`);
   if (workers.body.success) {
-    workersOk = true;
-    console.log("Workers Scripts: authorized");
-    lines.push("- Workers Scripts: authorized");
+    console.log("Workers Scripts: listable");
+    lines.push("- Workers Scripts: listable");
   } else {
-    gh(
-      "error",
-      `Token cannot list Workers scripts (${errText(workers.body)}). Edit the token and enable Account → Workers Scripts → Edit (the "Edit Cloudflare Workers" template).`
-    );
+    workerProblems.push(`Token cannot list Workers scripts (${errText(workers.body)}).`);
     lines.push(`- Workers Scripts: **unauthorized** — ${errText(workers.body)}`);
-    fatal++;
+  }
+
+  if (workerName && workers.body.success) {
+    const service = await cf(token, `/accounts/${accountId}/workers/services/${encodeURIComponent(workerName)}`);
+    if (service.body.success) {
+      workerAccess = true;
+      console.log(`Worker ${workerName}: token can manage it`);
+      lines.push(`- Worker \`${workerName}\`: token can manage it`);
+    } else if (service.body.errors?.some((e) => e.code === WORKER_NOT_FOUND)) {
+      workerAccess = true;
+      console.log(`Worker ${workerName}: not in this account yet; wrangler deploy will create it`);
+      lines.push(`- Worker \`${workerName}\`: not created yet`);
+    } else {
+      workerProblems.push(`Token cannot manage the ${workerName} Worker (${errText(service.body)}).`);
+      lines.push(`- Worker \`${workerName}\`: **no access** — ${errText(service.body)}`);
+    }
+  }
+
+  if (workerProblems.length > 0) {
+    const fix =
+      "Edit the token (Manage Account → Account API Tokens, or My Profile → API Tokens) and add Account → Workers Scripts → Edit, plus Zone → Workers Routes → Edit for summaverick.com (custom domains cannot use per-Worker roles).";
+    const consequence = REQUIRE_WORKER
+      ? "wrangler deploy cannot succeed."
+      : "Skipping steps that write to the Worker; Cloudflare Workers Builds still deploys it.";
+    gh(REQUIRE_WORKER ? "error" : "warning", `${workerProblems.join(" ")} ${fix} ${consequence}`);
+    if (REQUIRE_WORKER) fatal++;
   }
 
   if (databaseId) {
@@ -209,7 +238,7 @@ async function main() {
     if (!d1List.body.success) {
       gh(
         "warning",
-        `D1 API unauthorized (${errText(d1List.body)}). The "Edit Cloudflare Workers" token template does not include D1. Edit the token at https://dash.cloudflare.com/profile/api-tokens → Account → D1 → Edit. Worker deploy will still run; quiz/library stay empty until D1 works.`
+        `D1 API unauthorized (${errText(d1List.body)}). The "Edit Cloudflare Workers" token template does not include D1. Edit the token at https://dash.cloudflare.com/profile/api-tokens → Account → D1 → Edit. Remote migrations are skipped; the library stays empty until D1 works.`
       );
       lines.push(
         `- D1: **unauthorized** (${errText(d1List.body)}). Add Account → D1 → Edit to the API token.`
@@ -239,7 +268,7 @@ async function main() {
     lines.push("- D1: no database_id in wrangler.jsonc");
   }
 
-  output({ d1_ok: d1Ok ? "true" : "false", workers_ok: workersOk ? "true" : "false" });
+  output({ d1_ok: d1Ok ? "true" : "false", worker_access: workerAccess ? "true" : "false" });
   summary(lines);
 
   if (fatal > 0) {
@@ -247,7 +276,7 @@ async function main() {
   }
   if (!d1Ok) {
     console.log(
-      "D1 is not usable with this token/account. Worker deploy will proceed; remote migrations may be skipped."
+      "D1 is not usable with this token/account. Remote migrations will be skipped."
     );
   }
 }

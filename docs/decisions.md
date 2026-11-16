@@ -316,3 +316,21 @@ changes are required to turn it back on.
 **Scope note.** This is the only change in this pass. The larger handover work
 (cutting out-of-scope content, the five scroll scenes, the live agent demo, the
 eval scoreboard, the consulting surface) is untouched and still ahead.
+
+## 2026-11-16 — Workers Builds deploys; the deploy workflow stops repeating it
+
+**Context.** Every push-triggered `deploy` run since October failed at
+`wrangler deploy` with "No access to the specified service". The production
+token is an account API token. It can use D1 and list Workers scripts, but has
+no permission on the `summaverick` Worker itself. Meanwhile, Cloudflare Workers
+Builds (the Git integration) deployed every merge successfully, so the site was
+live and the red runs were noise. They also hid that `PERPLEXITY_API_KEY` was
+never copied onto the Worker.
+
+**Decision.** On push, `deploy.yml` no longer runs `wrangler deploy`. It keeps
+typecheck, tests, remote D1 migrations, and the Worker secret upload, which runs
+only when the preflight confirms the token can write to the Worker and is
+otherwise a warning. A manual dispatch still does the full deploy and post-deploy
+checks, and fails if the token cannot write to the Worker. The preflight now
+probes `/workers/services/<name>` (the call wrangler makes first) instead of
+trusting the scripts list.

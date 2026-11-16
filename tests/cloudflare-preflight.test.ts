@@ -8,6 +8,8 @@ const accountId = "a".repeat(32);
 const databaseId = "e60dc612-a809-418b-b2af-46eb39b5d11f";
 const active = { success: true, result: { status: "active" } };
 const rejected = { success: false, errors: [{ code: 1000, message: "Invalid API Token" }] };
+const noServiceAccess = { success: false, errors: [{ code: 10000, message: "No access to the specified service." }] };
+const noSuchWorker = { success: false, errors: [{ code: 10090, message: "This Worker does not exist on this account." }] };
 
 async function preflight(options: {
   token?: string;
@@ -15,7 +17,9 @@ async function preflight(options: {
   user?: unknown;
   account?: unknown;
   workersAllowed?: boolean;
+  service?: unknown;
   d1Allowed?: boolean;
+  args?: string[];
 } = {}) {
   const id = options.accountId ?? accountId;
   // All HTTP calls are scripted fixtures; no credentials or network are used.
@@ -26,6 +30,7 @@ async function preflight(options: {
     "/accounts": { success: true, result: [{ id, name: "Fixture account" }] },
     [`/accounts/${id}`]: { success: true, result: { name: "Fixture account" } },
     [`/accounts/${id}/workers/scripts`]: options.workersAllowed === false ? rejected : { success: true, result: [] },
+    [`/accounts/${id}/workers/services/summaverick`]: options.service ?? { success: true, result: { id: "summaverick" } },
     [`/accounts/${id}/d1/database`]: options.d1Allowed === false ? rejected : { success: true, result: [{ uuid: databaseId, name: "summaverick" }] },
   };
   const source = `
@@ -41,7 +46,7 @@ async function preflight(options: {
     await import(${JSON.stringify(script)});
   `;
   return new Promise<{ code: number | null; output: string; paths: string[] }>((resolve, reject) => {
-    const child = spawn(process.execPath, ["--input-type=module", "-e", source], {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", source, "--", ...(options.args ?? [])], {
       cwd: root, timeout: 5000,
       env: {
         ...process.env,
@@ -100,10 +105,32 @@ describe("Cloudflare deployment credential preflight", () => {
     expect(run.paths).toHaveLength(1);
   });
 
-  it("still fails when an active token lacks Workers permissions", async () => {
-    const run = await preflight({ token: "cfat_synthetic_fixture", workersAllowed: false });
+  it("checks access to the Worker named in wrangler.jsonc, not just the script list", async () => {
+    const run = await preflight({ token: "cfat_synthetic_fixture" });
+    expect(run.paths).toContain(`/accounts/${accountId}/workers/services/summaverick`);
+    expect(run.output).toContain("Worker summaverick: token can manage it");
+  });
+
+  it("warns, without failing, when the token cannot write to the Worker", async () => {
+    for (const options of [{ service: noServiceAccess }, { workersAllowed: false }]) {
+      const run = await preflight({ token: "cfat_synthetic_fixture", ...options });
+      expect(run.code).toBe(0);
+      expect(run.output).toContain("::warning::");
+      expect(run.output).toContain("Workers Scripts → Edit");
+    }
+  });
+
+  it("fails a manual deploy when the token cannot write to the Worker", async () => {
+    const run = await preflight({ token: "cfat_synthetic_fixture", service: noServiceAccess, args: ["--require-worker"] });
     expect(run.code).toBe(1);
-    expect(run.output).toContain("Token cannot list Workers scripts");
+    expect(run.output).toContain("::error::Token cannot manage the summaverick Worker (No access to the specified service. [code: 10000])");
+    expect(run.output).toContain("wrangler deploy cannot succeed");
+  });
+
+  it("lets a manual deploy create a Worker that does not exist yet", async () => {
+    const run = await preflight({ token: "cfat_synthetic_fixture", service: noSuchWorker, args: ["--require-worker"] });
+    expect(run.code).toBe(0);
+    expect(run.output).toContain("wrangler deploy will create it");
   });
 
   it("keeps D1-only authorization failures nonblocking", async () => {
