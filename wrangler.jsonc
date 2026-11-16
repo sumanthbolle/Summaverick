@@ -44,7 +44,10 @@
   "vars": {
     "ENVIRONMENT": "production",
     "PUBLIC_ORIGIN": "https://summaverick.com",
-    "MAGIC_LINK_FROM": "login@summaverick.com"
+    "MAGIC_LINK_FROM": "login@summaverick.com",
+    // Answers /ask-summaverick and its trending widgets while the Worker has no
+    // PERPLEXITY_API_KEY. Set to "" to disable.
+    "ASK_FALLBACK_URL": "https://wandering-haze-b394.sumanthbolle312.workers.dev"
   }
   // Account ID is supplied in CI as CLOUDFLARE_ACCOUNT_ID (do not hard-code a
   // token here). Optional: set "account_id" once you copy it from the dashboard.
