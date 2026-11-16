@@ -1,15 +1,23 @@
 name: deploy
 
-# Deploys the Worker to Cloudflare on every push to master, and on demand from
-# the Actions tab. Requires these repo secrets (Settings → Secrets and
-# variables → Actions, or Settings → Environments → production):
-#   - CLOUDFLARE_API_TOKEN   (Workers + D1 + KV + R2 Edit)
-#   - CLOUDFLARE_ACCOUNT_ID  (the Account ID from Workers overview, NOT a Zone ID)
-#   - PERPLEXITY_API_KEY     (required — copied to the summaverick Worker)
-# and wrangler.jsonc must point at real D1/KV/R2 resources with summaverick.com
-# added to that Cloudflare account. Until the secrets are set, the deploy job
-# fails fast at the credential check; the separate ci.yml build/test stays
-# green regardless. See docs/decisions.md.
+# Cloudflare Workers Builds (the Git integration on the summaverick Worker)
+# deploys every push to master. This workflow does the parts it does not:
+#
+#   push to master     typecheck + tests, remote D1 migrations, and copying
+#                      PERPLEXITY_API_KEY onto the Worker when the token may
+#                      write to it. It never runs `wrangler deploy`, so the two
+#                      deployers cannot race.
+#   manual dispatch    all of the above plus `wrangler deploy` and post-deploy
+#                      checks — for redeploying without Workers Builds.
+#
+# Repo secrets (Settings → Secrets and variables → Actions, or Settings →
+# Environments → production):
+#   - CLOUDFLARE_API_TOKEN   Account → D1 → Edit for migrations. Writing to the
+#                            Worker also needs Account → Workers Scripts → Edit
+#                            and Zone → Workers Routes → Edit (summaverick.com).
+#   - CLOUDFLARE_ACCOUNT_ID  the Account ID from Workers overview, NOT a Zone ID
+#   - PERPLEXITY_API_KEY     copied to the summaverick Worker
+# The preflight step names any missing permission. See docs/decisions.md.
 
 on:
   push:
@@ -31,15 +39,16 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN || vars.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
-      # Job-level so the required-secret check can read it.
-      # GitHub masks it in logs; the step below never prints it.
+      # Job-level so step conditions can read it.
+      # GitHub masks it in logs; no step prints it.
       PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+      MANUAL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' }}
       CI: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Check required Perplexity secret
-        if: env.PERPLEXITY_API_KEY == ''
+        if: env.PERPLEXITY_API_KEY == '' && env.MANUAL_DEPLOY == 'true'
         run: |
           echo "::error::PERPLEXITY_API_KEY is missing. Add it in this repository under Settings → Environments → production → Environment secrets, or Settings → Secrets and variables → Actions. Re-run deploy after saving it."
           exit 1
@@ -60,40 +69,41 @@ jobs:
       - name: Unit tests
         run: pnpm run test
 
-      # Explains a D1-only 7403 (token missing Account -> D1 -> Edit, or a Zone
-      # ID pasted as Account ID) instead of a generic wrangler error.
+      # Names the missing permission instead of a generic wrangler error. Missing
+      # Worker access only fails the manual deploy; on push it is a warning.
       - name: Check Cloudflare credentials
-        run: node scripts/check-cloudflare-auth.mjs
+        id: preflight
+        run: node scripts/check-cloudflare-auth.mjs ${{ env.MANUAL_DEPLOY == 'true' && '--require-worker' || '' }}
 
-      # The "Edit Cloudflare Workers" token template does not include D1, so
-      # this often fails with Cloudflare 7403. Do not block the deploy on it;
-      # static pages and non-D1 routes do not need it.
       - name: Apply D1 migrations (remote)
-        id: d1
-        continue-on-error: true
+        if: steps.preflight.outputs.d1_ok == 'true'
         run: pnpm exec wrangler d1 migrations apply summaverick --remote
 
       - name: Deploy Worker
+        if: env.MANUAL_DEPLOY == 'true'
         run: pnpm exec wrangler deploy
 
       # GitHub secrets are not automatically Worker bindings. Copy the value
-      # AFTER deploy (the Worker must exist first), through stdin without logging
-      # it. This updates the active Worker version; later deploys retain it.
+      # through stdin without logging it. This updates the active Worker
+      # version; later deploys (including Workers Builds) retain it.
       - name: Set PERPLEXITY_API_KEY on the Worker
+        if: steps.preflight.outputs.worker_access == 'true' && env.PERPLEXITY_API_KEY != ''
         run: printf '%s' "$PERPLEXITY_API_KEY" | pnpm exec wrangler secret put PERPLEXITY_API_KEY
 
+      - name: Perplexity key not synced
+        if: steps.preflight.outputs.worker_access != 'true'
+        run: |
+          echo "::warning::PERPLEXITY_API_KEY was not copied to the summaverick Worker because the Cloudflare token cannot write to it (see the preflight warning). /ask-summaverick keeps answering through ASK_FALLBACK_URL. Either grant the token Workers Scripts → Edit, or add the secret in the Cloudflare dashboard → Workers & Pages → summaverick → Settings → Variables and Secrets."
+
       - name: Verify Perplexity connection through the deployed assistant
+        if: env.MANUAL_DEPLOY == 'true'
         run: node scripts/verify-perplexity.mjs https://summaverick.com
 
       - name: Smoke checks (Worker + pages)
+        if: env.MANUAL_DEPLOY == 'true'
         run: node scripts/verify.mjs --core https://summaverick.com
 
       - name: Smoke checks (D1 catalog)
-        if: steps.d1.outcome == 'success'
+        if: env.MANUAL_DEPLOY == 'true' && steps.preflight.outputs.d1_ok == 'true'
         continue-on-error: true
         run: node scripts/verify.mjs https://summaverick.com
-
-      - name: D1 migrations note
-        if: steps.d1.outcome == 'failure'
-        run: |
-          echo "::warning::Remote D1 migrations failed (often Cloudflare 7403: API token missing Account -> D1 -> Edit). The Worker was still deployed. Edit the token at https://dash.cloudflare.com/profile/api-tokens, add D1 Edit, then re-run this workflow."

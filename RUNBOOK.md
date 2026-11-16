@@ -180,17 +180,24 @@ Actions secrets/variables also work):
 | `CLOUDFLARE_ACCOUNT_ID` | **Variable** (or secret) | **Account ID** from the Cloudflare dashboard **Workers** overview (right sidebar). Do **not** paste the **Zone ID** from the `summaverick.com` domain overview — both are 32 hex characters and they are not interchangeable. |
 | `PERPLEXITY_API_KEY` | **Secret** | Valid Perplexity API key for the assistant, research and trending. Never store this as a plain variable or commit it. |
 
-Push to `master` (or re-run the failed `deploy` workflow). The workflow runs
-required-key check → typecheck → tests → credential probe → `d1 migrations apply --remote` (non-blocking)
-→ `wrangler deploy` → Worker secret upload → live Perplexity check →
-`scripts/verify.mjs --core https://summaverick.com`.
+**Cloudflare Workers Builds deploys the Worker** on every push to `master`
+(the Git integration on the `summaverick` Worker). The `deploy` workflow does
+not repeat that on push. It runs typecheck → tests → credential probe →
+`d1 migrations apply --remote` (when the token can use D1) → Worker secret
+upload (only when the token can write to the Worker; otherwise a warning).
+
+Running `deploy` by hand from the Actions tab adds `wrangler deploy`, the live
+Perplexity check and `scripts/verify.mjs --core https://summaverick.com`, and
+fails if the token cannot write to the Worker.
 
 The credential probe supports both user-owned and account-owned API tokens.
 New account tokens (`cfat_…`) are verified at
 `/accounts/<account-id>/tokens/verify`; user tokens use `/user/tokens/verify`.
 Legacy account tokens are detected by retrying the account endpoint after
 code 1000 from the user endpoint. A successful response must report an active
-token, and Workers access is then checked independently.
+token. It then requests `/accounts/<account-id>/workers/services/summaverick`,
+the same call `wrangler deploy` makes first. Listing Workers scripts can succeed
+even when the token has no permission on that Worker.
 
 Code 1000 from the **user** verification endpoint alone does not prove an
 account-owned token is invalid. If verification fails at the correct endpoint,
@@ -198,6 +205,23 @@ check expiry, account scope and the saved token value, then replace it if needed
 A failed credential probe occurs before deployment and before Perplexity secret
 upload. See Cloudflare's [account-token documentation](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
 and [current token formats](https://developers.cloudflare.com/fundamentals/api/get-started/token-formats/).
+
+### "No access to the specified service"
+
+```
+A request to the Cloudflare API (/accounts/<id>/workers/services/summaverick) failed.
+  No access to the specified service.
+```
+
+means the Worker exists but the token has no permission on it. The token works
+for D1, so migrations still run. Edit the token and add **Account → Workers
+Scripts → Edit** and **Zone → Workers Routes → Edit** for `summaverick.com`.
+Per-Worker roles are not enough because the Worker uses custom domains. Until
+then, the push workflow stays green with a warning, but `PERPLEXITY_API_KEY` is
+not copied to the Worker. Either fix the token or add the secret directly in
+the Cloudflare dashboard → Workers & Pages → summaverick → Settings → Variables
+and Secrets. `/ask-summaverick` answers through `ASK_FALLBACK_URL` in the
+meantime.
 
 ### Cloudflare error 7403
 
