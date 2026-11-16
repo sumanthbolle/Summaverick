@@ -21,6 +21,7 @@
 import type { Ctx, Env, RouteDef, RouteMaker } from "../types";
 import { json, nowMs } from "../lib/json";
 import { callPerplexity, perplexityConfig, type PerplexityConfig } from "../lib/perplexity";
+import { askFallbackUrl, fetchFallback } from "../lib/fallback";
 import { getMetalSeries, upsertMetalDaily } from "../db/queries";
 import {
   amadeusHost,
@@ -65,6 +66,8 @@ import {
 const TRENDING_TTL_SECONDS = 600; // 10 min for full-success responses
 const TRENDING_PARTIAL_TTL_SECONDS = 60; // 1 min when one or more widgets failed
 const TRENDING_REQUEST_TIMEOUT_MS = 9000;
+/** The page gives up on trending after 12 s; leave the fallback a little less. */
+const TRENDING_FALLBACK_TIMEOUT_MS = 11_000;
 
 const SNOW_TTL_SECONDS = 3600; // 1 hour when the fetch fully succeeds
 const SNOW_PARTIAL_TTL_SECONDS = 300; // 5 min when one or more tracks failed
@@ -220,7 +223,20 @@ async function handleTrending(req: Request, ctx: Ctx): Promise<Response> {
 
   const pplx = perplexityConfig(ctx.env);
   if (!pplx) {
-    return json({ success: false, error: "API key not configured" });
+    const fallbackUrl = askFallbackUrl(ctx.env, "/trending");
+    const data = fallbackUrl
+      ? await fetchFallback<{ success?: unknown; widgets?: unknown }>(
+          country === "GLOBAL" ? fallbackUrl : `${fallbackUrl}?country=${encodeURIComponent(country)}`,
+          {},
+          TRENDING_FALLBACK_TIMEOUT_MS
+        )
+      : null;
+    if (!data || !data.widgets || typeof data.widgets !== "object") {
+      return json({ success: false, error: "API key not configured" });
+    }
+    const responseBody = JSON.stringify(data);
+    putCache(ctx, cacheKey, responseBody, TRENDING_TTL_SECONDS);
+    return rawJson(responseBody, { "X-Summaverick-Cache": "MISS" });
   }
 
   /* Local news would duplicate worldNews when the country is GLOBAL, so we skip

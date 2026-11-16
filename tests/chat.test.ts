@@ -68,6 +68,34 @@ describe("general chat", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("answers through the fallback service when the Worker has no Perplexity key", async () => {
+    delete ctx.env.PERPLEXITY_API_KEY;
+    ctx.env.ASK_FALLBACK_URL = "https://fallback.example.workers.dev";
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: true, result: { type: "rich", ...answer } })));
+    const res = await handler(post({ query: "Explain optics", depth: "deeper", context: [{ role: "user", content: "Hi" }] }), ctx);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, result: {
+      answer: answer.answer, sources: [{ index: 2, source: "example.org" }], relatedQuestions: answer.relatedQuestions,
+    } });
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(url).toBe("https://fallback.example.workers.dev/");
+    expect(JSON.parse(String(init!.body))).toEqual({ query: "Explain optics", depth: "deeper", context: [{ role: "user", content: "Hi" }] });
+  });
+
+  it("does not claim an answer when the fallback service fails", async () => {
+    delete ctx.env.PERPLEXITY_API_KEY;
+    ctx.env.ASK_FALLBACK_URL = "https://fallback.example.workers.dev";
+    for (const upstream of [
+      () => Response.json({ success: false, error: "API key not configured" }),
+      () => new Response("boom", { status: 500 }),
+    ]) {
+      vi.stubGlobal("fetch", vi.fn(async () => upstream()));
+      const res = await handler(post({ query: "Explain optics" }), ctx);
+      expect(res.status).toBe(502);
+      expect(await res.text()).not.toContain("API key");
+    }
+  });
+
   it("does not leak upstream credential errors", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("secret upstream detail", { status: 401 })));
     const res = await handler(post({ query: "Explain optics" }), ctx);

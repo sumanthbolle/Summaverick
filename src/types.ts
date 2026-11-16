@@ -16,6 +16,8 @@ export interface Env {
   ENVIRONMENT: string;
   PUBLIC_ORIGIN: string;
   MAGIC_LINK_FROM: string;
+  /** Answer service used by /ask-summaverick when PERPLEXITY_API_KEY is unset (see lib/fallback.ts). */
+  ASK_FALLBACK_URL?: string;
 
   // Secrets (wrangler secret put)
   PERPLEXITY_API_KEY?: string;
