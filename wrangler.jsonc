@@ -9,7 +9,17 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // Browser navigations to a path with no file get the 404 page straight from
+    // the asset layer, so the Worker must run first wherever it redirects or
+    // renders HTML itself (REDIRECTS and the /article fallback in src/index.ts).
+    "run_worker_first": [
+      "/ask", "/ask/", "/ask.html",
+      "/quiz*", "/tools*", "/flights*", "/metals*", "/upsc*", "/advocate*", "/signin*",
+      "/interviews*", "/search*",
+      "/article/*",
+      "/admin/*"
+    ]
   },
   "routes": [
     { "pattern": "summaverick.com", "custom_domain": true },

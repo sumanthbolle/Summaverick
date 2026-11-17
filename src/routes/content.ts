@@ -1,16 +1,17 @@
 /**
- * Content API (T8): blog posts, interviews, tutorials.
- *   GET /api/content?kind=&category=&page=   feed (metadata only)
- *   GET /api/content/:slug                   single item + body from R2
- *   GET /api/search?q=                       FTS5 bm25 ranked hits + snippets
+ * Content API (T8): published essays. Interview rows may still be in D1 but
+ * are no longer part of the site, so only `post` rows are served.
+ *   GET /api/content?category=&page=   feed (metadata only)
+ *   GET /api/content/:slug             single item + body from R2
  */
 import type { RouteDef, RouteMaker } from "../types";
 import {
   getContentBySlugAny,
   listContent,
-  searchContent,
 } from "../db/queries";
-import { badRequest, json, notFound, ok } from "../lib/json";
+import { json, notFound, ok } from "../lib/json";
+
+const PUBLISHED_KIND = "post";
 
 const PAGE_SIZE = 20;
 
@@ -47,7 +48,6 @@ function meta(c: {
 export function contentRoutes(route: RouteMaker): RouteDef[] {
   return [
     route("GET", "/api/content", async (_req, ctx) => {
-      const kind = ctx.url.searchParams.get("kind") ?? undefined;
       const category = ctx.url.searchParams.get("category") ?? undefined;
       const page = Math.max(
         0,
@@ -55,7 +55,7 @@ export function contentRoutes(route: RouteMaker): RouteDef[] {
       );
       try {
         const rows = await listContent(ctx.env.DB, {
-          kind,
+          kind: PUBLISHED_KIND,
           category,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
@@ -81,28 +81,9 @@ export function contentRoutes(route: RouteMaker): RouteDef[] {
       }
     }),
 
-    route("GET", "/api/search", async (_req, ctx) => {
-      const q = (ctx.url.searchParams.get("q") ?? "").trim();
-      if (q.length < 2) return badRequest("q must be at least 2 characters");
-      // FTS5 MATCH: quote the term to tolerate punctuation, keep it a phrase/prefix.
-      const safe = q.replace(/"/g, '""');
-      const hits = await searchContent(ctx.env.DB, `"${safe}"*`);
-      return ok({
-        query: q,
-        hits: hits.map((h) => ({
-          contentId: h.content_id,
-          kind: h.kind,
-          slug: h.slug,
-          title: h.title,
-          snippet: h.snippet,
-          rank: h.rank,
-        })),
-      });
-    }),
-
     route("GET", "/api/content/:slug", async (_req, ctx) => {
       const row = await getContentBySlugAny(ctx.env.DB, ctx.params.slug!);
-      if (!row) return notFound("no such content");
+      if (!row || row.kind !== PUBLISHED_KIND) return notFound("no such content");
       const obj = await ctx.env.BODIES.get(row.body_r2_key);
       const body = obj ? await obj.text() : null;
       return json({ ok: true, item: { ...meta(row), body } });

@@ -93,15 +93,13 @@ const coreChecks = [
     },
   },
   {
-    name: "advocate demo metadata",
+    name: "retired side projects redirect instead of serving",
     run: async () => {
-      const { status, body } = await getJson("/api/advocate");
-      assert(status === 200, `advocate status ${status}`);
-      assert(body?.ok === true, "advocate ok !== true");
-      assert(
-        Array.isArray(body?.scenarios) && body.scenarios.includes("cooperative"),
-        "advocate scenarios missing"
-      );
+      for (const [path, to] of [["/quiz", "/"], ["/upsc", "/"], ["/flights", "/"], ["/interviews", "/learn"]]) {
+        const res = await fetch(BASE + path, { redirect: "manual" });
+        assert(res.status === 301, `${path} status ${res.status}`);
+        assert(new URL(res.headers.get("location") ?? "", BASE).pathname === to, `${path} redirects to ${res.headers.get("location")}`);
+      }
     },
   },
 ];
@@ -116,20 +114,9 @@ const catalogChecks = [
     },
   },
   {
-    name: "quiz categories = 9, total 1318, no answers leaked",
-    run: async () => {
-      const { status, body } = await getJson("/api/quiz/categories");
-      assert(status === 200, `categories status ${status}`);
-      const cats = body?.categories ?? [];
-      assert(cats.length === 9, `expected 9 categories, got ${cats.length}`);
-      const total = cats.reduce((a, c) => a + (c.count ?? 0), 0);
-      assert(total === 1318, `expected 1318 questions, got ${total}`);
-    },
-  },
-  {
     name: "content feed returns posts",
     run: async () => {
-      const { status, body } = await getJson("/api/content?kind=post");
+      const { status, body } = await getJson("/api/content");
       assert(status === 200, `content status ${status}`);
       assert((body?.items ?? []).length > 0, "no post items");
     },

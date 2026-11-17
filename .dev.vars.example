@@ -15,10 +15,6 @@ UPSC_PUBLISH_TOKEN=""
 # follow-up is answered without the earlier answer's text.
 SESSION_SECRET=""
 
-# Amadeus (SkyFare / flights)
-AMADEUS_CLIENT_ID=""
-AMADEUS_CLIENT_SECRET=""
-
 # Resend (magic-link email delivery)
 RESEND_API_KEY=""
 

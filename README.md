@@ -1,15 +1,12 @@
 # summaverick
 
-Learning + tools platform for **summaverick.com** — quiz, blog, interviews,
-tutorials, UPSC, SkyFare (flights), metals, and ServiceNow research — built as a
-single Cloudflare **Worker with Static Assets**, backed by **D1** (relational),
-**R2** (long bodies / archives), and **KV** (hot config). The public homepage is
-the company site: Store apps, implementations, AI systems, product collaboration,
-and fine-tuning.
+Company site for **summaverick.com** — the Summaverick Group portfolio, the
+Meet Summaverick assistant, ServiceNow research, and the essay library — built
+as a single Cloudflare **Worker with Static Assets**, backed by **D1**
+(relational), **R2** (long bodies / archives), and **KV** (hot config).
 
 One origin serves both the HTML and the API, so there is **no CORS** and no
-`ALLOWED_ORIGIN` secret. Correct quiz answers are graded server-side and never
-shipped to the browser.
+`ALLOWED_ORIGIN` secret.
 
 > This repo is the learning/tools half of the estate. The personal brand stays
 > on `sumanthbolle.com` / `sumanthbolle.github.io`. Slugs here are kept identical
@@ -23,7 +20,7 @@ shipped to the browser.
 | Database | D1 (primary region APAC) |
 | Blobs | R2 (`summaverick-content`) |
 | Hot config | KV (`CONFIG`) |
-| Feed caching | Cache API (trending/servicenow/metals) |
+| Feed caching | Cache API (trending) |
 | Auth | Passkeys (WebAuthn) + email magic-link; admin behind Cloudflare Access |
 | Language | TypeScript |
 | Package manager | pnpm |
@@ -33,14 +30,14 @@ shipped to the browser.
 ```
 src/
   index.ts         router entry (API + assets, session, cron dispatch)
-  routes/          auth, quiz, content, tools, upsc, admin, research
+  routes/          auth, chat, contact, content, tools (trending), upsc, admin, research
   db/
     schema.ts      row types mirroring migrations
     queries.ts     the ONLY place raw SQL lives
   domain/          pure logic ported from the old api/*.js (no IO)
   lib/             session, webauthn, crypto, ratelimit, cors(=same-origin), json, backup, retention, perplexity (the one Perplexity client)
 migrations/        0001_init, 0002_content, 0003_upsc, 0004_metals
-scripts/           seed-quiz, seed-content, export-backup, verify (+ _util)
+scripts/           seed-content, build-library, export-backup, verify (+ _util)
 public/            static assets served by the Worker (full site UI)
 
 tests/             vitest unit tests
@@ -55,8 +52,7 @@ epoch **milliseconds** as INTEGER, everywhere.
 pnpm install
 cp .dev.vars.example .dev.vars        # fill in secrets as needed
 pnpm run migrate:local                # apply migrations to local D1
-pnpm run seed:quiz:local              # 1318 questions -> local D1
-pnpm run seed:content:local           # posts+interviews -> local D1 + R2
+pnpm run seed:content:local           # posts -> local D1 + R2 (interview rows are seeded but not served)
 pnpm run dev                          # wrangler dev (http://localhost:8787)
 pnpm run typecheck && pnpm run test
 ```
@@ -71,18 +67,17 @@ Pretty URLs (also served as `*.html`):
 | Path | Product |
 |---|---|
 | `/` | Company home — Store apps, implementations, AI, product work, fine-tuning |
-| `/quiz` | ServiceNow quiz |
-| `/learn` · `/interviews` · `/article/:slug` | Library |
+| `/learn` · `/article/:slug` | Essay library |
 | `/ask-summaverick` | Meet Summaverick — general-purpose AI chat with citations, follow-ups, three answer depths, local chat history, and trending widgets |
 | `/research` | Summaverick Research for ServiceNow — chat assistant with streamed, cited answers and follow-ups (`/ask` redirects here) |
-| `/flights` | SkyFare |
-| `/metals` | Gold & silver |
-| `/upsc` | Evidence-gated UPSC feed |
-| `/advocate` | Customer-advocacy live demo (Worker SSE) |
-| `/signin` | Passkeys + magic link |
-| `/search` | Full-text search |
 
-The Python advocacy MVP in `summaverick/` still runs offline (`bash scripts/demo.sh`). The live site streams the same loop from `POST/GET /api/advocate/demo`.
+The consumer side projects (`/quiz`, `/tools`, `/flights`, `/metals`, `/upsc`,
+`/advocate`, `/signin`) redirect to `/`, and `/interviews`, `/search` and the old
+interview articles redirect to `/learn` (see `src/index.ts` and
+`src/retired-articles.ts`). The UPSC publishing API, admin review queue and auth
+API remain for the existing publisher workflow.
+
+The Python advocacy MVP in `summaverick/` still runs offline (`bash scripts/demo.sh`).
 
 ## First-time cloud setup
 

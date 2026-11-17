@@ -8,32 +8,22 @@ import { notFound, ok, serverError } from "./lib/json";
 import { resolveSession } from "./lib/session";
 import { pingDb } from "./db/queries";
 import { authRoutes } from "./routes/auth";
-import { quizRoutes } from "./routes/quiz";
 import { contentRoutes } from "./routes/content";
 import { toolsRoutes } from "./routes/tools";
 import { upscRoutes } from "./routes/upsc";
 import { adminRoutes } from "./routes/admin";
 import { researchRoutes } from "./routes/research";
-import { advocateRoutes } from "./routes/advocate";
 import { chatRoutes } from "./routes/chat";
 import { contactRoutes } from "./routes/contact";
 import { runScheduled } from "./scheduled";
+import { RETIRED_ARTICLE_SLUGS } from "./retired-articles";
 
 /** Pretty paths → static HTML files in /public. */
 const PAGES: Record<string, string> = {
   "/": "/index.html",
-  "/quiz": "/quiz.html",
   "/research": "/research.html",
   "/ask-summaverick": "/ask-summaverick.html",
   "/learn": "/learn.html",
-  "/interviews": "/interviews.html",
-  "/search": "/search.html",
-  "/flights": "/flights.html",
-  "/metals": "/metals.html",
-  "/upsc": "/upsc.html",
-  "/advocate": "/advocate.html",
-  "/signin": "/signin.html",
-  "/tools": "/tools.html",
 };
 
 /** Retired paths → their permanent home. The query string is kept, so an old
@@ -41,7 +31,13 @@ const PAGES: Record<string, string> = {
 const REDIRECTS: Record<string, string> = {
   "/ask": "/research",
   "/ask.html": "/research",
+  ...retired(["/interviews", "/search"], "/learn"),
+  ...retired(["/quiz", "/tools", "/flights", "/metals", "/upsc", "/advocate", "/signin"], "/"),
 };
+
+function retired(paths: string[], to: string): Record<string, string> {
+  return Object.fromEntries(paths.flatMap((p) => [[p, to], [`${p}.html`, to]]));
+}
 
 function route(method: string, pattern: string, handler: Handler): RouteDef {
   return { method, pattern, handler };
@@ -51,14 +47,12 @@ function route(method: string, pattern: string, handler: Handler): RouteDef {
 const ROUTES: RouteDef[] = [
   // /api/health is handled directly in fetch() before session resolution.
   ...authRoutes(route),
-  ...quizRoutes(route),
   ...contentRoutes(route),
   ...toolsRoutes(route),
   ...upscRoutes(route),
   ...adminRoutes(route),
   ...researchRoutes(route),
   ...chatRoutes(route),
-  ...advocateRoutes(route),
   ...contactRoutes(route),
 ];
 
@@ -111,19 +105,18 @@ export default {
         return Response.redirect(new URL(moved + url.search, url.origin).toString(), 301);
       }
       if (path.startsWith("/article/") && path.length > "/article/".length) {
-        // The library builder pre-renders every essay and interview to
-        // /article/<slug>.html. Serve the static page when it exists so an
-        // article never depends on the D1/R2 seed; fall back to the
-        // API-driven article.html for anything added after the last build.
+        // The library builder pre-renders every essay to /article/<slug>.html.
+        // Serve the static page when it exists so an article never depends on
+        // the D1/R2 seed; fall back to the API-driven article page for anything
+        // added after the last build. Assets are requested by their pretty
+        // path: asking for "<name>.html" gets a redirect to the pretty URL.
         const slug = path.slice("/article/".length).split("/")[0] ?? "";
-        if (slug && !slug.includes(".")) {
-          const staticRes = await env.ASSETS.fetch(
-            new Request(new URL(`/article/${slug}.html`, url.origin), req)
-          );
-          if (staticRes.status !== 404) return staticRes;
+        if (RETIRED_ARTICLE_SLUGS.has(slug.replace(/\.html$/, ""))) {
+          return Response.redirect(new URL("/learn", url.origin).toString(), 301);
         }
-        const assetUrl = new URL("/article.html", url.origin);
-        return env.ASSETS.fetch(new Request(assetUrl, req));
+        const staticRes = await env.ASSETS.fetch(req);
+        if (staticRes.status !== 404) return staticRes;
+        return env.ASSETS.fetch(new Request(new URL("/article", url.origin), req));
       }
       const asset = PAGES[path];
       if (asset) {

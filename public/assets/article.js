@@ -34,13 +34,13 @@ if (!slug) {
       const it = data.item;
       if (!it) throw new Error("Not found");
       document.title = it.title + " — summaverick";
-      $("kicker").textContent = it.kind === "interview" ? "Interview" : it.category || "Essay";
+      $("kicker").textContent = it.category || "Essay";
       $("title").textContent = it.title;
       $("meta").textContent = [it.difficulty, it.company, it.readTime, fmtDate(it.publishedAt)]
         .filter(Boolean)
         .join(" · ");
-      $("backLink").href = it.kind === "interview" ? "/interviews" : "/learn";
-      $("backLink").textContent = it.kind === "interview" ? "Interviews" : "Library";
+      $("backLink").href = "/learn";
+      $("backLink").textContent = "Library";
       const body = $("body");
       body.textContent = "";
       body.append(...sanitize(it.body || "").childNodes);
