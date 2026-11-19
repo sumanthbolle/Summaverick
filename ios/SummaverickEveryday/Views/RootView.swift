@@ -15,6 +15,8 @@ final class Router {
     var openNote: (id: Int64, startSec: Int?)?
     /// Text to put into the Ask box when the Ask tab opens.
     var askDraft: String?
+    /// A question to ask as soon as Ask shows it (the Ask Summaverick shortcut). AskView takes and clears it.
+    var askNow: String?
     var showSettings = false
     var showDeletedRecording = false
 
@@ -33,6 +35,10 @@ final class Router {
         case .finishNow(let id):
             openNote = (id, nil)
             FinishNowController.shared.start(noteID: id)
+        case .ask(let question):
+            openNote = nil
+            askNow = question
+            tab = .ask
         }
     }
 }

@@ -12,6 +12,7 @@ import Foundation
 import WidgetKit
 #if !SVE_WIDGET_EXTENSION
 import UIKit
+import UserNotifications
 #endif
 
 /// The record control's state, read by the widget extension and written by the app (App Group defaults), and the
@@ -180,6 +181,159 @@ extension ForegroundContinuableIntent {
     }
 }
 
+// MARK: - assistant shortcuts (app target only)
+//
+// What's on today, Last note summary and Add a reminder read or write the person's own reminders and notes without
+// the app's Face ID screen, so each needs the phone unlocked (authenticationPolicy). Ask Summaverick opens the app
+// (the app lock applies as usual): answering loads the AI model, which cannot run inside a background intent.
+// What they say is the pure AssistantIntentLogic (RecordingIntentLogic.swift).
+
+@available(iOS 18.0, *)
+struct WhatsOnTodayIntent: AppIntent {
+    static let title: LocalizedStringResource = "What's on today"
+    static let description = IntentDescription("Tells you the reminders still to come today and your open to-dos.")
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+
+    @available(iOS 27.0, *)
+    static var allowedExecutionTargets: IntentExecutionTargets { .main }
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
+        let now = Date()
+        let reminders: [Reminder]
+        do {
+            reminders = try await CoreEngine.shared.remindersStrict(activeOnly: true)
+        } catch {
+            NSLog("[sve] intent: today could not read reminders: %@", String(describing: error))
+            let line = String(localized: "I couldn't read your reminders. Please try again.")
+            return .result(value: line, dialog: IntentDialog(stringLiteral: line))
+        }
+        let tasks = await CoreEngine.shared.tasks(openOnly: true)
+        // Today's times as Today lists them (ReminderOccurrence), only those still to come.
+        let today = ReminderOccurrence.upcoming(reminders, now: now, calendar: .current, days: 1)
+            .filter { $0.date >= now }
+            .map { AssistantIntentLogic.TodayReminder(time: AssistantFormat.time($0.hhmm), text: $0.reminder.text) }
+        let text = AssistantIntentLogic.todayText(reminders: today, todos: tasks.map(\.text))
+        NSLog("[sve] intent: today: %d reminder times, %d to-dos", today.count, tasks.count)
+        return .result(value: text, dialog: IntentDialog(stringLiteral: text))
+    }
+}
+
+@available(iOS 18.0, *)
+struct LastNoteSummaryIntent: AppIntent {
+    static let title: LocalizedStringResource = "Last note summary"
+    static let description = IntentDescription("Tells you the title and summary of your most recent note.")
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+
+    @available(iOS 27.0, *)
+    static var allowedExecutionTargets: IntentExecutionTargets { .main }
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
+        let list = await CoreEngine.shared.notes()
+        guard let id = AssistantIntentLogic.newestNote(list.map { (id: $0.id, createdAt: $0.created_at) }),
+              let note = await CoreEngine.shared.note(id) else {
+            let line = AssistantIntentLogic.noNotesText()
+            return .result(value: line, dialog: IntentDialog(stringLiteral: line))
+        }
+        // Writing now: as FinishNowView decides it (memories, after the notes, do not count).
+        let pipeline = ProcessingPipeline.shared
+        var writingNow = pipeline.activeNoteID == id && pipeline.isWorking
+        if case .memories = pipeline.stage { writingNow = false }
+        let state = AssistantIntentLogic.noteState(summary: note.short_summary, notes: note.detailed_notes,
+                                                   questions: note.revision_questions, writingNow: writingNow)
+        NSLog("[sve] intent: last note %lld: %@", id, String(describing: state))
+        let text = AssistantIntentLogic.lastNoteText(title: note.title, summary: note.short_summary, state: state)
+        return .result(value: text, dialog: IntentDialog(stringLiteral: text))
+    }
+}
+
+@available(iOS 18.0, *)
+struct AddReminderIntent: AppIntent {
+    static let title: LocalizedStringResource = "Add a reminder"
+    static let description = IntentDescription("Saves a one-time reminder in Summaverick. It rings at the time you choose.")
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+
+    @available(iOS 27.0, *)
+    static var allowedExecutionTargets: IntentExecutionTargets { .main }
+
+    @Parameter(title: "Reminder", requestValueDialog: "What should I remind you about?")
+    var text: String
+
+    @Parameter(title: "Time", requestValueDialog: "When should I remind you?")
+    var time: Date
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Remind me about \(\.$text) at \(\.$time)")
+    }
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let words = AssistantIntentLogic.cleanedReminderText(text) else {
+            throw $text.needsValueError("What should I remind you about?")
+        }
+        guard let at = AssistantIntentLogic.oneTimeReminder(at: time, now: Date(), calendar: .current) else {
+            return .result(dialog: "That time has already passed. Please choose a later time.")
+        }
+        do {
+            // The same core path as a reminder saved from Ask or Today: the person's own row, applied directly.
+            _ = try await CoreEngine.shared.createReminder(
+                NewReminder(text: words, times: [at.time], repeat: "once", startDate: at.day, untilDate: nil,
+                            noteID: nil, startSec: nil, medicineID: nil, sourceText: nil))
+        } catch {
+            NSLog("[sve] intent: add reminder failed: %@", String(describing: error))
+            return .result(dialog: "I couldn't save the reminder. Please try again.")
+        }
+        await ReminderScheduler.shared.resync()   // so it rings, even if the app is not opened
+        NotificationCenter.default.post(name: .assistantChanged, object: nil)
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        let canRing = status == .authorized || status == .provisional || status == .ephemeral
+        let when = time.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute())
+        let line = AssistantIntentLogic.reminderSavedText(text: words, when: when, canRing: canRing)
+        NSLog("[sve] intent: reminder saved for %@ %@ (notifications %@)", at.day, at.time, canRing ? "on" : "off")
+        return .result(dialog: IntentDialog(stringLiteral: line))
+    }
+}
+
+@available(iOS 18.0, *)
+struct AskSummaverickIntent: AppIntent {
+    static let title: LocalizedStringResource = "Ask Summaverick"
+    static let description = IntentDescription("Opens Summaverick and asks your question about your notes.")
+    /// The answer needs the AI model, which only runs with the app in front: the app opens (iOS 18–25).
+    static let openAppWhenRun = true
+
+    @available(iOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground }
+
+    @available(iOS 27.0, *)
+    static var allowedExecutionTargets: IntentExecutionTargets { .main }
+
+    @Parameter(title: "Question", requestValueDialog: "What would you like to ask?")
+    var question: String
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Ask \(\.$question)")
+    }
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { throw $question.needsValueError("What would you like to ask?") }
+        // RootView routes it once the app is unlocked and nothing is open over it; Ask asks it.
+        ReminderScheduler.shared.pendingRoute = .ask(question: q)
+        NSLog("[sve] intent: ask opened the app with a question")
+        return .result()
+    }
+}
+
 /// Siri phrases and the Shortcuts app's actions (also offered for the Action button). App target only.
 @available(iOS 18.0, *)
 struct SummaverickShortcuts: AppShortcutsProvider {
@@ -190,6 +344,24 @@ struct SummaverickShortcuts: AppShortcutsProvider {
         AppShortcut(intent: StopRecordingIntent(),
                     phrases: ["Stop recording in \(.applicationName)"],
                     shortTitle: "Stop recording", systemImageName: "stop.circle")
+        AppShortcut(intent: WhatsOnTodayIntent(),
+                    phrases: ["What's on today in \(.applicationName)",
+                              "What's on my day in \(.applicationName)",
+                              "What do I have today in \(.applicationName)"],
+                    shortTitle: "What's on today", systemImageName: "calendar")
+        AppShortcut(intent: LastNoteSummaryIntent(),
+                    phrases: ["Last note summary in \(.applicationName)",
+                              "Read my last note in \(.applicationName)",
+                              "What was my last note in \(.applicationName)"],
+                    shortTitle: "Last note", systemImageName: "doc.text")
+        AppShortcut(intent: AddReminderIntent(),
+                    phrases: ["Add a reminder in \(.applicationName)",
+                              "Remind me with \(.applicationName)"],
+                    shortTitle: "Add a reminder", systemImageName: "bell.badge")
+        AppShortcut(intent: AskSummaverickIntent(),
+                    phrases: ["Ask \(.applicationName)",
+                              "Ask \(.applicationName) a question"],
+                    shortTitle: "Ask", systemImageName: "bubble.left.and.text.bubble.right")
     }
 }
 #endif

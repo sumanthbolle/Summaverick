@@ -9,6 +9,8 @@ enum ReminderRoute: Equatable {
     case deletedRecording(reminderID: Int64)
     /// "Finish now" on a note's notes notice: the note opens, with the mode over it (FinishNowView).
     case finishNow(noteID: Int64)
+    /// The Ask Summaverick shortcut: Ask opens with the question and asks it (the answer needs the app in front).
+    case ask(question: String)
 }
 
 /// One notification request, computed without touching UNUserNotificationCenter.

@@ -148,8 +148,9 @@ struct AskView: View {
             chats.deleteAll()
             named = [:]
         }
-        .onAppear { takeDraft() }
+        .onAppear { takeDraft(); takeQuestion() }
         .onChange(of: router.askDraft) { _, _ in takeDraft() }
+        .onChange(of: router.askNow) { _, _ in takeQuestion() }
         .onChange(of: recorder.elapsed) { _, t in if listening && t >= Self.maxVoiceSeconds { endVoice() } }
         .onChange(of: presenting) { _, open in PresentationGate.shared.set("ask", open) }
         .onDisappear {
@@ -601,6 +602,15 @@ struct AskView: View {
         guard let d = router.askDraft else { return }
         router.askDraft = nil
         text = d
+    }
+
+    /// The Ask Summaverick shortcut's question: put in the box and asked. When it cannot be asked now (an answer is
+    /// being written, the AI is busy or not ready), it stays in the box with the usual notice.
+    private func takeQuestion() {
+        guard let q = router.askNow else { return }
+        router.askNow = nil
+        text = q
+        send(q)
     }
 
     /// Why a question that needs the model cannot run now; nil when it can.
