@@ -80,12 +80,16 @@ enum LiveActivityLogic {
         return s
     }
 
-    /// nil: the activity stays. Every ready, paused, failed, cancelled and deleted stage ends it.
+    /// nil: the activity stays. Ready, failed, cancelled and deleted end it. A pause (paused, cut off, overnight,
+    /// waiting for the AI, idle after one) keeps it, showing the pause, so the same card moves on to the work and
+    /// "ready" when the note carries on: an ended "Taking a short break" stayed on the lock screen after the note
+    /// finished. An app that is closed meanwhile ends it at the next launch (RecordingActivities.endStale).
     static func ending(for stage: Stage) -> Ending? {
         switch stage {
         case .recording, .transcribing, .loadingModel, .extracting, .sections, .generating, .cooling, .queued: return nil
+        case .paused, .cutOff, .overnight, .waitingForAI, .idle: return nil
         case .ready, .done, .memories: return .after(readyStaysFor)
-        case .paused, .cutOff, .overnight, .waitingForAI, .idle, .failed: return .standard
+        case .failed: return .standard
         case .cancelled, .deleted: return .immediately
         }
     }

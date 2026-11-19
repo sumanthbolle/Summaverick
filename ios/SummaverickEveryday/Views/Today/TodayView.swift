@@ -82,7 +82,7 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     greeting
                     if pipeline.isBusy || isFailed || isPaused {
-                        StatusBanner(stage: pipeline.stage).clipShape(RoundedRectangle(cornerRadius: 10))
+                        StatusBanner(stage: pipeline.stage, line: pipeline.progressLine).clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                     if models.status == .unsupported {
                         if !unsupportedShown { AIUnsupportedCard { unsupportedShown = true } }

@@ -120,7 +120,7 @@ final class ProcessingPipeline {
     }
 
     /// A run of this note ended: an activity still showing its work ends now, unless the note waits its turn (queued,
-    /// shown as such). Every other ending (ready, paused, cut off, failed) has already ended it.
+    /// shown as such). Ready and failed have already ended it; a pause keeps it, showing the pause.
     private func activityRunEnded(_ id: Int64) {
         guard RecordingActivities.shared.isFollowing(noteID: id), !interrupted.contains(id) else { return }
         RecordingActivities.shared.update(noteID: id, .idle, line: lastFailure[id] ?? "", percent: ContinuedWork.shared.percent)
@@ -143,7 +143,10 @@ final class ProcessingPipeline {
     /// Notes the "AI is ready" pass already ran once, so a silent recording is not re-run every launch.
     @ObservationIgnored private var autoTried: Set<Int64> = ProcessingPipeline.killRestore.tried
     @ObservationIgnored private var autoTriedPruned = false
-    private(set) var activeNoteID: Int64?
+    private(set) var activeNoteID: Int64? {
+        // Work on a note goes on: a pause or failure notice of it in the list is no longer true.
+        didSet { if let id = activeNoteID, id != oldValue { NotesNotifier.withdrawStale(noteID: id) } }
+    }
     /// Last failure message per note, so the note screen can show why nothing was generated.
     private(set) var lastFailure: [Int64: String] = [:]
     /// The line a real failure (FailureKind .failed) wrote into lastFailure: the note screen says "couldn't finish"
@@ -429,9 +432,12 @@ final class ProcessingPipeline {
 
     /// The heat ladder at paused (critical heat, or almost no free memory): the note is paused and resumes once the
     /// ladder is below paused (a minute of calm).
-    private func pausedForHeat(_ id: Int64) -> Bool {
-        guard HeatGovernor.shared.level == .paused else { return false }
-        NSLog("[sve] pausing note %lld: heat paused (thermal state %ld)", id, ProcessInfo.processInfo.thermalState.rawValue)
+    /// beforeSystemEnds: hot in the background (HeatLadder.pausesBeforeSystemEnds), paused by the app before iOS ends
+    /// the task as "Failed".
+    private func pausedForHeat(_ id: Int64, beforeSystemEnds: Bool = false) -> Bool {
+        guard beforeSystemEnds || HeatGovernor.shared.level == .paused else { return false }
+        NSLog("[sve] pausing note %lld: heat %@ (thermal state %ld)%@", id, HeatGovernor.shared.level.name,
+              ProcessInfo.processInfo.thermalState.rawValue, beforeSystemEnds ? ", in the background, before iOS ends the task" : "")
         interrupted.insert(id)
         heatPaused.insert(id)
         runPausedForHeat = true
@@ -455,6 +461,9 @@ final class ProcessingPipeline {
         let heat = HeatGovernor.shared
         let level = heat.level
         if level == .paused { return !pausedForHeat(id) }
+        if HeatLadder.pausesBeforeSystemEnds(level, appActive: appIsActive, taskHeld: ContinuedWork.shared.isHeld) {
+            return !pausedForHeat(id, beforeSystemEnds: true)
+        }
         guard HeatLadder.showsCooling(level) else { heatGatePassed = HeatGovernor.now; return true }   // full: no rest
         let start = HeatGovernor.now
         // The step since the last gate let it through: at minimal the rest matches it (HeatLadder.restSeconds).
@@ -471,6 +480,9 @@ final class ProcessingPipeline {
             return l == .paused || HeatGovernor.now - start >= rest(l)
         }
         while !over(), !abort.isSet, !LiveTranscriber.shared.liveRunning {
+            // The rest is work going on (up to 3 minutes): without a sign of life the heartbeat stops, the lock-screen
+            // progress stands still and iOS ends the task as "Failed".
+            ContinuedWork.beat()
             do { try await Task.sleep(nanoseconds: 500_000_000) } catch { break }
         }
         if pausedForHeat(id) { return false }

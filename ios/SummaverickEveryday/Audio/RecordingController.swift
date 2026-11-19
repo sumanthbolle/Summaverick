@@ -281,7 +281,8 @@ enum UnfinishedRecordings {
 }
 
 /// The recordings' Live Activities (iOS 18+, where the widget extension runs): one per recording, from its start
-/// until its note's notes are ready, paused or failed, or it is cancelled or deleted. Progress is sent on every stage
+/// until its note's notes are ready or failed, or it is cancelled or deleted. A pause keeps it, showing the pause, and
+/// the same card moves on when the work goes on (LiveActivityLogic.ending). Progress is sent on every stage
 /// change and otherwise about every 5 s (LiveActivityLogic). Every request goes through one chain per activity, so
 /// they reach the system in order.
 @MainActor

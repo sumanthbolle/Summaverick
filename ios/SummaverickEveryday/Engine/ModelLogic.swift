@@ -152,6 +152,14 @@ enum HeatLadder {
         }
     }
 
+    /// In the background under the continued-processing task, a hot phone (minimal or worse) pauses the note instead of
+    /// resting: iOS ends the task itself on high temperature, and a task iOS ends shows "Failed" on the lock screen,
+    /// whatever the app sets (Apple forums 808756, 815830; the owner saw "task failed" while the note only waited to
+    /// cool, 2026-11-19). Ended by the app first, it shows "Taking a short break", which is true. In front it rests.
+    static func pausesBeforeSystemEnds(_ l: Level, appActive: Bool, taskHeld: Bool) -> Bool {
+        !appActive && taskHeld && l >= .minimal
+    }
+
     /// Longest rest at minimal, and the longest step counted as work (a longer gap was idle time, not work).
     static let minimalRestCap: Double = 180
     static let workCountedUpTo: Double = 600
@@ -726,6 +734,18 @@ enum NotifyRule {
 
     /// One identifier per note, so a later state replaces the earlier one.
     static func identifier(noteID: Int64) -> String { "notes.\(noteID)" }
+
+    /// userInfo key of a notes notice's kind (kind(state:)).
+    static let kindKey = "sve_kind"
+    /// The kind of a notes notice from the state it is posted with: "paused", "saved", "failed" or "progress".
+    static func kind(state: String) -> String {
+        if state.hasPrefix("paused") { return "paused" }
+        if state.hasPrefix("saved") { return "saved" }
+        if state == "failed" { return "failed" }
+        return "progress"
+    }
+    /// A notice that says the work stopped stops being true once the work goes on again.
+    static func withdrawnWhenWorkResumes(kind: String?) -> Bool { kind == "paused" || kind == "saved" || kind == "failed" }
 
     /// "Taking a short break" when work after Stop is cut off; not each time the overnight task is ended during the night (the
     /// note was already paused and finishes in a later run).

@@ -87,6 +87,22 @@ enum NotesNotifier {
              body: String(localized: "\"\(title)\": \(line)"), hold: hold)
     }
 
+    /// The note's work goes on again (a resume, a Try again): a "Taking a short break", "Your recording is saved" or
+    /// "couldn't write" notice still in the list is no longer true, so it goes. Notices of what is ready stay.
+    static func withdrawStale(noteID: Int64) {
+        let c = UNUserNotificationCenter.current()
+        let id = NotifyRule.identifier(noteID: noteID)
+        c.getDeliveredNotifications { delivered in
+            let stale = delivered.filter {
+                $0.request.identifier == id
+                    && NotifyRule.withdrawnWhenWorkResumes(kind: $0.request.content.userInfo[NotifyRule.kindKey] as? String)
+            }
+            guard !stale.isEmpty else { return }
+            c.removeDeliveredNotifications(withIdentifiers: [id])
+            NSLog("[sve] bg: note %lld works again: its pause or failure notice is withdrawn", noteID)
+        }
+    }
+
     /// hold: background time the caller took synchronously, before any await (right after a cut-off the app may be
     /// suspended at any moment); ended once the request is handed over. Without one, it is taken here.
     /// finishNow: the notes are still being written, so the notice carries the "Finish now" action.
@@ -110,7 +126,7 @@ enum NotesNotifier {
         } else {
             content.sound = .default
         }
-        content.userInfo = ["note_id": NSNumber(value: noteID)]
+        content.userInfo = ["note_id": NSNumber(value: noteID), NotifyRule.kindKey: NotifyRule.kind(state: state)]
         if finishNow { content.categoryIdentifier = workingCategory }
         let request = UNNotificationRequest(identifier: NotifyRule.identifier(noteID: noteID), content: content, trigger: nil)
         Task {

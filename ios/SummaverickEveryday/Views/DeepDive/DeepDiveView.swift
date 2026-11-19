@@ -23,7 +23,7 @@ struct DeepDiveView: View {
             VStack(spacing: 0) {
                 BrandHeader()
                 if pipeline.isBusy || isFailed || isPaused {
-                    StatusBanner(stage: pipeline.stage)
+                    StatusBanner(stage: pipeline.stage, line: pipeline.progressLine)
                 }
                 if !models.isReady {
                     AIStatusLine().padding(.horizontal).padding(.vertical, 8)
