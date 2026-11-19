@@ -17,6 +17,7 @@ struct Item {
     bool waiting = false;
     int count = 0;
     bool counted = false;
+    bool question = false;  // an open question shows as open until done
 };
 
 bool has_source(const json &m, int64_t note_id) {
@@ -29,8 +30,10 @@ bool has_source(const json &m, int64_t note_id) {
 bool shown_on_map(const json &m) { return memory_on_map(m); }
 
 json item_json(const Item &it) {
-    return {{"ref", it.ref}, {"label", it.label}, {"importance", it.importance}, {"new", it.is_new},
-            {"low_confidence", it.low}, {"done", it.done}, {"count", it.count}, {"waiting", it.waiting}};
+    json j = {{"ref", it.ref}, {"label", it.label}, {"importance", it.importance}, {"new", it.is_new},
+              {"low_confidence", it.low}, {"done", it.done}, {"count", it.count}, {"waiting", it.waiting}};
+    if (it.question) j["open"] = !it.done;
+    return j;
 }
 
 std::string name_of(const json &list, int64_t id) {
@@ -56,7 +59,7 @@ void add_branch(json &out, const std::string &kind, std::vector<Item> items, int
 }  // namespace
 
 json build_brain_map(const json &memories, const json &people, const json &topics, const json &meaning_pairs,
-                     int64_t note_id, int per_branch) {
+                     int64_t note_id, int per_branch, const json &relations) {
     std::vector<const json *> mems;
     if (memories.is_array())
         for (const auto &m : memories)
@@ -97,7 +100,7 @@ json build_brain_map(const json &memories, const json &people, const json &topic
         const std::string type = m.value("type", std::string());
         if (type == "promise") promises.push_back(mi);
         else if (type == "decision") decisions.push_back(mi);
-        else if (type == "question") questions.push_back(mi);
+        else if (type == "question") { mi.question = true; questions.push_back(mi); }
         if (type == "promise" || type == "decision" || type == "question") shown[id] = mi;
         std::set<int64_t> seen;
         if (m.contains("people") && m["people"].is_array())
@@ -155,6 +158,30 @@ json build_brain_map(const json &memories, const json &people, const json &topic
     };
     share(by_person, "person");
     share(by_topic, "topic");
+
+    // Accepted relations: a person to what they decided or asked, and a person to the person they told or asked.
+    if (relations.is_array()) {
+        std::set<std::string> drawn;
+        for (const auto &r : relations) {
+            if (!r.is_object() || r.value("status", std::string("accepted")) != "accepted") continue;
+            const std::string rel = r.value("relation", std::string()), to_kind = r.value("to_kind", std::string());
+            if (rel != "decided" && rel != "asked" && rel != "told") continue;
+            const json ft = r.contains("from_topic") ? r["from_topic"] : json(nullptr);
+            if (r.value("from_kind", std::string()) != "person" || !ft.is_number_integer()) continue;
+            const std::string a = "t" + std::to_string(ft.get<int64_t>());
+            std::string b;
+            if (to_kind == "decision" || to_kind == "question") {
+                const json mid = r.contains("memory_id") ? r["memory_id"] : json(nullptr);
+                if (mid.is_number_integer()) b = "m" + std::to_string(mid.get<int64_t>());
+            } else if (to_kind == "person") {
+                const json tt = r.contains("to_topic") ? r["to_topic"] : json(nullptr);
+                if (tt.is_number_integer()) b = "t" + std::to_string(tt.get<int64_t>());
+            }
+            if (b.empty() || a == b || !shown_refs.count(a) || !shown_refs.count(b)) continue;
+            if (!drawn.insert(a + ">" + b + ":" + rel).second) continue;
+            links.push_back({{"a", a}, {"b", b}, {"kind", "relation"}, {"label", rel}});
+        }
+    }
 
     // Meaning: cosine >= 0.8, strongest first, at most 2 per memory, both memories eligible.
     struct Pair { int64_t a, b; double cos; };

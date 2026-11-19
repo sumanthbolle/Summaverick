@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <ctime>
+#include <map>
 #include <set>
 
 #include "sve_medcheck.h"   // med_tokens
@@ -596,6 +598,284 @@ int64_t resolve_person(Store &st, int64_t note_id, const std::string &raw, const
         if (st.add_person_question(other, tid, st.person_context(other), context) <= 0) return -1;
     }
     return tid;
+}
+
+// ---------------------------------------------------------------- relations
+
+bool names_me(const std::string &who, const std::string &self_lower) {
+    static const std::set<std::string> kMe = {"i", "me", "myself", "we", "us", "నేను", "నా", "మేము", "మనం", "నన్ను"};
+    const std::string w = ascii_lower(nfc_clean(trim_copy(who)));
+    if (w.empty()) return false;
+    return kMe.count(w) > 0 || (!self_lower.empty() && w == self_lower);
+}
+
+namespace {
+
+std::string self_lower_of(Store &st) {
+    auto p = st.setting_get("profile");
+    json j = p ? json::parse(*p, nullptr, false) : json();
+    return j.is_object() ? ascii_lower(trim_copy(jstr(j, "name"))) : "";
+}
+
+// One side of a relation: a known person, the owner, or nobody named.
+struct Party {
+    std::string kind = "person";  // person | me
+    int64_t topic = 0;
+    std::string name;
+    bool known() const { return kind == "me" || topic > 0; }
+    json topic_j() const { return topic > 0 ? json(topic) : json(nullptr); }
+};
+
+Party party_of(const json &m, const char *role, const std::string &self_lower) {
+    Party p;
+    for (const auto &e : jarr(m, "people"))
+        if (jstr(e, "role") == role && jint(e, "id", 0) > 0) {
+            p.topic = jint(e, "id", 0);
+            p.name = jstr(e, "name");
+            return p;
+        }
+    const std::string said = trim_copy(jstr(m, role));
+    if (names_me(said, self_lower)) { p.kind = "me"; p.name = said; }
+    return p;
+}
+
+std::string relation_key(const json &r) {
+    auto n = [&](const char *k) { return std::to_string(jint(r, k, 0)); };
+    return jstr(r, "relation") + "|" + jstr(r, "from_kind") + "|" + n("from_topic") + "|" + jstr(r, "to_kind") + "|" +
+           n("to_topic") + "|" + n("memory_id");
+}
+
+}  // namespace
+
+json derive_relations(int64_t note_id, const json &memories, const json &note_people, const std::string &self_lower) {
+    json out = json::array();
+    std::set<std::string> seen;
+    auto add = [&](json r) {
+        r["note_id"] = note_id;
+        if (seen.insert(relation_key(r)).second) out.push_back(std::move(r));
+    };
+    // Everyone the recording names: its people first, in the order linked, then the memories' people.
+    std::vector<std::pair<int64_t, std::string>> involved;
+    std::set<int64_t> have;
+    auto involve = [&](int64_t tid, const std::string &name) {
+        if (tid > 0 && have.insert(tid).second) involved.push_back({tid, name});
+    };
+    if (note_people.is_array())
+        for (const auto &p : note_people) involve(jint(p, "id", 0), jstr(p, "name"));
+
+    json lines = json::array();
+    if (memories.is_array())
+        for (const auto &m : memories) {
+            if (!m.is_object() || jstr(m, "review") == "wrong" || jstr(m, "origin") == "medicine") continue;
+            if (m.contains("superseded_by") && !m["superseded_by"].is_null()) continue;
+            for (const auto &e : jarr(m, "people")) involve(jint(e, "id", 0), jstr(e, "name"));
+            const std::string type = jstr(m, "type");
+            const bool done = m.contains("done") && ((m["done"].is_boolean() && m["done"].get<bool>()) ||
+                                                     (m["done"].is_number_integer() && m["done"].get<int64_t>() != 0));
+            if (type != "decision" && !(type == "question" && !done) && type != "promise") continue;
+            lines.push_back(m);
+        }
+    for (const auto &p : involved)
+        add({{"relation", "involved_in"}, {"from_kind", "person"}, {"from_topic", p.first}, {"from_name", p.second},
+             {"to_kind", "note"}, {"to_topic", nullptr}, {"to_text", ""}, {"memory_id", nullptr}, {"quote", nullptr},
+             {"start_sec", nullptr}});
+
+    for (const auto &m : lines) {
+        const std::string type = jstr(m, "type"), text = jstr(m, "text");
+        const int64_t mid = jint(m, "id", 0);
+        json quote = nullptr, start = nullptr;
+        for (const auto &s : jarr(m, "sources"))
+            if (jint(s, "note_id", -1) == note_id) { quote = jstr(s, "quote"); start = jint(s, "start_sec", 0); break; }
+        auto base = [&](const char *relation) {
+            return json{{"relation", relation}, {"memory_id", mid}, {"quote", quote}, {"start_sec", start}};
+        };
+        const Party who = party_of(m, "who", self_lower), to = party_of(m, "to_whom", self_lower);
+        if (type == "decision" || type == "question") {
+            json r = base(type == "decision" ? "decided" : "asked");
+            r["from_kind"] = who.kind; r["from_topic"] = who.topic_j(); r["from_name"] = who.name;
+            r["to_kind"] = type; r["to_topic"] = nullptr; r["to_text"] = text;
+            add(r);
+            for (const auto &t : jarr(m, "topics")) {
+                if (jint(t, "id", 0) <= 0) continue;
+                json a = base("about");
+                a["from_kind"] = type; a["from_topic"] = nullptr; a["from_name"] = text;
+                a["to_kind"] = "topic"; a["to_topic"] = jint(t, "id", 0); a["to_text"] = jstr(t, "name");
+                add(a);
+            }
+        }
+        // Someone said it to someone: asked (a question) or told.
+        if (who.known() && to.known() && !(who.kind == to.kind && who.topic == to.topic)) {
+            json r = base(type == "question" ? "asked" : "told");
+            r["from_kind"] = who.kind; r["from_topic"] = who.topic_j(); r["from_name"] = who.name;
+            r["to_kind"] = to.kind; r["to_topic"] = to.topic_j(); r["to_text"] = to.name;
+            add(r);
+        }
+    }
+    return out;
+}
+
+int refresh_relations(Store &st, int64_t note_id) {
+    const json mems = st.memory_items_with_topics({{"note_id", note_id}});
+    const json rows = derive_relations(note_id, mems, st.note_topics(note_id, "person"), self_lower_of(st));
+    std::set<std::string> decided;
+    for (const auto &r : st.relations({{"note_id", note_id}}))
+        if (jstr(r, "status") != "pending") decided.insert(relation_key(r));
+    if (st.delete_relations(note_id, "pending") < 0) return -1;
+    int n = 0;
+    for (const auto &r : rows) {
+        if (decided.count(relation_key(r))) continue;
+        if (st.add_relation(r) <= 0) return -1;
+        ++n;
+    }
+    return n;
+}
+
+json relation_reviews(Store &st) {
+    json out = json::array();
+    for (const auto &n : st.relation_review_notes()) {
+        const int64_t note_id = jint(n, "note_id", 0);
+        json people = json::array(), decisions = json::array(), questions = json::array(), between = json::array();
+        for (const auto &r : st.relations({{"note_id", note_id}, {"status", "pending"}})) {
+            const std::string rel = jstr(r, "relation"), to_kind = jstr(r, "to_kind");
+            if (rel == "involved_in") {
+                if (jstr(r, "from_kind") == "person" && jint(r, "from_topic", 0) > 0)
+                    people.push_back({{"id", r["id"]}, {"topic_id", r["from_topic"]}, {"name", r["from_name"]}});
+            } else if ((rel == "decided" && to_kind == "decision") || (rel == "asked" && to_kind == "question")) {
+                const std::string fk = jstr(r, "from_kind");
+                json line = {{"id", r["id"]}, {"memory_id", r["memory_id"]}, {"text", r["to_text"]},
+                             {"who", fk == "me" ? "" : jstr(r, "from_name")},
+                             {"who_kind", fk == "me" ? "me" : (jint(r, "from_topic", 0) > 0 ? "person" : "nobody")},
+                             {"quote", r["quote"]}, {"start_sec", r["start_sec"]}};
+                (rel == "decided" ? decisions : questions).push_back(line);
+            } else if (rel == "told" || rel == "asked") {
+                between.push_back({{"id", r["id"]}, {"relation", rel},
+                                   {"from", jstr(r, "from_kind") == "me" ? "me" : jstr(r, "from_name")},
+                                   {"to", to_kind == "me" ? "me" : jstr(r, "to_text")}});
+            }
+        }
+        if (people.empty() && decisions.empty() && questions.empty()) continue;
+        out.push_back({{"note_id", note_id}, {"title", n["title"]}, {"created_at", n["created_at"]}, {"people", people},
+                       {"decisions", decisions}, {"questions", questions}, {"between", between}});
+    }
+    return out;
+}
+
+namespace {
+
+bool accept_body(Store &st, int64_t note_id, const json &edits) {
+    const std::string self = self_lower_of(st);
+    std::map<int64_t, json> edit;
+    if (edits.is_array())
+        for (const auto &e : edits)
+            if (e.is_object() && jint(e, "id", 0) > 0) edit[jint(e, "id", 0)] = e;
+    auto removed = [&](int64_t id) {
+        auto it = edit.find(id);
+        return it != edit.end() && it->second.value("removed", false) == true;
+    };
+    auto field = [&](int64_t id, const char *k, std::string &out) {
+        auto it = edit.find(id);
+        if (it == edit.end() || !it->second.contains(k) || !it->second[k].is_string()) return false;
+        out = trim_copy(it->second[k].get<std::string>());
+        return true;
+    };
+    json rows = st.relations({{"note_id", note_id}, {"status", "pending"}});
+    if (rows.empty()) return false;
+    std::set<int64_t> gone_people, gone_memories;
+
+    // People: removed, or renamed (resolved like a spoken name; this note's links move to them).
+    for (const auto &r : rows) {
+        const int64_t id = jint(r, "id", 0), tid = jint(r, "from_topic", 0);
+        if (jstr(r, "relation") != "involved_in" || tid <= 0) continue;
+        if (removed(id)) { gone_people.insert(tid); continue; }
+        std::string name;
+        if (!field(id, "name", name) || name.empty() || name == jstr(r, "from_name")) continue;
+        int64_t into = 0;
+        if (!names_me(name, self)) {
+            into = resolve_person(st, note_id, name, self, "", {});
+            if (into < 0) return false;
+            if (into == 0) continue;  // not a name (a pronoun): kept as it was
+        }
+        if (!st.move_note_person(note_id, tid, into, jstr(r, "from_name"), name)) return false;
+    }
+
+    // Decision and question lines: removed, who changed, words corrected.
+    rows = st.relations({{"note_id", note_id}, {"status", "pending"}});
+    for (const auto &r : rows) {
+        const int64_t id = jint(r, "id", 0), mid = jint(r, "memory_id", 0);
+        const std::string rel = jstr(r, "relation"), to_kind = jstr(r, "to_kind");
+        if (mid <= 0 || !((rel == "decided" && to_kind == "decision") || (rel == "asked" && to_kind == "question"))) continue;
+        if (removed(id)) { gone_memories.insert(mid); continue; }
+        std::string who;
+        const std::string now_who = jstr(r, "from_kind") == "me" ? "me" : jstr(r, "from_name");
+        if (field(id, "who", who) && who != now_who) {
+            Party p;
+            p.name = who;
+            if (names_me(who, self)) p.kind = "me";
+            else if (!who.empty()) {
+                p.topic = resolve_person(st, note_id, who, self, jstr(r, "to_text"), {});
+                if (p.topic < 0) return false;
+                if (p.topic == 0) p.name = "";
+            }
+            if (!st.set_memory_who(mid, p.topic, p.name)) return false;
+            for (const auto &o : rows)
+                if (jint(o, "memory_id", 0) == mid && (jstr(o, "from_kind") == "person" || jstr(o, "from_kind") == "me") &&
+                    !st.update_relation(jint(o, "id", 0), {{"from_kind", p.kind}, {"from_topic", p.topic_j()}, {"from_name", p.name}}))
+                    return false;
+        }
+        std::string text;
+        if (field(id, "text", text) && !text.empty() && text != jstr(r, "to_text")) {
+            if (!st.update_memory_item(mid, {{"text", text}, {"review", "corrected"}, {"queue", 0}})) return false;
+            for (const auto &o : rows) {
+                if (jint(o, "memory_id", 0) != mid) continue;
+                const std::string orel = jstr(o, "relation");
+                json f = orel == "about" ? json{{"from_name", text}} : json{{"to_text", text}};
+                if ((orel == "about" || jstr(o, "to_kind") == to_kind) && !st.update_relation(jint(o, "id", 0), f)) return false;
+            }
+        }
+    }
+
+    // Everything left is accepted, apart from what the person took out.
+    const int64_t now = (int64_t)time(nullptr);
+    for (const auto &r : st.relations({{"note_id", note_id}, {"status", "pending"}})) {
+        const int64_t id = jint(r, "id", 0);
+        const std::string rel = jstr(r, "relation"), to_kind = jstr(r, "to_kind");
+        const bool line = (rel == "decided" && to_kind == "decision") || (rel == "asked" && to_kind == "question");
+        json f = {{"status", "accepted"}, {"decided_at", now}};
+        if (gone_memories.count(jint(r, "memory_id", 0))) f["status"] = "rejected";
+        else if (gone_people.count(jint(r, "from_topic", 0)) || gone_people.count(jint(r, "to_topic", 0))) {
+            // A decision or question stays, with nobody named for it; the person's other relations go.
+            if (line) { f["from_kind"] = "person"; f["from_topic"] = nullptr; f["from_name"] = ""; }
+            else f["status"] = "rejected";
+        }
+        auto it = edit.find(id);
+        if (it != edit.end()) { f["edited"] = 1; f["edits"] = it->second; }
+        if (!st.update_relation(id, f)) return false;
+    }
+    return true;
+}
+
+}  // namespace
+
+bool accept_relations(Store &st, int64_t note_id, const json &edits) {
+    if (!st.begin()) return false;
+    bool ok = false;
+    try {
+        ok = accept_body(st, note_id, edits);
+    } catch (...) {
+        st.rollback();
+        throw;
+    }
+    if (!ok) { st.rollback(); return false; }
+    return st.commit();
+}
+
+bool dismiss_relations(Store &st, int64_t note_id) {
+    json rows = st.relations({{"note_id", note_id}, {"status", "pending"}});
+    if (rows.empty() || !st.begin()) return false;
+    const int64_t now = (int64_t)time(nullptr);
+    for (const auto &r : rows)
+        if (!st.update_relation(jint(r, "id", 0), {{"status", "rejected"}, {"decided_at", now}})) { st.rollback(); return false; }
+    return st.commit();
 }
 
 }  // namespace sve

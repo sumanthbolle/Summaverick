@@ -60,19 +60,33 @@ struct MapBranch: Decodable, Equatable, Hashable {
     var total: Int { items.count + more }
 }
 
-/// Two shown memories that share a person, a topic or a meaning.
+/// Two shown memories that share a person, a topic or a meaning; or, kind "relation", a relation the person
+/// accepted: a person to what they decided or asked ("t<id>" to "m<id>"), or to the person they told or asked.
 struct MapLink: Decodable, Equatable, Hashable {
     var a: String
     var b: String
-    /// "person" | "topic" | "meaning"
+    /// "person" | "topic" | "meaning" | "relation"
     var kind: String
+    /// Relations only: "decided" | "asked" | "told".
+    var label: String?
 
-    init(a: String, b: String, kind: String) { self.a = a; self.b = b; self.kind = kind }
+    init(a: String, b: String, kind: String, label: String? = nil) { self.a = a; self.b = b; self.kind = kind; self.label = label }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        a = c.lenient(.a) ?? ""; b = c.lenient(.b) ?? ""; kind = c.lenient(.kind) ?? ""
+        a = c.lenient(.a) ?? ""; b = c.lenient(.b) ?? ""; kind = c.lenient(.kind) ?? ""; label = c.lenient(.label)
     }
-    enum CodingKeys: String, CodingKey { case a, b, kind }
+    enum CodingKeys: String, CodingKey { case a, b, kind, label }
+
+    /// The relation's words on the map, in the phone's language; nil for other links.
+    var relationWords: String? {
+        guard kind == "relation" else { return nil }
+        switch label {
+        case "decided": return String(localized: "decided")
+        case "asked": return String(localized: "asked")
+        case "told": return String(localized: "told")
+        default: return nil
+        }
+    }
 }
 
 /// The whole map, or one recording's (center.kind "recording").

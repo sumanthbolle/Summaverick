@@ -224,6 +224,25 @@ END;
 CREATE TRIGGER IF NOT EXISTS pieces_au_embed AFTER UPDATE OF text ON transcript_pieces BEGIN
   DELETE FROM embeddings WHERE kind='piece' AND ref=old.rowid;
 END;
+-- Who decided, asked or told what in one recording (derived from its memories, sve_consolidate.h), for the
+-- person to check: pending until they accept (with their corrections) or dismiss the note's review; only accepted
+-- rows reach the map. Rows go with their note and their memory; a person's topic id moves with merge_topics.
+-- relation: decided (person -> decision), asked (person -> question or person), told (person -> person),
+-- involved_in (person -> note), about (decision/question -> topic). from_kind 'person' with no topic and no name: nobody said.
+CREATE TABLE IF NOT EXISTS relations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    memory_id INTEGER REFERENCES memories(id) ON DELETE CASCADE,
+    relation TEXT NOT NULL CHECK(relation IN ('decided','asked','told','involved_in','about')),
+    from_kind TEXT NOT NULL CHECK(from_kind IN ('person','me','decision','question')),
+    from_topic INTEGER REFERENCES topics(id) ON DELETE SET NULL, from_name TEXT NOT NULL DEFAULT '',
+    to_kind TEXT NOT NULL CHECK(to_kind IN ('person','me','decision','question','topic','note')),
+    to_topic INTEGER REFERENCES topics(id) ON DELETE SET NULL, to_text TEXT NOT NULL DEFAULT '',
+    quote TEXT, start_sec INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted','rejected')),
+    edited INTEGER NOT NULL DEFAULT 0, edits TEXT, created_at INTEGER NOT NULL, decided_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS relations_note ON relations(note_id, status);
 CREATE TRIGGER IF NOT EXISTS memories_ad_embed AFTER DELETE ON memories BEGIN
   DELETE FROM embeddings WHERE kind='memory' AND ref=old.id;
 END;
@@ -772,6 +791,9 @@ bool Store::merge_topics_body(int64_t from, int64_t into) {
            run("INSERT OR IGNORE INTO memory_entities(memory_id,topic_id,role) SELECT memory_id,?,role FROM memory_entities "
                "WHERE topic_id=?", {into, from}) &&
            // Questions about `from` are now about `into`; a pending one about the two of them is answered by this.
+           // Relations name the person by topic: they follow the merge (deleting `from` would only blank them).
+           run("UPDATE relations SET from_topic=? WHERE from_topic=?", {into, from}) &&
+           run("UPDATE relations SET to_topic=? WHERE to_topic=?", {into, from}) &&
            run("UPDATE person_questions SET a_topic=? WHERE a_topic=?", {into, from}) &&
            run("UPDATE person_questions SET b_topic=? WHERE b_topic=?", {into, from}) &&
            run("DELETE FROM person_questions WHERE a_topic=b_topic AND status='pending'", {}) &&
@@ -1386,7 +1408,7 @@ static const char *kAssistantSettings[] = {"profile", "insight.last_date"};
 
 bool Store::wipe_assistant() {
     // Children before parents, so no foreign key blocks a delete; the FTS triggers clean the indexes.
-    static const char *kTables[] = {"embeddings", "person_questions", "memory_entities", "memory_sources", "memory_progress", "memories",
+    static const char *kTables[] = {"relations", "embeddings", "person_questions", "memory_entities", "memory_sources", "memory_progress", "memories",
                                     "suggestions", "reminders", "tasks", "note_topics", "topics", "memory",
                                     "medicines", "decisions", "insights", "section_outputs", "step_attempts", "sections",
                                     "transcript_pieces"};
@@ -1499,6 +1521,106 @@ json Store::search_memory_refs(const std::string &q, int limit) {
                                      " ORDER BY bm25(memories_fts) LIMIT ?").c_str(), {fq, limit}))
         out.push_back(r["id"]);
     return out;
+}
+
+// relations (who decided, asked or told what; sve_consolidate.h) ---------------
+
+static const char *kRelationCols =
+    "r.id AS id, r.note_id AS note_id, r.memory_id AS memory_id, r.relation AS relation, r.from_kind AS from_kind, "
+    "r.from_topic AS from_topic, COALESCE(ft.name, r.from_name) AS from_name, r.to_kind AS to_kind, r.to_topic AS to_topic, "
+    "CASE WHEN r.to_kind IN ('person','topic') THEN COALESCE(tt.name, r.to_text) ELSE r.to_text END AS to_text, "
+    "r.quote AS quote, r.start_sec AS start_sec, r.status AS status, r.edited AS edited, r.edits AS edits, "
+    "r.created_at AS created_at, r.decided_at AS decided_at";
+
+int64_t Store::add_relation(const json &r) {
+    int64_t id = -1;
+    bool ok = run("INSERT INTO relations(note_id,memory_id,relation,from_kind,from_topic,from_name,to_kind,to_topic,to_text,"
+                  "quote,start_sec,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  {jget(r, "note_id"), jget(r, "memory_id"), jget(r, "relation"), jget(r, "from_kind"), jget(r, "from_topic"),
+                   jget(r, "from_name", ""), jget(r, "to_kind"), jget(r, "to_topic"), jget(r, "to_text", ""), jget(r, "quote"),
+                   jget(r, "start_sec"), jget(r, "status", "pending"), now_j()},
+                  &id);
+    return ok ? id : -1;
+}
+
+json Store::relations(const json &filter) {
+    std::string sql = std::string("SELECT ") + kRelationCols +
+                      " FROM relations r LEFT JOIN topics ft ON ft.id=r.from_topic LEFT JOIN topics tt ON tt.id=r.to_topic WHERE 1=1";
+    std::vector<json> binds;
+    json note = jget(filter, "note_id"), status = jget(filter, "status");
+    if (note.is_number_integer()) { sql += " AND r.note_id=?"; binds.push_back(note); }
+    if (status.is_string()) { sql += " AND r.status=?"; binds.push_back(status); }
+    sql += " ORDER BY r.note_id, r.id";
+    json out = query_rows(sql.c_str(), binds);
+    for (auto &r : out) {
+        r["edited"] = r["edited"].is_number_integer() && r["edited"].get<int64_t>() != 0;
+        if (r["edits"].is_string()) {
+            json e = json::parse(r["edits"].get<std::string>(), nullptr, false);
+            r["edits"] = e.is_discarded() ? json(nullptr) : e;
+        }
+    }
+    return out;
+}
+
+json Store::relation_review_notes() {
+    return query_rows("SELECT n.id AS note_id, n.title AS title, n.created_at AS created_at FROM notes n WHERE EXISTS "
+                      "(SELECT 1 FROM relations r WHERE r.note_id=n.id AND r.status='pending') ORDER BY n.created_at DESC, n.id DESC", {});
+}
+
+bool Store::update_relation(int64_t id, const json &fields) {
+    static const char *kEditable[] = {"status", "from_kind", "from_topic", "from_name", "to_kind", "to_topic", "to_text",
+                                      "edited", "edits", "decided_at"};
+    if (!fields.is_object()) return false;
+    std::string sets;
+    std::vector<json> binds;
+    for (const char *col : kEditable) {
+        if (!fields.contains(col)) continue;
+        sets += std::string(sets.empty() ? "" : ",") + col + "=?";
+        binds.push_back(std::strcmp(col, "edits") == 0 && !fields[col].is_null() ? json(fields[col].dump()) : fields[col]);
+    }
+    if (sets.empty()) return false;
+    binds.push_back(id);
+    return run(("UPDATE relations SET " + sets + " WHERE id=?").c_str(), binds) && sqlite3_changes(db_) > 0;
+}
+
+int Store::delete_relations(int64_t note_id, const std::string &status) {
+    if (!run("DELETE FROM relations WHERE note_id=? AND status=?", {note_id, status})) return -1;
+    return sqlite3_changes(db_);
+}
+
+bool Store::move_note_person(int64_t note_id, int64_t from_topic, int64_t into_topic, const std::string &old_name,
+                             const std::string &new_name) {
+    if (from_topic <= 0 || from_topic == into_topic) return true;
+    const char *mine = "(SELECT memory_id FROM memory_sources WHERE note_id=?)";
+    bool ok = true;
+    if (into_topic > 0)
+        ok = run((std::string("INSERT OR IGNORE INTO memory_entities(memory_id,topic_id,role) SELECT memory_id,?,role FROM "
+                              "memory_entities WHERE topic_id=? AND memory_id IN ") + mine).c_str(),
+                 {into_topic, from_topic, note_id}) &&
+             link_topic(note_id, into_topic);
+    ok = ok && run((std::string("DELETE FROM memory_entities WHERE topic_id=? AND memory_id IN ") + mine).c_str(),
+                   {from_topic, note_id}) &&
+         run("DELETE FROM note_topics WHERE note_id=? AND topic_id=?", {note_id, from_topic});
+    // The memories' own words for who and to whom follow the name the person gave.
+    for (const char *col : {"who", "to_whom"})
+        ok = ok && run((std::string("UPDATE memories SET ") + col + "=? WHERE lower(trim(" + col + "))=lower(trim(?)) AND id IN " +
+                        mine).c_str(),
+                       {new_name.empty() ? json(nullptr) : json(new_name), old_name, note_id});
+    const json into = into_topic > 0 ? json(into_topic) : json(nullptr);
+    const char *kind = into_topic > 0 ? "person" : "me";
+    ok = ok && run("UPDATE relations SET from_topic=?, from_kind=?, from_name=? WHERE note_id=? AND from_topic=?",
+                   {into, kind, new_name, note_id, from_topic}) &&
+         run("UPDATE relations SET to_topic=?, to_kind=?, to_text=? WHERE note_id=? AND to_topic=?",
+             {into, kind, new_name, note_id, from_topic});
+    // A name nobody else uses any more (a mishearing) goes; one other recordings still use stays.
+    return ok && run("DELETE FROM topics WHERE id=? AND kind='person' AND NOT EXISTS (SELECT 1 FROM note_topics WHERE topic_id=?) "
+                     "AND NOT EXISTS (SELECT 1 FROM memory_entities WHERE topic_id=?)", {from_topic, from_topic, from_topic});
+}
+
+bool Store::set_memory_who(int64_t memory_id, int64_t topic_id, const std::string &who) {
+    return run("UPDATE memories SET who=? WHERE id=?", {who.empty() ? json(nullptr) : json(who), memory_id}) &&
+           run("DELETE FROM memory_entities WHERE memory_id=? AND role='who'", {memory_id}) &&
+           (topic_id <= 0 || link_memory_entity(memory_id, topic_id, "who"));
 }
 
 std::string json_escape(const std::string &s) {

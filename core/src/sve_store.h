@@ -219,8 +219,25 @@ public:
     json search_memory_refs(const std::string &q, int limit);
     json piece_refs(const std::vector<int64_t> &refs);  // [{ref,note_id,start_sec}] in that order; missing ones left out
 
+    // Relations (who decided, asked or told what in one recording; rules in sve_consolidate.h). Row JSON:
+    // {id,note_id,memory_id,relation,from_kind,from_topic,from_name,to_kind,to_topic,to_text,quote,start_sec,status,
+    // edited,edits,created_at,decided_at}; from_name/to_text of a person or topic are its current name. They go with
+    // their note (delete) and their memory, move with merge_topics, and go with wipe_assistant.
+    int64_t add_relation(const json &row);
+    json relations(const json &filter);  // filter: note_id, status; by note then id
+    json relation_review_notes();        // [{note_id,title,created_at}] of notes with pending rows, newest first
+    bool update_relation(int64_t id, const json &fields);  // whitelisted columns only
+    int delete_relations(int64_t note_id, const std::string &status);  // rows deleted, -1 on error
+    // The person `from_topic` of this note is `into_topic` (0: the person themselves) named new_name: this note's
+    // memory links, note link, relations and memories' who/to_whom words (where they were old_name) move; the old
+    // person goes when nothing else uses them. No transaction of its own.
+    bool move_note_person(int64_t note_id, int64_t from_topic, int64_t into_topic, const std::string &old_name,
+                          const std::string &new_name);
+    // The memory's "who" words and its one who link (topic 0: none). No transaction of its own.
+    bool set_memory_who(int64_t memory_id, int64_t topic_id, const std::string &who);
+
     // Deletes everything the assistant stored, in one transaction: profile and other assistant settings,
-    // medicines, memory, memories (with sources, links, progress), reminders, tasks, topics and links, person questions,
+    // medicines, memory, memories (with sources, links, progress), relations, reminders, tasks, topics and links, person questions,
     // suggestions, decisions, insights, transcript pieces, meaning vectors. Notes and other settings are kept (the host deletes notes). Not nested in begin().
     bool wipe_assistant();
 

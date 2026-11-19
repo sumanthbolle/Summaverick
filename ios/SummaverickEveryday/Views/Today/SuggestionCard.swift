@@ -881,3 +881,211 @@ extension View {
         listRowBackground(on ? Theme.cautionFill : Theme.formRow)
     }
 }
+
+// MARK: - relations review card
+
+/// One recording's people, decisions (with who made them) and open questions (with who asked), for the person to
+/// correct. Each line can be taken out or edited; Accept sends the corrections and only then does any of it reach
+/// the map. Not now puts the card away. Tells the app when done (assistantChanged), which reloads Today.
+struct RelationsReviewCard: View {
+    let review: RelationReview
+
+    @Environment(Router.self) private var router
+    @State private var names: [Int64: String] = [:]
+    @State private var texts: [Int64: String] = [:]
+    @State private var whos: [Int64: String] = [:]
+    @State private var removed: Set<Int64> = []
+    @State private var editing = false
+    @State private var busy = false
+    @State private var failed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "point.3.connected.trianglepath.dotted").font(.title3).foregroundStyle(Theme.accent)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                Text("Who's involved, what was decided, what's still open — check this")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if busy { ProgressView() }
+            }
+            Button { router.openNote = (review.noteID, nil) } label: {
+                Text(verbatim: "▶ \(review.title.isEmpty ? String(localized: "Recording") : review.title)")
+                    .font(.subheadline.weight(.medium)).multilineTextAlignment(.leading)
+                    .frame(minHeight: 44, alignment: .leading).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.accent)
+            .accessibilityLabel(Text("Open the recording"))
+
+            if !review.people.isEmpty {
+                group("People") { ForEach(review.people) { personRow($0) } }
+            }
+            if !review.decisions.isEmpty {
+                group("Decisions") { ForEach(review.decisions) { lineRow($0, question: false) } }
+            }
+            if !review.questions.isEmpty {
+                group("Open questions") { ForEach(review.questions) { lineRow($0, question: true) } }
+            }
+            Text("Nothing goes on your map until you accept.").font(.footnote).foregroundStyle(Theme.secondary)
+            if failed {
+                Label("I couldn't save this. Please try again.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.warning)
+            }
+            HStack(spacing: 10) {
+                Button { accept() } label: {
+                    Label("Accept", systemImage: "checkmark").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.pillPositiveFilled)
+                Button { withAnimation { editing.toggle() } } label: {
+                    Label(editing ? "Done" : "Edit", systemImage: editing ? "checkmark.circle" : "pencil")
+                        .font(.headline).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.pill)
+                Button { dismiss() } label: {
+                    Text("Not now").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.pill)
+            }
+            .labelStyle(.titleAndIcon)
+            .disabled(busy)
+        }
+        .padding(16)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func group<Content: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    private func personRow(_ p: RelationPerson) -> some View {
+        let out = removed.contains(p.id)
+        return HStack(spacing: 8) {
+            if editing && !out {
+                TextField("Name", text: bind(.name, p.id, p.name)).textFieldStyle(.roundedBorder)
+            } else {
+                Text(verbatim: names[p.id] ?? p.name).font(.body).strikethrough(out)
+                    .foregroundStyle(out ? Theme.secondary : Theme.text)
+            }
+            Spacer(minLength: 0)
+            removeButton(p.id)
+        }
+    }
+
+    private func lineRow(_ l: RelationLine, question: Bool) -> some View {
+        let out = removed.contains(l.id)
+        return HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                if editing && !out {
+                    TextField(question ? LocalizedStringKey("The question") : LocalizedStringKey("What was decided"), text: bind(.text, l.id, l.text), axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Who", text: bind(.who, l.id, initialWho(l))).textFieldStyle(.roundedBorder)
+                } else {
+                    Text(verbatim: texts[l.id] ?? l.text).font(.body).strikethrough(out)
+                        .foregroundStyle(out ? Theme.secondary : Theme.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(whoLine(l, question: question)).font(.footnote).foregroundStyle(Theme.secondary)
+                }
+            }
+            Spacer(minLength: 0)
+            removeButton(l.id)
+        }
+    }
+
+    private func removeButton(_ id: Int64) -> some View {
+        let out = removed.contains(id)
+        return Button {
+            withAnimation { if out { removed.remove(id) } else { removed.insert(id) } }
+        } label: {
+            Image(systemName: out ? "arrow.uturn.backward" : "xmark.circle").font(.title3).frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.secondary)
+        .accessibilityLabel(Text(out ? "Undo" : "Remove"))
+        .disabled(busy)
+    }
+
+    /// What the Who field starts with: the name, "me" for the person themselves, empty for nobody.
+    private func initialWho(_ l: RelationLine) -> String {
+        switch l.whoKind {
+        case "me": return String(localized: "me")
+        case "person": return l.who
+        default: return ""
+        }
+    }
+
+    private func whoLine(_ l: RelationLine, question: Bool) -> String {
+        let typed = whos[l.id].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let who = typed ?? (l.whoKind == "person" ? l.who : "")
+        let me = typed.map { $0.lowercased() == String(localized: "me").lowercased() } ?? (l.whoKind == "me")
+        if me { return question ? String(localized: "You asked") : String(localized: "You decided") }
+        if who.isEmpty { return String(localized: "Nobody named") }
+        return question ? String(localized: "Asked by \(who)") : String(localized: "Decided by \(who)")
+    }
+
+    private enum Field { case name, text, who }
+
+    /// A text field's value: what the person typed, else what the core proposed.
+    private func bind(_ field: Field, _ id: Int64, _ initial: String) -> Binding<String> {
+        Binding(get: {
+            switch field {
+            case .name: return names[id] ?? initial
+            case .text: return texts[id] ?? initial
+            case .who: return whos[id] ?? initial
+            }
+        }, set: { v in
+            switch field {
+            case .name: names[id] = v
+            case .text: texts[id] = v
+            case .who: whos[id] = v
+            }
+        })
+    }
+
+    private func trimmed(_ s: String?) -> String? { s?.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Only what changed: removed lines, new names, new words, a new who.
+    private var edits: [RelationEdit] {
+        var out: [RelationEdit] = []
+        for p in review.people {
+            if removed.contains(p.id) { out.append(RelationEdit(id: p.id, removed: true)); continue }
+            if let n = trimmed(names[p.id]), !n.isEmpty, n != p.name { out.append(RelationEdit(id: p.id, name: n)) }
+        }
+        for l in review.decisions + review.questions {
+            if removed.contains(l.id) { out.append(RelationEdit(id: l.id, removed: true)); continue }
+            var e = RelationEdit(id: l.id)
+            if let t = trimmed(texts[l.id]), !t.isEmpty, t != l.text { e.text = t }
+            if let w = trimmed(whos[l.id]), w != initialWho(l) {
+                e.who = w.lowercased() == String(localized: "me").lowercased() ? "me" : w
+            }
+            if e.text != nil || e.who != nil { out.append(e) }
+        }
+        return out
+    }
+
+    private func accept() {
+        guard !busy else { return }
+        busy = true; failed = false
+        let sent = edits
+        Task {
+            let ok = await CoreEngine.shared.acceptRelations(noteID: review.noteID, edits: sent)
+            busy = false
+            if ok { NotificationCenter.default.post(name: .assistantChanged, object: nil) } else { failed = true }
+        }
+    }
+
+    private func dismiss() {
+        guard !busy else { return }
+        busy = true; failed = false
+        Task {
+            let ok = await CoreEngine.shared.dismissRelations(noteID: review.noteID)
+            busy = false
+            if ok { NotificationCenter.default.post(name: .assistantChanged, object: nil) } else { failed = true }
+        }
+    }
+}

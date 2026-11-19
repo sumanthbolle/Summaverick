@@ -269,3 +269,77 @@ struct MemoryFilter: Encodable, Equatable {
         case noteID = "note_id", includeWrong = "include_wrong", includeSuperseded = "include_superseded"
     }
 }
+
+// MARK: - relations review (sve_relation_reviews_json)
+
+/// A person a recording names, as one line of its relations review.
+struct RelationPerson: Decodable, Equatable, Hashable, Identifiable {
+    /// The relation id (what an edit names).
+    var id: Int64
+    var topicID: Int64
+    var name: String
+
+    init(id: Int64, topicID: Int64 = 0, name: String) { self.id = id; self.topicID = topicID; self.name = name }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id) ?? 0; topicID = c.lenient(.topicID) ?? 0; name = c.lenient(.name) ?? ""
+    }
+    enum CodingKeys: String, CodingKey { case id, name, topicID = "topic_id" }
+}
+
+/// A decision and who made it, or an open question and who asked it.
+struct RelationLine: Decodable, Equatable, Hashable, Identifiable {
+    var id: Int64
+    var memoryID: Int64
+    var text: String
+    /// The person's name; "" when it was the phone's owner ("me") or nobody was named.
+    var who: String
+    /// "person" | "me" | "nobody"
+    var whoKind: String
+    var quote: String?
+    var startSec: Int?
+
+    init(id: Int64, memoryID: Int64 = 0, text: String, who: String = "", whoKind: String = "nobody",
+         quote: String? = nil, startSec: Int? = nil) {
+        self.id = id; self.memoryID = memoryID; self.text = text; self.who = who; self.whoKind = whoKind
+        self.quote = quote; self.startSec = startSec
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id) ?? 0; memoryID = c.lenient(.memoryID) ?? 0; text = c.lenient(.text) ?? ""
+        who = c.lenient(.who) ?? ""; whoKind = c.lenient(.whoKind) ?? "nobody"
+        quote = c.lenient(.quote); startSec = c.lenient(.startSec)
+    }
+    enum CodingKeys: String, CodingKey {
+        case id, text, who, quote
+        case memoryID = "memory_id", whoKind = "who_kind", startSec = "start_sec"
+    }
+}
+
+/// One recording's "who's involved, what was decided, what's still open", waiting for the person to check.
+struct RelationReview: Decodable, Equatable, Identifiable {
+    var noteID: Int64
+    var title: String
+    var people: [RelationPerson]
+    var decisions: [RelationLine]
+    var questions: [RelationLine]
+    var id: Int64 { noteID }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        noteID = c.lenient(.noteID) ?? 0; title = c.lenient(.title) ?? ""
+        people = c.lenient(.people) ?? []; decisions = c.lenient(.decisions) ?? []; questions = c.lenient(.questions) ?? []
+    }
+    enum CodingKeys: String, CodingKey { case title, people, decisions, questions, noteID = "note_id" }
+}
+
+/// The person's correction to one line, as sve_relations_accept takes it. Only what changed is sent.
+struct RelationEdit: Encodable, Equatable {
+    var id: Int64
+    var removed: Bool? = nil
+    /// A person line: the right name.
+    var name: String? = nil
+    /// A decision or question line: the right words, and who ("me" for the person themselves, "" for nobody).
+    var text: String? = nil
+    var who: String? = nil
+}

@@ -82,4 +82,36 @@ std::vector<std::pair<std::string, json>> person_checks(const std::vector<std::s
 int64_t resolve_person(Store &st, int64_t note_id, const std::string &name, const std::string &self_lower,
                        const std::string &context, const PersonAnswers &answers);
 
+// ---------------------------------------------------------------- relations
+// Who decided, asked or told what in one recording, derived in code from its memories (no model call): person ->
+// decided -> decision, person -> asked -> open question, person -> asked/told -> person (to_whom), person ->
+// involved_in -> the note, decision/question -> about -> topic. "who" comes from the spoken names only; "I", "we"
+// or the person's own name is "me" (from_kind "me"); a decision nobody is named for has an empty person.
+
+// True for words that mean the phone's owner: I, me, myself, we, నేను, మేము, మనం, or their own name.
+bool names_me(const std::string &who, const std::string &self_lower);
+
+// Relation rows (Store::add_relation shape, without id/status) for note_id. memories: Store::memory_items_with_topics
+// of the note; note_people: Store::note_topics(note_id, "person"). Wrong, superseded and medicine memories, and
+// questions marked done, give none.
+json derive_relations(int64_t note_id, const json &memories, const json &note_people, const std::string &self_lower);
+
+// The note's pending review made again from its memories now: pending rows are replaced by the derived ones, leaving
+// out any the person already accepted or rejected. Number of pending rows, -1 on error. No transaction of its own.
+int refresh_relations(Store &st, int64_t note_id);
+
+// One review per note with pending rows, newest note first: [{"note_id","title","created_at",
+// "people":[{"id","topic_id","name"}], "decisions":[{"id","memory_id","text","who","who_kind":"person"|"me"|"nobody",
+// "quote","start_sec"}], "questions":[same], "between":[{"id","relation","from","to"}]}]; ids are relation ids.
+json relation_reviews(Store &st);
+
+// Accepts the note's pending review with the person's corrections: edits [{"id", "removed":bool, "name" (a person
+// line), "text","who" (a decision or question line)}]. A renamed person is resolved like a spoken name
+// (resolve_person) and this note's links move to them; an edited text corrects the memory. A removed person is
+// dropped from the note's relations (a decision of theirs stays, with nobody named); a removed line drops its
+// relations. Everything else becomes accepted. False when the note has no pending review or on error (nothing changed).
+bool accept_relations(Store &st, int64_t note_id, const json &edits);
+// Not now: the note's pending rows are rejected (they are not offered again). False when there were none.
+bool dismiss_relations(Store &st, int64_t note_id);
+
 }  // namespace sve

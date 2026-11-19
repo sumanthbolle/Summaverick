@@ -56,6 +56,8 @@ struct TodayView: View {
     @State private var loaded = false
     /// Pending suggestions, without those shown inside a memory's card in "To check".
     @State private var suggestions: [Suggestion] = []
+    /// Recordings whose people, decisions and open questions wait to be checked before they reach the map.
+    @State private var relationReviews: [RelationReview] = []
     /// Memories waiting for the person to check, newest recording first.
     @State private var queue: [ReviewItem] = []
     @State private var showAllToCheck = false
@@ -187,7 +189,7 @@ struct TodayView: View {
         let todayYMD = AssistantFormat.ymd(now)
         let rem = occurrences.filter { cal.isDateInToday($0.day) && $0.date >= now }.count
         let due = tasks.filter { t in t.dueDate.map { $0 <= todayYMD } ?? false }.count
-        return suggestions.count + queue.count + rem + due
+        return suggestions.count + relationReviews.count + queue.count + rem + due
     }
 
     private var occurrences: [ReminderOccurrence] {
@@ -218,8 +220,8 @@ struct TodayView: View {
 
     private var waitingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Waiting for you", count: suggestions.count)
-            if suggestions.isEmpty {
+            sectionTitle("Waiting for you", count: suggestions.count + relationReviews.count)
+            if suggestions.isEmpty && relationReviews.isEmpty {
                 emptyLine("All clear. When I spot something in your recordings, it shows up here.")
             }
             ForEach(suggestions) { s in
@@ -230,6 +232,7 @@ struct TodayView: View {
                                onAccept: { edited in beginAccept(s, edited: edited) },
                                onReject: { beginReject(s) })
             }
+            ForEach(relationReviews) { RelationsReviewCard(review: $0).id($0.noteID) }
         }
     }
 
@@ -456,6 +459,7 @@ struct TodayView: View {
     private func reload() async {
         let e = CoreEngine.shared
         let s = await e.suggestions(status: "pending")
+        let rv = await e.relationReviews()
         let q = await e.reviewQueue()
         let r = await e.reminders(activeOnly: true)
         let t = await e.tasks(openOnly: true)
@@ -468,6 +472,7 @@ struct TodayView: View {
         if let q { withAnimation { queue = q } }
         let inCards = ReviewItem.suggestionIDsShown(in: queue)
         suggestions = s.filter { !inCards.contains($0.id) }
+        relationReviews = rv
         reminders = r
         tasks = t
         insight = i.flatMap { $0.dismissed ? nil : $0 }

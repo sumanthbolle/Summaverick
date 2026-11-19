@@ -16,7 +16,11 @@ using nlohmann::json;
 // shown memories all are; within a branch, importance first, then checked before waiting. Counts, "more" and
 // "list" include waiting ones. Empty branches are left out. Facts and ideas are not branches: they are counted
 // under their topic.
+// relations: ACCEPTED relation rows (Store::relations): a person who decided or asked a shown decision or question
+// links to it, and a person who told or asked another links to them, both drawn: {"a":"t<person>","b":"m<id>"|
+// "t<person>","kind":"relation","label":"decided"|"asked"|"told"}. The caller passes accepted rows only (pending
+// ones never reach the map). Question items carry "open": true until done.
 json build_brain_map(const json &memories, const json &people, const json &topics, const json &meaning_pairs,
-                     int64_t note_id, int per_branch = 6);
+                     int64_t note_id, int per_branch = 6, const json &relations = json::array());
 
 }  // namespace sve

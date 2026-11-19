@@ -502,8 +502,16 @@ struct BrainMapCanvas: View {
                 guard let a = placed.first(where: { $0.node.item?.ref == link.a && $0.node.kind == .item }),
                       let b = placed.first(where: { $0.node.item?.ref == link.b && $0.node.kind == .item }) else { continue }
                 var path = Path()
+                let control = CGPoint(x: (a.foot.x + b.foot.x) / 2, y: min(a.foot.y, b.foot.y) - 40)
                 path.move(to: a.foot)
-                path.addQuadCurve(to: b.foot, control: CGPoint(x: (a.foot.x + b.foot.x) / 2, y: min(a.foot.y, b.foot.y) - 40))
+                path.addQuadCurve(to: b.foot, control: control)
+                if let words = link.relationWords {
+                    // An accepted relation: a solid line with its words at the top of the arc.
+                    ctx.stroke(path, with: .color(Theme.accent.opacity(0.7)), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                    let mid = CGPoint(x: (a.foot.x + 2 * control.x + b.foot.x) / 4, y: (a.foot.y + 2 * control.y + b.foot.y) / 4)
+                    ctx.draw(Text(verbatim: words).font(.caption2.weight(.semibold)).foregroundStyle(Theme.accent), at: mid)
+                    continue
+                }
                 ctx.stroke(path, with: .color(Theme.secondary.opacity(0.55)), style: StrokeStyle(lineWidth: 1.3, lineCap: .round, dash: [2, 5]))
             }
             // Shadows, stems and points, back to front.

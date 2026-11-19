@@ -449,8 +449,28 @@ char *sve_person_questions_json(sve_ctx *ctx);
  * to a); 0 keeps them apart and the pair is not asked again. 0 ok, -1 error (no such pending question). */
 int   sve_person_question_answer(sve_ctx *ctx, int64_t id, int same);
 
+/* Relations: who decided, asked or told what in one recording, made in code from its memories (no model call)
+ * when its last section's memories are stored (sve_memories_from_section), as one review for the person to check.
+ * Nothing reaches the map (sve_brain_map_json) until accepted.
+ * Pending reviews, newest recording first: [{"note_id","title","created_at","people":[{"id","topic_id","name"}],
+ * "decisions":[{"id","memory_id","text","who","who_kind":"person"|"me"|"nobody","quote","start_sec"}],
+ * "questions":[same, open questions only],"between":[{"id","relation":"told"|"asked","from","to"}]}] ("me" is the
+ * person themselves). ids are relation ids. NULL on error. */
+char *sve_relation_reviews_json(sve_ctx *ctx);
+/* Accepts the note's review with the person's corrections, a JSON array (NULL or "" = as proposed):
+ * [{"id", "removed":true} | {"id","name"} (a person line: renamed, resolved like a spoken name, the note's links move
+ * to them) | {"id","text","who"} (a decision or question line: the memory's words and who; "me" = the person)].
+ * A removed person leaves the note's relations (their decisions stay, with nobody named); a removed line takes its
+ * relations with it. 0 ok, -1 error or no pending review (nothing changed). */
+int   sve_relations_accept(sve_ctx *ctx, int64_t note_id, const char *edits_json);
+/* Not now: the note's pending review is dropped and not offered again. 0 ok, -1 none pending. */
+int   sve_relations_dismiss(sve_ctx *ctx, int64_t note_id);
+/* Makes the note's pending review again from its memories now (already accepted or rejected relations are not
+ * offered again). Number of relations to check, -1 on error. */
+int   sve_relations_refresh(sve_ctx *ctx, int64_t note_id);
+
 /* Deletes everything the assistant stored, in one transaction: the profile, medicines, memory (vocabulary,
- * preferences, facts), reminders, tasks, topics and their note links, person questions, suggestions, decisions, insights,
+ * preferences, facts), reminders, tasks, topics and their note links, person questions, relations, suggestions, decisions, insights,
  * transcript pieces, and the settings keys the assistant created ("profile", "insight.last_date", "extracted.<id>").
  * Notes and other settings are kept; the host deletes notes and cancels scheduled notifications.
  * Returns 0, or -1 on error (nothing deleted). */

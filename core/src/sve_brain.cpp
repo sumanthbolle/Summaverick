@@ -237,6 +237,16 @@ void section_material(sve::Store &st, int64_t note_id, const json &section, sve:
     }
 }
 
+// Every section of the note has its memories (so its relations review can be made).
+bool relations_due(sve::Store &st, int64_t note_id) {
+    const json done = st.memory_sections_done(note_id);
+    for (const auto &s : st.sections(note_id)) {
+        json idx = s.contains("idx") ? s["idx"] : json(nullptr);
+        if (std::find(done.begin(), done.end(), idx) == done.end()) return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sve_progress_cb cb, void *user) {
@@ -359,6 +369,16 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
             st.rollback();
             throw;
         }
+        // The note's last section: its "who decided, asked or told what" review, made in code from its memories.
+        if (relations_due(st, note_id)) {
+            int n = -1;
+            if (st.begin()) {
+                n = sve::refresh_relations(st, note_id);
+                if (n < 0 || !st.commit()) { st.rollback(); n = -1; }
+            }
+            if (n < 0) sve_logf(1, "relations: review for note %lld not made", (long long)note_id);
+            else sve_logf(1, "relations: note %lld: %d to check", (long long)note_id, n);
+        }
         const size_t questions_after = st.person_questions().size();
         sve_logf(1, "memories: section %d of note %lld: %d new, %d same again, %d updated, %d conflicts, %zu person questions",
                  section_idx, (long long)note_id, tally.added, tally.same, tally.updated, tally.conflicts,
@@ -406,7 +426,11 @@ char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id) {
         json f = json::object();  // waiting ones too: memory_on_map decides
         if (note_id > 0) f["note_id"] = note_id;
         // Meaning pairs come with embeddings (not built yet): none for now.
-        return dump(sve::build_brain_map(st.memory_items_with_topics(f), st.topics("person"), st.topics("topic"), json::array(), note_id));
+        // Only relations the person accepted (sve_relations_accept) draw person links.
+        json rf = {{"status", "accepted"}};
+        if (note_id > 0) rf["note_id"] = note_id;
+        return dump(sve::build_brain_map(st.memory_items_with_topics(f), st.topics("person"), st.topics("topic"), json::array(), note_id,
+                                         6, st.relations(rf)));
     });
 }
 
@@ -494,6 +518,34 @@ char *sve_review_queue_json(sve_ctx *ctx) {
             out.push_back(m);
         }
         return dump(out);
+    });
+}
+
+char *sve_relation_reviews_json(sve_ctx *ctx) {
+    return guard<char *>("sve_relation_reviews_json", nullptr, [&]() -> char * { return ctx ? dump(sve::relation_reviews(*ctx->store)) : nullptr; });
+}
+
+int sve_relations_accept(sve_ctx *ctx, int64_t note_id, const char *edits_json) {
+    return guard("sve_relations_accept", -1, [&] {
+        if (!ctx) return -1;
+        json e = edits_json && *edits_json ? parse(edits_json) : json::array();
+        if (!e.is_array()) return -1;
+        return sve::accept_relations(*ctx->store, note_id, e) ? 0 : -1;
+    });
+}
+
+int sve_relations_dismiss(sve_ctx *ctx, int64_t note_id) {
+    return guard("sve_relations_dismiss", -1, [&] { return ctx && sve::dismiss_relations(*ctx->store, note_id) ? 0 : -1; });
+}
+
+int sve_relations_refresh(sve_ctx *ctx, int64_t note_id) {
+    return guard("sve_relations_refresh", -1, [&] {
+        if (!ctx || !ctx->store->get(note_id)) return -1;
+        sve::Store &st = *ctx->store;
+        if (!st.begin()) return -1;
+        const int n = sve::refresh_relations(st, note_id);
+        if (n < 0 || !st.commit()) { st.rollback(); return -1; }
+        return n;
     });
 }
 

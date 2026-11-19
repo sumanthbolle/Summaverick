@@ -7191,6 +7191,406 @@
           }
         }
       }
+    },
+    "What's on today": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈరోజు ఏమున్నాయి"
+          }
+        }
+      }
+    },
+    "Tells you the reminders still to come today and your open to-dos.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈరోజు ఇంకా రావాల్సిన రిమైండర్లు, మీరు చేయాల్సిన పనులు చెబుతుంది."
+          }
+        }
+      }
+    },
+    "I couldn't read your reminders. Please try again.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ రిమైండర్లు చదవలేకపోయాను. దయచేసి మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Nothing on today.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈరోజు ఏమీ లేదు."
+          }
+        }
+      }
+    },
+    "Reminders today:": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈరోజు రిమైండర్లు:"
+          }
+        }
+      }
+    },
+    "To do:": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చేయాల్సినవి:"
+          }
+        }
+      }
+    },
+    "Last note summary": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చివరి నోట్ సారాంశం"
+          }
+        }
+      }
+    },
+    "Last note": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చివరి నోట్"
+          }
+        }
+      }
+    },
+    "Tells you the title and summary of your most recent note.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ తాజా నోట్ పేరు, సారాంశం చెబుతుంది."
+          }
+        }
+      }
+    },
+    "Your last recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీ చివరి రికార్డింగ్"
+          }
+        }
+      }
+    },
+    "This note has no summary.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ నోట్‌కి సారాంశం లేదు."
+          }
+        }
+      }
+    },
+    "I'm still writing its notes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీని నోట్స్ ఇంకా రాస్తున్నాను."
+          }
+        }
+      }
+    },
+    "Its notes aren't finished yet.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దీని నోట్స్ ఇంకా పూర్తి కాలేదు."
+          }
+        }
+      }
+    },
+    "You don't have any notes yet.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీకు ఇంకా నోట్స్ ఏవీ లేవు."
+          }
+        }
+      }
+    },
+    "Add a reminder": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్ పెట్టండి"
+          }
+        }
+      }
+    },
+    "Saves a one-time reminder in Summaverick. It rings at the time you choose.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverickలో ఒకసారి మోగే రిమైండర్ సేవ్ చేస్తుంది. మీరు ఎంచుకున్న సమయానికి మోగుతుంది."
+          }
+        }
+      }
+    },
+    "What should I remind you about?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దేని గురించి గుర్తు చేయాలి?"
+          }
+        }
+      }
+    },
+    "When should I remind you?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎప్పుడు గుర్తు చేయాలి?"
+          }
+        }
+      }
+    },
+    "Remind me about ${text} at ${time}": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${time}కి ${text} గురించి గుర్తు చేయండి"
+          }
+        }
+      }
+    },
+    "That time has already passed. Please choose a later time.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఆ సమయం ఇప్పటికే దాటిపోయింది. దయచేసి తర్వాతి సమయం ఎంచుకోండి."
+          }
+        }
+      }
+    },
+    "I couldn't save the reminder. Please try again.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రిమైండర్ సేవ్ చేయలేకపోయాను. దయచేసి మళ్ళీ ప్రయత్నించండి."
+          }
+        }
+      }
+    },
+    "Saved. I'll remind you: %@, %@.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సేవ్ చేశాను. మీకు గుర్తు చేస్తాను: %1$@, %2$@."
+          }
+        }
+      }
+    },
+    "It can't ring until notifications are on for Summaverick.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverickకి నోటిఫికేషన్లు ఆన్ చేసే వరకు అది మోగదు."
+          }
+        }
+      }
+    },
+    "Opens Summaverick and asks your question about your notes.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverick తెరిచి, మీ నోట్స్ గురించి మీ ప్రశ్న అడుగుతుంది."
+          }
+        }
+      }
+    },
+    "What would you like to ask?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఏమి అడగాలనుకుంటున్నారు?"
+          }
+        }
+      }
+    },
+    "Ask ${question}": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${question} అడగండి"
+          }
+        }
+      }
+    },
+    "Who's involved, what was decided, what's still open — check this": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎవరెవరు ఉన్నారు, ఏం నిర్ణయించారు, ఇంకా ఏం తేలలేదు — ఒకసారి చూడండి"
+          }
+        }
+      }
+    },
+    "Nothing goes on your map until you accept.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు ఒప్పుకునే వరకు ఇవేవీ మీ మ్యాప్‌లోకి వెళ్ళవు."
+          }
+        }
+      }
+    },
+    "Accept": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఒప్పుకోండి"
+          }
+        }
+      }
+    },
+    "The question": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రశ్న"
+          }
+        }
+      }
+    },
+    "What was decided": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఏం నిర్ణయించారు"
+          }
+        }
+      }
+    },
+    "me": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నేను"
+          }
+        }
+      }
+    },
+    "You asked": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు అడిగారు"
+          }
+        }
+      }
+    },
+    "You decided": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మీరు నిర్ణయించారు"
+          }
+        }
+      }
+    },
+    "Nobody named": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎవరి పేరూ చెప్పలేదు"
+          }
+        }
+      }
+    },
+    "Asked by %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ అడిగారు"
+          }
+        }
+      }
+    },
+    "Decided by %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ నిర్ణయించారు"
+          }
+        }
+      }
+    },
+    "decided": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నిర్ణయించారు"
+          }
+        }
+      }
+    },
+    "asked": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "అడిగారు"
+          }
+        }
+      }
+    },
+    "told": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చెప్పారు"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

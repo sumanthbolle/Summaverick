@@ -599,3 +599,23 @@ extension CoreEngine {
         }
     }
 }
+
+// MARK: relations review (store context)
+
+extension CoreEngine {
+    /// Recordings whose people, decisions and open questions wait for the person to check, newest first.
+    nonisolated func relationReviews() async -> [RelationReview] {
+        await store { self.decode([RelationReview].self, self.take(sve_relation_reviews_json($0))) ?? [] }
+    }
+
+    /// Accepts a recording's review with the person's corrections; only then does it reach the map.
+    @discardableResult nonisolated func acceptRelations(noteID: Int64, edits: [RelationEdit]) async -> Bool {
+        let json = (try? JSONEncoder().encode(edits)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        return await store { sve_relations_accept($0, noteID, json) == 0 }
+    }
+
+    /// Not now: the review is put away and not offered again.
+    @discardableResult nonisolated func dismissRelations(noteID: Int64) async -> Bool {
+        await store { sve_relations_dismiss($0, noteID) == 0 }
+    }
+}
