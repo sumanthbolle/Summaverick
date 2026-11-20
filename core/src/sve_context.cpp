@@ -1,4 +1,7 @@
 #include "sve_context.h"
+#include "sve_english_words.h"
+#include <cctype>
+#include <algorithm>
 #include "sve_prompts.h"
 #include "sve_sections.h"  // terms_said
 #include <vector>
@@ -168,6 +171,158 @@ std::string spelling_vocab_line(Store &store, size_t max_bytes, const std::strin
     const std::string line = vocab_line(vocab, head, max_bytes);
     if (line.empty()) return line;
     return "Spell these words this way (" + std::string(kVocabOnlyIfSaid) + "): " + line.substr(head.size());
+}
+
+namespace {
+
+// UTF-8 to code points (a bad byte stands for itself).
+std::u32string code_points(const std::string &s) {
+    std::u32string out;
+    for (size_t i = 0; i < s.size();) {
+        unsigned char c = s[i];
+        size_t n = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 1;
+        if (i + n > s.size()) n = 1;
+        char32_t cp = n == 1 ? c : (c & (0xFF >> (n + 1)));
+        for (size_t k = 1; k < n; k++) cp = (cp << 6) | (s[i + k] & 0x3F);
+        out.push_back(cp);
+        i += n;
+    }
+    return out;
+}
+
+size_t edit_distance(const std::u32string &a, const std::u32string &b) {
+    std::vector<size_t> prev(b.size() + 1), cur(b.size() + 1);
+    for (size_t j = 0; j <= b.size(); j++) prev[j] = j;
+    for (size_t i = 1; i <= a.size(); i++) {
+        cur[0] = i;
+        for (size_t j = 1; j <= b.size(); j++)
+            cur[j] = std::min({prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)});
+        std::swap(prev, cur);
+    }
+    return prev[b.size()];
+}
+
+bool edge_punct(unsigned char c) { return c < 0x80 && !std::isalnum(c); }
+
+// Lowercase ASCII, punctuation and spaces taken off; other scripts kept as they are.
+std::string match_key(const std::string &s) {
+    std::string k;
+    for (unsigned char c : s) {
+        if (c >= 0x80) k.push_back((char)c);
+        else if (std::isalnum(c)) k.push_back((char)std::tolower(c));
+    }
+    return k;
+}
+
+size_t word_count(const std::string &s) {
+    size_t n = 0;
+    bool in = false;
+    for (unsigned char c : s) {
+        bool sp = std::isspace(c);
+        if (!sp && !in) n++;
+        in = !sp;
+    }
+    return n;
+}
+
+struct Term { std::string text, key; std::u32string cps; size_t words; };
+
+// 0 exact, else the distance over the longer length; -1 when it is not close enough.
+double closeness(const std::string &span_key, const Term &t) {
+    if (span_key == t.key) return 0;
+    const std::u32string a = code_points(span_key);
+    const size_t len = std::max(a.size(), t.cps.size());
+    if (len < 6) return -1;
+    const double r = (double)edit_distance(a, t.cps) / (double)len;
+    return r <= (len >= 10 ? 0.25 : 0.2) ? r : -1;
+}
+
+}  // namespace
+
+std::string vocab_correct(const std::string &text, const std::vector<std::string> &terms,
+                          const std::vector<std::string> &protected_names) {
+    if (text.empty() || terms.empty()) return text;
+    std::vector<std::string> keep;
+    for (const auto &p : protected_names) { std::string k = match_key(p); if (!k.empty()) keep.push_back(k); }
+    std::vector<Term> ts;
+    for (const auto &t : terms) {
+        Term x{t, match_key(t), {}, word_count(t)};
+        if (x.key.empty() || !x.words) continue;
+        x.cps = code_points(x.key);
+        bool guarded = false;
+        for (const auto &k : keep) {
+            Term kt{k, k, code_points(k), 1};
+            if (closeness(x.key, kt) >= 0) { guarded = true; break; }
+        }
+        if (!guarded) ts.push_back(x);
+    }
+    if (ts.empty()) return text;
+
+    // Words with the spaces before them, as written.
+    struct Word { std::string space, lead, core, trail; };
+    std::vector<Word> w;
+    for (size_t i = 0; i < text.size();) {
+        Word x;
+        while (i < text.size() && std::isspace((unsigned char)text[i])) x.space.push_back(text[i++]);
+        std::string tok;
+        while (i < text.size() && !std::isspace((unsigned char)text[i])) tok.push_back(text[i++]);
+        size_t a = 0, b = tok.size();
+        while (a < b && edge_punct((unsigned char)tok[a])) a++;
+        while (b > a && edge_punct((unsigned char)tok[b - 1])) b--;
+        x.lead = tok.substr(0, a);
+        x.core = tok.substr(a, b - a);
+        x.trail = tok.substr(b);
+        w.push_back(x);
+    }
+    auto starts_digit = [](const std::string &s) { return !s.empty() && std::isdigit((unsigned char)s[0]); };
+
+    struct Best { double score = -1; size_t n = 0; const Term *t = nullptr; };
+    auto best_at = [&](size_t i) {
+        Best b;
+        std::string span;
+        for (size_t n = 1; n <= 4 && i + n <= w.size(); n++) {
+            const Word &last = w[i + n - 1];
+            if (last.core.empty() || (n > 1 && !w[i + n - 2].trail.empty())) break;  // no span across punctuation
+            if (starts_digit(last.core)) break;                                      // numbers are never a term
+            span += match_key(last.core);
+            if (i + n < w.size() && starts_digit(w[i + n].core)) continue;           // right before a dose
+            bool all_common = true;
+            for (size_t k = i; k < i + n; k++) {
+                std::string low;
+                for (unsigned char c : w[k].core) low.push_back((char)std::tolower(c));
+                all_common = all_common && common_english_word(low);
+            }
+            for (const auto &t : ts) {
+                if (n > std::max<size_t>(t.words, 2)) continue;  // a term's own words, or a word split in two
+                const double r = closeness(span, t);
+                if (r < 0) continue;
+                if (n == 1 && all_common && t.words == 1) continue;                  // a common word: kept as said
+                if (r > 0 && (t.key == span + "s" || span == t.key + "s")) continue;  // plural or singular
+                if (b.score < 0 || r < b.score || (r == b.score && n > b.n)) { b.score = r; b.n = n; b.t = &t; }
+            }
+        }
+        return b;
+    };
+
+    std::string out;
+    for (size_t i = 0; i < w.size();) {
+        Best b = best_at(i);
+        // A match that takes in the word before a term ("but perplexity"): the term from the next word is as close
+        // or closer, so this word stays as it was.
+        if (b.t && b.n > 1 && i + 1 < w.size()) {
+            Best next = best_at(i + 1);
+            if (next.t && next.score <= b.score) b = Best{};
+        }
+        const Word &first = w[i];
+        if (!b.t) {
+            out += first.space + first.lead + first.core + first.trail;
+            i++;
+            continue;
+        }
+        out += first.space + first.lead + b.t->text + w[i + b.n - 1].trail;
+        i += b.n;
+    }
+    return out;
 }
 
 Relevant relevant(Store &store, const std::string &query, size_t max_bytes, int64_t from, int64_t to) {

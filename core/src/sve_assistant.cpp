@@ -795,6 +795,16 @@ int sve_memory_delete(sve_ctx *ctx, int64_t id) {
     return guard("sve_memory_delete", -1, [&] { return ctx && ctx->store->delete_learned_memory(id) ? 0 : -1; });
 }
 
+char *sve_vocab_correct(sve_ctx *ctx, const char *text) {
+    return guard<char *>("sve_vocab_correct", nullptr, [&]() -> char * {
+        if (!ctx || !text) return nullptr;
+        std::vector<std::string> meds;
+        for (const auto &m : ctx->store->medicines()) meds.push_back(jstr(m, "name"));
+        const std::string out = sve::vocab_correct(text, sve::saved_vocab(*ctx->store), meds);
+        return dup(out);
+    });
+}
+
 int64_t sve_vocab_add(sve_ctx *ctx, const char *term) {
     return guard<int64_t>("sve_vocab_add", -1, [&]() -> int64_t {
         if (!ctx || !term) return -1;

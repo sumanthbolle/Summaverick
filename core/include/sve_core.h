@@ -381,6 +381,9 @@ int   sve_memory_update(sve_ctx *ctx, int64_t id, const char *text);
 int   sve_memory_delete(sve_ctx *ctx, int64_t id);
 /* Adds a vocabulary word the person fixed (applied directly). Returns its id (existing id if known). */
 int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
+/* The transcript text with the saved vocabulary written in where the transcriber misheard it (sve::vocab_correct);
+ * saved medicine names are never written in. Free with sve_free_string. NULL on error. */
+char *sve_vocab_correct(sve_ctx *ctx, const char *text);
 
 /* ---- memories (the second brain) ---------------------------------------
  * Memory row JSON: {"id","type":"fact|decision|promise|question|person|idea","text","who","to_whom",

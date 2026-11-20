@@ -660,9 +660,7 @@ final class ProcessingPipeline {
             if !pausedForHeat(id) { stopShort(error.localizedDescription, error: error) }
             return id
         }
-        let pieces = TranscriptRun.pieces(done)
-        let transcript = Self.joined(pieces)
-        await store(done, noteID: id, transcript: transcript)
+        let transcript = await store(done, noteID: id, transcript: Self.joined(TranscriptRun.pieces(done)))
         TranscriptSidecar.remove(audioPath: audio.path)   // complete and saved to the note
         NotificationCenter.default.post(name: .notesChanged, object: nil)
         if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -752,7 +750,7 @@ final class ProcessingPipeline {
             if t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 stopShort(String(localized: "I couldn't hear anyone speaking in this recording."), noSpeech: true); return
             }
-            await store(done, noteID: noteID, transcript: t)
+            t = await store(done, noteID: noteID, transcript: t)
             TranscriptSidecar.remove(audioPath: path)   // complete and saved to the note
             NotificationCenter.default.post(name: .notesChanged, object: nil)
             transcriptStored(noteID)
@@ -1136,20 +1134,30 @@ final class ProcessingPipeline {
 
     /// A finished transcription into the note: pieces, transcript, and the sections written while recording
     /// (those that still fit the pieces; replacing whatever the note had, which belonged to older pieces).
-    private func store(_ done: TranscriptSidecar, noteID id: Int64, transcript: String) async {
+    /// Returns the transcript as stored: the saved words written in where the transcriber misheard them (Shruti never
+    /// sees them), in the pieces and so in the transcript (sve_vocab_correct; never a medicine).
+    @discardableResult
+    private func store(_ done: TranscriptSidecar, noteID id: Int64, transcript heard: String) async -> String {
         let engine = CoreEngine.shared
-        let pieces = TranscriptRun.pieces(done)
+        let raw = TranscriptRun.pieces(done)
+        let pieces = await engine.vocabCorrected(raw)
+        let transcript = Self.joined(raw) == heard.trimmingCharacters(in: .whitespacesAndNewlines) ? Self.joined(pieces) : heard
+        if transcript != heard {
+            let changed = zip(raw, pieces).filter { $0.text != $1.text }.count
+            NSLog("[sve] note %lld: saved words fixed %ld of %ld pieces", id, changed, raw.count)
+        }
         await engine.setPieces(id, pieces)
         await engine.setTranscript(id, transcript)
         await engine.setSections(id, NoteSection.validPrefix(done.sections, pieceCount: pieces.count))
         // Notes and questions written while recording (LiveParts): into the note when its section still has the
         // range they were written for; the others are dropped and written again by the normal steps.
-        guard !done.parts.isEmpty else { return }
+        guard !done.parts.isEmpty else { return transcript }
         var put = 0, dropped = 0
         for part in done.parts {
             if await engine.putSectionOutput(noteID: id, part) == 1 { put += 1 } else { dropped += 1 }
         }
         NSLog("[sve] live parts: %ld put into note %lld at Stop, %ld dropped (range changed)", put, id, dropped)
+        return transcript
     }
 
     private static func joined(_ pieces: [TranscriptPiece]) -> String {

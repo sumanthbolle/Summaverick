@@ -40,6 +40,15 @@ extern const char *const kVocabOnlyIfSaid;
 // alone did not stop "AI bubble" being listed for a note that never said it). Empty when no word is left.
 std::string spelling_vocab_line(Store &store, size_t max_bytes = 400, const std::string *said = nullptr);
 
+// The saved words fix what the transcriber misheard (Shruti never sees them; Gemma only as a hint): a span of up to
+// four words whose letters are close to a term (edit distance at most 20%, 25% for 10+ letters; exact but for case
+// under 6 letters), or a term split in two ("charge bee" -> "ChargeBee"), is written as the term, keeping the
+// punctuation around it. Never: a common English word into another, a plural or singular of it, a span right before
+// a number (a dose), or a term close to one of `protected_names` (the saved medicines: the medicine check must
+// read what was said).
+std::string vocab_correct(const std::string &text, const std::vector<std::string> &terms,
+                          const std::vector<std::string> &protected_names);
+
 struct Relevant {
     std::string block;
     json sources;  // [{"label":"S1","note_id":..,"start_sec":..,"title":..}], exactly the labels in block

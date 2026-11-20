@@ -206,6 +206,16 @@ extension CoreEngine {
     }
     @discardableResult nonisolated func deleteMemory(_ id: Int64) async -> Bool { await store { sve_memory_delete($0, id) == 0 } }
     @discardableResult nonisolated func addVocab(_ term: String) async -> Int64 { await store { sve_vocab_add($0, term) } }
+    /// Each piece's text with the saved words written in where the transcriber misheard them (never a medicine).
+    nonisolated func vocabCorrected(_ pieces: [TranscriptPiece]) async -> [TranscriptPiece] {
+        await store { ctx in
+            pieces.map { p in
+                var q = p
+                if let fixed = self.take(sve_vocab_correct(ctx, p.text)) { q.text = fixed }
+                return q
+            }
+        }
+    }
 
     // MARK: ask
 
