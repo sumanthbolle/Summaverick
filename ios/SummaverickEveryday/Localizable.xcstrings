@@ -7532,16 +7532,6 @@
         }
       }
     },
-    "Nobody named": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ఎవరి పేరూ చెప్పలేదు"
-          }
-        }
-      }
-    },
     "Asked by %@": {
       "localizations": {
         "te": {
@@ -7588,6 +7578,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "చెప్పారు"
+          }
+        }
+      }
+    },
+    "This recording is too short to write notes from.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ రికార్డింగ్ నోట్స్ రాయడానికి చాలా చిన్నది."
+          }
+        }
+      }
+    },
+    "Someone asked · tap Edit to say who": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎవరో అడిగారు · ఎవరో చెప్పడానికి మార్చండి నొక్కండి"
+          }
+        }
+      }
+    },
+    "Someone decided · tap Edit to say who": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎవరో నిర్ణయించారు · ఎవరో చెప్పడానికి మార్చండి నొక్కండి"
           }
         }
       }

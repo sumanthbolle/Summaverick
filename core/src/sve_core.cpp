@@ -185,15 +185,18 @@ int sve_all_fits(sve_ctx *ctx, const char *transcript) {
     }
 }
 
-// The title as sve_suggest_title leaves it: the first line, "Title:" and quotes taken off.
+// The title as sve_suggest_title leaves it: the first line, Markdown marks ("### ", "**"), "Title:" and quotes taken
+// off (note 8 came out as "### Unclaimed Territories…", 2026-11-19).
 static std::string clean_title(std::string out) {
     size_t nl = out.find('\n');
     if (nl != std::string::npos) out.resize(nl);
+    auto mark = [](char c) { return c == '#' || c == '*' || c == '_' || c == '"' || c == '\'' || c == ' '; };
+    while (!out.empty() && mark(out.front())) out.erase(0, 1);
     for (const char *lead : {"Title:", "title:", "Title -", "Title"}) {
         if (out.rfind(lead, 0) == 0) { out.erase(0, strlen(lead)); break; }
     }
-    while (!out.empty() && (out.front() == '"' || out.front() == '\'' || out.front() == ' ')) out.erase(0, 1);
-    while (!out.empty() && (out.back() == '"' || out.back() == '\'' || out.back() == ' ' || out.back() == '.')) out.pop_back();
+    while (!out.empty() && mark(out.front())) out.erase(0, 1);
+    while (!out.empty() && (mark(out.back()) || out.back() == '.')) out.pop_back();
     return out;
 }
 

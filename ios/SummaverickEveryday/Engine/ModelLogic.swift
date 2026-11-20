@@ -728,6 +728,18 @@ enum QuietHours {
 }
 
 /// Notes notifications (NotesNotifier): ready, paused, failed. One per state change, never per percent.
+/// A transcript too thin to write notes from. Fewer than `minWords` words (a 1–2 s tap that caught "అది"):
+/// Gemma made up a whole meeting from it, title, summary and nine questions (notes 3 and 7, 2026-11-19). Such a
+/// note keeps its transcript and gets no notes, and says so instead.
+enum TranscriptRule {
+    static let minWords = 4
+    static func words(_ t: String) -> Int {
+        t.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).filter { $0.contains(where: { $0.isLetter || $0.isNumber }) }.count
+    }
+    static func tooShortForNotes(_ t: String) -> Bool { words(t) < minWords }
+    static var tooShortMessage: String { String(localized: "This recording is too short to write notes from.") }
+}
+
 enum NotifyRule {
     /// In front the app already shows the note: nothing is posted.
     static func shouldNotify(appActive: Bool) -> Bool { !appActive }

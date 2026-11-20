@@ -669,6 +669,11 @@ final class ProcessingPipeline {
             stopShort(String(localized: "I couldn't hear anyone speaking in this recording."), noSpeech: true)
             return id
         }
+        if TranscriptRule.tooShortForNotes(transcript) {
+            NSLog("[sve] note %lld: %ld words, too short for notes", id, TranscriptRule.words(transcript))
+            stopShort(TranscriptRule.tooShortMessage, noSpeech: true)
+            return id
+        }
         transcriptStored(id)
 
         // 2. notes
@@ -754,6 +759,10 @@ final class ProcessingPipeline {
         } else if let path = AudioRecorder.existingAudioPath(note.audio_path) {
             TranscriptSidecar.remove(audioPath: path)   // left over from before the transcript was saved
         }
+        if TranscriptRule.tooShortForNotes(t) {
+            NSLog("[sve] note %lld: %ld words, too short for notes", noteID, TranscriptRule.words(t))
+            stopShort(TranscriptRule.tooShortMessage, noSpeech: true); return
+        }
         // The note keeps its language: a resumed or retried run writes in note.lang, as a regenerate does (its parts,
         // the Try again lines and the note screen all read that one language).
         await generateOutputs(noteID: noteID, transcript: t, lang: note.lang, setTitle: note.title.hasPrefix("Recording "))
@@ -810,7 +819,8 @@ final class ProcessingPipeline {
         guard let note = await engine.note(id) else { return nil }   // deleted
         let transcript = note.transcript ?? ""
         // No speech: a real failure ("Try again" shows why nothing changed).
-        guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { regenerateFailed[id] = request; return nil }
+        // Too few words: Gemma would make the notes up (TranscriptRule).
+        guard !TranscriptRule.tooShortForNotes(transcript) else { regenerateFailed[id] = request; return nil }
         guard ModelManager.shared.isReady else {
             // The AI is not ready: queued (the resume loop runs taps only once it is), the note shows the waiting line.
             NSLog("[sve] bg: note %lld: regenerate waits for the AI", id)
