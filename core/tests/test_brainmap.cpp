@@ -1,3 +1,4 @@
+#include <set>
 #include "check.h"
 #include "sve_brainmap.h"
 #include "sve_memory.h"
@@ -264,4 +265,59 @@ TEST(touch_raises_importance) {
     double stale = memory_importance(row, 1, 0, now);
     row["last_used"] = now - 86400;
     CHECK(memory_importance(row, 1, 0, now) > stale);
+}
+
+// The phone on 2026-11-20: 29 memories, nearly all under one topic, and 15 people and topics on recordings. The map
+// showed 6 points, so it fell back to a list and no graph was drawn.
+TEST(map_shows_people_and_topics_of_recordings) {
+    json people = json::array({{{"id", 1}, {"name", "Roman"}, {"note_count", 1}},
+                               {{"id", 2}, {"name", "John"}, {"note_count", 1}},
+                               {{"id", 3}, {"name", "Nobody yet"}, {"note_count", 0}}});
+    json topics = json::array();
+    for (int i = 10; i < 17; i++) topics.push_back({{"id", i}, {"name", "topic " + std::to_string(i)}, {"note_count", i == 10 ? 3 : 1}});
+    // Notes: 100 has Roman, John, 10, 11; 200 has 10, 12.
+    json links = json::array({{{"note_id", 100}, {"topic_id", 1}}, {{"note_id", 100}, {"topic_id", 2}},
+                              {{"note_id", 100}, {"topic_id", 10}}, {{"note_id", 100}, {"topic_id", 11}},
+                              {{"note_id", 200}, {"topic_id", 10}}, {{"note_id", 200}, {"topic_id", 12}}});
+    json m = build_brain_map(kNone, people, topics, kNone, 0, 6, kNone, links);
+    CHECK(m["list"] == false);  // 2 people + 7 topics: a graph
+    const json *p = branch(m, "people");
+    CHECK(p != nullptr);
+    CHECK_EQ((int)(*p)["items"].size(), 2);  // a person on no recording is left out
+    const json *t = branch(m, "topics");
+    CHECK(t != nullptr);
+    CHECK_EQ((*t)["items"][0]["label"].get<std::string>(), std::string("topic 10"));  // on most recordings first
+    CHECK_EQ((*t)["items"][0]["count"].get<int>(), 3);
+    CHECK((*t)["items"][0]["waiting"] == false);
+    int together = 0;
+    bool roman_john = false, t11_t12 = false;
+    for (const auto &l : m["links"]) {
+        if (l["kind"] != "together") continue;
+        together++;
+        std::set<std::string> ends = {l["a"].get<std::string>(), l["b"].get<std::string>()};
+        if (ends == std::set<std::string>{"t1", "t2"}) roman_john = true;
+        if (ends == std::set<std::string>{"t11", "t12"}) t11_t12 = true;
+    }
+    CHECK(roman_john);   // on the same recording
+    CHECK(!t11_t12);     // never on the same recording
+    CHECK_EQ(together, 7);  // note 100: 4 ends, 6 pairs; note 200: 1 pair
+}
+
+TEST(map_of_one_recording_keeps_memory_only_points) {
+    json people = json::array({{{"id", 1}, {"name", "Roman"}, {"note_count", 1}}});
+    json links = json::array({{{"note_id", 100}, {"topic_id", 1}}});
+    json m = build_brain_map(kNone, people, kNone, kNone, 100, 6, kNone, links);
+    CHECK(branch(m, "people") == nullptr);  // a recording's own map: its memories decide, as before
+}
+
+TEST(map_topic_from_memories_and_recordings_counts_once) {
+    json a = mem(1, "promise", 1);
+    a["topics"] = json::array({{{"id", 10}}});
+    json topics = json::array({{{"id", 10}, {"name", "road safety"}, {"note_count", 2}}});
+    json links = json::array({{{"note_id", 1}, {"topic_id", 10}}, {{"note_id", 2}, {"topic_id", 10}}});
+    json m = build_brain_map(json::array({a}), kNone, topics, kNone, 0, 6, kNone, links);
+    const json *t = branch(m, "topics");
+    CHECK(t != nullptr);
+    CHECK_EQ((int)(*t)["items"].size(), 1);
+    CHECK_EQ((*t)["items"][0]["count"].get<int>(), 2);  // the larger of 1 memory and 2 recordings
 }

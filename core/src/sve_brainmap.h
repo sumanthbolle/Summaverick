@@ -20,7 +20,11 @@ using nlohmann::json;
 // links to it, and a person who told or asked another links to them, both drawn: {"a":"t<person>","b":"m<id>"|
 // "t<person>","kind":"relation","label":"decided"|"asked"|"told"}. The caller passes accepted rows only (pending
 // ones never reach the map). Question items carry "open": true until done.
+// note_links: every {note_id, topic_id} of note_topics. On the whole map (note_id <= 0) each person and topic on a
+// recording (note_count > 0) is a point even with no memory, counted by its recordings, and people and topics on
+// the same recording are linked: {"a":"t<id>","b":"t<id>","kind":"together"}. A recording's own map is unchanged.
 json build_brain_map(const json &memories, const json &people, const json &topics, const json &meaning_pairs,
-                     int64_t note_id, int per_branch = 6, const json &relations = json::array());
+                     int64_t note_id, int per_branch = 6, const json &relations = json::array(),
+                     const json &note_links = json::array());
 
 }  // namespace sve

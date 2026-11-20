@@ -772,6 +772,10 @@ json Store::topic_notes(int64_t topic_id) {
                       "ORDER BY n.created_at DESC, n.id DESC", {topic_id});
 }
 
+json Store::note_topic_links() {
+    return query_rows("SELECT note_id, topic_id FROM note_topics ORDER BY note_id, rowid", {});
+}
+
 json Store::note_topics(int64_t note_id, const std::string &kind) {
     return query_rows("SELECT t.id AS id, t.kind AS kind, t.name AS name FROM note_topics nt JOIN topics t ON t.id=nt.topic_id "
                       "WHERE nt.note_id=? AND t.kind=? ORDER BY nt.rowid", {note_id, kind});

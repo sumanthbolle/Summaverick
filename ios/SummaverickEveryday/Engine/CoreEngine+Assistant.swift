@@ -618,4 +618,19 @@ extension CoreEngine {
     @discardableResult nonisolated func dismissRelations(noteID: Int64) async -> Bool {
         await store { sve_relations_dismiss($0, noteID) == 0 }
     }
+
+    /// Once per install: recordings whose memories were made before relations existed get their review too. Only the
+    /// store (no model); safe to repeat, since accepted or put-away relations are never offered again.
+    nonisolated func backfillRelationReviewsOnce() async {
+        let key = "relations.backfilled.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let ids = await notes().map(\.id)
+        var made = 0
+        for id in ids {
+            let n = await store { sve_relations_refresh($0, id) }
+            if n > 0 { made += 1 }
+        }
+        UserDefaults.standard.set(true, forKey: key)
+        NSLog("[sve] relations: older recordings checked: %ld, %ld with a review", ids.count, made)
+    }
 }

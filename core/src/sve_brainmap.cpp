@@ -59,7 +59,7 @@ void add_branch(json &out, const std::string &kind, std::vector<Item> items, int
 }  // namespace
 
 json build_brain_map(const json &memories, const json &people, const json &topics, const json &meaning_pairs,
-                     int64_t note_id, int per_branch, const json &relations) {
+                     int64_t note_id, int per_branch, const json &relations, const json &note_links) {
     std::vector<const json *> mems;
     if (memories.is_array())
         for (const auto &m : memories)
@@ -120,6 +120,29 @@ json build_brain_map(const json &memories, const json &people, const json &topic
             }
     }
 
+    // The whole map: people and topics of recordings, with or without memories, counted by their recordings.
+    if (note_id <= 0) {
+        auto from_notes = [&](std::map<int64_t, Item> &into, const json &list) {
+            if (!list.is_array()) return;
+            for (const auto &e : list) {
+                if (!e.is_object()) continue;
+                const int64_t tid = e.value("id", (int64_t)0);
+                const int notes = (int)e.value("note_count", (int64_t)0);
+                if (tid <= 0 || notes <= 0) continue;
+                Item &it = into[tid];
+                if (it.ref.empty()) {
+                    it.ref = "t" + std::to_string(tid);
+                    it.label = e.value("name", std::string());
+                }
+                it.waiting = false;  // a recording's topic is not waiting for a check
+                it.count = std::max(it.count, notes);
+                it.importance = std::max(it.importance, std::min(2.0, 0.5 + 0.5 * notes));
+            }
+        };
+        from_notes(person_items, people);
+        from_notes(topic_items, topics);
+    }
+
     // A promise's open/closed state is not a topic's: topics and people are never "done".
     std::vector<Item> ppl, tps;
     for (auto &kv : person_items) ppl.push_back(kv.second);
@@ -158,6 +181,27 @@ json build_brain_map(const json &memories, const json &people, const json &topic
     };
     share(by_person, "person");
     share(by_topic, "topic");
+
+    // People and topics on the same recording (whole map only), both drawn.
+    if (note_id <= 0 && note_links.is_array()) {
+        std::map<int64_t, std::vector<std::string>> by_note;
+        for (const auto &l : note_links) {
+            if (!l.is_object()) continue;
+            const int64_t n = l.value("note_id", (int64_t)0), t = l.value("topic_id", (int64_t)0);
+            const std::string ref = "t" + std::to_string(t);
+            if (n > 0 && t > 0 && shown_refs.count(ref)) by_note[n].push_back(ref);
+        }
+        std::set<std::pair<std::string, std::string>> done;
+        for (const auto &kv : by_note) {
+            const auto &refs = kv.second;
+            for (size_t i = 0; i < refs.size(); i++)
+                for (size_t j = i + 1; j < refs.size(); j++) {
+                    auto key = std::minmax(refs[i], refs[j]);
+                    if (refs[i] == refs[j] || !done.insert({key.first, key.second}).second) continue;
+                    links.push_back({{"a", key.first}, {"b", key.second}, {"kind", "together"}});
+                }
+        }
+    }
 
     // Accepted relations: a person to what they decided or asked, and a person to the person they told or asked.
     if (relations.is_array()) {

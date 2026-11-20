@@ -430,7 +430,7 @@ char *sve_brain_map_json(sve_ctx *ctx, int64_t note_id) {
         json rf = {{"status", "accepted"}};
         if (note_id > 0) rf["note_id"] = note_id;
         return dump(sve::build_brain_map(st.memory_items_with_topics(f), st.topics("person"), st.topics("topic"), json::array(), note_id,
-                                         6, st.relations(rf)));
+                                         6, st.relations(rf), note_id > 0 ? json::array() : st.note_topic_links()));
     });
 }
 

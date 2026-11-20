@@ -1024,7 +1024,11 @@ struct RelationsReviewCard: View {
         let who = typed ?? (l.whoKind == "person" ? l.who : "")
         let me = typed.map { $0.lowercased() == String(localized: "me").lowercased() } ?? (l.whoKind == "me")
         if me { return question ? String(localized: "You asked") : String(localized: "You decided") }
-        if who.isEmpty { return String(localized: "Nobody named") }
+        if who.isEmpty {
+            // Nobody was named in the recording: say so plainly, and how to add who.
+            return question ? String(localized: "Someone asked · tap Edit to say who")
+                            : String(localized: "Someone decided · tap Edit to say who")
+        }
         return question ? String(localized: "Asked by \(who)") : String(localized: "Decided by \(who)")
     }
 

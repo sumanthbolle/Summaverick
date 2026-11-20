@@ -119,6 +119,8 @@ public:
     bool link_topic(int64_t note_id, int64_t topic_id);
     json topics(const std::string &kind);
     json topic_notes(int64_t topic_id);
+    // Every {note_id, topic_id} pair (people and topics), for the whole map's "together" links.
+    json note_topic_links();
     json note_topics(int64_t note_id, const std::string &kind);  // [{id,kind,name}] in the order they were linked
     bool set_topic_summary(int64_t id, const std::string &summary);
     bool rename_topic(int64_t id, const std::string &name);

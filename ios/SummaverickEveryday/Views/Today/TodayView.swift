@@ -459,6 +459,7 @@ struct TodayView: View {
     private func reload() async {
         let e = CoreEngine.shared
         let s = await e.suggestions(status: "pending")
+        await e.backfillRelationReviewsOnce()
         let rv = await e.relationReviews()
         let q = await e.reviewQueue()
         let r = await e.reminders(activeOnly: true)
