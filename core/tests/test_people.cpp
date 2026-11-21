@@ -72,3 +72,18 @@ TEST(store_drops_people_known_only_as_mentioned_words) {
     CHECK_EQ((int)st.topics("person").size(), 1);
     CHECK_EQ(st.topics("person")[0].value("name", ""), std::string("Roman Goffman"));
 }
+
+TEST(notes_whose_memories_all_dropped_are_due_again) {
+    Store st(":memory:");
+    int64_t empty = st.create("a", "te", nullptr, "tr", 60), full = st.create("b", "te", nullptr, "tr", 60);
+    st.set_sections(empty, nlohmann::json::array({{{"idx", 0}, {"first_piece", 0}, {"last_piece", 0}, {"title", "x"}, {"summary", "y"}}}));
+    st.set_sections(full, nlohmann::json::array({{{"idx", 0}, {"first_piece", 0}, {"last_piece", 0}, {"title", "x"}, {"summary", "y"}}}));
+    st.mark_memory_section(empty, 0);
+    st.mark_memory_section(full, 0);
+    int64_t m = st.add_memory_item({{"type", "fact"}, {"text", "kept"}, {"review", "kept"}});
+    st.add_memory_source(m, full, 0, "kept", std::nullopt);
+    CHECK_EQ(st.retry_notes_without_memories(), 1);
+    auto due = st.notes_needing_memories(10);
+    CHECK_EQ((int)due.size(), 1);
+    CHECK_EQ(due[0].get<int64_t>(), empty);
+}

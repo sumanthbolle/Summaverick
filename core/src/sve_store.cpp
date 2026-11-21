@@ -822,6 +822,14 @@ int Store::drop_mentioned_only_people() {
     return commit() ? n : -1;
 }
 
+int Store::retry_notes_without_memories() {
+    json ids = query_rows("SELECT DISTINCT p.note_id AS id FROM memory_progress p "
+                          "WHERE NOT EXISTS (SELECT 1 FROM memory_sources s WHERE s.note_id=p.note_id)", {});
+    if (ids.empty()) return 0;
+    if (!run("DELETE FROM memory_progress WHERE note_id NOT IN (SELECT DISTINCT note_id FROM memory_sources)", {})) return -1;
+    return (int)ids.size();
+}
+
 json Store::note_topic_links() {
     return query_rows("SELECT note_id, topic_id FROM note_topics ORDER BY note_id, rowid", {});
 }

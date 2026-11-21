@@ -80,6 +80,14 @@ sve_ctx *sve_init(const char *db_path) {
         delete c;
         return nullptr;
     }
+    // Once: notes whose memories were all dropped by the Telugu number and name checks (fixed) are tried again.
+    if (!c->store->setting_get("memories.retry_telugu.v1")) {
+        const int again = c->store->retry_notes_without_memories();
+        if (again >= 0) {
+            c->store->setting_set("memories.retry_telugu.v1", "1");
+            if (again > 0) sve_logf(1, "memories: %d notes with none are due again", again);
+        }
+    }
     // Once: people made from words the grounding check could not place ("yoi", "lanex") go.
     if (!c->store->setting_get("people.mentioned_only.v1")) {
         const int gone = c->store->drop_mentioned_only_people();
