@@ -48,6 +48,24 @@
   --c-on-ink-mute:   #9a9aa6;
   --c-ink-line:      rgba(244, 244, 247, 0.14);
 
+  /* ---- Night ----------------------------------------------------------
+     The homepage hero is night in both appearances: the black of the logo
+     render, with titanium for light. --night-steel is the colour of the
+     dithered light and of the points that draw the folded S. */
+  --night-bg:          #060608;
+  --night-surface:     #0c0d10;
+  --night-surface-2:   #15161b;
+  --night-line:        rgba(232, 236, 245, 0.09);
+  --night-line-strong: rgba(232, 236, 245, 0.17);
+  --night-text:        #f4f5f8;   /* 18.9:1 on --night-bg */
+  --night-text-dim:    #b4b8c4;   /*  9.9:1 */
+  --night-text-mute:   #8a8f9c;   /*  6.1:1 */
+  --night-steel:       #aeb6c8;
+  --night-glass:       rgba(16, 17, 21, 0.72);
+  --grad-head-night: linear-gradient(180deg, #ffffff 0%, #d6dae4 52%, #a6abb9 100%);
+  --grad-hero-night: linear-gradient(100deg, #9a9ea6 0%, #ffffff 24%, #e2e4e9 44%, #ffffff 58%, #9a9ea6 82%, #ffffff 100%);
+  --glass-spectrum-night: linear-gradient(100deg, #73CAFF 0%, #B4E9FF 10%, #A795F1 25%, #E6BDF9 42%, #F391C9 53%, #FFD0B6 68%, #EED29B 80%, #A0E1E8 91%, #73CAFF 100%);
+
   /* ---- Status ---------------------------------------------------------
      Always paired with a glyph or a label. HIG "Color > Inclusive color":
      never let colour be the only carrier of meaning. */
