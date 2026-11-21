@@ -159,8 +159,10 @@ function setup(canvas) {
     const still = reduced.matches;
     let g = 1;
     if (!gathered) {
-      if (!gatherStart) gatherStart = now;
-      g = Math.min(1, (now - gatherStart) / GATHER_MS);
+      // Off-screen draws (the first resize) hold the cloud; the gather
+      // starts on the first frame the visitor can see.
+      if (!gatherStart && visible) gatherStart = now;
+      g = gatherStart ? Math.min(1, (now - gatherStart) / GATHER_MS) : 0;
       if (g >= 1) gathered = true;
     }
 
