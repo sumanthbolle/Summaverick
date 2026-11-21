@@ -990,6 +990,7 @@ struct RelationsReviewCard: View {
                         .foregroundStyle(out ? Theme.secondary : Theme.text)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(whoLine(l, question: question)).font(.footnote).foregroundStyle(Theme.secondary)
+                    if !out && needsWho(l) { whoChoices(l, question: question) }
                 }
             }
             Spacer(minLength: 0)
@@ -1007,6 +1008,31 @@ struct RelationsReviewCard: View {
         .buttonStyle(.plain)
         .foregroundStyle(Theme.secondary)
         .accessibilityLabel(Text(out ? "Undo" : "Remove"))
+        .disabled(busy)
+    }
+
+    /// Nobody was named for it, and the person has not said who yet.
+    private func needsWho(_ l: RelationLine) -> Bool {
+        l.whoKind == "nobody" && (whos[l.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// One tap says who: the person themselves, or someone of this recording. Only then does the map get the link.
+    private func whoChoices(_ l: RelationLine, question: Bool) -> some View {
+        let people = review.people.filter { !removed.contains($0.id) }.map { names[$0.id] ?? $0.name }
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Text(question ? "Who asked?" : "Who decided?").font(.footnote.weight(.semibold)).foregroundStyle(Theme.secondary)
+                whoChip(String(localized: "Me"), set: String(localized: "me"), id: l.id)
+                ForEach(people, id: \.self) { whoChip($0, set: $0, id: l.id) }
+            }
+        }
+    }
+
+    private func whoChip(_ title: String, set value: String, id: Int64) -> some View {
+        Button { withAnimation { whos[id] = value } } label: {
+            Text(verbatim: title).font(.footnote.weight(.medium)).padding(.horizontal, 12).frame(minHeight: 36)
+        }
+        .buttonStyle(.pill)
         .disabled(busy)
     }
 

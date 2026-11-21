@@ -7611,6 +7611,36 @@
           }
         }
       }
+    },
+    "Who asked?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎవరు అడిగారు?"
+          }
+        }
+      }
+    },
+    "Who decided?": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎవరు నిర్ణయించారు?"
+          }
+        }
+      }
+    },
+    "Me": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నేను"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
