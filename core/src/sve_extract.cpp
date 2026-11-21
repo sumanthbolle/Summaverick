@@ -1,3 +1,6 @@
+#include <vector>
+#include <cctype>
+#include <set>
 #include "sve_extract.h"
 
 #include <algorithm>
@@ -40,7 +43,9 @@ std::string extraction_prompt(const std::string &context_block,
          "- \"facts\": advice or information worth remembering, such as a diet instruction or a test result.\n"
          "- \"profile\": a change to the listener's own medicines or daily routine stated in the transcript. "
          "Never propose what is already in the context above.\n"
-         "- \"people\": other people named in the recording, not the person this assistant is for.\n\n"
+         "- \"people\": names of individual people said in the recording, not the person this assistant is for. "
+         "Never a company, product, organisation or app (those are topics), and never a description such as "
+         "\"one of the managers\" or \"my doctor\".\n\n"
          "Rules:\n"
          "- Write every \"text\" and \"detail\" field in the person's preferred language from the context above. "
          "Keys and the fixed values (repeat, change) stay in English.\n"
@@ -153,6 +158,82 @@ std::string pieces_with_markers(const json &pieces) {
         }
     } catch (...) {}
     return out;
+}
+
+}  // namespace sve
+
+namespace sve {
+
+namespace {
+const std::set<std::string> &lead_words() {
+    static const std::set<std::string> k = {"one", "a", "an", "the", "my", "our", "his", "her", "their", "your",
+                                            "some", "someone", "somebody", "everyone", "everybody", "this", "that"};
+    return k;
+}
+std::string first_word_lower(const std::string &s, size_t *count) {
+    std::string first, cur;
+    size_t n = 0;
+    for (size_t i = 0; i <= s.size(); i++) {
+        const bool end = i == s.size() || std::isspace((unsigned char)s[i]);
+        if (!end) { cur.push_back((char)std::tolower((unsigned char)s[i])); continue; }
+        if (cur.empty()) continue;
+        if (!n) first = cur;
+        n++;
+        cur.clear();
+    }
+    if (count) *count = n;
+    return first;
+}
+}  // namespace
+
+bool looks_like_description(const std::string &name) {
+    size_t n = 0;
+    const std::string first = first_word_lower(name, &n);
+    return n > 0 && (lead_words().count(first) > 0 || n > 5);
+}
+
+bool looks_like_person_name(const std::string &raw) {
+    std::vector<std::string> words;
+    std::string cur;
+    bool caps_word = false;
+    for (char ch : raw) {
+        unsigned char c = (unsigned char)ch;
+        if (std::isspace(c)) { if (!cur.empty()) words.push_back(cur); cur.clear(); continue; }
+        if (std::isdigit(c)) return false;
+        cur.push_back(ch);
+    }
+    if (!cur.empty()) words.push_back(cur);
+    if (words.empty() || words.size() > 4) return false;
+    if (words.size() == 1) {  // an acronym ("HCSC", "TCS"): an organisation, not a person
+        const std::string &w = words[0];
+        int upper = 0, letters = 0;
+        for (unsigned char c : w) if (c < 0x80 && std::isalpha(c)) { letters++; if (std::isupper(c)) upper++; }
+        caps_word = letters >= 3 && upper == letters;
+        if (caps_word) return false;
+    }
+    auto low = [](std::string w) {
+        std::string o;
+        for (unsigned char c : w) if (c >= 0x80 || std::isalnum(c)) o.push_back((char)std::tolower(c));
+        return o;
+    };
+    static const std::set<std::string> kOrg = {
+        "technologies", "technology", "tech", "inc", "ltd", "llc", "llp", "corp", "corporation", "company", "co",
+        "group", "bank", "university", "college", "school", "ministry", "department", "dept", "depot", "depo",
+        "police", "services", "service", "systems", "labs", "lab", "ai", "airlines", "airways", "motors",
+        "foundation", "institute", "hospital", "clinic", "government", "council", "committee", "team", "society",
+        "network", "agency", "board", "office", "industries", "enterprises", "solutions", "pvt", "private", "limited",
+        "manager", "managers", "director", "doctor", "teacher", "officer", "brother", "sister", "friend", "people"};
+    static const std::set<std::string> kBrand = {
+        "google", "microsoft", "apple", "amazon", "meta", "facebook", "openai", "perplexity", "twitter", "nvidia",
+        "samsung", "tesla", "netflix", "uber", "ola", "flipkart", "infosys", "wipro", "swiggy", "zomato", "youtube",
+        "whatsapp", "instagram", "chatgpt", "gemini", "claude", "anthropic", "linkedin", "paytm", "reliance", "jio",
+        "airtel", "tata", "adani", "nasa", "isro", "cia", "fbi", "faa", "who", "un"};
+    if (lead_words().count(low(words[0]))) return false;
+    for (const auto &w : words) {
+        const std::string l = low(w);
+        if (kOrg.count(l) || kBrand.count(l)) return false;
+    }
+    return true;
 }
 
 }  // namespace sve

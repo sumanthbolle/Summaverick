@@ -1,4 +1,5 @@
 #include "sve_consolidate.h"
+#include "sve_extract.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -571,7 +572,8 @@ std::vector<std::pair<std::string, json>> person_checks(const std::vector<std::s
 int64_t resolve_person(Store &st, int64_t note_id, const std::string &raw, const std::string &self_lower,
                        const std::string &context, const PersonAnswers &answers) {
     const std::string name = trim_copy(raw);
-    if (!eligible_name(name) || (!self_lower.empty() && ascii_lower(name) == self_lower)) return 0;
+    if (!eligible_name(name) || !looks_like_person_name(name) || (!self_lower.empty() && ascii_lower(name) == self_lower))
+        return 0;  // a company, an organisation or a description is not a person
     int64_t same = 0;
     bool exact = false;
     std::vector<json> maybes;

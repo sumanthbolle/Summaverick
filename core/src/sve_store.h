@@ -226,6 +226,10 @@ public:
     // edited,edits,created_at,decided_at}; from_name/to_text of a person or topic are its current name. They go with
     // their note (delete) and their memory, move with merge_topics, and go with wipe_assistant.
     int64_t add_relation(const json &row);
+    // People that are not people (is_person false): each becomes a topic of the same name (joining one that exists),
+    // keeping its recordings; a description (is_description) is deleted. Their relations go. Returns how many
+    // changed, -1 on error.
+    int reclassify_non_people(bool (*is_person)(const std::string &), bool (*is_description)(const std::string &));
     json relations(const json &filter);  // filter: note_id, status; by note then id
     json relation_review_notes();        // [{note_id,title,created_at}] of notes with pending rows, newest first
     bool update_relation(int64_t id, const json &fields);  // whitelisted columns only

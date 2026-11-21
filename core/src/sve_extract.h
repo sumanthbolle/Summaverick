@@ -32,4 +32,11 @@ bool first_json_object(const std::string &text, nlohmann::json &out);
 // pieces: [{"start_sec":int,"text":str,...}, ...] -> "[t=<sec>] <text>\n" per piece.
 std::string pieces_with_markers(const nlohmann::json &pieces);
 
+// A recording's "people" are individual people: a name of at most four words, no digits, not a company, product,
+// organisation, acronym or description ("one of the managers ...", "my manager"). The model also returned Google,
+// Perplexity and "l three harris technologies" as people (2026-11-21). Those go in as topics instead.
+bool looks_like_person_name(const std::string &name);
+// A description of someone ("one of the managers ...", "my manager"), not a name of anyone or anything: dropped.
+bool looks_like_description(const std::string &name);
+
 }  // namespace sve

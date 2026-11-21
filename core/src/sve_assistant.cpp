@@ -506,13 +506,19 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         }
         const std::string self = lower(jstr(profile_of(st), "name"));
         for (const auto &[kind, names] : {std::make_pair("topic", merged.topics), std::make_pair("person", merged.people)}) {
-            json existing = st.topics(kind);
             for (const auto &n : names) {
                 std::string name = n.get<std::string>();
                 if (name.size() > 80 || (std::string(kind) == "person" && !self.empty() && lower(name) == self)) continue;
-                for (const auto &t : existing)
+                std::string as = kind;
+                if (as == "person" && !sve::looks_like_person_name(name)) {
+                    // A company or organisation named as a person is a topic; a description ("one of the managers")
+                    // is nobody in particular and is left out.
+                    if (sve::looks_like_description(name)) continue;
+                    as = "topic";
+                }
+                for (const auto &t : st.topics(as))
                     if (lower(jstr(t, "name")) == lower(name)) name = jstr(t, "name");
-                int64_t tid = st.upsert_topic(kind, name);
+                int64_t tid = st.upsert_topic(as, name);
                 if (tid > 0) st.link_topic(note_id, tid);
             }
         }

@@ -772,6 +772,37 @@ json Store::topic_notes(int64_t topic_id) {
                       "ORDER BY n.created_at DESC, n.id DESC", {topic_id});
 }
 
+int Store::reclassify_non_people(bool (*is_person)(const std::string &), bool (*is_description)(const std::string &)) {
+    int moved = 0;
+    for (const auto &t : topics("person")) {
+        const int64_t id = t.value("id", (int64_t)0);
+        const std::string name = t.value("name", std::string());
+        if (id <= 0 || is_person(name)) continue;
+        if (!begin()) return -1;
+        bool ok = run("DELETE FROM relations WHERE from_topic=? OR to_topic=?", {id, id});
+        json same = query_rows("SELECT id FROM topics WHERE kind='topic' AND lower(name)=lower(?) LIMIT 1", {name});
+        if (ok && is_description(name)) {
+            ok = run("DELETE FROM memory_entities WHERE topic_id=?", {id}) && run("DELETE FROM note_topics WHERE topic_id=?", {id}) &&
+                 run("DELETE FROM topics WHERE id=?", {id});
+        } else if (ok && !same.empty()) {
+            const int64_t into = same[0].value("id", (int64_t)0);
+            ok = run("INSERT OR IGNORE INTO note_topics(note_id, topic_id) SELECT note_id, ? FROM note_topics WHERE topic_id=?", {into, id}) &&
+                 run("UPDATE OR IGNORE memory_entities SET topic_id=?, role='topic' WHERE topic_id=?", {into, id}) &&
+                 run("DELETE FROM memory_entities WHERE topic_id=?", {id}) &&
+                 run("DELETE FROM note_topics WHERE topic_id=?", {id}) &&
+                 run("DELETE FROM topics WHERE id=?", {id});
+        } else if (ok) {
+            ok = run("UPDATE topics SET kind='topic' WHERE id=?", {id}) &&
+                 run("UPDATE OR IGNORE memory_entities SET role='topic' WHERE topic_id=?", {id}) &&
+                 run("DELETE FROM memory_entities WHERE topic_id=? AND role<>'topic'", {id});
+        }
+        if (!ok) { rollback(); return -1; }
+        if (!commit()) return -1;
+        moved++;
+    }
+    return moved;
+}
+
 json Store::note_topic_links() {
     return query_rows("SELECT note_id, topic_id FROM note_topics ORDER BY note_id, rowid", {});
 }

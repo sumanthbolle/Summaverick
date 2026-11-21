@@ -1,6 +1,7 @@
 // Summaverick Everyday — portable core implementation.
 // Hosts: iOS (today), Android (next), the Summaverick Everyday device (Linux/ARM).
 #include "sve_core.h"
+#include "sve_extract.h"
 #include "sve_internal.h"
 #include <mutex>
 #include "sve_prompts.h"
@@ -78,6 +79,14 @@ sve_ctx *sve_init(const char *db_path) {
         sve_logf(2, "store open failed: %s", c->store->last_error().c_str());
         delete c;
         return nullptr;
+    }
+    // Once: people saved before looks_like_person_name (Google, Perplexity, ...) become topics.
+    if (!c->store->setting_get("people.reclassified.v1")) {
+        const int moved = c->store->reclassify_non_people(sve::looks_like_person_name, sve::looks_like_description);
+        if (moved >= 0) {
+            c->store->setting_set("people.reclassified.v1", "1");
+            if (moved > 0) sve_logf(1, "people: %d saved names that are not people are topics now", moved);
+        }
     }
     return c;
 }
