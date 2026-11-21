@@ -171,7 +171,7 @@ int64_t store_memory(sve::Store &st, int64_t note_id, json g, int double_check, 
     }
     const std::vector<std::string> names = memory_names(g);
     for (size_t i = 2; i < names.size(); ++i) {
-        int64_t tid = sve::resolve_person(st, note_id, names[i], self, text, answers);
+        int64_t tid = sve::known_person(st, note_id, names[i]);  // links someone known; never a new person
         if (tid < 0) return -1;
         if (tid > 0) add_link(tid, "mentioned");
     }

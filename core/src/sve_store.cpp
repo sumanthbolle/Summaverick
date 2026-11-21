@@ -803,6 +803,25 @@ int Store::reclassify_non_people(bool (*is_person)(const std::string &), bool (*
     return moved;
 }
 
+int Store::drop_mentioned_only_people() {
+    json ids = query_rows(
+        "SELECT t.id AS id FROM topics t WHERE t.kind='person' "
+        "AND EXISTS (SELECT 1 FROM memory_entities e WHERE e.topic_id=t.id AND e.role='mentioned') "
+        "AND NOT EXISTS (SELECT 1 FROM memory_entities e WHERE e.topic_id=t.id AND e.role<>'mentioned') "
+        "AND NOT EXISTS (SELECT 1 FROM relations r WHERE (r.from_topic=t.id OR r.to_topic=t.id) AND r.status='accepted')", {});
+    if (ids.empty()) return 0;
+    if (!begin()) return -1;
+    int n = 0;
+    for (const auto &r : ids) {
+        const int64_t id = r.value("id", (int64_t)0);
+        if (!run("DELETE FROM relations WHERE from_topic=? OR to_topic=?", {id, id}) ||
+            !run("DELETE FROM memory_entities WHERE topic_id=?", {id}) || !run("DELETE FROM note_topics WHERE topic_id=?", {id}) ||
+            !run("DELETE FROM topics WHERE id=?", {id})) { rollback(); return -1; }
+        n++;
+    }
+    return commit() ? n : -1;
+}
+
 json Store::note_topic_links() {
     return query_rows("SELECT note_id, topic_id FROM note_topics ORDER BY note_id, rowid", {});
 }

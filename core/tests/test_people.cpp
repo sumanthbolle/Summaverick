@@ -3,6 +3,7 @@
 #include "check.h"
 #include "sve_extract.h"
 #include "sve_store.h"
+#include "sve_consolidate.h"
 
 using namespace sve;
 
@@ -44,4 +45,30 @@ TEST(store_turns_saved_non_people_into_topics_once) {
     CHECK(roman_person);
     CHECK(!description_left);  // a description is nobody in particular: gone, not a topic
     CHECK_EQ(st.reclassify_non_people(looks_like_person_name, looks_like_description), 0);  // nothing left to move
+}
+
+// Note 4 (2026-11-21): words the grounding check could not place ("yoi", "lanex", "hyperarity") were "mentioned"
+// names, and each became a new person. A mentioned name only links someone already known.
+TEST(mentioned_name_links_only_a_known_person) {
+    Store st(":memory:");
+    int64_t note = st.create("t", "en", nullptr, "tr", 60);
+    int64_t ravi = st.upsert_topic("person", "Ravi Kumar");
+    CHECK_EQ(known_person(st, note, "Ravi Kumar"), ravi);
+    CHECK_EQ(known_person(st, note, "lanex"), (int64_t)0);
+    CHECK_EQ((int)st.topics("person").size(), 1);
+}
+
+TEST(store_drops_people_known_only_as_mentioned_words) {
+    Store st(":memory:");
+    int64_t note = st.create("t", "en", nullptr, "tr", 60);
+    int64_t yoi = st.upsert_topic("person", "yoi");
+    int64_t roman = st.upsert_topic("person", "Roman Goffman");  // named by extraction: no memory links
+    st.link_topic(note, yoi);
+    st.link_topic(note, roman);
+    int64_t m = st.add_memory_item({{"type", "fact"}, {"text", "old yoi"}, {"review", "kept"}});
+    CHECK(m > 0);
+    CHECK(st.link_memory_entity(m, yoi, "mentioned"));
+    CHECK_EQ(st.drop_mentioned_only_people(), 1);
+    CHECK_EQ((int)st.topics("person").size(), 1);
+    CHECK_EQ(st.topics("person")[0].value("name", ""), std::string("Roman Goffman"));
 }

@@ -569,6 +569,17 @@ std::vector<std::pair<std::string, json>> person_checks(const std::vector<std::s
     return out;
 }
 
+int64_t known_person(Store &st, int64_t note_id, const std::string &raw) {
+    const std::string name = trim_copy(raw);
+    if (!eligible_name(name) || !looks_like_person_name(name)) return 0;
+    for (const auto &t : st.topics("person"))
+        if (match_person(name, jstr(t, "name")) == PersonMatch::same) {
+            const int64_t id = jint(t, "id", 0);
+            return id > 0 && st.link_topic(note_id, id) ? id : -1;
+        }
+    return 0;
+}
+
 int64_t resolve_person(Store &st, int64_t note_id, const std::string &raw, const std::string &self_lower,
                        const std::string &context, const PersonAnswers &answers) {
     const std::string name = trim_copy(raw);

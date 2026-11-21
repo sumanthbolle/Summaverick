@@ -80,6 +80,14 @@ sve_ctx *sve_init(const char *db_path) {
         delete c;
         return nullptr;
     }
+    // Once: people made from words the grounding check could not place ("yoi", "lanex") go.
+    if (!c->store->setting_get("people.mentioned_only.v1")) {
+        const int gone = c->store->drop_mentioned_only_people();
+        if (gone >= 0) {
+            c->store->setting_set("people.mentioned_only.v1", "1");
+            if (gone > 0) sve_logf(1, "people: %d made from unplaced words are gone", gone);
+        }
+    }
     // Once: people saved before looks_like_person_name (Google, Perplexity, ...) become topics.
     if (!c->store->setting_get("people.reclassified.v1")) {
         const int moved = c->store->reclassify_non_people(sve::looks_like_person_name, sve::looks_like_description);

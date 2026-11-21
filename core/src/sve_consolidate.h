@@ -79,6 +79,10 @@ std::vector<std::pair<std::string, json>> person_checks(const std::vector<std::s
 // The person topic for a spoken name, linked to the note: a known person who is the "same", else a new
 // topic, plus a pending person_questions row against every known "maybe" the answers do not rule out.
 // 0 for a name that names nobody (empty, too long, a pronoun, the person themselves), -1 on error.
+// A name the memory only mentions (found by the grounding check, not given as who or to whom): the known person it
+// clearly is, linked to the note; 0 when nobody known is that name. Never makes a new person: an unplaced word
+// ("yoi", "lanex") is not someone.
+int64_t known_person(Store &st, int64_t note_id, const std::string &name);
 int64_t resolve_person(Store &st, int64_t note_id, const std::string &name, const std::string &self_lower,
                        const std::string &context, const PersonAnswers &answers);
 

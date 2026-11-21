@@ -230,6 +230,9 @@ public:
     // keeping its recordings; a description (is_description) is deleted. Their relations go. Returns how many
     // changed, -1 on error.
     int reclassify_non_people(bool (*is_person)(const std::string &), bool (*is_description)(const std::string &));
+    // People whose memory links are all "mentioned" (an unplaced word the grounding check took for a name) and who
+    // were never who or to whom, nor in an accepted relation: deleted. Returns how many, -1 on error.
+    int drop_mentioned_only_people();
     json relations(const json &filter);  // filter: note_id, status; by note then id
     json relation_review_notes();        // [{note_id,title,created_at}] of notes with pending rows, newest first
     bool update_relation(int64_t id, const json &fields);  // whitelisted columns only
