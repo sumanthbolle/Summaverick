@@ -7342,16 +7342,6 @@
         }
       }
     },
-    "Saves a one-time reminder in Summaverick. It rings at the time you choose.": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Summaverickలో ఒకసారి మోగే రిమైండర్ సేవ్ చేస్తుంది. మీరు ఎంచుకున్న సమయానికి మోగుతుంది."
-          }
-        }
-      }
-    },
     "What should I remind you about?": {
       "localizations": {
         "te": {
@@ -7368,16 +7358,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "ఎప్పుడు గుర్తు చేయాలి?"
-          }
-        }
-      }
-    },
-    "Remind me about ${text} at ${time}": {
-      "localizations": {
-        "te": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "${time}కి ${text} గురించి గుర్తు చేయండి"
           }
         }
       }
@@ -7638,6 +7618,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "నేను"
+          }
+        }
+      }
+    },
+    "Remind me about ${text} at ${time}, ${repeats}": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${time}కి ${text} గురించి గుర్తు చేయండి, ${repeats}"
+          }
+        }
+      }
+    },
+    "Repeat": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మళ్ళీ మళ్ళీ"
+          }
+        }
+      }
+    },
+    "Saves a reminder in Summaverick, once, every day or every week. It rings at the time you choose.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summaverickలో ఒకసారి, ప్రతిరోజూ లేదా ప్రతి వారం గుర్తుచేసేదాన్ని సేవ్ చేస్తుంది. మీరు ఎంచుకున్న సమయానికి మోగుతుంది."
+          }
+        }
+      }
+    },
+    "every %@ at %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రతి %1$@ %2$@కి"
+          }
+        }
+      }
+    },
+    "every day at %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ప్రతిరోజూ %@కి"
           }
         }
       }

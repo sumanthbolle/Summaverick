@@ -252,10 +252,21 @@ struct LastNoteSummaryIntent: AppIntent {
     }
 }
 
+/// How often a reminder from the shortcut rings (AssistantIntentLogic.RepeatRule).
+@available(iOS 18.0, *)
+enum ReminderRepeatOption: String, AppEnum {
+    case once, daily, weekly
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Repeat"
+    static let caseDisplayRepresentations: [ReminderRepeatOption: DisplayRepresentation] = [
+        .once: "Once", .daily: "Every day", .weekly: "Every week",
+    ]
+    var rule: AssistantIntentLogic.RepeatRule { AssistantIntentLogic.RepeatRule(rawValue: rawValue) ?? .once }
+}
+
 @available(iOS 18.0, *)
 struct AddReminderIntent: AppIntent {
     static let title: LocalizedStringResource = "Add a reminder"
-    static let description = IntentDescription("Saves a one-time reminder in Summaverick. It rings at the time you choose.")
+    static let description = IntentDescription("Saves a reminder in Summaverick, once, every day or every week. It rings at the time you choose.")
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @available(iOS 27.0, *)
@@ -267,8 +278,11 @@ struct AddReminderIntent: AppIntent {
     @Parameter(title: "Time", requestValueDialog: "When should I remind you?")
     var time: Date
 
+    @Parameter(title: "Repeat", default: .once)
+    var repeats: ReminderRepeatOption
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Remind me about \(\.$text) at \(\.$time)")
+        Summary("Remind me about \(\.$text) at \(\.$time), \(\.$repeats)")
     }
 
     init() {}
@@ -278,13 +292,14 @@ struct AddReminderIntent: AppIntent {
         guard let words = AssistantIntentLogic.cleanedReminderText(text) else {
             throw $text.needsValueError("What should I remind you about?")
         }
-        guard let at = AssistantIntentLogic.oneTimeReminder(at: time, now: Date(), calendar: .current) else {
+        let rule = repeats.rule
+        guard let at = AssistantIntentLogic.reminderStart(at: time, rule: rule, now: Date(), calendar: .current) else {
             return .result(dialog: "That time has already passed. Please choose a later time.")
         }
         do {
             // The same core path as a reminder saved from Ask or Today: the person's own row, applied directly.
             _ = try await CoreEngine.shared.createReminder(
-                NewReminder(text: words, times: [at.time], repeat: "once", startDate: at.day, untilDate: nil,
+                NewReminder(text: words, times: [at.time], repeat: rule.rawValue, startDate: at.day, untilDate: nil,
                             noteID: nil, startSec: nil, medicineID: nil, sourceText: nil))
         } catch {
             NSLog("[sve] intent: add reminder failed: %@", String(describing: error))
@@ -294,9 +309,11 @@ struct AddReminderIntent: AppIntent {
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
         let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         let canRing = status == .authorized || status == .provisional || status == .ephemeral
-        let when = time.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute())
+        let when = rule == .once ? time.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute())
+            : AssistantIntentLogic.repeatWhen(rule: rule, time: time.formatted(date: .omitted, time: .shortened),
+                                              weekday: time.formatted(.dateTime.weekday(.wide)))
         let line = AssistantIntentLogic.reminderSavedText(text: words, when: when, canRing: canRing)
-        NSLog("[sve] intent: reminder saved for %@ %@ (notifications %@)", at.day, at.time, canRing ? "on" : "off")
+        NSLog("[sve] intent: reminder saved for %@ %@ %@ (notifications %@)", at.day, at.time, rule.rawValue, canRing ? "on" : "off")
         return .result(dialog: IntentDialog(stringLiteral: line))
     }
 }

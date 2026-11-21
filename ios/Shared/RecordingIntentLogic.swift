@@ -150,6 +150,27 @@ enum AssistantIntentLogic {
         return (String(format: "%04d-%02d-%02d", y, mo, d), String(format: "%02d:%02d", h, mi))
     }
 
+    /// How often a reminder from the shortcut rings.
+    enum RepeatRule: String, CaseIterable { case once, daily, weekly }
+
+    /// The first day and the time a reminder starts. Once: that minute, if still to come (else nil). Every day or
+    /// week: that time of day, from that day if the time is still to come, else from the next day (week).
+    static func reminderStart(at date: Date, rule: RepeatRule, now: Date, calendar: Calendar) -> (day: String, time: String)? {
+        if rule == .once { return oneTimeReminder(at: date, now: now, calendar: calendar) }
+        if let today = oneTimeReminder(at: date, now: now, calendar: calendar) { return today }
+        guard let next = calendar.date(byAdding: .day, value: rule == .daily ? 1 : 7, to: date) else { return nil }
+        return oneTimeReminder(at: next, now: now, calendar: calendar)
+    }
+
+    /// "every day at 8:00 AM" / "every Saturday at 8:00 AM", for what the shortcut says after saving.
+    static func repeatWhen(rule: RepeatRule, time: String, weekday: String) -> String {
+        switch rule {
+        case .daily: return String(localized: "every day at \(time)")
+        case .weekly: return String(localized: "every \(weekday) at \(time)")
+        case .once: return time
+        }
+    }
+
     static func cleanedReminderText(_ text: String) -> String? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? nil : t
