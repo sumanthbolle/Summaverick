@@ -335,7 +335,7 @@ body[data-home] [data-spot]::after {
   z-index: 2;
   padding: 1px;
   border-radius: inherit;
-  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, -60%), color-mix(in srgb, var(--c-text) 45%, transparent), transparent 70%);
+  background: radial-gradient(320px circle at var(--mx, 50%) var(--my, -60%), color-mix(in srgb, var(--c-text) 70%, transparent), transparent 70%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -344,6 +344,9 @@ body[data-home] [data-spot]::after {
   pointer-events: none;
 }
 body[data-home] [data-spot]:hover::after { opacity: 1; }
+body[data-home] [data-spot]:hover {
+  background-image: radial-gradient(440px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--c-text) 5%, transparent), transparent 65%);
+}
 
 /* ---- Floating nav ------------------------------------------------------------------
    On the homepage the bar becomes a pill that floats over the page, lined up
