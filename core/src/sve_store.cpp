@@ -116,6 +116,9 @@ END;
 CREATE TRIGGER IF NOT EXISTS notes_ad_extracted AFTER DELETE ON notes BEGIN
   DELETE FROM settings WHERE key='extracted.' || old.id;
 END;
+CREATE TRIGGER IF NOT EXISTS notes_ad_speed AFTER DELETE ON notes BEGIN
+  DELETE FROM settings WHERE key='speed.' || old.id;
+END;
 CREATE TABLE IF NOT EXISTS topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('topic','person')),
     name TEXT NOT NULL, summary TEXT, summary_stale INTEGER NOT NULL DEFAULT 1, UNIQUE(kind, name)

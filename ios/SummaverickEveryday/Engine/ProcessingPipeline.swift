@@ -90,6 +90,7 @@ final class ProcessingPipeline {
 
     private(set) var stage: Stage = .idle {
         didSet {
+            speedTick()
             refreshExpiryOutcome()
             if stage.isWorking { ContinuedWork.shared.update(subtitle: progressLine) }
             guard case .failed(let msg) = stage, let id = activeNoteID else { followStage(); return }
@@ -99,6 +100,66 @@ final class ProcessingPipeline {
             failedLines[id] = msg
             notifyFailed(id, line: msg)
             RecordingActivities.shared.update(noteID: id, .failed, line: msg, percent: ContinuedWork.shared.percent)
+        }
+    }
+
+    // MARK: speed record (SpeedRecord): active work time per note, heat and battery, for the owner's own figures.
+
+    @ObservationIgnored private var speedOpen: (id: Int64, bucket: SpeedMath.Bucket, since: Date)?
+    @ObservationIgnored private var speedChain: Task<Void, Never>?
+
+    private func speedBucket(_ s: Stage) -> SpeedMath.Bucket {
+        switch s {
+        case .transcribing: return .transcribe
+        case .cooling: return .rest
+        case .loadingModel, .extracting, .sections, .generating: return .notes
+        default: return .none
+        }
+    }
+
+    private static let deviceModel: String = {
+        var u = utsname()
+        uname(&u)
+        return withUnsafeBytes(of: &u.machine) { String(decoding: $0.prefix(while: { $0 != 0 }), as: UTF8.self) }
+    }()
+
+    /// Each stage change: the time since the last one goes to the note it was for; the new stage starts its own.
+    /// Only a note's own notes run is timed (a regenerate or memories are not). Writes go one after another.
+    private func speedTick() {
+        let now = Date()
+        let closing = speedOpen.map { (id: $0.id, bucket: $0.bucket, seconds: now.timeIntervalSince($0.since)) }
+        let bucket = notesRun ? speedBucket(stage) : .none
+        let id = activeNoteID
+        speedOpen = bucket != .none ? id.map { (id: $0, bucket: bucket, since: now) } : nil
+        let finished = stage == .done ? id : nil
+        let touched = Set([closing?.id, bucket != .none ? id : nil, finished].compactMap { $0 })
+        guard !touched.isEmpty else { return }
+        let thermal = ProcessInfo.processInfo.thermalState.rawValue
+        let d = UIDevice.current
+        let battery: Double? = d.isBatteryMonitoringEnabled && d.batteryLevel >= 0 ? Double(d.batteryLevel) : nil
+        let charging = d.isBatteryMonitoringEnabled && (d.batteryState == .charging || d.batteryState == .full)
+        let previous = speedChain
+        speedChain = Task {
+            await previous?.value
+            let engine = CoreEngine.shared
+            for n in touched {
+                var r: SpeedRecord
+                if let json = await engine.setting(SpeedRecord.key(n)), let data = json.data(using: .utf8),
+                   let old = try? JSONDecoder().decode(SpeedRecord.self, from: data) {
+                    r = old
+                } else {
+                    guard let note = await engine.note(n) else { continue }
+                    r = SpeedRecord(audioSeconds: Double(note.duration_seconds), device: Self.deviceModel)
+                    r.batteryStart = battery
+                }
+                if let c = closing, c.id == n { r = SpeedMath.adding(r, c.bucket, seconds: c.seconds) }
+                r.peakThermal = max(r.peakThermal, thermal)
+                if let battery { r.batteryEnd = battery; if r.batteryStart == nil { r.batteryStart = battery } }
+                r.charging = r.charging || charging
+                if finished == n { r.finishedAt = now.timeIntervalSince1970 }
+                guard let data = try? JSONEncoder().encode(r), let json = String(data: data, encoding: .utf8) else { continue }
+                await engine.setSetting(SpeedRecord.key(n), json)
+            }
         }
     }
 

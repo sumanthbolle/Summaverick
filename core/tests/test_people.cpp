@@ -87,3 +87,13 @@ TEST(notes_whose_memories_all_dropped_are_due_again) {
     CHECK_EQ((int)due.size(), 1);
     CHECK_EQ(due[0].get<int64_t>(), empty);
 }
+
+TEST(a_notes_speed_record_goes_with_it) {
+    Store st(":memory:");
+    int64_t n = st.create("t", "en", nullptr, "tr", 60);
+    st.setting_set("speed." + std::to_string(n), "{}");
+    st.setting_set("speed.999", "{}");
+    CHECK(st.remove(n));
+    CHECK(!st.setting_get("speed." + std::to_string(n)));
+    CHECK(st.setting_get("speed.999").has_value());
+}

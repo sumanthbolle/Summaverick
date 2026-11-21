@@ -5,12 +5,24 @@ struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var models = ModelManager.shared
+    @State private var speedRecords: [(noteID: Int64, record: SpeedRecord)] = []
     @State private var confirmWipe = false
     @State private var confirmRemoveAI = false
     @State private var wipeFailed = false
     @State private var wipeBusy = false
     @State private var wiping = false
     @State private var pipeline = ProcessingPipeline.shared
+
+    /// Every note's speed record (SpeedRecord), newest notes first.
+    private func loadSpeed() async {
+        var out: [(noteID: Int64, record: SpeedRecord)] = []
+        for n in await CoreEngine.shared.notes() {
+            guard let json = await CoreEngine.shared.setting(SpeedRecord.key(n.id)), let data = json.data(using: .utf8),
+                  let r = try? JSONDecoder().decode(SpeedRecord.self, from: data) else { continue }
+            out.append((noteID: n.id, record: r))
+        }
+        speedRecords = out
+    }
 
     var body: some View {
         @Bindable var settings = settings
@@ -75,6 +87,21 @@ struct SettingsView: View {
                         .font(.footnote).foregroundStyle(Theme.secondary)
                 }
                 .listRowBackground(Theme.formRow)
+
+                Section("Speed on this phone") {
+                    ForEach(SpeedMath.summaryLines(speedRecords.map(\.record)), id: \.self) { Text(verbatim: $0) }
+                    if speedRecords.contains(where: { $0.record.finishedAt != nil }) {
+                        ShareLink(item: SpeedMath.csv(speedRecords.filter { $0.record.finishedAt != nil }),
+                                  subject: Text("Summaverick speed on this phone"),
+                                  preview: SharePreview("Summaverick speed on this phone")) {
+                            Label("Share speed report", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    Text("Only the time spent working is counted, not pauses. Measured on this phone; nothing is sent anywhere unless you share it.")
+                        .font(.footnote).foregroundStyle(Theme.secondary)
+                }
+                .listRowBackground(Theme.formRow)
+                .task { await loadSpeed() }
 
                 Section("Privacy") {
                     Toggle("Require Face ID / passcode to open", isOn: $settings.requireUnlock)

@@ -728,6 +728,129 @@ enum QuietHours {
 }
 
 /// Notes notifications (NotesNotifier): ready, paused, failed. One per state change, never per percent.
+/// How one note ran on this phone, for the owner's own speed figures (market notes, 2026-11-21: publish
+/// transcription speed, summary time, heat and battery). Only active work is timed: a pause or a night's wait does
+/// not count. Kept in the core's settings as "speed.<note id>", deleted with the note.
+struct SpeedRecord: Codable, Equatable {
+    var audioSeconds: Double
+    var transcribeSeconds: Double = 0
+    var notesSeconds: Double = 0
+    /// Rests for heat (the cooling stage), inside the work.
+    var restSeconds: Double = 0
+    /// Highest ProcessInfo.ThermalState raw value seen while working: 0 nominal, 1 fair, 2 serious, 3 critical.
+    var peakThermal: Int = 0
+    /// 0...1; nil when iOS did not say.
+    var batteryStart: Double?
+    var batteryEnd: Double?
+    var charging = false
+    var finishedAt: Double?
+    var device: String
+
+    static func key(_ noteID: Int64) -> String { "speed.\(noteID)" }
+}
+
+enum SpeedMath {
+    enum Bucket: Equatable { case transcribe, notes, rest, none }
+
+    static func adding(_ r: SpeedRecord, _ b: Bucket, seconds: Double) -> SpeedRecord {
+        guard seconds > 0, seconds < 6 * 3600 else { return r }   // a clock jump is not work
+        var x = r
+        switch b {
+        case .transcribe: x.transcribeSeconds += seconds
+        case .notes: x.notesSeconds += seconds
+        case .rest: x.restSeconds += seconds
+        case .none: break
+        }
+        return x
+    }
+
+    /// Times faster than the recording itself (audio seconds per second of work); nil without both.
+    static func timesRealTime(audio: Double, work: Double) -> Double? {
+        audio > 0 && work > 0 ? audio / work : nil
+    }
+
+    /// Battery used, in whole percent; nil when unknown or charging.
+    static func batteryUsed(_ r: SpeedRecord) -> Int? {
+        guard !r.charging, let a = r.batteryStart, let b = r.batteryEnd, a >= 0, b >= 0, a >= b else { return nil }
+        return Int(((a - b) * 100).rounded())
+    }
+
+    static func minutes(_ s: Double) -> String {
+        s < 60 ? String(localized: "\(Int(s.rounded())) s") : String(format: String(localized: "%.1f min"), s / 60)
+    }
+
+    static func heatWord(_ t: Int) -> String {
+        switch t {
+        case 3: return String(localized: "very hot")
+        case 2: return String(localized: "hot")
+        case 1: return String(localized: "warm")
+        default: return String(localized: "cool")
+        }
+    }
+
+    /// The note screen's lines.
+    static func noteLines(_ r: SpeedRecord) -> [String] {
+        var out: [String] = []
+        if r.transcribeSeconds > 0 {
+            var l = String(localized: "Transcript: \(minutes(r.transcribeSeconds))")
+            if let x = timesRealTime(audio: r.audioSeconds, work: r.transcribeSeconds) {
+                l += " · " + String(format: String(localized: "%.1f× faster than the recording"), x)
+            }
+            out.append(l)
+        }
+        if r.notesSeconds > 0 { out.append(String(localized: "Notes: \(minutes(r.notesSeconds))")) }
+        if r.restSeconds >= 1 { out.append(String(localized: "Rested to cool down: \(minutes(r.restSeconds))")) }
+        var phone = String(localized: "Phone: \(heatWord(r.peakThermal))")
+        if let b = batteryUsed(r) { phone += " · " + String(localized: "battery used \(b)%") }
+        else if r.charging { phone += " · " + String(localized: "charging") }
+        out.append(phone)
+        return out
+    }
+
+    static func median(_ xs: [Double]) -> Double? {
+        let s = xs.sorted()
+        guard !s.isEmpty else { return nil }
+        return s.count % 2 == 1 ? s[s.count / 2] : (s[s.count / 2 - 1] + s[s.count / 2]) / 2
+    }
+
+    /// Settings' summary over finished notes: how many, typical transcript speed, typical notes time per 10 minutes
+    /// of recording, how often the phone got hot, battery per hour of recording (on battery only).
+    static func summaryLines(_ rs: [SpeedRecord]) -> [String] {
+        let done = rs.filter { $0.finishedAt != nil && $0.audioSeconds > 0 }
+        guard !done.isEmpty else { return [String(localized: "No finished notes measured yet.")] }
+        var out = [String(localized: "\(done.count) notes, \(minutes(done.map(\.audioSeconds).reduce(0, +))) of recordings")]
+        if let x = median(done.compactMap { timesRealTime(audio: $0.audioSeconds, work: $0.transcribeSeconds) }) {
+            out.append(String(format: String(localized: "Transcript: usually %.1f× faster than the recording"), x))
+        }
+        if let n = median(done.filter { $0.notesSeconds > 0 }.map { $0.notesSeconds / $0.audioSeconds * 600 }) {
+            out.append(String(localized: "Notes: usually \(minutes(n)) for every 10 minutes recorded"))
+        }
+        let hot = done.filter { $0.peakThermal >= 2 }.count
+        out.append(String(localized: "The phone got hot on \(hot) of \(done.count)"))
+        let onBattery = done.compactMap { r -> (Int, Double)? in batteryUsed(r).map { ($0, r.audioSeconds) } }
+        if !onBattery.isEmpty {
+            let used = Double(onBattery.map(\.0).reduce(0, +)), hours = onBattery.map(\.1).reduce(0, +) / 3600
+            if hours > 0 { out.append(String(format: String(localized: "Battery: about %.0f%% per hour recorded"), used / hours)) }
+        }
+        return out
+    }
+
+    /// One row per note, for sharing: device, minutes recorded, minutes of transcript work, times faster, notes
+    /// minutes, rest minutes, peak heat, battery used, finished (ISO date).
+    static func csv(_ rows: [(noteID: Int64, record: SpeedRecord)]) -> String {
+        var out = "note,device,recorded_min,transcript_min,times_faster,notes_min,rest_min,peak_heat,battery_used_pct,finished\n"
+        let iso = ISO8601DateFormatter()
+        for (id, r) in rows.sorted(by: { $0.noteID < $1.noteID }) {
+            let x = timesRealTime(audio: r.audioSeconds, work: r.transcribeSeconds).map { String(format: "%.2f", $0) } ?? ""
+            let fin = r.finishedAt.map { iso.string(from: Date(timeIntervalSince1970: $0)) } ?? ""
+            out += [String(id), "\"" + r.device.replacingOccurrences(of: "\"", with: "\"\"") + "\"", String(format: "%.2f", r.audioSeconds / 60), String(format: "%.2f", r.transcribeSeconds / 60), x,
+                    String(format: "%.2f", r.notesSeconds / 60), String(format: "%.2f", r.restSeconds / 60), heatWord(r.peakThermal),
+                    batteryUsed(r).map(String.init) ?? "", fin].joined(separator: ",") + "\n"
+        }
+        return out
+    }
+}
+
 /// A transcript too thin to write notes from. Fewer than `minWords` words (a 1–2 s tap that caught "అది"):
 /// Gemma made up a whole meeting from it, title, summary and nine questions (notes 3 and 7, 2026-11-19). Such a
 /// note keeps its transcript and gets no notes, and says so instead.

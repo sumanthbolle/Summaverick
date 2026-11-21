@@ -11,6 +11,7 @@ struct NoteDetailView: View {
     let startAt: Int?
 
     @State private var note: Note?
+    @State private var speed: SpeedRecord?
     @State private var loaded = false
     @State private var pieces: [TranscriptPiece] = []
     @State private var chapters: [Chapter] = []
@@ -137,6 +138,17 @@ struct NoteDetailView: View {
                             }
                         }
                         .font(.caption).foregroundStyle(Theme.secondary)
+                    }
+
+                    if let speed, speed.finishedAt != nil {
+                        DisclosureGroup("How it ran on this phone") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(SpeedMath.noteLines(speed), id: \.self) { Text(verbatim: $0) }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 4)
+                        }
+                        .font(.footnote).foregroundStyle(Theme.secondary)
                     }
 
                     ChaptersView(chapters: chapters, onPlay: audioPath.map { p in { sec in playChapter(p, sec) } })
@@ -575,6 +587,9 @@ struct NoteDetailView: View {
         let previous = note
         let n = await CoreEngine.shared.note(noteID)
         let ps = await CoreEngine.shared.pieces(noteID)
+        if let json = await CoreEngine.shared.setting(SpeedRecord.key(noteID)), let data = json.data(using: .utf8) {
+            speed = try? JSONDecoder().decode(SpeedRecord.self, from: data)
+        }
         chapters = await CoreEngine.shared.chapters(noteID)
         extracted = await CoreEngine.shared.noteExtracted(noteID)
         let lang = n?.lang ?? "en"

@@ -7671,6 +7671,246 @@
           }
         }
       }
+    },
+    "%.1f min": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%.1f నిమి"
+          }
+        }
+      }
+    },
+    "%.1f× faster than the recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రికార్డింగ్ కంటే %.1f× వేగంగా"
+          }
+        }
+      }
+    },
+    "%lld notes, %@ of recordings": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld నోట్స్, %@ రికార్డింగ్‌లు"
+          }
+        }
+      }
+    },
+    "%lld s": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld సె"
+          }
+        }
+      }
+    },
+    "Battery: about %.0f%% per hour recorded": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "బ్యాటరీ: రికార్డ్ చేసిన ప్రతి గంటకు సుమారు %.0f%%"
+          }
+        }
+      }
+    },
+    "How it ran on this phone": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లో ఎలా నడిచింది"
+          }
+        }
+      }
+    },
+    "No finished notes measured yet.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా పూర్తయిన నోట్స్ ఏవీ కొలవలేదు."
+          }
+        }
+      }
+    },
+    "Notes: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్: %@"
+          }
+        }
+      }
+    },
+    "Notes: usually %@ for every 10 minutes recorded": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్: సాధారణంగా ప్రతి 10 నిమిషాల రికార్డింగ్‌కు %@"
+          }
+        }
+      }
+    },
+    "Only the time spent working is counted, not pauses. Measured on this phone; nothing is sent anywhere unless you share it.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పని చేసిన సమయం మాత్రమే లెక్కిస్తాం, విరామాలు కాదు. ఈ ఫోన్‌లోనే కొలుస్తాం; మీరు షేర్ చేస్తేనే ఎక్కడికైనా వెళ్తుంది."
+          }
+        }
+      }
+    },
+    "Phone: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్: %@"
+          }
+        }
+      }
+    },
+    "Rested to cool down: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చల్లబడటానికి విశ్రాంతి: %@"
+          }
+        }
+      }
+    },
+    "Share speed report": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వేగం నివేదికను షేర్ చేయండి"
+          }
+        }
+      }
+    },
+    "Speed on this phone": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లో వేగం"
+          }
+        }
+      }
+    },
+    "Summaverick speed on this phone": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ ఫోన్‌లో Summaverick వేగం"
+          }
+        }
+      }
+    },
+    "The phone got hot on %lld of %lld": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld లో %1$lld సార్లు ఫోన్ వేడెక్కింది"
+          }
+        }
+      }
+    },
+    "Transcript: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాత ప్రతి: %@"
+          }
+        }
+      }
+    },
+    "Transcript: usually %.1f× faster than the recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "రాత ప్రతి: సాధారణంగా రికార్డింగ్ కంటే %.1f× వేగంగా"
+          }
+        }
+      }
+    },
+    "battery used %lld%%": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "బ్యాటరీ %lld%% వాడింది"
+          }
+        }
+      }
+    },
+    "charging": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చార్జ్ అవుతోంది"
+          }
+        }
+      }
+    },
+    "cool": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చల్లగా"
+          }
+        }
+      }
+    },
+    "hot": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "వేడిగా"
+          }
+        }
+      }
+    },
+    "very hot": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చాలా వేడిగా"
+          }
+        }
+      }
+    },
+    "warm": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కొంచెం వేడిగా"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
