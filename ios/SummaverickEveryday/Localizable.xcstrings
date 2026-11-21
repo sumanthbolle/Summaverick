@@ -7911,6 +7911,46 @@
           }
         }
       }
+    },
+    "Notes ready after %@ of work": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ పని తర్వాత నోట్స్ సిద్ధం"
+          }
+        }
+      }
+    },
+    "Loading the AI: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI లోడ్ అవ్వడం: %@"
+          }
+        }
+      }
+    },
+    "Reminders and tasks, after the notes: %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ తర్వాత రిమైండర్లు, పనులు: %@"
+          }
+        }
+      }
+    },
+    "Notes ready: usually after %@ for every 10 minutes recorded": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ సిద్ధం: సాధారణంగా ప్రతి 10 నిమిషాల రికార్డింగ్‌కు %@ తర్వాత"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

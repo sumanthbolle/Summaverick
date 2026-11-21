@@ -734,9 +734,16 @@ enum QuietHours {
 struct SpeedRecord: Codable, Equatable {
     var audioSeconds: Double
     var transcribeSeconds: Double = 0
+    /// Writing the title, summary, notes and questions (the model loaded).
     var notesSeconds: Double = 0
-    /// Rests for heat (the cooling stage), inside the work.
+    /// Loading the AI model for the notes.
+    var loadSeconds: Double = 0
+    /// Rests for heat (the cooling stage) before the notes are stored.
     var restSeconds: Double = 0
+    /// After the notes are stored (reminders and tasks, sections): delays nothing the person waits for.
+    var afterSeconds: Double = 0
+    /// Working time from the first transcript piece until the notes were stored.
+    var notesReadyAfter: Double?
     /// Highest ProcessInfo.ThermalState raw value seen while working: 0 nominal, 1 fair, 2 serious, 3 critical.
     var peakThermal: Int = 0
     /// 0...1; nil when iOS did not say.
@@ -750,7 +757,7 @@ struct SpeedRecord: Codable, Equatable {
 }
 
 enum SpeedMath {
-    enum Bucket: Equatable { case transcribe, notes, rest, none }
+    enum Bucket: Equatable { case transcribe, load, notes, rest, after, none }
 
     static func adding(_ r: SpeedRecord, _ b: Bucket, seconds: Double) -> SpeedRecord {
         guard seconds > 0, seconds < 6 * 3600 else { return r }   // a clock jump is not work
@@ -759,6 +766,8 @@ enum SpeedMath {
         case .transcribe: x.transcribeSeconds += seconds
         case .notes: x.notesSeconds += seconds
         case .rest: x.restSeconds += seconds
+        case .load: x.loadSeconds += seconds
+        case .after: x.afterSeconds += seconds
         case .none: break
         }
         return x
@@ -791,6 +800,9 @@ enum SpeedMath {
     /// The note screen's lines.
     static func noteLines(_ r: SpeedRecord) -> [String] {
         var out: [String] = []
+        if let ready = r.notesReadyAfter, ready > 0 {
+            out.append(String(localized: "Notes ready after \(minutes(ready)) of work"))
+        }
         if r.transcribeSeconds > 0 {
             var l = String(localized: "Transcript: \(minutes(r.transcribeSeconds))")
             if let x = timesRealTime(audio: r.audioSeconds, work: r.transcribeSeconds) {
@@ -798,8 +810,10 @@ enum SpeedMath {
             }
             out.append(l)
         }
+        if r.loadSeconds >= 1 { out.append(String(localized: "Loading the AI: \(minutes(r.loadSeconds))")) }
         if r.notesSeconds > 0 { out.append(String(localized: "Notes: \(minutes(r.notesSeconds))")) }
         if r.restSeconds >= 1 { out.append(String(localized: "Rested to cool down: \(minutes(r.restSeconds))")) }
+        if r.afterSeconds >= 1 { out.append(String(localized: "Reminders and tasks, after the notes: \(minutes(r.afterSeconds))")) }
         var phone = String(localized: "Phone: \(heatWord(r.peakThermal))")
         if let b = batteryUsed(r) { phone += " · " + String(localized: "battery used \(b)%") }
         else if r.charging { phone += " · " + String(localized: "charging") }
@@ -822,7 +836,9 @@ enum SpeedMath {
         if let x = median(done.compactMap { timesRealTime(audio: $0.audioSeconds, work: $0.transcribeSeconds) }) {
             out.append(String(format: String(localized: "Transcript: usually %.1f× faster than the recording"), x))
         }
-        if let n = median(done.filter { $0.notesSeconds > 0 }.map { $0.notesSeconds / $0.audioSeconds * 600 }) {
+        if let n = median(done.compactMap { r in r.notesReadyAfter.map { $0 / r.audioSeconds * 600 } }) {
+            out.append(String(localized: "Notes ready: usually after \(minutes(n)) for every 10 minutes recorded"))
+        } else if let n = median(done.filter { $0.notesSeconds > 0 }.map { $0.notesSeconds / $0.audioSeconds * 600 }) {
             out.append(String(localized: "Notes: usually \(minutes(n)) for every 10 minutes recorded"))
         }
         let hot = done.filter { $0.peakThermal >= 2 }.count
@@ -838,13 +854,15 @@ enum SpeedMath {
     /// One row per note, for sharing: device, minutes recorded, minutes of transcript work, times faster, notes
     /// minutes, rest minutes, peak heat, battery used, finished (ISO date).
     static func csv(_ rows: [(noteID: Int64, record: SpeedRecord)]) -> String {
-        var out = "note,device,recorded_min,transcript_min,times_faster,notes_min,rest_min,peak_heat,battery_used_pct,finished\n"
+        var out = "note,device,recorded_min,transcript_min,times_faster,load_min,notes_min,rest_min,notes_ready_min,after_min,peak_heat,battery_used_pct,finished\n"
         let iso = ISO8601DateFormatter()
         for (id, r) in rows.sorted(by: { $0.noteID < $1.noteID }) {
             let x = timesRealTime(audio: r.audioSeconds, work: r.transcribeSeconds).map { String(format: "%.2f", $0) } ?? ""
             let fin = r.finishedAt.map { iso.string(from: Date(timeIntervalSince1970: $0)) } ?? ""
             out += [String(id), "\"" + r.device.replacingOccurrences(of: "\"", with: "\"\"") + "\"", String(format: "%.2f", r.audioSeconds / 60), String(format: "%.2f", r.transcribeSeconds / 60), x,
-                    String(format: "%.2f", r.notesSeconds / 60), String(format: "%.2f", r.restSeconds / 60), heatWord(r.peakThermal),
+                    String(format: "%.2f", r.loadSeconds / 60), String(format: "%.2f", r.notesSeconds / 60),
+                    String(format: "%.2f", r.restSeconds / 60), r.notesReadyAfter.map { String(format: "%.2f", $0 / 60) } ?? "",
+                    String(format: "%.2f", r.afterSeconds / 60), heatWord(r.peakThermal),
                     batteryUsed(r).map(String.init) ?? "", fin].joined(separator: ",") + "\n"
         }
         return out

@@ -111,8 +111,10 @@ final class ProcessingPipeline {
     private func speedBucket(_ s: Stage) -> SpeedMath.Bucket {
         switch s {
         case .transcribing: return .transcribe
-        case .cooling: return .rest
-        case .loadingModel, .extracting, .sections, .generating: return .notes
+        case .cooling: return notesStored ? .none : .rest   // a rest after the notes are stored delays nothing
+        case .loadingModel: return notesStored ? .none : .load
+        case .sections, .generating: return notesStored ? .after : .notes
+        case .extracting: return .after
         default: return .none
         }
     }
@@ -132,7 +134,8 @@ final class ProcessingPipeline {
         let id = activeNoteID
         speedOpen = bucket != .none ? id.map { (id: $0, bucket: bucket, since: now) } : nil
         let finished = stage == .done ? id : nil
-        let touched = Set([closing?.id, bucket != .none ? id : nil, finished].compactMap { $0 })
+        let notesReady = notesStored ? id : nil
+        let touched = Set([closing?.id, bucket != .none ? id : nil, finished, notesReady].compactMap { $0 })
         guard !touched.isEmpty else { return }
         let thermal = ProcessInfo.processInfo.thermalState.rawValue
         let d = UIDevice.current
@@ -157,6 +160,9 @@ final class ProcessingPipeline {
                 if let battery { r.batteryEnd = battery; if r.batteryStart == nil { r.batteryStart = battery } }
                 r.charging = r.charging || charging
                 if finished == n { r.finishedAt = now.timeIntervalSince1970 }
+                if notesReady == n, r.notesReadyAfter == nil {
+                    r.notesReadyAfter = r.transcribeSeconds + r.loadSeconds + r.notesSeconds + r.restSeconds
+                }
                 guard let data = try? JSONEncoder().encode(r), let json = String(data: data, encoding: .utf8) else { continue }
                 await engine.setSetting(SpeedRecord.key(n), json)
             }
@@ -1475,6 +1481,9 @@ final class ProcessingPipeline {
             stopShort(error.localizedDescription, error: error)
             return
         }
+        // Loading reads the model from storage and makes little heat: it is not work the next rest pays for
+        // (a hot phone rested as long as the load, note 15, 2026-11-21).
+        heatGatePassed = HeatGovernor.now
 
         // The notes first; reminders, tasks and profile changes after them (ExtractAfterNotes), so the summary never
         // waits behind them.
@@ -1507,7 +1516,8 @@ final class ProcessingPipeline {
         var onePassDone = false
         if order == .notesFirst {
             NSLog("[sve] note %lld: notes first, sections after", id)
-            if !(await heatGate(id)) { return }
+            // Right after the gate and the load: still paused or stepped aside if it must, but no second rest.
+            if !(await heatGate(id, light: true)) { return }
             onePassDone = await writeAllInOnePass(noteID: id, transcript: material, lang: lang, steps: steps)
             if !onePassDone, abort.isSet { stopShort(CoreError.generationFailed.localizedDescription); return }
             // Not split: the sections are written and the steps run, as for any other note.
