@@ -75,4 +75,9 @@ const char *memory_map_review_sql();
 // Waiting in the review queue, not checked yet (queue 1, review new): the map draws it lighter.
 bool memory_waiting(const json &row);
 
+// An English (Latin-letter) name said in Telugu letters in the quote: some Telugu word of it, case ending taken off,
+// has nearly the same consonants ("Antarctica" ~ "అంటర్కిటికాలో"). At most one consonant off per four, three or
+// more consonants. For memories written in English from a Telugu recording (note 8, 2026-11-21).
+bool said_in_telugu(const std::string &latin_name, const std::string &quote);
+
 }  // namespace sve

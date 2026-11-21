@@ -1,3 +1,4 @@
+#include <set>
 #include "sve_textmatch.h"
 
 #include <algorithm>
@@ -303,7 +304,31 @@ std::vector<std::string> match_tokens(const std::string &s) {
     NumRun run;
     auto flush = [&] { if (run.open()) out.push_back(run.emit()); };
     for (size_t i = 0; i < t.size(); ++i) {
+        // English "one" as a pronoun ("no one", "any one"): not the number.
+        if (t[i] == "1" && i > 0) {
+            static const std::set<std::string> kPron = {"no", "any", "every", "some", "each", "which", "this", "that"};
+            if (kPron.count(t[i - 1])) { flush(); out.push_back("one"); continue; }
+        }
         Num n = num_of(t[i]);
+        // A Telugu number word with a case ending ("తొమ్మిదిలో", "ఐదులోకి", "మూడుకి"): the number, and the end of it.
+        if (n.kind == N_NONE) {
+            static const std::vector<std::string> kEnds = {"లోకి", "లోని", "లోను", "లో", "కి", "కు", "ని", "ను", "తో", "గా"};
+            static const std::vector<std::pair<std::string, int>> kSmall = {
+                {"ఒకటి", 1}, {"ఒక", 1}, {"రెండు", 2}, {"మూడు", 3}, {"నాలుగు", 4}, {"ఐదు", 5}};
+            bool taken = false;
+            for (const auto &e : kEnds) {
+                if (taken) break;
+                if (t[i].size() <= e.size() || t[i].compare(t[i].size() - e.size(), e.size(), e) != 0) continue;
+                const std::string stem = t[i].substr(0, t[i].size() - e.size());
+                Num sn = num_of(stem);
+                for (const auto &k : kSmall) if (sn.kind == N_NONE && stem == k.first) { sn.kind = N_SMALL; sn.v = k.second; }
+                if (sn.kind == N_NONE) continue;
+                if (!run.add(stem, sn)) { flush(); run.add(stem, sn); }
+                flush();
+                taken = true;
+            }
+            if (taken) continue;
+        }
         if (n.kind != N_NONE) {
             if (run.add(t[i], n)) continue;
             flush();

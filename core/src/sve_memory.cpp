@@ -211,6 +211,37 @@ bool transliterates(const std::string &written, const std::string &said) {
     return false;
 }
 
+bool said_in_telugu_impl(const std::string &latin_name, const std::string &quote) {
+    if (has_telugu(latin_name) || !has_telugu(quote)) return false;
+    const std::string lat = latin_skeleton(latin_name);
+    if (lat.size() < 3) return false;
+    auto dist = [](const std::string &a, const std::string &b) {
+        std::vector<size_t> prev(b.size() + 1), cur(b.size() + 1);
+        for (size_t j = 0; j <= b.size(); j++) prev[j] = j;
+        for (size_t i = 1; i <= a.size(); i++) {
+            cur[0] = i;
+            for (size_t j = 1; j <= b.size(); j++)
+                cur[j] = std::min({prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)});
+            std::swap(prev, cur);
+        }
+        return prev[b.size()];
+    };
+    const size_t allowed = std::max<size_t>(1, lat.size() / 4);
+    static const std::vector<std::string> kMore = {"లోకి", "లోని", "లోను", "గా", "కే", "నే"};
+    for (const auto &w : med_tokens(nfc_clean(quote), false)) {
+        if (!has_telugu(w)) continue;
+        std::vector<std::string> stems = {w};
+        for (const auto *ends : {&kTeluguCaseEndings, &kMore})
+            for (const auto &e : *ends)
+                if (w.size() > e.size() && w.compare(w.size() - e.size(), e.size(), e) == 0) stems.push_back(w.substr(0, w.size() - e.size()));
+        for (const auto &st : stems) {
+            const std::string sk = collapse(telugu_skeleton(st));
+            if (sk.size() + allowed >= lat.size() && dist(sk, lat) <= allowed) return true;
+        }
+    }
+    return false;
+}
+
 // names as [{"as_said","as_written"}]; a plain string is both.
 json names_json(const json &cand) {
     json out = json::array();
@@ -452,7 +483,7 @@ Grounded ground_memory(const json &cand, const SectionPieces &pieces, const std:
                 cap = (at == 0 || edge(quote[at - 1])) && (at + w.size() >= quote.size() || edge(quote[at + w.size()]));
             }
             if (cap) continue;
-        } else if (name_said(w, quote)) continue;
+        } else if (name_said(w, quote) || said_in_telugu_impl(w, quote)) continue;
         bool listed = std::any_of(names.begin(), names.end(), [&](const Name &n) {
             const Tokens ws = med_tokens(n.written, false);
             return std::find(ws.begin(), ws.end(), wl) != ws.end() && transliterates(n.written, n.said);
@@ -575,5 +606,7 @@ const char *memory_map_review_sql() {
                  " AND ((m.queue=0 AND m.review IN ('kept','corrected'))"
                  " OR (m.queue=1 AND m.review='new' AND m.health=0 AND m.conflict_with IS NULL))";
 }
+
+bool said_in_telugu(const std::string &latin_name, const std::string &quote) { return said_in_telugu_impl(latin_name, quote); }
 
 }  // namespace sve

@@ -414,3 +414,12 @@ TEST(parse_yes_no_variants) {
     CHECK_EQ(parse_yes_no("nothing"), -1);
     CHECK_EQ(parse_yes_no(""), -1);
 }
+
+// Note 8: the memory is in English, the recording in Telugu; the name is said in Telugu letters.
+TEST(english_name_said_in_telugu_letters) {
+    CHECK(sve::said_in_telugu("Antarctica", "అలాంటి అతిపెద్ద ప్రాంతం అంటర్కిటికాలో ఉంది"));
+    CHECK(sve::said_in_telugu("Serbia", "సరిహద్వని సర్బియా వాదిస్తుంది"));
+    CHECK(!sve::said_in_telugu("Antarctica", "అలాంటి అతిపెద్ద ప్రాంతం ఆఫ్రికాలో ఉంది"));
+    CHECK(!sve::said_in_telugu("Ravi", "సీత వచ్చింది"));
+    CHECK(!sve::said_in_telugu("Ravi", "only english words here"));
+}

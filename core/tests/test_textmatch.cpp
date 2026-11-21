@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "check.h"
 #include "sve_medcheck.h"
 #include "sve_textmatch.h"
@@ -101,4 +102,21 @@ TEST(medcheck_tokens_unchanged) {
     CHECK_EQ(med_tokens("Dolo650"), (V{"dolo", "650"}));
     CHECK(contains_run(V{"a", "b", "c"}, V{"b", "c"}));
     CHECK(name_ok("Dolo", "take dolo 650"));
+}
+
+// Note 8 (2026-11-21): Telugu numbers with a case ending, and English "no one", made true memories fail.
+TEST(telugu_number_with_case_ending_counts) {
+    auto f = sve::canonical_facts("అంటర్కిటికీ ఒప్పందంపై పంతొమ్మిది వందల యాభై తొమ్మిదిలో సంతకం జరిగింది");
+    CHECK(std::find(f.begin(), f.end(), "1959") != f.end());
+    auto g = sve::canonical_facts("సరిహద్దును పంతొమ్మిది వందల నలభై ఐదులోకి ఇస్తారు");
+    CHECK(std::find(g.begin(), g.end(), "1945") != g.end());
+    auto h = sve::canonical_facts("మూడుకి వెళ్తాను");
+    CHECK(std::find(h.begin(), h.end(), "3") != h.end());
+}
+
+TEST(no_one_is_not_a_number) {
+    CHECK(sve::canonical_facts("an area that belongs to no one").empty());
+    CHECK(sve::canonical_facts("anyone or any one of them").empty());
+    auto f = sve::canonical_facts("take one tablet");
+    CHECK(std::find(f.begin(), f.end(), "1") != f.end());  // a count still counts
 }
