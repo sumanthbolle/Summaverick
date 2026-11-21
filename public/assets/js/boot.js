@@ -8,6 +8,9 @@ import { initGreeting } from "./greeting.js";
 import { initGlassmark } from "./glassmark.js";
 import { initHeroHeadline } from "./hero-headline.js";
 import { initExamples } from "./examples.js";
+import { initDither } from "./dither.js";
+import { initParticleS } from "./particle-s.js";
+import { initFx } from "./fx.js";
 
 function boot() {
   initChrome();
@@ -16,6 +19,9 @@ function boot() {
   initGreeting();
   initHeroHeadline(initGlassmark());
   initExamples();
+  initDither();
+  initParticleS();
+  initFx();
 }
 
 if (document.readyState === "loading") {
