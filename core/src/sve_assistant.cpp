@@ -822,6 +822,13 @@ int sve_memory_delete(sve_ctx *ctx, int64_t id) {
     return guard("sve_memory_delete", -1, [&] { return ctx && ctx->store->delete_learned_memory(id) ? 0 : -1; });
 }
 
+char *sve_piece_clean(sve_ctx *ctx, const char *text, const char *prev) {
+    return guard<char *>("sve_piece_clean", nullptr, [&]() -> char * {
+        if (!ctx || !text) return nullptr;
+        return dup(sve::clean_piece(text, prev ? prev : "", sve::saved_vocab(*ctx->store)));
+    });
+}
+
 char *sve_vocab_correct(sve_ctx *ctx, const char *text) {
     return guard<char *>("sve_vocab_correct", nullptr, [&]() -> char * {
         if (!ctx || !text) return nullptr;

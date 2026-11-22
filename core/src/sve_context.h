@@ -46,6 +46,11 @@ std::string spelling_vocab_line(Store &store, size_t max_bytes = 400, const std:
 // punctuation around it. Never: a common English word into another, a plural or singular of it, a span right before
 // a number (a dose), or a term close to one of `protected_names` (the saved medicines: the medicine check must
 // read what was said).
+// A transcript piece as it is kept (note 18, 2026-11-22): loops collapsed (collapse_repeats; nothing but a loop is
+// noise, ""), "" when it repeats the previous piece word for word (40+ bytes), "" when two or more saved words make
+// up most of it (the transcriber wrote the spelling hints as speech on a near-silent piece).
+std::string clean_piece(const std::string &text, const std::string &prev, const std::vector<std::string> &vocab);
+
 std::string vocab_correct(const std::string &text, const std::vector<std::string> &terms,
                           const std::vector<std::string> &protected_names);
 

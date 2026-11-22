@@ -384,6 +384,9 @@ int64_t sve_vocab_add(sve_ctx *ctx, const char *term);
 /* The transcript text with the saved vocabulary written in where the transcriber misheard it (sve::vocab_correct);
  * saved medicine names are never written in. Free with sve_free_string. NULL on error. */
 char *sve_vocab_correct(sve_ctx *ctx, const char *text);
+/* A transcript piece as kept (sve::clean_piece): loops collapsed, "" for noise, for a repeat of the previous piece
+ * (prev, may be NULL) or for saved words written as speech. Free with sve_free_string. NULL on error. */
+char *sve_piece_clean(sve_ctx *ctx, const char *text, const char *prev);
 
 /* ---- memories (the second brain) ---------------------------------------
  * Memory row JSON: {"id","type":"fact|decision|promise|question|person|idea","text","who","to_whom",

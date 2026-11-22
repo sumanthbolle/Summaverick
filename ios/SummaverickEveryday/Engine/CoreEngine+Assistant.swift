@@ -209,9 +209,15 @@ extension CoreEngine {
     /// Each piece's text with the saved words written in where the transcriber misheard them (never a medicine).
     nonisolated func vocabCorrected(_ pieces: [TranscriptPiece]) async -> [TranscriptPiece] {
         await store { ctx in
-            pieces.map { p in
+            // Each piece cleaned first (loops, a repeat of the last piece, saved words written as speech: note 18),
+            // then the saved words written in.
+            var prev = ""
+            return pieces.map { p in
                 var q = p
-                if let fixed = self.take(sve_vocab_correct(ctx, p.text)) { q.text = fixed }
+                let raw = p.text
+                if let clean = self.take(sve_piece_clean(ctx, raw, prev)) { q.text = clean }
+                if !q.text.isEmpty, let fixed = self.take(sve_vocab_correct(ctx, q.text)) { q.text = fixed }
+                if !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { prev = raw }
                 return q
             }
         }

@@ -1,4 +1,5 @@
 #include "sve_context.h"
+#include "sve_whisper_text.h"
 #include "sve_english_words.h"
 #include <cctype>
 #include <algorithm>
@@ -238,6 +239,59 @@ double closeness(const std::string &span_key, const Term &t) {
 }
 
 }  // namespace
+
+std::string clean_piece(const std::string &text, const std::string &prev, const std::vector<std::string> &vocab) {
+    // A run of zero-width joiners or non-joiners (U+200C/U+200D) is one ("నైన్‌‌‌‌‌‌", note 18).
+    std::string z;
+    for (size_t i = 0; i < text.size();) {
+        const bool zw = i + 2 < text.size() && (unsigned char)text[i] == 0xE2 && (unsigned char)text[i + 1] == 0x80 &&
+                        ((unsigned char)text[i + 2] == 0x8C || (unsigned char)text[i + 2] == 0x8D);
+        if (zw) {
+            z.append(text, i, 3);
+            i += 3;
+            while (i + 2 < text.size() && (unsigned char)text[i] == 0xE2 && (unsigned char)text[i + 1] == 0x80 &&
+                   ((unsigned char)text[i + 2] == 0x8C || (unsigned char)text[i + 2] == 0x8D)) i += 3;
+            continue;
+        }
+        z.push_back(text[i++]);
+    }
+    std::string t = collapse_repeats(z, 3);
+    while (!t.empty() && std::isspace((unsigned char)t.back())) t.pop_back();
+    while (!t.empty() && std::isspace((unsigned char)t.front())) t.erase(0, 1);
+    if (t.empty()) return "";
+    auto words = [](const std::string &s) {
+        std::vector<std::string> w;
+        std::string cur;
+        for (size_t i = 0; i <= s.size(); ++i) {
+            const bool end = i == s.size() || std::isspace((unsigned char)s[i]);
+            if (!end) { cur.push_back(s[i]); continue; }
+            const std::string k = match_key(cur);
+            if (!k.empty()) w.push_back(k);
+            cur.clear();
+        }
+        return w;
+    };
+    const std::vector<std::string> tw = words(t);
+    if (t.size() >= 40 && tw == words(prev)) return "";
+    // Saved words as speech.
+    std::vector<bool> used(tw.size(), false);
+    int terms = 0;
+    for (const auto &v : vocab) {
+        const std::vector<std::string> vw = words(v);
+        if (vw.empty() || vw.size() > tw.size()) continue;
+        bool found = false;
+        for (size_t i = 0; i + vw.size() <= tw.size(); ++i)
+            if (std::equal(vw.begin(), vw.end(), tw.begin() + (long)i)) {
+                for (size_t k = 0; k < vw.size(); ++k) used[i + k] = true;
+                found = true;
+            }
+        terms += found;
+    }
+    size_t covered = 0;
+    for (bool u : used) covered += u;
+    if (terms >= 2 && covered * 10 >= tw.size() * 6) return "";
+    return t;
+}
 
 std::string vocab_correct(const std::string &text, const std::vector<std::string> &terms,
                           const std::vector<std::string> &protected_names) {

@@ -66,3 +66,35 @@ TEST(vocab_never_eats_the_word_before_a_term) {
     CHECK_EQ(fix("అది perplexity", {"Perplexity"}), std::string("అది Perplexity"));
 }
 
+
+// Note 18 (2026-11-22): Shruti looped on noise ("conflict conflict ..."), and Gemma, given a near-silent piece, wrote
+// the saved words as speech, the same line eight times.
+TEST(piece_clean_collapses_loops) {
+    std::string loop;
+    for (int i = 0; i < 30; i++) loop += "conflict ";
+    CHECK_EQ(clean_piece(loop, "", {}), std::string(""));   // nothing but a loop: noise
+    CHECK_EQ(clean_piece("ఇక్కడ registration number ఇక్కడ registration number ఇక్కడ registration number ఇక్కడ registration number ఉంటుంది", "", {}),
+             std::string("ఇక్కడ registration number ఉంటుంది"));
+    CHECK_EQ(clean_piece("ok wait ఒక్క నిమిషం first చెప్తాను", "", {}), std::string("ok wait ఒక్క నిమిషం first చెప్తాను"));
+}
+
+TEST(piece_clean_drops_a_repeat_of_the_last_piece) {
+    const std::string line = "అయినా high context cultures, low context cultures, continuous white lines";
+    CHECK_EQ(clean_piece(line, line, {}), std::string(""));
+    CHECK_EQ(clean_piece("చెప్పండి sir", "చెప్పండి sir", {}), std::string("చెప్పండి sir"));   // short: may be said twice
+}
+
+TEST(piece_clean_drops_saved_words_written_as_speech) {
+    const std::vector<std::string> vocab = {"high context cultures", "low context cultures", "continuous white lines", "dotted lines"};
+    CHECK_EQ(clean_piece("అయినా high context cultures, low context cultures, continuous white lines, dotted lines", "", vocab), std::string(""));
+    // A real sentence that uses one saved term stays.
+    const std::string real = "Japan is one of the high context cultures, so people read between the lines a lot";
+    CHECK_EQ(clean_piece(real, "", vocab), real);
+}
+
+TEST(piece_clean_folds_a_run_of_zero_width_joiners) {
+    const std::string zwnj = "\xE2\x80\x8C";
+    std::string t = "నైన్" + zwnj;
+    for (int i = 0; i < 20; i++) t += zwnj;
+    CHECK_EQ(clean_piece(t, "", {}), std::string("నైన్") + zwnj);
+}
