@@ -1,4 +1,6 @@
+#include <regex>
 #include "sve_suggest.h"
+#include "sve_textmatch.h"
 #include "sve_medcheck.h"
 
 #include <algorithm>
@@ -307,6 +309,41 @@ std::vector<json> group_windows(const json &pieces, int budget_tokens,
     return out;
 }
 
+std::string clock_time(const std::string &words) {
+    std::string w;
+    for (unsigned char c : words) w.push_back(c < 0x80 ? (char)std::tolower(c) : (char)c);
+    auto fmt = [](int h, int m) {
+        if (h < 0 || h > 23 || m < 0 || m > 59) return std::string();
+        char b[6];
+        snprintf(b, sizeof b, "%02d:%02d", h, m);
+        return std::string(b);
+    };
+    static const std::regex ampm(R"((^|[^0-9:])(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z]))");
+    std::smatch m;
+    if (std::regex_search(w, m, ampm)) {
+        int h = std::stoi(m[2]), mi = m[3].matched ? std::stoi(m[3]) : 0;
+        if (h < 1 || h > 12) return "";
+        const bool pm = m[4].str()[0] == 'p';
+        if (h == 12) h = pm ? 12 : 0; else if (pm) h += 12;
+        return fmt(h, mi);
+    }
+    static const std::regex hhmm(R"((^|[^0-9])(\d{1,2}):(\d{2})($|[^0-9]))");
+    if (std::regex_search(w, m, hhmm)) return fmt(std::stoi(m[2]), std::stoi(m[3]));
+    // Telugu: "<part of day> N గంటలకు".
+    static const std::regex te(R"((\d{1,2})\s*(గంటలకు|గంటకు|గంటల))");
+    if (std::regex_search(w, m, te)) {
+        int h = std::stoi(m[1]);
+        if (h < 1 || h > 12) return "";
+        const bool later = w.find("సాయంత్రం") != std::string::npos || w.find("రాత్రి") != std::string::npos ||
+                           (w.find("మధ్యాహ్నం") != std::string::npos && h < 12);
+        const bool morning = w.find("ఉదయం") != std::string::npos || w.find("పొద్దున") != std::string::npos;
+        if (!later && !morning) return "";
+        if (later && h < 12) h += 12;
+        return fmt(h, 0);
+    }
+    return "";
+}
+
 Extracted merge_extracted(const std::vector<Extracted> &parts) {
     Extracted m;
     std::set<std::string> seen_vocab, seen_topics, seen_people;
@@ -328,6 +365,7 @@ Extracted merge_extracted(const std::vector<Extracted> &parts) {
         add_unique(m.vocab, p.vocab, seen_vocab, 50);
         add_unique(m.topics, p.topics, seen_topics, 3);
         add_unique(m.people, p.people, seen_people, 5);
+        if (m.next_meeting.is_null() && p.next_meeting.is_object()) m.next_meeting = p.next_meeting;
     }
     return m;
 }
@@ -484,9 +522,57 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
         std::string text = trim(jstr(it, "text"));
         if (text.empty()) continue;
         Base b = base_for("task", it, pieces, note_id);
+        // No quote from the model (meeting action items, 2026-11-22): the task's own words, when they are a run of
+        // one line's words, find the line; that line is the quote.
+        if (trim(jstr(it, "quote")).empty()) {
+            QuoteHit h = locate_quote(pieces, text, -1);
+            if (h.found && pieces.is_array())
+                for (const auto &p : pieces)
+                    if (p.is_object() && jint(p, "start_sec", -1) == h.start_sec) {
+                        b.rec["quote"] = jstr(p, "text");
+                        b.rec["start_sec"] = h.start_sec;
+                        b.fields.erase(std::remove(b.fields.begin(), b.fields.end(), "quote"), b.fields.end());
+                        break;
+                    }
+        }
         if (mentions_medicine(text, names)) b.fields.push_back("text");
         json due = date_field(it, "due_date", b.fields, false, today, true);
+        // The day the words say, worked out here: the model got "by Monday" a week late (2026-11-22). Its own date is
+        // kept only when the words name no day.
+        for (const std::string &words : {trim(jstr(it, "due_text")), trim(jstr(it, "quote"))}) {
+            if (words.empty()) continue;
+            const std::string spoken = resolve_spoken_date(words, today);
+            if (spoken.empty()) continue;
+            due = spoken;
+            b.fields.erase(std::remove(b.fields.begin(), b.fields.end(), "due_date"), b.fields.end());
+            break;
+        }
         out.push_back(finish(b, {{"text", text}, {"who", str_or_null(trim(jstr(it, "who")))}, {"due_date", due}}));
+    }
+    // The next meeting: a one-time reminder from this note, on the day and at the time its words say.
+    if (e.next_meeting.is_object()) {
+        const json &it = e.next_meeting;
+        const std::string text = trim(jstr(it, "text")), when = trim(jstr(it, "when_text"));
+        const std::string day = when.empty() ? "" : resolve_spoken_date(when, today);
+        std::vector<std::string> times;
+        if (const std::string clock = clock_time(when); !clock.empty()) times.push_back(clock);
+        else if (!when.empty()) times = resolve_times(when, routine);
+        if (!text.empty() && !day.empty() && !times.empty()) {
+            Base b = base_for("reminder", it, pieces, note_id);
+            if (trim(jstr(it, "quote")).empty()) {  // the words that say when find their line
+                QuoteHit h = locate_quote(pieces, when, -1);
+                if (h.found && pieces.is_array())
+                    for (const auto &p : pieces)
+                        if (p.is_object() && jint(p, "start_sec", -1) == h.start_sec) {
+                            b.rec["quote"] = jstr(p, "text");
+                            b.rec["start_sec"] = h.start_sec;
+                            b.fields.erase(std::remove(b.fields.begin(), b.fields.end(), "quote"), b.fields.end());
+                            break;
+                        }
+            }
+            out.push_back(finish(b, {{"text", text}, {"when_text", when}, {"times", json(times)}, {"repeat", "once"},
+                                     {"start_date", day}, {"until_date", nullptr}, {"medicine", nullptr}}));
+        }
     }
     for (const auto &it : e.profile) {
         std::string change = jstr(it, "change");

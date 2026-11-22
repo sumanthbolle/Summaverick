@@ -34,6 +34,9 @@ bool twice_daily_mismatch(const std::string &repeat, const json &times);
 
 // Times implied by meal/day words in when_text ("after dinner" -> routine dinner), sorted.
 std::vector<std::string> resolve_times(const std::string &when_text, const json &routine);
+// A clock time said in words, "HH:MM": "4 PM", "4:30 pm", "16:00", "సాయంత్రం 4 గంటలకు". "" when none, or when
+// am/pm is not said for an hour under 13. For meetings, not medicines.
+std::string clock_time(const std::string &words);
 
 // Groups pieces into windows whose "[t=SEC] text" lines total at most budget_tokens
 // (counted line by line with `count`). A piece larger than the budget gets its own window.

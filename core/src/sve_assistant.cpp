@@ -1,3 +1,4 @@
+#include <cstdio>
 // Personal assistant C API: extraction, suggestions, profile, medicines, Ask, topics, insights.
 // The checks that keep medicine information safe live in sve_suggest.cpp (pure, unit-tested);
 // this file wires them to the store and the model. Nothing here throws out of a C function.
@@ -457,7 +458,9 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         if (pieces.empty()) return 0;
 
         const std::string ab = sve::always_block(st), today = today_iso() + " (" + sve::weekday_name(today_iso()) + ")";
-        const std::string sys = std::string("You turn a recording's transcript into proposals for a personal assistant. ") + kSafety;
+        const std::string sys = std::string("You turn a recording's transcript into proposals for a personal assistant: the "
+                                            "listener's reminders and to-dos, and every action item anyone in the recording "
+                                            "agreed to or was given, with who will do it. ") + kSafety;
         const int max_new = 900;
         // Each window's transcript must fit next to the prompt, the always block and the reply.
         int scaffold = llm.count_tokens(llm.apply_template(sys, sve::extraction_prompt(ab, "", today)));
@@ -473,6 +476,7 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
             std::string prompt = llm.apply_template(sys, sve::extraction_prompt(ab, sve::pieces_with_markers(windows[i]), today));
             std::string out;
             if (!llm.complete(prompt, max_new, out, cb, user, "chunk", i, total, true)) return -2;
+            if (getenv("SVE_EXTRACT_DUMP")) fprintf(stderr, "--- extract reply %d/%d\n%s\n---\n", i + 1, total, out.c_str());  // desktop checks only
             sve::Extracted e = sve::parse_extraction(sve::strip_thinking(out));
             if (!e.ok) sve_logf(1, "extract: window %d/%d gave no usable JSON", i + 1, total);
             else  // counts only, never the text: the log shows whether the model proposed anything at all

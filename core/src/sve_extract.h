@@ -19,6 +19,8 @@ struct Extracted {
     nlohmann::json facts = nlohmann::json::array();
     nlohmann::json topics = nlohmann::json::array();
     nlohmann::json people = nlohmann::json::array();
+    // The next meeting the recording sets ({"text","when_text","quote","start_sec"}), or null.
+    nlohmann::json next_meeting = nullptr;
     bool ok = false;
 };
 

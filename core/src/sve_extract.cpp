@@ -26,7 +26,8 @@ std::string extraction_prompt(const std::string &context_block,
          "\"repeat\":\"once|daily|twice_daily|weekly\",\"start_date\":\"YYYY-MM-DD|null\",\"until_date\":\"YYYY-MM-DD|null\","
          "\"quote\":\"\",\"start_sec\":0,"
          "\"medicine\":{\"name\":\"\",\"dose\":\"\",\"frequency\":\"\",\"duration\":\"\"}|null}],"
-         "\"tasks\":[{\"text\":\"\",\"who\":\"\",\"due_date\":\"YYYY-MM-DD|null\",\"quote\":\"\",\"start_sec\":0}],"
+         "\"tasks\":[{\"text\":\"\",\"who\":\"\",\"due_text\":\"\",\"due_date\":\"YYYY-MM-DD|null\",\"quote\":\"\",\"start_sec\":0}],"
+         "\"next_meeting\":{\"text\":\"\",\"when_text\":\"\",\"quote\":\"\",\"start_sec\":0}|null,"
          "\"profile\":[{\"change\":\"add_medicine|update_medicine|stop_medicine|routine\",\"detail\":\"\","
          "\"quote\":\"\",\"start_sec\":0,"
          "\"medicine\":{\"name\":\"\",\"dose\":\"\",\"when_text\":\"\",\"frequency\":\"\",\"duration\":\"\"}|null,"
@@ -38,20 +39,30 @@ std::string extraction_prompt(const std::string &context_block,
          "What goes where:\n"
          "- \"reminders\": something to do at a time of day or on a schedule, above all taking a medicine. "
          "A one-time thing on a day, with no time of day, is a task, not a reminder.\n"
-         "- \"tasks\": a one-time thing to do, such as bringing, buying, calling or submitting something, "
-         "with \"due_date\" when a day is said.\n"
+         "- \"tasks\": every one-time thing someone agreed or was asked to do: the listener's own and other "
+         "people's action items, as in a meeting (\"I'll send the document by Friday\", \"Priya will fix the bug\"), "
+         "such as bringing, buying, calling, sending, fixing, ordering or submitting something. One task per action. "
+         "\"who\" is the person who will do it, as said, or \"me\" when it is the listener (\"I\", \"నేను\"); empty when "
+         "nobody is named. On a line that starts with a speaker's name (\"Priya: నేను ... చేస్తాను\"), \"I\" and \"నేను\" "
+         "are that speaker. \"due_text\" is the words that say when, copied exactly (\"by Monday\", \"Wednesday కల్లా\", "
+         "\"tomorrow\"), and \"due_date\" the day they mean.\n"
+         "- \"next_meeting\": when the recording says when the group meets next (\"Next meeting Friday 4 PM\", "
+         "\"మళ్ళీ సోమవారం కలుద్దాం\"): \"text\" names the meeting in a few words, \"when_text\" copies the words that "
+         "say when. null when no next meeting is said.\n"
          "- \"facts\": advice or information worth remembering, such as a diet instruction or a test result.\n"
          "- \"profile\": a change to the listener's own medicines or daily routine stated in the transcript. "
          "Never propose what is already in the context above.\n"
          "- \"people\": names of individual people said in the recording, not the person this assistant is for. "
          "Never a company, product, organisation or app (those are topics), and never a description such as "
-         "\"one of the managers\" or \"my doctor\".\n\n"
+         "\"one of the managers\" or \"my doctor\".\n"
+         "\n"
          "Rules:\n"
          "- Write every \"text\" and \"detail\" field in the person's preferred language from the context above. "
          "Keys and the fixed values (repeat, change) stay in English.\n"
          "- Only statements clearly about the listener (\"you\", \"your\") go into \"profile\". "
          "General talk about medicines never goes into \"profile\". "
-         "Other people's medicines and tasks never go into \"profile\": only the listener's own.\n"
+         "Other people's medicines never go into \"profile\": only the listener's own. "
+         "Other people's action items do go into \"tasks\", with their name in \"who\".\n"
          "- \"quote\" must be copied word-for-word from the transcript.\n"
          "- Each \"quote\" covers exactly one medicine: the shortest sentence that states it.\n"
          "- \"when_text\" is the words of the quote that say when (for example \"after dinner\"), copied exactly. "
@@ -136,6 +147,7 @@ Extracted parse_extraction(const std::string &model_output) {
         e.facts = arr_of(j, "facts", true);
         e.topics = arr_of(j, "topics", false);
         e.people = arr_of(j, "people", false);
+        if (j.contains("next_meeting") && j["next_meeting"].is_object()) e.next_meeting = j["next_meeting"];
         e.ok = true;
     } catch (...) {
         return Extracted();

@@ -445,14 +445,15 @@ TEST(weekday_resolves_to_nearest_upcoming) {
     };
     // today is Friday 2026-11-06
     CHECK_EQ(run("2026-11-07", "Bring your blood test report on Saturday")["check_status"].get<std::string>(), std::string("ok"));
+    // A day a week late is put right from the words (2026-11-22: "by Monday" came out a week late), not only flagged.
     json late = run("2026-11-14", "Bring your blood test report on Saturday");
-    CHECK_EQ(late["check_status"].get<std::string>(), std::string("check"));
-    CHECK(has(late["check_fields"], "due_date"));
+    CHECK_EQ(late["payload"]["due_date"].get<std::string>(), std::string("2026-11-07"));
+    CHECK(!has(late["check_fields"], "due_date"));
     CHECK_EQ(run("2026-11-14", "Bring the report next Saturday")["check_status"].get<std::string>(), std::string("check"));  // quote not in pieces
     CHECK(!has(run("2026-11-14", "Bring the report next Saturday")["check_fields"], "due_date"));
     CHECK(!has(run("2026-11-14", "వచ్చే శనివారం report తీసుకురండి")["check_fields"], "due_date"));
     CHECK(has(run("2026-11-14", "శని report తీసుకురండి")["check_fields"], "due_date"));     // short Telugu form
-    CHECK(has(run("2026-11-06", "Bring it Fri")["check_fields"], "due_date"));              // Friday without "today" -> 11-13
+    CHECK_EQ(run("2026-11-06", "Bring it Fri")["payload"]["due_date"].get<std::string>(), std::string("2026-11-13"));  // Friday without "today"
     CHECK(!has(run("2026-11-13", "Bring it Fri")["check_fields"], "due_date"));
     CHECK(!has(run("2026-11-06", "Bring it today, Friday")["check_fields"], "due_date"));
 }
@@ -668,4 +669,76 @@ TEST(backfill_pieces_fit_extraction_windows) {
         n += win.size();
     }
     CHECK_EQ(n, (size_t)6);
+}
+
+// Meeting action items (2026-11-22): the model writes the words, the core the day.
+TEST(task_due_day_from_due_text) {
+    auto v = build_suggestions(ex(R"({"tasks":[{"text":"order test phones","who":"Kiran","due_text":"by Monday","due_date":"2026-11-30","quote":"","start_sec":56}]})"),
+                               kPieces, 7, kRoutine, "2026-11-22");
+    CHECK(!v.empty());
+    CHECK_EQ(v[0]["payload"]["due_date"].get<std::string>(), std::string("2026-11-23"));
+    CHECK_EQ(v[0]["payload"]["who"].get<std::string>(), std::string("Kiran"));
+    auto w = build_suggestions(ex(R"({"tasks":[{"text":"fix login bug","who":"Priya","due_text":"Wednesday కల్లా","due_date":null,"quote":"","start_sec":56}]})"),
+                               kPieces, 7, kRoutine, "2026-11-22");
+    CHECK_EQ(w[0]["payload"]["due_date"].get<std::string>(), std::string("2026-11-25"));
+}
+
+// The model left the quote out of meeting action items: the task's own words find their line.
+TEST(task_without_quote_finds_its_line) {
+    const json meeting = json::parse(R"([
+      {"start_sec":0,"text":"Ravi: సరే అందరూ join అయ్యారా?"},
+      {"start_sec":52,"text":"Ravi: Good. నేను Friday లోపు API document అందరికీ పంపిస్తాను."}
+    ])");
+    auto v = build_suggestions(ex(R"({"tasks":[{"text":"API document అందరికీ పంపిస్తాను","who":"Ravi","due_text":"Friday లోపు","due_date":"2026-11-27"}]})"),
+                               meeting, 7, kRoutine, "2026-11-22");
+    CHECK(!v.empty());
+    CHECK_EQ(v[0]["check_status"].get<std::string>(), std::string("ok"));
+    CHECK_EQ(v[0]["start_sec"].get<int64_t>(), (int64_t)52);
+    CHECK(v[0]["quote"].get<std::string>().find("API document") != std::string::npos);
+    // Words that are not in the transcript stay to be checked.
+    auto w = build_suggestions(ex(R"({"tasks":[{"text":"order the phones","who":"Kiran","due_text":"","due_date":null}]})"),
+                               meeting, 7, kRoutine, "2026-11-22");
+    CHECK_EQ(w[0]["check_status"].get<std::string>(), std::string("check"));
+}
+
+// "Next meeting Friday 4 PM": a one-time reminder of the meeting, from this note, on the day and at the time said.
+TEST(next_meeting_becomes_a_reminder_of_this_note) {
+    const json meeting = json::parse(R"([
+      {"start_sec":0,"text":"Ravi: సరే అందరూ join అయ్యారా?"},
+      {"start_sec":214,"text":"Ravi: Okay. Next meeting Friday 4 PM, same time."}
+    ])");
+    auto v = build_suggestions(ex(R"({"next_meeting":{"text":"Release meeting","when_text":"Friday 4 PM","quote":"Next meeting Friday 4 PM, same time.","start_sec":214}})"),
+                               meeting, 7, kRoutine, "2026-11-22");
+    CHECK_EQ((int)v.size(), 1);
+    CHECK_EQ(v[0]["kind"].get<std::string>(), std::string("reminder"));
+    CHECK_EQ(v[0]["payload"]["text"].get<std::string>(), std::string("Release meeting"));
+    CHECK_EQ(v[0]["payload"]["start_date"].get<std::string>(), std::string("2026-11-27"));
+    CHECK_EQ(v[0]["payload"]["times"][0].get<std::string>(), std::string("16:00"));
+    CHECK_EQ(v[0]["payload"]["repeat"].get<std::string>(), std::string("once"));
+    CHECK_EQ(v[0]["note_id"].get<int64_t>(), (int64_t)7);
+    CHECK_EQ(v[0]["check_status"].get<std::string>(), std::string("ok"));
+    // No day said: nothing to remind of.
+    CHECK(build_suggestions(ex(R"({"next_meeting":{"text":"Sync","when_text":"soon","quote":"","start_sec":0}})"),
+                            meeting, 7, kRoutine, "2026-11-22").empty());
+    CHECK(build_suggestions(ex(R"({"next_meeting":null})"), meeting, 7, kRoutine, "2026-11-22").empty());
+    // No quote: the when words find the line.
+    auto q = build_suggestions(ex(R"({"next_meeting":{"text":"Next meeting","when_text":"Friday 4 PM","start_sec":214}})"),
+                               meeting, 7, kRoutine, "2026-11-22");
+    CHECK_EQ(q[0]["check_status"].get<std::string>(), std::string("ok"));
+    CHECK_EQ(q[0]["start_sec"].get<int64_t>(), (int64_t)214);
+}
+
+TEST(clock_time_from_words) {
+    CHECK_EQ(clock_time("Friday 4 PM"), std::string("16:00"));
+    CHECK_EQ(clock_time("at 4:30 pm"), std::string("16:30"));
+    CHECK_EQ(clock_time("10 a.m. Monday"), std::string("10:00"));
+    CHECK_EQ(clock_time("12 pm"), std::string("12:00"));
+    CHECK_EQ(clock_time("12 am"), std::string("00:00"));
+    CHECK_EQ(clock_time("Friday 16:00"), std::string("16:00"));
+    CHECK_EQ(clock_time("శుక్రవారం సాయంత్రం 4 గంటలకు"), std::string("16:00"));
+    CHECK_EQ(clock_time("ఉదయం 10 గంటలకు"), std::string("10:00"));
+    CHECK_EQ(clock_time("మధ్యాహ్నం 2 గంటలకు"), std::string("14:00"));
+    CHECK_EQ(clock_time("Friday at 4"), std::string(""));      // am or pm is not said
+    CHECK_EQ(clock_time("13 pm"), std::string(""));
+    CHECK_EQ(clock_time("in 5 mg"), std::string(""));
 }

@@ -1,0 +1,10 @@
+[t=0] Ravi: సరే అందరూ join అయ్యారా? Okay, let's start. ఈ వారం release గురించి మాట్లాడుకుందాం.
+[t=24] Priya: Login page లో bug ఇంకా ఉంది. నేను Wednesday కల్లా ఆ login bug fix చేస్తాను.
+[t=52] Ravi: Good. నేను Friday లోపు API document అందరికీ పంపిస్తాను.
+[t=80] Ravi: Launch గురించి మనం decide చేశాం: launch ఈ నెల కాదు, next month 15th కి.
+[t=108] Kiran: Budget ఎవరు approve చేస్తారు? అది ఇంకా clear గా లేదు.
+[t=134] Ravi: అది నాకు కూడా తెలియదు, finance team ని అడగాలి.
+[t=160] నేను: నేను client కి call చేసి demo date confirm చేస్తాను, tomorrow.
+[t=186] Kiran: Testing కోసం ఇంకో device కావాలి. Kiran will order the test phones by Monday.
+[t=214] Ravi: Okay. Next meeting Friday 4 PM, same time. అప్పటికి ఈ items అన్నీ update చేయండి.
+[t=240] Priya: Sure. Coffee ఎవరైనా? (laughs) సరే bye.
