@@ -65,6 +65,8 @@ struct TodayView: View {
     @State private var queueFailed = false
     @State private var reminders: [Reminder] = []
     @State private var tasks: [TaskItem] = []
+    /// Coming meetings from recordings, with what is open from them (MeetingBrief).
+    @State private var briefs: [BriefData] = []
     @State private var insight: Insight?
     @State private var profile: Profile?
     @State private var titles: [Int64: String] = [:]
@@ -92,6 +94,9 @@ struct TodayView: View {
                         AIDownloadCard()
                     }
                     if loaded && needsProfile { setupProfileCard }
+                    ForEach(briefs) { b in
+                        BeforeMeetingCard(brief: b, selfName: profile?.name, onDone: { t in Task { await setDone(t) } })
+                    }
                     waitingSection
                     if !queue.isEmpty || queueFailed { toCheckSection }
                     remindersSection
@@ -476,6 +481,7 @@ struct TodayView: View {
         relationReviews = rv
         reminders = r
         tasks = t
+        briefs = await Self.loadBriefs(reminders: r, tasks: t)
         insight = i.flatMap { $0.dismissed ? nil : $0 }
         profile = p
         medicineCount = m.count
@@ -570,6 +576,23 @@ struct TodayView: View {
         return ok
     }
 
+    /// The meetings coming up in the next two days that come from a recording with something still open.
+    private static func loadBriefs(reminders: [Reminder], tasks: [TaskItem]) async -> [BriefData] {
+        let now = Date()
+        let occ = ReminderOccurrence.upcoming(reminders, now: now, calendar: .current, days: 3)
+            .map { (noteID: $0.reminder.fromDeleted ? nil : $0.reminder.noteID, date: $0.date, text: $0.reminder.text) }
+        var out: [BriefData] = []
+        for d in MeetingBrief.due(occ, now: now) {
+            let mems = await CoreEngine.shared.memories(MemoryFilter(noteID: d.noteID, types: ["decision", "question"]))
+            let b = BriefData(noteID: d.noteID, date: d.date, title: d.text,
+                              tasks: tasks.filter { $0.noteID == d.noteID && !$0.done },
+                              decisions: mems.filter { $0.type == "decision" },
+                              questions: mems.filter { $0.type == "question" && !$0.done })
+            if !b.tasks.isEmpty || !b.decisions.isEmpty || !b.questions.isEmpty { out.append(b) }
+        }
+        return out
+    }
+
     private func setDone(_ t: TaskItem) async {
         await CoreEngine.shared.setTaskDone(t.id, true)
         await changed()
@@ -594,5 +617,91 @@ struct TodayView: View {
         default:
             break
         }
+    }
+}
+
+
+/// One coming meeting and what is open from the recording it was set in.
+struct BriefData: Identifiable {
+    let noteID: Int64
+    let date: Date
+    let title: String
+    let tasks: [TaskItem]
+    let decisions: [BrainMemory]
+    let questions: [BrainMemory]
+    var id: Int64 { noteID }
+}
+
+/// "Before your meeting": the actions with who and when (tick to mark done), what was decided, what is still open.
+struct BeforeMeetingCard: View {
+    let brief: BriefData
+    let selfName: String?
+    let onDone: (TaskItem) -> Void
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "person.3.sequence.fill").font(.title3).foregroundStyle(Theme.accent).frame(width: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Before \(brief.title)").font(.headline)
+                    Text(brief.date, format: .dateTime.weekday(.wide).hour().minute())
+                        .font(.subheadline).foregroundStyle(Theme.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            if !brief.tasks.isEmpty {
+                group("Open actions") {
+                    ForEach(brief.tasks) { t in
+                        HStack(alignment: .top, spacing: 10) {
+                            Button { onDone(t) } label: {
+                                Image(systemName: "circle").font(.title3).frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain).foregroundStyle(Theme.secondary)
+                            .accessibilityLabel(Text("Mark done"))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(verbatim: t.text).font(.body).fixedSize(horizontal: false, vertical: true)
+                                Text(verbatim: actionLine(t)).font(.footnote).foregroundStyle(Theme.secondary)
+                            }
+                            .padding(.top, 10)
+                        }
+                    }
+                }
+            }
+            if !brief.decisions.isEmpty {
+                group("Decided") { ForEach(brief.decisions) { line($0.text) } }
+            }
+            if !brief.questions.isEmpty {
+                group("Still open") { ForEach(brief.questions) { line($0.text) } }
+            }
+            Button { router.openNote = (brief.noteID, nil) } label: {
+                Label("Open the meeting", systemImage: "play.circle").font(.subheadline.weight(.medium))
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain).foregroundStyle(Theme.accent)
+        }
+        .padding(16)
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func actionLine(_ t: TaskItem) -> String {
+        var parts: [String] = []
+        if let who = MeetingBrief.owner(t.who, selfName: selfName) { parts.append(who) }
+        if let d = t.dueDate, let day = ReminderScheduler.day(d, .current) {
+            parts.append(String(localized: "by \(day.formatted(.dateTime.weekday(.wide).day().month()))"))
+        }
+        return parts.isEmpty ? String(localized: "Nobody named") : parts.joined(separator: " · ")
+    }
+
+    private func group<Content: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary).accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    private func line(_ text: String) -> some View {
+        Text(verbatim: "• " + text).font(.body).fixedSize(horizontal: false, vertical: true)
     }
 }

@@ -869,6 +869,46 @@ enum SpeedMath {
     }
 }
 
+/// "Before your meeting" (2026-11-22): a reminder from a recording that is coming up soon brings that recording's open
+/// actions, decisions and open questions to Today, so they are in front of the person before the meeting starts.
+enum MeetingBrief {
+    /// The soonest coming occurrence per recording within `within` seconds from now, soonest first.
+    static func due(_ occurrences: [(noteID: Int64?, date: Date, text: String)], now: Date,
+                    within: TimeInterval = 48 * 3600) -> [(noteID: Int64, date: Date, text: String)] {
+        var seen = Set<Int64>()
+        var out: [(noteID: Int64, date: Date, text: String)] = []
+        for o in occurrences.sorted(by: { $0.date < $1.date }) {
+            guard let n = o.noteID, o.date > now, o.date.timeIntervalSince(now) <= within, seen.insert(n).inserted else { continue }
+            out.append((noteID: n, date: o.date, text: o.text))
+        }
+        return out
+    }
+
+    /// Who will do it, for the action line: "You" for the person themselves ("me", or their own name).
+    static func owner(_ who: String?, selfName: String?) -> String? {
+        let w = (who ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !w.isEmpty else { return nil }
+        let me = ["me", "i", "నేను", "నాకు"]
+        if me.contains(w.lowercased()) || (selfName.map { !$0.isEmpty && $0.lowercased() == w.lowercased() } ?? false) {
+            return String(localized: "You")
+        }
+        return w
+    }
+}
+
+/// A recording's flow (2026-11-22): its discussion in order (the chapters), and under each what came out of it, by
+/// when it was said. Not links between points: what led to what.
+enum FlowGroups {
+    /// For each item's second (nil: not known), the index of the chapter it falls in: the last chapter starting at or
+    /// before it; before the first chapter, the first; not known, nil (shown at the end).
+    static func chapterIndex(chapterStarts: [Int], second: Int?) -> Int? {
+        guard let second, !chapterStarts.isEmpty else { return nil }
+        var idx = 0
+        for (i, st) in chapterStarts.enumerated() where st <= second { idx = i }
+        return idx
+    }
+}
+
 /// A transcript too thin to write notes from. Fewer than `minWords` words (a 1–2 s tap that caught "అది"):
 /// Gemma made up a whole meeting from it, title, summary and nine questions (notes 3 and 7, 2026-11-19). Such a
 /// note keeps its transcript and gets no notes, and says so instead.

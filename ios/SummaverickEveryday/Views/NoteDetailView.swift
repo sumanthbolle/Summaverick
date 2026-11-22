@@ -12,6 +12,8 @@ struct NoteDetailView: View {
 
     @State private var note: Note?
     @State private var speed: SpeedRecord?
+    enum MapMode: Hashable { case flow, graph }
+    @State private var mapMode: MapMode = .flow
     @State private var loaded = false
     @State private var pieces: [TranscriptPiece] = []
     @State private var chapters: [Chapter] = []
@@ -57,11 +59,11 @@ struct NoteDetailView: View {
             case .notes: return "Notes"
             case .questions: return "Questions"
             case .transcript: return "Word for word"
-            case .map: return "Graph"
+            case .map: return "Map"
             }
         }
         /// What VoiceOver says: the full name where the control shows a short one.
-        var accessibilityTitle: LocalizedStringKey { self == .map ? "Knowledge graph" : title }
+        var accessibilityTitle: LocalizedStringKey { self == .map ? "Flow and knowledge graph" : title }
         /// The output this tab shows; nil for the transcript.
         var kind: OutputKind? {
             switch self {
@@ -284,11 +286,20 @@ struct NoteDetailView: View {
 
     @ViewBuilder private var content: some View {
         if tab == .map {
-            // This recording's map: its centre is the title. Sideways drags turn it; up and down scroll the page.
-            BrainMapScreen(noteID: noteID, centerTitle: title, inScroll: true) { id, sec in playMoment(id, sec) }
-                .frame(height: 540)
-                .background(Theme.background, in: RoundedRectangle(cornerRadius: 16))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+            Picker("Show", selection: $mapMode) {
+                Text("Flow").tag(MapMode.flow)
+                Text("Graph").tag(MapMode.graph)
+            }
+            .pickerStyle(.segmented)
+            if mapMode == .flow {
+                NoteFlowView(noteID: noteID, chapters: chapters) { sec in playMoment(noteID, sec) }
+            } else {
+                // This recording's map: its centre is the title. Sideways drags turn it; up and down scroll the page.
+                BrainMapScreen(noteID: noteID, centerTitle: title, inScroll: true) { id, sec in playMoment(id, sec) }
+                    .frame(height: 540)
+                    .background(Theme.background, in: RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
         } else if tab == .transcript && !pieces.isEmpty {
             piecesList
         } else {
@@ -793,5 +804,176 @@ private struct FixWordSheet: View {
                 }
             }
         }
+    }
+}
+
+
+/// A recording's flow: its discussion in order (the chapters) and, under each part, what came out of it by when it
+/// was said: decisions, actions with who and when (done or open, or still waiting for a Yes), promises and open
+/// questions; then the next meeting, if one was set. Key points are counted, opened on a tap.
+struct NoteFlowView: View {
+    let noteID: Int64
+    let chapters: [Chapter]
+    let onPlay: (Int) -> Void
+
+    struct Outcome: Identifiable {
+        enum Kind { case decision, action, proposed, promise, question, point }
+        let id: String
+        let kind: Kind
+        let text: String
+        let detail: String?
+        let done: Bool
+        let second: Int?
+    }
+
+    @State private var outcomes: [Outcome] = []
+    @State private var next: (text: String, date: Date)?
+    @State private var openPoints: Set<Int> = []
+    @State private var loaded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if loaded && outcomes.isEmpty && chapters.isEmpty {
+                Text("Nothing came out of this recording yet: no decisions, actions or open questions.")
+                    .foregroundStyle(Theme.secondary).padding(.vertical, 16)
+            }
+            let groups = grouped()
+            ForEach(groups.indices, id: \.self) { i in
+                stage(i, groups[i], last: i == groups.count - 1 && next == nil)
+            }
+            if let next {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "calendar.badge.clock").foregroundStyle(Theme.accent).frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Next meeting").font(.subheadline.weight(.semibold))
+                        Text(verbatim: next.text + " · " + next.date.formatted(.dateTime.weekday(.wide).day().month().hour().minute()))
+                            .font(.footnote).foregroundStyle(Theme.secondary)
+                    }
+                }
+                .padding(.top, 8)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .assistantChanged)) { _ in Task { await load() } }
+    }
+
+    /// One part of the discussion and what came out of it. The last group (index chapters.count) holds what has no time.
+    private func stage(_ i: Int, _ items: [Outcome], last: Bool) -> some View {
+        let isChapter = i < chapters.count
+        let points = items.filter { $0.kind == .point }
+        let outs = items.filter { $0.kind != .point }
+        return HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
+                Circle().fill(Theme.accent).frame(width: 10, height: 10).padding(.top, 6)
+                if !last { Rectangle().fill(Theme.secondary.opacity(0.35)).frame(width: 2).frame(maxHeight: .infinity) }
+            }
+            .frame(width: 24)
+            VStack(alignment: .leading, spacing: 8) {
+                if isChapter {
+                    Button { onPlay(chapters[i].start_sec) } label: {
+                        HStack(spacing: 6) {
+                            Text(verbatim: chapters[i].title).font(.headline).multilineTextAlignment(.leading)
+                            Text(verbatim: Duration.seconds(chapters[i].start_sec).formatted(.time(pattern: .minuteSecond)))
+                                .font(.caption.monospacedDigit()).foregroundStyle(Theme.secondary)
+                        }
+                        .frame(minHeight: 32, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                } else if !items.isEmpty {
+                    Text("Also from this recording").font(.headline)
+                }
+                ForEach(outs) { row($0) }
+                if !points.isEmpty {
+                    Button { withAnimation { if openPoints.contains(i) { openPoints.remove(i) } else { openPoints.insert(i) } } } label: {
+                        Label(openPoints.contains(i) ? "Hide key points" : "\(points.count) key points",
+                              systemImage: openPoints.contains(i) ? "chevron.up" : "chevron.down")
+                            .font(.footnote.weight(.medium)).frame(minHeight: 32)
+                    }
+                    .buttonStyle(.plain).foregroundStyle(Theme.accent)
+                    if openPoints.contains(i) { ForEach(points) { row($0) } }
+                }
+            }
+            .padding(.bottom, 14)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func row(_ o: Outcome) -> some View {
+        let icon: String, label: LocalizedStringKey
+        switch o.kind {
+        case .decision: icon = "checkmark.seal.fill"; label = "Decided"
+        case .action: icon = o.done ? "checkmark.circle.fill" : "circle"; label = o.done ? "Done" : "Action"
+        case .proposed: icon = "circle.dashed"; label = "Action, waiting for your Yes"
+        case .promise: icon = "hand.raised.fill"; label = "Promised"
+        case .question: icon = "questionmark.circle.fill"; label = o.done ? "Answered" : "Still open"
+        case .point: icon = "lightbulb"; label = "Key point"
+        }
+        return Button { if let s = o.second { onPlay(s) } } label: {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: icon).foregroundStyle(o.kind == .question && !o.done ? Theme.cautionIcon : Theme.accent)
+                    .frame(width: 20).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label).font(.caption.weight(.semibold)).foregroundStyle(Theme.secondary)
+                    Text(verbatim: o.text).font(.body).strikethrough(o.kind == .action && o.done)
+                        .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                    if let d = o.detail { Text(verbatim: d).font(.footnote).foregroundStyle(Theme.secondary) }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(o.second == nil)
+    }
+
+    /// The outcomes by part of the discussion, in the order said; the last group holds those with no time.
+    private func grouped() -> [[Outcome]] {
+        var g = Array(repeating: [Outcome](), count: chapters.count + 1)
+        let starts = chapters.map(\.start_sec)
+        for o in outcomes.sorted(by: { ($0.second ?? .max) < ($1.second ?? .max) }) {
+            g[FlowGroups.chapterIndex(chapterStarts: starts, second: o.second) ?? chapters.count].append(o)
+        }
+        if g.last?.isEmpty == true { g.removeLast() }
+        return g
+    }
+
+    private func who(_ w: String?, due: String?) -> String? {
+        var parts: [String] = []
+        if let w = MeetingBrief.owner(w, selfName: nil) { parts.append(w) }
+        if let d = due, let day = ReminderScheduler.day(d, .current) {
+            parts.append(String(localized: "by \(day.formatted(.dateTime.weekday(.wide).day().month()))"))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func load() async {
+        let e = CoreEngine.shared
+        var out: [Outcome] = []
+        for t in await e.tasks(openOnly: false) where t.noteID == noteID {
+            out.append(Outcome(id: "t\(t.id)", kind: .action, text: t.text, detail: who(t.who, due: t.dueDate), done: t.done, second: t.startSec))
+        }
+        for s in await e.suggestions(status: "pending") where s.noteID == noteID && s.kind == .task {
+            out.append(Outcome(id: "s\(s.id)", kind: .proposed, text: s.payload.text ?? "", detail: who(s.payload.who, due: s.payload.dueDate),
+                               done: false, second: s.startSec))
+        }
+        for m in await e.memories(MemoryFilter(noteID: noteID, types: ["decision", "promise", "question", "fact", "idea"])) {
+            let kind: Outcome.Kind
+            switch m.type {
+            case "decision": kind = .decision
+            case "promise": kind = .promise
+            case "question": kind = .question
+            default: kind = .point
+            }
+            let sec = m.sources.first(where: { $0.noteID == noteID })?.startSec
+            let detail = m.type == "promise" || m.type == "decision" ? who(m.who, due: m.dueDate) : nil
+            out.append(Outcome(id: "m\(m.id)", kind: kind, text: m.text, detail: detail, done: m.done, second: sec))
+        }
+        outcomes = out
+        let now = Date()
+        let rs = await e.reminders(activeOnly: true).filter { $0.noteID == noteID && $0.medicineID == nil }
+        next = ReminderOccurrence.upcoming(rs, now: now, calendar: .current, days: 14).first { $0.date > now }
+            .map { (text: $0.reminder.text, date: $0.date) }
+        loaded = true
     }
 }

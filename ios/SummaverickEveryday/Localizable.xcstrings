@@ -7951,6 +7951,226 @@
           }
         }
       }
+    },
+    "%lld key points": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ముఖ్యాంశాలు"
+          }
+        }
+      }
+    },
+    "Action": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చేయాల్సిన పని"
+          }
+        }
+      }
+    },
+    "Action, waiting for your Yes": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చేయాల్సిన పని, మీ అవును కోసం ఎదురుచూస్తోంది"
+          }
+        }
+      }
+    },
+    "Also from this recording": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ రికార్డింగ్ నుంచి ఇంకా"
+          }
+        }
+      }
+    },
+    "Answered": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "జవాబు దొరికింది"
+          }
+        }
+      }
+    },
+    "Before %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ కి ముందు"
+          }
+        }
+      }
+    },
+    "Decided": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నిర్ణయించారు"
+          }
+        }
+      }
+    },
+    "Flow": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "క్రమం"
+          }
+        }
+      }
+    },
+    "Flow and knowledge graph": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "క్రమం మరియు జ్ఞాన చిత్రం"
+          }
+        }
+      }
+    },
+    "Hide key points": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముఖ్యాంశాలు దాచండి"
+          }
+        }
+      }
+    },
+    "Key point": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ముఖ్యాంశం"
+          }
+        }
+      }
+    },
+    "Map": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మ్యాప్"
+          }
+        }
+      }
+    },
+    "Mark done": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పూర్తయినట్లు గుర్తించండి"
+          }
+        }
+      }
+    },
+    "Next meeting": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "తదుపరి సమావేశం"
+          }
+        }
+      }
+    },
+    "Nobody named": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎవరి పేరూ చెప్పలేదు"
+          }
+        }
+      }
+    },
+    "Nothing came out of this recording yet: no decisions, actions or open questions.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఈ రికార్డింగ్ నుంచి ఇంకా ఏమీ రాలేదు: నిర్ణయాలు, పనులు, తెరిచిన ప్రశ్నలు ఏవీ లేవు."
+          }
+        }
+      }
+    },
+    "Open actions": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మిగిలిన పనులు"
+          }
+        }
+      }
+    },
+    "Open the meeting": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "సమావేశాన్ని తెరవండి"
+          }
+        }
+      }
+    },
+    "Promised": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "మాట ఇచ్చారు"
+          }
+        }
+      }
+    },
+    "Show": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చూపించు"
+          }
+        }
+      }
+    },
+    "Still open": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా తేలలేదు"
+          }
+        }
+      }
+    },
+    "by %@": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ లోపు"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
