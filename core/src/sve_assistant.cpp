@@ -487,6 +487,24 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         sve::Extracted merged = sve::merge_extracted(parts);
         if (!merged.ok) { sve_logf(1, "extract: no usable output for note %lld", (long long)note_id); return 0; }
 
+        // The action-item workflow: coverage check and updater after the finder (sve_suggest.h).
+        {
+            int step = 0;
+            const sve::ModelFn model = [&](const std::string &phase, const std::string &system, const std::string &prompt,
+                                           int max_out, std::string &reply) {
+                reply.clear();
+                const bool ok = llm.complete(llm.apply_template(system, prompt), max_out, reply, cb, user, phase.c_str(), 0, 1, true);
+                step++;
+                reply = sve::strip_thinking(reply);
+                if (getenv("SVE_EXTRACT_DUMP")) fprintf(stderr, "--- %s\n%s\n---\n", phase.c_str(), reply.c_str());  // desktop checks only
+                return ok;
+            };
+            sve::ActionStats as;
+            merged = sve::refine_actions(merged, pieces, model, sve::language_name(lang_of(st)), as);
+            sve_logf(1, "extract: actions: %d found, %d lines checked, %d added, %d updated, %d cancelled",
+                     as.found, as.lines_checked, as.added, as.updated, as.cancelled);
+        }
+
         // A re-run replaces this note's earlier proposals that are still waiting.
         for (const auto &s : st.suggestions("pending"))
             if (jint(s, "note_id", -1) == note_id) st.set_suggestion_status(jint(s, "id", 0), "superseded");

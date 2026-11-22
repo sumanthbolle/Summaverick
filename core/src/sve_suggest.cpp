@@ -1,5 +1,6 @@
 #include <regex>
 #include "sve_suggest.h"
+#include "sve_skills.h"
 #include "sve_textmatch.h"
 #include "sve_medcheck.h"
 
@@ -344,6 +345,205 @@ std::string clock_time(const std::string &words) {
     return "";
 }
 
+// ---- the action-item workflow ----------------------------------------------------------------------------
+
+std::vector<size_t> commitment_lines(const json &pieces) {
+    std::vector<size_t> out;
+    if (!pieces.is_array()) return out;
+    static const std::regex en(R"((^|[^a-z'])(i'll|i will|we'll|we will|i'm going to|i am going to|let me|i can do)([^a-z]|$)|[a-z]+ will (?!be\b|you\b|it\b|we\b|i\b|they\b)[a-z]+)");
+    static const std::vector<std::string> te = {"స్తాను", "స్తా", "ద్దాం", "చేస్తాను", "పంపిస్తాను", "ఇస్తాను", "తీసుకుంటాను", "చూసుకుంటాను"};
+    for (size_t i = 0; i < pieces.size(); ++i) {
+        const std::string text = jstr(pieces[i], "text");
+        std::string low;
+        for (unsigned char c : text) low.push_back(c < 0x80 ? (char)std::tolower(c) : (char)c);
+        bool hit = std::regex_search(low, en);
+        if (!hit) {
+            std::string tok;
+            auto check = [&](const std::string &t) {
+                std::string w = t;
+                while (!w.empty() && (unsigned char)w.back() < 0x80 && !std::isalnum((unsigned char)w.back())) w.pop_back();
+                for (const auto &e : te)
+                    if (w.size() >= e.size() && w.compare(w.size() - e.size(), e.size(), e) == 0) return true;
+                return false;
+            };
+            for (size_t k = 0; k <= text.size() && !hit; ++k) {
+                if (k == text.size() || std::isspace((unsigned char)text[k])) { if (!tok.empty()) hit = check(tok); tok.clear(); }
+                else tok.push_back(text[k]);
+            }
+        }
+        if (hit) out.push_back(i);
+    }
+    return out;
+}
+
+namespace {
+
+// The piece an action was said in: its quote, else its own words; -1 when neither is found.
+long piece_of(const json &task, const json &pieces) {
+    QuoteHit h = locate_quote(pieces, jstr(task, "quote"), jint(task, "start_sec", -1));
+    if (!h.found) h = locate_quote(pieces, jstr(task, "text"), -1);
+    if (h.found)
+        for (size_t i = 0; i < pieces.size(); ++i)
+            if (jint(pieces[i], "start_sec", -1) == h.start_sec) return (long)i;
+    // Most of its words in one line; else the line it shares the most words with (two at least, one of them long):
+    // a mixed-language action ("Proposal పంపిస్తాను (after Anil confirms the pricing)") is never a run of the line.
+    const std::vector<std::string> w = norm_tokens(jstr(task, "text"));
+    if (w.size() < 2) return -1;
+    long best = -1;
+    size_t best_in = 0;
+    for (size_t i = 0; i < pieces.size(); ++i) {
+        // The speaker's label ("Anil: ...") is not what was said: "after Anil confirms" is not Anil's line.
+        std::string said = jstr(pieces[i], "text");
+        const size_t colon = said.find(':');
+        if (colon != std::string::npos && colon < 40 && said.substr(0, colon).find(' ') == std::string::npos) said = said.substr(colon + 1);
+        const std::vector<std::string> p = norm_tokens(said);
+        size_t in = 0, longw = 0;
+        for (const auto &t : w)
+            if (std::find(p.begin(), p.end(), t) != p.end()) { in++; longw += t.size() >= 5; }
+        if (in * 10 >= w.size() * 6) return (long)i;
+        if (in >= 2 && longw >= 1 && in > best_in) { best = (long)i; best_in = in; }
+    }
+    return best;
+}
+
+std::string marked(const json &p) { return "[t=" + std::to_string(jint(p, "start_sec", 0)) + "] " + jstr(p, "text"); }
+
+// "after", "once", "until", "తర్వాత": the action waits on something.
+bool has_condition(const std::string &text) {
+    std::string low;
+    for (unsigned char c : text) low.push_back(c < 0x80 ? (char)std::tolower(c) : (char)c);
+    static const std::regex en(R"((^|[^a-z])(after|once|until|unless|when|as soon as|depending on|subject to)([^a-z]|$))");
+    return std::regex_search(low, en) || low.find("తర్వాత") != std::string::npos || low.find("తరువాత") != std::string::npos ||
+           low.find("అయ్యాక") != std::string::npos;
+}
+
+// Whether text still says the words of `when` (its day word at least).
+bool says_words(const std::string &text, const std::string &when) {
+    const std::vector<std::string> t = norm_tokens(text);
+    for (const auto &w : norm_tokens(when))
+        if (w.size() >= 3 && std::find(t.begin(), t.end(), w) != t.end()) return true;
+    return false;
+}
+
+// One action per person and line: the one with a condition, else the first.
+json one_per_line(const json &tasks, const json &pieces) {
+    json out = json::array();
+    std::vector<std::pair<long, std::string>> seen;
+    for (const auto &t : tasks) {
+        const long i = piece_of(t, pieces);
+        std::string who;
+        for (unsigned char c : jstr(t, "who")) who.push_back((char)std::tolower(c));
+        if (i < 0) { seen.push_back({-1 - (long)out.size(), who}); out.push_back(t); continue; }
+        bool dup = false;
+        for (size_t k = 0; k < seen.size() && !dup; ++k) {
+            if (seen[k].first != i || seen[k].second != who) continue;
+            dup = true;
+            if (has_condition(jstr(t, "text")) && !has_condition(jstr(out[k], "text"))) out[k] = t;
+        }
+        if (dup) continue;
+        seen.push_back({i, who});
+        out.push_back(t);
+    }
+    return out;
+}
+
+}  // namespace
+
+Extracted refine_actions(const Extracted &e, const json &pieces, const ModelFn &model, const std::string &lang_name,
+                         ActionStats &stats) {
+    Extracted out = e;
+    stats = ActionStats();
+    stats.found = (int)out.tasks.size();
+    if (!pieces.is_array() || pieces.empty() || !model) return out;
+    const std::string sys = skills::system(skills::Skill::todos);
+
+    // Updater first: each action with the lines after it, as the conversation ends.
+    out.tasks = one_per_line(out.tasks, pieces);
+    std::vector<bool> covered(pieces.size(), false);
+    json kept = json::array();
+    int asked = 0;
+    for (json t : out.tasks) {
+        const long i = piece_of(t, pieces);
+        if (i >= 0) covered[(size_t)i] = true;
+        if (i < 0 || (size_t)i + 1 >= pieces.size() || asked >= 10) { kept.push_back(t); continue; }
+        asked++;
+        std::string lines;
+        for (size_t k = (size_t)i; k < pieces.size() && k <= (size_t)i + 10; ++k) lines += marked(pieces[k]) + "\n";
+        const std::string prompt =
+            "An action item from a recording:\n- what: " + jstr(t, "text") + "\n- who: " + jstr(t, "who") +
+            "\n- when: " + jstr(t, "due_text") + "\n\nThe conversation from where it was said to the end:\n" + lines +
+            "\nAs the conversation ends, does this action still stand? A later line can put it on hold, add a condition, "
+            "change the day or cancel it. Reply with JSON only: {\"status\":\"stands|changed|cancelled\",\"text\":\"the "
+            "action as it stands, with any condition, in " + lang_name + "\",\"due_text\":\"the words that say when, only "
+            "if that day still stands\",\"day_stands\":true|false}. \"day_stands\" is false when the day said "
+            "first is no longer the plan.";
+        std::string reply;
+        json r;
+        if (!model("actions_update", sys, prompt, 160, reply) || !first_json_object(reply, r) || !r.is_object()) {
+            kept.push_back(t);
+            continue;
+        }
+        const std::string status = jstr(r, "status");
+        if (status != "stands" && status != "changed" && status != "cancelled") { kept.push_back(t); continue; }
+        // The later lines it read about this action are its, not new actions.
+        {
+            const std::vector<std::string> mine = norm_tokens(jstr(t, "text") + " " + jstr(r, "text"));
+            for (size_t k = (size_t)i + 1; k < pieces.size() && k <= (size_t)i + 10; ++k) {
+                int shared = 0;
+                for (const auto &w : norm_tokens(jstr(pieces[k], "text")))
+                    if (w.size() >= 4 && std::find(mine.begin(), mine.end(), w) != mine.end()) shared++;
+                if (shared >= 1) covered[k] = true;
+            }
+        }
+        if (status == "cancelled") { stats.cancelled++; continue; }
+        // Its line stays its quote when the wording changes (the reworded text is not in the transcript).
+        if (trim(jstr(t, "quote")).empty()) t["quote"] = jstr(pieces[(size_t)i], "text");
+        t["start_sec"] = jint(pieces[(size_t)i], "start_sec", 0);
+        const std::string before = jstr(t, "text");
+        if (!trim(jstr(r, "text")).empty()) t["text"] = trim(jstr(r, "text"));   // written in the person's language
+        bool day_stands = !(r.contains("day_stands") && r["day_stands"].is_boolean() && !r["day_stands"].get<bool>());
+        // The parent's check: a condition now in the action that no longer says the day replaced the day.
+        if (day_stands && !trim(jstr(t, "due_text")).empty() && has_condition(jstr(t, "text")) && !has_condition(before) &&
+            !says_words(jstr(t, "text"), jstr(t, "due_text")))
+            day_stands = false;
+        if (status == "changed" || !day_stands) {
+            t["due_text"] = day_stands ? trim(jstr(r, "due_text")) : std::string();
+            t["due_date"] = nullptr;   // the day comes from due_text again, or there is none
+            if (status == "changed") stats.updated++;
+        }
+        kept.push_back(t);
+    }
+    // Then the coverage check: a line where someone commits, with no action from it and not read by the updater for
+    // one, is asked about alone.
+    out.tasks = kept;
+    // Every line an action now comes from counts as covered (the updater may have reworded it).
+    for (const auto &t : out.tasks) { const long i = piece_of(t, pieces); if (i >= 0) covered[(size_t)i] = true; }
+    for (size_t i : commitment_lines(pieces)) {
+        if (covered[i] || stats.lines_checked >= 6) continue;
+        stats.lines_checked++;
+        const std::string lines = (i > 0 ? marked(pieces[i - 1]) + "\n" : std::string()) + marked(pieces[i]);
+        const std::string prompt =
+            "Lines from a recording (each starts with its [t=SEC] marker):\n" + lines + "\n\n"
+            "List the action items said in the last line: what will be done, who will do it (\"me\" for the listener; on "
+            "a line that starts with a name, \"I\" is that person) and the words that say when. Write \"text\" in " +
+            lang_name + ". Reply with JSON only: {\"tasks\":[{\"text\":\"\",\"who\":\"\",\"due_text\":\"\",\"quote\":\"\","
+            "\"start_sec\":0}]}, or {\"tasks\":[]} when it has none.";
+        std::string reply;
+        if (!model("actions_check", sys, prompt, 300, reply)) continue;
+        Extracted got = parse_extraction(reply);
+        if (!got.ok) continue;
+        for (json t : got.tasks) {
+            if (trim(jstr(t, "text")).empty()) continue;
+            if (trim(jstr(t, "quote")).empty()) t["quote"] = jstr(pieces[i], "text");
+            t["start_sec"] = jint(pieces[i], "start_sec", 0);
+            out.tasks.push_back(t);
+            stats.added++;
+        }
+    }
+
+    return out;
+}
+
 Extracted merge_extracted(const std::vector<Extracted> &parts) {
     Extracted m;
     std::set<std::string> seen_vocab, seen_topics, seen_people;
@@ -539,7 +739,10 @@ std::vector<json> build_suggestions(const Extracted &e, const json &pieces, int6
         json due = date_field(it, "due_date", b.fields, false, today, true);
         // The day the words say, worked out here: the model got "by Monday" a week late (2026-11-22). Its own date is
         // kept only when the words name no day.
-        for (const std::string &words : {trim(jstr(it, "due_text")), trim(jstr(it, "quote"))}) {
+        // A due_text given (even empty: the workflow found the day no longer stands) is the answer; the quote is
+        // read for a day only when there is none.
+        const bool has_due_text = it.contains("due_text") && it["due_text"].is_string();
+        for (const std::string &words : {trim(jstr(it, "due_text")), has_due_text ? std::string() : trim(jstr(it, "quote"))}) {
             if (words.empty()) continue;
             const std::string spoken = resolve_spoken_date(words, today);
             if (spoken.empty()) continue;

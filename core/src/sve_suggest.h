@@ -52,6 +52,27 @@ struct QuoteHit { bool found = false; int64_t start_sec = -1; };
 // else in any piece of the note, else across two adjacent pieces. Empty quote: not found.
 QuoteHit locate_quote(const json &pieces, const std::string &quote, int64_t cited_start_sec);
 
+// ---- the action-item workflow (2026-11-22) -----------------------------------------------------------------
+// One call cannot both find every action item and follow how each changed by the end of the conversation (the
+// test meeting and the proposal test pulled against each other on Gemma 4 E4B). So: the finder (sve_extract's
+// call) proposes; the coverage check finds lines where someone commits and no action came from them, and asks
+// again about that line alone; the updater reads each action with the lines after it and says whether it still
+// stands, changed (condition, day) or was cancelled; the parent applies that, and build_suggestions checks the rest.
+
+// A model call: phase (for progress and logs), system, prompt, max new tokens, reply. False when the call failed.
+using ModelFn = std::function<bool(const std::string &phase, const std::string &system, const std::string &prompt,
+                                   int max_out, std::string &out)>;
+struct ActionStats { int found = 0, lines_checked = 0, added = 0, updated = 0, cancelled = 0; };
+
+// Indexes of pieces where someone commits or is given an action ("I'll", "Kiran will order", "చేస్తాను",
+// "పంపిస్తాను", "చేద్దాం"), in order. Questions and small talk are not.
+std::vector<size_t> commitment_lines(const json &pieces);
+
+// The workflow above over the finder's output e. lang_name: the language to write "text" in. A worker whose reply
+// does not parse changes nothing.
+Extracted refine_actions(const Extracted &e, const json &pieces, const ModelFn &model, const std::string &lang_name,
+                         ActionStats &stats);
+
 // True when the dose is non-empty and its last normalized token is a number (no unit).
 bool dose_missing_unit(const std::string &dose);
 
