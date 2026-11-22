@@ -1,6 +1,7 @@
 // Memory C API: memories from section summaries, the review queue and the person's own changes.
 // The rules that decide what may become a memory live in sve_memory.cpp (pure, unit-tested); this file
 // runs the model calls they need and writes the results. Nothing here throws out of a C function.
+#include "sve_skills.h"
 #include "sve_core.h"
 #include "sve_internal.h"
 #include "sve_context.h"
@@ -35,8 +36,7 @@ namespace {
 constexpr int kMemoryMaxOut = 900;  // the memory-only call
 constexpr int kYesNoMaxOut = 3;     // the double-check
 
-const char *kCheckSystem =
-    "You check whether a quote from a recording says what a memory claims. Answer only yes or no.";
+const std::string kCheckSystem = sve::skills::text(sve::skills::Skill::check_quote);
 
 std::string lower(std::string s) {
     for (auto &c : s) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
@@ -277,7 +277,7 @@ int sve_memories_from_section(sve_ctx *ctx, int64_t note_id, int section_idx, sv
                 if (i < conf.size() && conf[i] && sve::piece_unclear(*conf[i])) continue;
                 said += (said.empty() ? "" : "\n") + pieces[i].second;
             }
-            const std::string sys = sve::context_system(st, sve::system_prompt(lang), false, &said);
+            const std::string sys = sve::context_system(st, sve::memory_system_prompt(lang), false, &said);
             const std::string prompt = sve::memory_prompt(pieces, lang, sve::spelling_vocab_line(st, 400, &said));
             std::string out;
             Watch w{cb, user, false};

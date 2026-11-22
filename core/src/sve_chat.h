@@ -46,6 +46,11 @@ std::string chat_search_query(const std::string &question, const std::vector<Cha
 
 // The user prompt of a recordings answer: the conversation (may be ""), the material (relevant().block), the
 // question, in lang_name. Asks for [S<n>] labels and NOT_FOUND as sve_assistant_ask does.
+// A request to write something ("Draft a message asking him for an update", "make it shorter", "రాయండి").
+bool is_compose_request(const std::string &text);
+// The prompt for such a request: write it, using the conversation and the material for every fact.
+std::string chat_compose_prompt(const std::string &history, const std::string &material, const std::string &request,
+                                const std::string &lang_name);
 std::string chat_recordings_prompt(const std::string &history, const std::string &material, const std::string &question,
                                    const std::string &lang_name);
 

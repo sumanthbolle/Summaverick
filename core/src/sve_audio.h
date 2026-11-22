@@ -47,7 +47,7 @@ PiecePlan plan_next_piece(const std::vector<float> &pcm, size_t offset, size_t s
 // The user turn for one audio piece: the media marker, the instruction, the vocabulary line (may be
 // empty) and, when there is one, the last 400 bytes of the previous piece for names and spellings.
 std::string transcription_instruction(const std::string &marker, const std::string &vocab, const std::string &prev);
-extern const char *const kTranscriberSystem;
+extern const std::string kTranscriberSystem;
 
 // A piece whose mean token probability (conf) is under this is transcribed once more (N7).
 constexpr double kRetryConf = 0.80;

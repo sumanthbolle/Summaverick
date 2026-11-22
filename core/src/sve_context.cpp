@@ -325,6 +325,29 @@ std::string vocab_correct(const std::string &text, const std::vector<std::string
     return out;
 }
 
+Relevant recent_relevant(Store &store, size_t max_bytes) {
+    Relevant r;
+    r.sources = json::array();
+    auto notes = store.list("", 1);
+    if (notes.empty()) return r;
+    const auto &n = notes[0];
+    std::string out = "From the most recent recording:\n";
+    int k = 0;
+    for (const auto &p : store.pieces(n.id)) {
+        const std::string text = str_of(p, "text");
+        if (text.empty()) continue;
+        const long long sec = p.contains("start_sec") && p["start_sec"].is_number() ? p["start_sec"].get<long long>() : 0;
+        const std::string label = "S" + std::to_string(k + 1);
+        const std::string line = "[" + label + "] " + n.title + " " + timestamp(sec) + ": " + text + "\n";
+        if (out.size() + line.size() > max_bytes) break;
+        out += line;
+        r.sources.push_back({{"label", label}, {"note_id", n.id}, {"start_sec", sec}, {"title", n.title}});
+        k++;
+    }
+    if (k) r.block = out;
+    return r;
+}
+
 Relevant relevant(Store &store, const std::string &query, size_t max_bytes, int64_t from, int64_t to) {
     Selection sel = select_relevant(store, query, from, to);
     Relevant r;

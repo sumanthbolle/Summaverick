@@ -89,3 +89,17 @@ TEST(trim_cut_reply_ends_cleanly) {
     CHECK_EQ(trim_cut_reply("The speaker advises"), std::string("The speaker advises"));
     CHECK_EQ(trim_cut_reply(""), std::string());
 }
+
+// Every call is the core plus one skill (2026-11-22); the one-word checkers and the transcriber take theirs alone.
+TEST(skills_core_on_writing_skills_only) {
+    using namespace sve::skills;
+    for (Skill s : {Skill::notes, Skill::memories, Skill::insight, Skill::ask, Skill::compose, Skill::summary, Skill::general})
+        CHECK(has(system(s), "Read the material to its end"));
+    for (Skill s : {Skill::check_quote, Skill::same_person, Skill::classify, Skill::transcribe, Skill::todos})
+        CHECK(!has(system(s), "Read the material to its end"));
+    CHECK(has(system(Skill::todos), "\"We could\" is a suggestion"));
+    CHECK(has(system(Skill::compose), "ready to send"));
+    CHECK(has(sve::system_prompt("en"), "Skill: notes"));
+    CHECK(has(sve::memory_system_prompt("te"), "Skill: things to remember"));
+    CHECK(has(sve::memory_system_prompt("te"), "Write in Telugu"));
+}

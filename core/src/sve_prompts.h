@@ -2,6 +2,7 @@
 // Written for small (0.6B–2B) instruction models: short, explicit, fixed output shape,
 // and we always say "only use what is in the transcript" to cut hallucination.
 #pragma once
+#include "sve_skills.h"
 #include <string>
 
 namespace sve {
@@ -28,14 +29,16 @@ inline std::string language_name(const std::string &code) {
     return "English";
 }
 
-inline std::string system_prompt(const std::string &lang) {
-    // "/no_think" switches Qwen3 to non‑thinking mode; harmless for other models.
-    return "You are Summaverick, a careful note-taker. You only use information that is present in the "
-           "transcript you are given. You never invent names, numbers, dates or facts. If something is "
-           "unclear in the transcript, leave it out. The transcript may mix languages (for example Telugu "
-           "with English terms) and may contain mis-heard words: understand all of it and correct obvious "
-           "mis-hearings from context. Write in " + language_name(lang) + "; keep important terms from other "
-           "languages in brackets in their original script. /no_think";
+// The notes skill (sve_skills.h) with the writing language. "/no_think" switches Qwen3 to non-thinking mode; harmless
+// for other models.
+inline std::string write_in(const std::string &lang) {
+    return "Write in " + language_name(lang) + "; keep important terms from other languages in brackets in their "
+           "original script. /no_think";
+}
+inline std::string system_prompt(const std::string &lang) { return skills::system(skills::Skill::notes, write_in(lang)); }
+/// The memory pass's system prompt: the memories skill, same language rule.
+inline std::string memory_system_prompt(const std::string &lang) {
+    return skills::system(skills::Skill::memories, write_in(lang));
 }
 
 // Transcript text from a piece heard with conf < 0.80 starts with "[unclear] " (sve::kUnclearTag, N7 rev 1); every

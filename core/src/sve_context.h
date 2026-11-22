@@ -57,6 +57,9 @@ struct Relevant {
 // Memories (current, not wrong) and transcript pieces matching `query`, within max_bytes. Whole items only
 // (pieces first, then facts); an oversized first piece is included truncated.
 // to != 0: only pieces of notes created in [from, to), and no remembered facts (they have no period).
+// The newest recording, in order, in the same labelled form as relevant(), within max_bytes: what a question that
+// names no topic ("What do I need to do?") is about when nothing matches its words.
+Relevant recent_relevant(Store &store, size_t max_bytes);
 Relevant relevant(Store &store, const std::string &query, size_t max_bytes, int64_t from = 0, int64_t to = 0);
 
 std::string relevant_block(Store &store, const std::string &query, size_t max_bytes);

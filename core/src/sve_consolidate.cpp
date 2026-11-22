@@ -1,3 +1,4 @@
+#include "sve_skills.h"
 #include "sve_consolidate.h"
 #include "sve_extract.h"
 
@@ -457,8 +458,7 @@ PersonMatch match_person(const std::string &a, const std::string &b) {
     return PersonMatch::different;
 }
 
-const char *kSamePersonSystem =
-    "You check whether two names from someone's recordings are the same person. Answer only yes or no.";
+const std::string kSamePersonSystem = skills::text(skills::Skill::same_person);
 
 std::string same_person_prompt(const std::string &a_name, const std::string &a_context, const std::string &b_name,
                                const std::string &b_context) {

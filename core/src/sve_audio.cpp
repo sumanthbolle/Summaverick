@@ -1,3 +1,4 @@
+#include "sve_skills.h"
 #include "sve_audio.h"
 
 #include <algorithm>
@@ -6,8 +7,7 @@
 
 namespace sve {
 
-const char *const kTranscriberSystem =
-    "You are a precise transcriber. Speakers often mix languages, for example Telugu with English words.";
+const std::string kTranscriberSystem = skills::text(skills::Skill::transcribe);
 
 static uint32_t le32(const unsigned char *p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24); }
 static uint16_t le16(const unsigned char *p) { return (uint16_t)(p[0] | (p[1] << 8)); }

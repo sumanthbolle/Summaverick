@@ -1,3 +1,4 @@
+#include "sve_skills.h"
 #include <cstdio>
 // Personal assistant C API: extraction, suggestions, profile, medicines, Ask, topics, insights.
 // The checks that keep medicine information safe live in sve_suggest.cpp (pure, unit-tested);
@@ -458,9 +459,7 @@ int sve_extract(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
         if (pieces.empty()) return 0;
 
         const std::string ab = sve::always_block(st), today = today_iso() + " (" + sve::weekday_name(today_iso()) + ")";
-        const std::string sys = std::string("You turn a recording's transcript into proposals for a personal assistant: the "
-                                            "listener's reminders and to-dos, and every action item anyone in the recording "
-                                            "agreed to or was given, with who will do it. ") + kSafety;
+        const std::string sys = sve::skills::system(sve::skills::Skill::todos, kSafety);
         const int max_new = 900;
         // Each window's transcript must fit next to the prompt, the always block and the reply.
         int scaffold = llm.count_tokens(llm.apply_template(sys, sve::extraction_prompt(ab, "", today)));
@@ -952,7 +951,11 @@ json cited_answer(sve::Store &st, const std::string &model_out, const sve::Relev
 }
 
 std::string ask_system(sve::Store &st) {
-    return sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety);
+    return sve::context_system(st, sve::skills::system(sve::skills::Skill::ask, kSafety));
+}
+
+std::string compose_system(sve::Store &st) {
+    return sve::context_system(st, sve::skills::system(sve::skills::Skill::compose, kSafety));
 }
 
 constexpr int kChatMaxOut = 400;  // a chat answer: a few sentences, a little more room than sve_assistant_ask's 300
@@ -1129,8 +1132,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
 
         auto general = [&]() -> char * {
             const std::string sys = sve::context_system(st,
-                "You are Summaverick, a helpful assistant on the person's phone, without internet. "
-                "Never give medical advice, medicine names or doses.", false);
+                sve::skills::system(sve::skills::Skill::general, "Never give medical advice, medicine names or doses."), false);
             // Held at a sentence the health check flags: the code-built line, not model text.
             sve::AnswerStream stream(names, sink);
             std::string raw;
@@ -1163,7 +1165,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
             std::string material = sve::summary_material(notes, names, &any);
             if (!any) return result(ask_result(titles_answer, sources, false, false), "summary");   // nothing to summarise: no model
             if (!has_model) return nullptr;
-            const std::string sys = sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety, false);
+            const std::string sys = sve::context_system(st, sve::skills::system(sve::skills::Skill::summary, kSafety), false);
             if (llm) {
                 // Stored summaries that fit go straight to the final call; only a long period needs the model to map them.
                 const int history_tokens = llm->count_tokens(sve::history_block(sve::history_window(history, sve::kChatHistoryTokens, count)));
@@ -1261,7 +1263,7 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
                 const char *r = g_sve_model_reply("classify", prompt.c_str());
                 if (r) { reply = r; ok = true; }
             } else {
-                ok = llm->complete(llm->apply_template("You sort questions. Reply with one letter.", prompt), kClassifyMaxOut,
+                ok = llm->complete(llm->apply_template(sve::skills::text(sve::skills::Skill::classify), prompt), kClassifyMaxOut,
                                    reply, cb, cbuser, "classify", 0, 1, true);
             }
             const char route_to = ok ? sve::classify_route(reply) : 'R';
@@ -1269,8 +1271,31 @@ char *sve_assistant_chat(sve_ctx *ctx, const char *messages_json, const char *la
             if (route_to == 'G') return general();
             if (route_to == 'H') return result(ask_result(sve::health_only_text(lang), json::array(), true, false), "health");
         }
-        if (rel.sources.empty()) return nothing();
+        // Nothing matches the words of a question that names no topic ("What do I need to do?", or a follow-up such
+        // as "Draft a message asking him for an update"): it is about the newest recording.
+        const bool compose = sve::is_compose_request(q);
+        if (rel.sources.empty()) {
+            rel = sve::recent_relevant(st, 6000);
+            sve::drop_flagged_facts(rel, names);
+            for (const auto &src : rel.sources)
+                if (flagged(piece_text(st, jint(src, "note_id", 0), jint(src, "start_sec", 0)))) { rel = sve::Relevant(); rel.sources = json::array(); break; }
+        }
+        if (rel.sources.empty() && !compose) return nothing();
         if (!has_model) return nullptr;
+
+        if (compose) {
+            // Writing what the person asks: new words, the facts from the conversation and the material.
+            sve::AnswerStream stream(names, sink);
+            std::string raw;
+            if (!run("compose", compose_system(st), kChatMaxOut, stream, raw,
+                     [&](const std::string &h) { return sve::chat_compose_prompt(h, rel.block, q, lname); }))
+                return nullptr;
+            std::string answer = sve::strip_thinking(stream.shown().empty() ? raw : stream.shown());
+            if (stream.held()) return result(ask_result(sve::health_only_text(lang), json::array(), true, false), "recordings");
+            json srcs = json::array();
+            for (const auto &x : rel.sources) { srcs.push_back(source_of(x)); if (srcs.size() >= 3) break; }
+            return result(ask_result(answer, srcs, answer.empty(), false), "compose");
+        }
 
         sve::neutral_titles(rel, names);
         sve::AnswerStream stream(names, sink);
@@ -1321,7 +1346,7 @@ char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, vo
             }
         }
         const std::string lang = lang_of(st);
-        const std::string sys = sve::context_system(st, std::string("You are Summaverick, a careful personal assistant. ") + kSafety);
+        const std::string sys = sve::context_system(st, sve::skills::system(sve::skills::Skill::insight, kSafety));
         const std::string userp = material + "\nToday is " + today + ".\n"
             "Write ONE short, helpful insight for the person, at most 2 sentences, in " + sve::language_name(lang) +
             ": a topic that keeps coming up, a deadline that is close, or a suggestion to revise a topic with its quiz. "

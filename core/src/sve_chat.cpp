@@ -529,6 +529,32 @@ bool has_subject(const std::string &text) {
     return false;
 }
 
+bool is_compose_request(const std::string &text) {
+    const std::vector<std::string> w = ascii_words(text);
+    static const std::vector<std::string> kVerbs = {"draft", "write", "compose", "rewrite", "rephrase", "reword",
+                                                    "shorten", "translate", "reply", "respond"};
+    for (size_t i = 0; i < w.size() && i < 4; ++i)
+        for (const auto &v : kVerbs) if (w[i] == v) return true;
+    if (has_phrase(w, {"make", "it", "shorter"}) || has_phrase(w, {"make", "it", "longer"}) ||
+        has_phrase(w, {"make", "it", "simpler"}) || has_phrase(w, {"make", "it", "formal"})) return true;
+    return has_any(text, {"రాయి", "రాయండి", "రాసి ఇవ్వు", "రాసివ్వు", "మెసేజ్ రాయ", "మెయిల్ రాయ", "చిన్నగా చేయ", "తగ్గించి రాయ"});
+}
+
+std::string chat_compose_prompt(const std::string &history, const std::string &material, const std::string &request,
+                                const std::string &lang_name) {
+    std::string p;
+    if (!history.empty()) p += history + "\n";
+    if (!material.empty())
+        p += "Material from the person's recordings and memory. Each recording excerpt starts with a label such as [S1].\n\n" +
+             material + "\n";
+    p += "Request: " + request + "\n\n"
+         "Write what the person asks for, in " + lang_name + " unless they ask for another language, ready to use. "
+         "Take every name, task, condition, date and number from the conversation and the material; never add one that "
+         "is not there. Keep details that still apply when you change something. Write only the requested text, with no "
+         "labels and no explanation.";
+    return p;
+}
+
 Route route_question(const std::string &text, int64_t now, const std::vector<std::string> &medicine_names) {
     Route r;
     if (is_medicine_question(text, medicine_names)) { r.kind = "medicine"; r.by_rule = true; return r; }

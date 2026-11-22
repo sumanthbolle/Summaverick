@@ -36,7 +36,7 @@ PersonMatch match_person(const std::string &a, const std::string &b);
 // The model's same-person check, answered with parse_yes_no.
 std::string same_person_prompt(const std::string &a_name, const std::string &a_context, const std::string &b_name,
                                const std::string &b_context);
-extern const char *kSamePersonSystem;
+extern const std::string kSamePersonSystem;
 
 enum class Pair { unrelated, same, update, contradiction };
 // Rows in the memory_items shape (type, text, checked, said_date, people:[{id}], topics:[{id}]).
