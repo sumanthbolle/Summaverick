@@ -270,7 +270,12 @@ final class ProcessingPipeline {
     @ObservationIgnored private var autoTriedPruned = false
     private(set) var activeNoteID: Int64? {
         // Work on a note goes on: a pause or failure notice of it in the list is no longer true.
-        didSet { if let id = activeNoteID, id != oldValue { NotesNotifier.withdrawStale(noteID: id) } }
+        didSet {
+            if let id = activeNoteID, id != oldValue {
+                NotesNotifier.withdrawStale(noteID: id)
+                ActivityLog.log("note", note: id, ["stage": stageName(stage)])   // the run works on this note from here
+            }
+        }
     }
     /// Last failure message per note, so the note screen can show why nothing was generated.
     private(set) var lastFailure: [Int64: String] = [:]
@@ -2650,7 +2655,7 @@ final class ProcessingPipeline {
     }
 
     private func beginBackground() {
-        ActivityLog.log("run_start", note: activeNoteID, ["heat": HeatGovernor.shared.level.name,
+        ActivityLog.log("run_start", ["heat": HeatGovernor.shared.level.name,
                                                           "in_front": UIApplication.shared.applicationState == .active])
         startWatchdog()
         notesStored = false
