@@ -130,6 +130,8 @@ final class HeatGovernor {
             NSLog("[sve] heat: %@ -> %@ (thermal %ld, mem %d MB, battery %.2f)", before.name, state.level.name,
                   thermal.rawValue, Int32(clamping: memoryMB), battery)
             Self.threads.set(state.level)
+            ActivityLog.log("heat", ["from": before.name, "to": state.level.name, "thermal": thermal.rawValue,
+                                     "battery": (Double(battery) * 100).rounded() / 100, "charging": charging])
             NotificationCenter.default.post(name: .heatLevelChanged, object: nil)
         }
         keepTicking()

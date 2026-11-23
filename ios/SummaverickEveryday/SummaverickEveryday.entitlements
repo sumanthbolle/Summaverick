@@ -2,13 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Lets the app use more of the phone's RAM: needed for the 5 GB Gemma 4 model. -->
 	<key>com.apple.developer.kernel.increased-memory-limit</key>
 	<true/>
-	<!-- Shared with the widget extension: the record control reads whether a recording is going. -->
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.summaverick.everyday</string>
-	</array>
 </dict>
 </plist>

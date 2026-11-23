@@ -88,6 +88,15 @@ struct SettingsView: View {
                 }
                 .listRowBackground(Theme.formRow)
 
+                Section {
+                    NavigationLink { ProcessingActivityView() } label: {
+                        Label("Processing activity", systemImage: "waveform.path.ecg")
+                    }
+                } footer: {
+                    Text("What the notes work is doing now, and every step it took, on this phone.")
+                }
+                .listRowBackground(Theme.formRow)
+
                 Section("Speed on this phone") {
                     ForEach(SpeedMath.summaryLines(speedRecords.map(\.record)), id: \.self) { Text(verbatim: $0) }
                     if speedRecords.contains(where: { $0.record.finishedAt != nil }) {
@@ -242,6 +251,62 @@ struct SettingsView: View {
             dismiss()
             try? await Task.sleep(for: .milliseconds(500))   // once Settings has gone, so the welcome can show
             SetupState.shared.restartAfterWipe()
+        }
+    }
+}
+
+
+/// What the notes work is doing now and the steps it took (ActivityLog), refreshed every 2 s: the stage and for how
+/// long, the heat, the last sign of life, and the recent events with their times. Nothing of what was said.
+struct ProcessingActivityView: View {
+    @State private var pipeline = ProcessingPipeline.shared
+    @State private var heat = HeatGovernor.shared
+    @State private var entries: [ActivityLog.Entry] = []
+    @State private var titles: [Int64: String] = [:]
+
+    var body: some View {
+        SwiftUI.TimelineView(.periodic(from: .now, by: 2)) { context in
+            List {
+                Section("Now") {
+                    if pipeline.isWorking, let id = pipeline.activeNoteID {
+                        LabeledContent("Recording", value: titles[id] ?? "#\(id)")
+                        LabeledContent("Step", value: pipeline.progressLine)
+                        LabeledContent("For", value: Duration.seconds(context.date.timeIntervalSince(pipeline.currentStageSince))
+                            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated)))
+                        let quiet = ContinuedWork.secondsSinceAlive
+                        LabeledContent("Last sign of life", value: Duration.seconds(Int(quiet))
+                            .formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated)))
+                        if Watchdog.stalled(working: true, secondsSinceAlive: quiet) {
+                            Label("No progress for a while. It may be stuck; it carries on by itself, or tap Continue now on the note.",
+                                  systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning)
+                        }
+                    } else {
+                        Text("Nothing is being written now.").foregroundStyle(Theme.secondary)
+                    }
+                    LabeledContent("Phone heat", value: heat.level.name)
+                }
+                .listRowBackground(Theme.formRow)
+                Section("Recent steps") {
+                    if entries.isEmpty { Text("Nothing logged yet.").foregroundStyle(Theme.secondary) }
+                    ForEach(Array(entries.enumerated()), id: \.offset) { _, e in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(e.time, format: .dateTime.hour().minute().second()).font(.caption.monospacedDigit())
+                                Text(verbatim: e.event).font(.caption.weight(.semibold))
+                                if let n = e.note { Text(verbatim: titles[n] ?? "#\(n)").font(.caption).foregroundStyle(Theme.secondary).lineLimit(1) }
+                            }
+                            if !e.detail.isEmpty { Text(verbatim: e.detail).font(.caption2.monospaced()).foregroundStyle(Theme.secondary) }
+                        }
+                    }
+                }
+                .listRowBackground(Theme.formRow)
+            }
+            .onChange(of: context.date) { _, _ in entries = ActivityLog.recent(200) }
+        }
+        .navigationTitle("Processing activity")
+        .task {
+            entries = ActivityLog.recent(200)
+            titles = Dictionary(await CoreEngine.shared.notes().map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
         }
     }
 }

@@ -80,6 +80,7 @@ final class ContinuedWork {
         private var lastAlive = Date()
         func stamp(_ now: Date = Date()) { lock.lock(); lastMove = now; lastAlive = now; lock.unlock() }
         func alive(_ now: Date = Date()) { lock.lock(); lastAlive = now; lock.unlock() }
+        func sinceAlive(_ now: Date = Date()) -> TimeInterval { lock.lock(); defer { lock.unlock() }; return now.timeIntervalSince(lastAlive) }
         /// True once per heartbeat: the progress stood still for `NotesProgress.heartbeatSeconds` while the work is alive.
         func pulseDue(_ now: Date = Date()) -> Bool {
             lock.lock(); defer { lock.unlock() }
@@ -94,6 +95,8 @@ final class ContinuedWork {
     /// The heartbeat itself comes from a timer (startPulses), because callbacks can be further apart than iOS
     /// waits for progress.
     nonisolated static func beat() { clock.alive() }
+    /// Seconds since the work last showed a sign of life (the watchdog, ActivityLog).
+    nonisolated static var secondsSinceAlive: TimeInterval { clock.sinceAlive() }
 
     /// While a task is held: every few seconds, a progress that stood still for `heartbeatSeconds` moves one unit.
     private func startPulses(_ h: Held) {

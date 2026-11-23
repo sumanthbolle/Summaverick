@@ -91,6 +91,7 @@ final class ProcessingPipeline {
     private(set) var stage: Stage = .idle {
         didSet {
             speedTick()
+            logStage()
             refreshExpiryOutcome()
             if stage.isWorking { ContinuedWork.shared.update(subtitle: progressLine) }
             guard case .failed(let msg) = stage, let id = activeNoteID else { followStage(); return }
@@ -100,6 +101,63 @@ final class ProcessingPipeline {
             failedLines[id] = msg
             notifyFailed(id, line: msg)
             RecordingActivities.shared.update(noteID: id, .failed, line: msg, percent: ContinuedWork.shared.percent)
+        }
+    }
+
+    // MARK: activity log (ActivityLog) and watchdog
+
+    @ObservationIgnored private var loggedStage = ""
+    @ObservationIgnored private var stageSince = Date()
+    @ObservationIgnored private var watchdog: Task<Void, Never>?
+    /// When the current stage began (the Processing activity screen's "for 3 min").
+    var currentStageSince: Date { stageSince }
+
+    private func stageName(_ s: Stage) -> String {
+        switch s {
+        case .idle: return "idle"
+        case .transcribing: return "transcribing"
+        case .loadingModel: return "loading_model"
+        case .extracting: return "actions"
+        case .sections: return "sections"
+        case .generating(let k, _, _, _): return "writing_" + String(describing: k)
+        case .done: return "done"
+        case .failed: return "failed"
+        case .paused: return "paused"
+        case .cooling: return "cooling"
+        case .overnight: return "overnight"
+        case .memories: return "memories"
+        }
+    }
+
+    /// A new stage (not each progress tick): logged with the time the last one took.
+    private func logStage() {
+        let name = stageName(stage)
+        guard name != loggedStage else { return }
+        let now = Date()
+        ActivityLog.log("stage", note: activeNoteID, ["stage": name, "prev": loggedStage.isEmpty ? "-" : loggedStage,
+                                                      "prev_s": Int(now.timeIntervalSince(stageSince))])
+        loggedStage = name
+        stageSince = now
+    }
+
+    /// While a run works: every 30 s, work that has shown no sign of life for Watchdog.stallSeconds is logged as stalled
+    /// (once per stall), with its stage and how long.
+    private func startWatchdog() {
+        watchdog?.cancel()
+        watchdog = Task { @MainActor [weak self] in
+            var reported = false
+            while let self, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                let quiet = ContinuedWork.secondsSinceAlive
+                if Watchdog.stalled(working: self.isWorking, secondsSinceAlive: quiet) {
+                    if !reported {
+                        ActivityLog.log("stalled", note: self.activeNoteID, ["stage": self.stageName(self.stage), "quiet_s": Int(quiet),
+                                                                             "heat": HeatGovernor.shared.level.name])
+                        NSLog("[sve] watchdog: no sign of life for %.0f s in %@", quiet, self.stageName(self.stage))
+                        reported = true
+                    }
+                } else { reported = false }
+            }
         }
     }
 
@@ -1296,6 +1354,7 @@ final class ProcessingPipeline {
     /// hold: background time taken in the expiration handler itself, before the hop here; it ends once every
     /// notification and Live Activity end below has taken its own.
     private func continuedWorkExpired(hold: NotesNotifier.Hold) {
+        ActivityLog.log("task_expired", note: activeNoteID, ["stage": stageName(stage)])
         defer { hold.end() }
         abort.set(true)
         // Memories and the insight run after the notes are stored: stopping them leaves nothing to resume or show.
@@ -1338,6 +1397,7 @@ final class ProcessingPipeline {
     /// The run in flight was cancelled; every piece, section and output already finished is kept.
     /// queued: the note was waiting its turn, not running (its progress is not known: 0%).
     private func cutOff(_ id: Int64, queued: Bool = false) {
+        ActivityLog.log("cut_off", note: id, ["queued": queued, "percent": ContinuedWork.shared.percent])
         RecordingActivities.shared.update(noteID: id, .cutOff, line: lastFailure[id] ?? Self.cutOffMessage,
                                           percent: queued ? 0 : ContinuedWork.shared.percent)
         guard OvernightList.enrolsAfterCutOff(notesRun: queued || notesRun, memoriesOnly: !queued && memoryWork,
@@ -1383,6 +1443,8 @@ final class ProcessingPipeline {
     @discardableResult
     private func stopShort(_ line: String, error: Error? = nil, heat: Bool = false, noSpeech: Bool = false,
                            audioGone: Bool = false) -> FailureKind.Outcome {
+        ActivityLog.log("stopped_short", note: activeNoteID, ["stage": stageName(stage), "heat": heat, "no_speech": noSpeech,
+                                                              "error": error.map { String(describing: type(of: $0)) } ?? "-"])
         let id = activeNoteID
         let outcome = classify(id, run: notesRun ? .notes : .findReminders, error: error, heat: heat, noSpeech: noSpeech,
                                audioGone: audioGone)
@@ -2588,6 +2650,9 @@ final class ProcessingPipeline {
     }
 
     private func beginBackground() {
+        ActivityLog.log("run_start", note: activeNoteID, ["heat": HeatGovernor.shared.level.name,
+                                                          "in_front": UIApplication.shared.applicationState == .active])
+        startWatchdog()
         notesStored = false
         runPausedForHeat = false
         runSteppedAside = false
@@ -2631,6 +2696,9 @@ final class ProcessingPipeline {
         endBackground()
     }
     private func endBackground() {
+        ActivityLog.log("run_end", note: activeNoteID, ["stage": stageName(stage)])
+        watchdog?.cancel()
+        watchdog = nil
         // Ended, not killed: nothing left to restore next launch, unless the note is queued to go on (the queue is not saved).
         if let id = runningNote, !WaitingNotes.keepsRunningNote(queued: interrupted.contains(id)) {
             runningNote = nil

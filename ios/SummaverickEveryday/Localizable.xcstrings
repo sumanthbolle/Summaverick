@@ -8171,6 +8171,116 @@
           }
         }
       }
+    },
+    "For": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఎంతసేపు"
+          }
+        }
+      }
+    },
+    "Last sign of life": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "చివరి కదలిక"
+          }
+        }
+      }
+    },
+    "No progress for a while. It may be stuck; it carries on by itself, or tap Continue now on the note.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "కాసేపటిగా ముందుకు కదలడం లేదు. ఆగిపోయి ఉండవచ్చు; దానంతట అదే కొనసాగుతుంది, లేదా నోట్‌లో ఇప్పుడే కొనసాగించు నొక్కండి."
+          }
+        }
+      }
+    },
+    "Nothing is being written now.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడు ఏమీ రాయడం లేదు."
+          }
+        }
+      }
+    },
+    "Nothing logged yet.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇంకా ఏమీ నమోదు కాలేదు."
+          }
+        }
+      }
+    },
+    "Now": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇప్పుడు"
+          }
+        }
+      }
+    },
+    "Phone heat": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఫోన్ వేడి"
+          }
+        }
+      }
+    },
+    "Processing activity": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "పని జరుగుతున్న తీరు"
+          }
+        }
+      }
+    },
+    "Recent steps": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ఇటీవలి దశలు"
+          }
+        }
+      }
+    },
+    "Step": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "దశ"
+          }
+        }
+      }
+    },
+    "What the notes work is doing now, and every step it took, on this phone.": {
+      "localizations": {
+        "te": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "నోట్స్ పని ఇప్పుడు ఏం చేస్తోంది, ఈ ఫోన్‌లో అది వేసిన ప్రతి అడుగు."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

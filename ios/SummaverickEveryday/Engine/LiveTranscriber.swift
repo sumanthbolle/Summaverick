@@ -169,6 +169,11 @@ enum TranscriptRun {
                 NSLog("[sve] shruti piece %d: %.1f s audio in %.0f ms, %d chars", n,
                       Double(end - start) / Double(ShrutiRecognizer.sampleRate),
                       Date().timeIntervalSince(began) * 1000, text.count)
+                ActivityLog.log("piece", ["engine": "shruti", "at_s": startSec,
+                                          "audio_s": (Double(end - start) / Double(ShrutiRecognizer.sampleRate) * 10).rounded() / 10,
+                                          "ms": Int(Date().timeIntervalSince(began) * 1000), "chars": text.count,
+                                          "peak": (Double(peak) * 1000).rounded() / 1000,
+                                          "to_gemma": ShrutiPiece.needsGemma(text: text, peak: peak)])
                 progress.save(audioPath: audioPath)   // skipped when the audio was deleted meanwhile
                 onPiece(progress)
             }
@@ -199,6 +204,7 @@ enum TranscriptRun {
             let previous = progress.pieces[..<i].last(where: { !$0.text.isEmpty && $0.pending != true })?.text
             let b = await backend()
             try await ModelManager.shared.loadIntoCore(backend: b)
+            let gemmaBegan = Date()
             let heard: (String, Double?)
             do {
                 heard = try await CoreEngine.shared.transcribeSpan(path: audioPath, start: start, end: end,
@@ -210,6 +216,10 @@ enum TranscriptRun {
                                                                    previousText: previous, backend: .cpu, shouldStop: shouldStop)
             }
             progress.fill(i, text: heard.0, conf: heard.1)
+            ActivityLog.log("piece", ["engine": "gemma", "at_s": p.start_sec,
+                                      "audio_s": (Double(end - start) / 16000 * 10).rounded() / 10,
+                                      "ms": Int(Date().timeIntervalSince(gemmaBegan) * 1000), "chars": heard.0.count,
+                                      "conf": heard.1.map { ($0 * 100).rounded() / 100 } ?? -1, "backend": b == .gpu ? "gpu" : "cpu"])
             progress.save(audioPath: audioPath)
             onPiece(progress)
         }

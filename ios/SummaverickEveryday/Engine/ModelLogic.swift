@@ -909,6 +909,83 @@ enum FlowGroups {
     }
 }
 
+/// The processing activity log (owner, 2026-11-23: "monitor long running process within this application"): one JSON
+/// line per event in Application Support/Summaverick/activity.log, kept under 1 MB (the older half goes). It survives
+/// the phone locking, so a run can be followed afterwards: the Processing activity screen reads it, and the Mac reads
+/// it with devicectl. Never the words of a recording: stages, times, counts, heat, which engine wrote a piece.
+enum ActivityLog {
+    struct Entry: Equatable {
+        let time: Date
+        let event: String
+        let note: Int64?
+        let detail: String
+    }
+
+    static let maxBytes = 1_000_000
+    private static let queue = DispatchQueue(label: "com.summaverick.activity")
+    static var url: URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Summaverick", isDirectory: true)
+        return dir.appendingPathComponent("activity.log")
+    }
+
+    /// One event. fields: short facts ("stage": "transcribing", "ms": 840); never transcript text.
+    static func log(_ event: String, note: Int64? = nil, _ fields: [String: Any] = [:]) {
+        var row: [String: Any] = ["t": (Date().timeIntervalSince1970 * 1000).rounded() / 1000, "ev": event]
+        if let note { row["note"] = note }
+        for (k, v) in fields { row[k] = v }
+        guard JSONSerialization.isValidJSONObject(row), let data = try? JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]),
+              var line = String(data: data, encoding: .utf8) else { return }
+        line += "\n"
+        let file = url
+        queue.async {
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if let h = try? FileHandle(forWritingTo: file) {
+                h.seekToEndOfFile()
+                h.write(Data(line.utf8))
+                let size = h.offsetInFile
+                try? h.close()
+                if size > UInt64(maxBytes) { trim(file) }
+            } else {
+                try? Data(line.utf8).write(to: file)
+            }
+        }
+    }
+
+    /// Keeps the newer half when the file is over maxBytes.
+    private static func trim(_ file: URL) {
+        guard let data = try? Data(contentsOf: file) else { return }
+        let half = data.suffix(maxBytes / 2)
+        guard let nl = half.firstIndex(of: 0x0A) else { return }
+        try? half.suffix(from: half.index(after: nl)).write(to: file)
+    }
+
+    /// The newest `limit` entries, newest first.
+    static func recent(_ limit: Int = 200) -> [Entry] {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        return parse(text).suffix(limit).reversed()
+    }
+
+    static func parse(_ text: String) -> [Entry] {
+        text.split(separator: "\n").compactMap { line in
+            guard let d = line.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+                  let t = o["t"] as? Double, let ev = o["ev"] as? String else { return nil }
+            let note = (o["note"] as? NSNumber)?.int64Value
+            let detail = o.keys.filter { !["t", "ev", "note"].contains($0) }.sorted()
+                .map { k in "\(k) \(o[k].map { "\($0)" } ?? "")" }.joined(separator: " · ")
+            return Entry(time: Date(timeIntervalSince1970: t), event: ev, note: note, detail: detail)
+        }
+    }
+
+    static func clear() { queue.async { try? FileManager.default.removeItem(at: url) } }
+}
+
+/// The watchdog's rule: work that says it is running has shown no sign of life for `stallSeconds` is stalled.
+enum Watchdog {
+    static let stallSeconds: TimeInterval = 300
+    static func stalled(working: Bool, secondsSinceAlive: TimeInterval) -> Bool { working && secondsSinceAlive >= stallSeconds }
+}
+
 /// A transcript too thin to write notes from. Fewer than `minWords` words (a 1–2 s tap that caught "అది"):
 /// Gemma made up a whole meeting from it, title, summary and nine questions (notes 3 and 7, 2026-11-19). Such a
 /// note keeps its transcript and gets no notes, and says so instead.
