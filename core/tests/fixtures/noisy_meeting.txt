@@ -1,0 +1,7 @@
+[t=0] Ravi: Okay, the billing move. We are moving the invoices from the old system next quarter.
+[t=30] ChargeBee Kubernetes Razorpay
+[t=60] Priya: I will write the migration plan by Thursday and share it with finance.
+[t=90] okay okay okay okay okay okay okay okay okay okay okay okay okay okay okay okay
+[t=120] Ravi: Good. The old system stays read-only until March, that is decided.
+[t=150] ChargeBee Kubernetes Razorpay
+[t=180] Priya: One open question: who signs off the vendor contract? Nobody knows yet.

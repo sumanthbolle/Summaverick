@@ -12,6 +12,7 @@ struct NoteDetailView: View {
 
     @State private var note: Note?
     @State private var speed: SpeedRecord?
+    @State private var check: NoteCheck.Report?
     enum MapMode: Hashable { case flow, graph }
     @State private var mapMode: MapMode = .flow
     @State private var loaded = false
@@ -196,6 +197,8 @@ struct NoteDetailView: View {
                         ForEach(Tab.allCases) { Text($0.title).accessibilityLabel(Text($0.accessibilityTitle)).tag($0) }
                     }
                     .pickerStyle(.segmented)
+
+                    checkBanner
 
                     content
 
@@ -592,6 +595,37 @@ struct NoteDetailView: View {
         return (try? AttributedString(markdown: cleaned, options: opts)) ?? AttributedString(s)
     }
 
+    /// "Please check" on an output the checking agent could not get through its checks (NoteCheck).
+    @ViewBuilder private var checkBanner: some View {
+        let part: String? = {
+            switch tab {
+            case .summary: return "summary"
+            case .notes: return "notes"
+            case .questions: return "questions"
+            default: return nil
+            }
+        }()
+        if let part, let p = NoteCheck.flagged(check, part: part) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title2).foregroundStyle(Theme.caution)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Please check").font(.headline)
+                    ForEach(NoteCheck.reasons(p), id: \.self) { Text($0).font(.body) }
+                    Text("I checked this against the recording and tried again, but could not be sure.")
+                        .font(.footnote).foregroundStyle(Theme.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Theme.text)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.cautionFill, in: RoundedRectangle(cornerRadius: 12))
+            .accessibilityElement(children: .combine)
+        }
+    }
+
     // MARK: data
 
     private func load() async {
@@ -601,6 +635,7 @@ struct NoteDetailView: View {
         if let json = await CoreEngine.shared.setting(SpeedRecord.key(noteID)), let data = json.data(using: .utf8) {
             speed = try? JSONDecoder().decode(SpeedRecord.self, from: data)
         }
+        check = await CoreEngine.shared.setting(NoteCheck.key(noteID)).flatMap(NoteCheck.report)
         chapters = await CoreEngine.shared.chapters(noteID)
         extracted = await CoreEngine.shared.noteExtracted(noteID)
         let lang = n?.lang ?? "en"

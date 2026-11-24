@@ -171,6 +171,12 @@ int section_output_max_out(SectionOutputKind kind) { return kind == SectionOutpu
 
 int count_questions(const std::string &reply) { return (int)questions_of(strip_unclear_tags(reply)).size(); }
 
+std::vector<std::pair<std::string, std::string>> question_pairs(const std::string &reply) {
+    std::vector<std::pair<std::string, std::string>> out;
+    for (const auto &x : questions_of(strip_unclear_tags(reply))) out.push_back({x.q, x.a});
+    return out;
+}
+
 bool onepass_questions_enough(const std::string &questions) { return count_questions(questions) >= kRevisionQuestions; }
 
 std::string section_prompt_shared(const std::string &material, const std::string &guide, int part, int total,

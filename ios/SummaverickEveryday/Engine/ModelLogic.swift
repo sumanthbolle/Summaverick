@@ -980,6 +980,61 @@ enum ActivityLog {
     static func clear() { queue.async { try? FileManager.default.removeItem(at: url) } }
 }
 
+/// The checking agent's result (sve_verify_note, settings "verify.<id>"): which outputs still fail their checks after
+/// the retries, shown as "Please check" on the note, and what to look at, in plain words.
+enum NoteCheck {
+    struct Event: Decodable {
+        let part: String, check: String, action: String
+        let attempt: Int, total: Int, failed: Int
+        let id: Int64?
+    }
+    struct Part: Decodable, Equatable {
+        let please_check: Bool
+        let retries: Int
+        let checks: [String]
+        let items: [String]?
+    }
+    struct Report: Decodable {
+        let parts: [String: Part]?
+        let memories_flagged: Int?
+        let actions_flagged: Int?
+        let judge_calls: Int?
+        let cancelled: Bool?
+        let events: [Event]?
+
+        var memoriesFlagged: Int? { memories_flagged }
+        var actionsFlagged: Int? { actions_flagged }
+        var judgeCalls: Int? { judge_calls }
+        var isCancelled: Bool { cancelled ?? false }
+        var pleaseCheckParts: [String] { (parts ?? [:]).filter { $0.value.please_check }.map(\.key).sorted() }
+        var retries: Int { (parts ?? [:]).values.reduce(0) { $0 + $1.retries } }
+    }
+
+    static func key(_ noteID: Int64) -> String { "verify.\(noteID)" }
+    static func report(_ json: String) -> Report? {
+        guard let d = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(Report.self, from: d)
+    }
+    /// The part of the report for an output ("summary", "notes", "questions"), when it still needs a look.
+    static func flagged(_ r: Report?, part: String) -> Part? {
+        guard let p = r?.parts?[part], p.please_check else { return nil }
+        return p
+    }
+    /// What to look at, one line per check that failed.
+    static func reasons(_ p: Part) -> [String] {
+        p.checks.compactMap { c in
+            switch c {
+            case "language": return String(localized: "Parts may not be in your language.")
+            case "grounded": return String(localized: "Some decisions or action items may not be in the recording.")
+            case "owner": return String(localized: "Some action items may name the wrong person.")
+            case "noise": return String(localized: "Some lines may repeat or come from background noise.")
+            case "answerable": return String(localized: "Some questions may not be answered by the recording.")
+            default: return nil
+            }
+        }
+    }
+}
+
 /// The watchdog's rule: work that says it is running has shown no sign of life for `stallSeconds` is stalled.
 enum Watchdog {
     static let stallSeconds: TimeInterval = 300

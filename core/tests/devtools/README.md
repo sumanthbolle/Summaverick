@@ -22,6 +22,11 @@ Store-only tools (map_from_db, vocab_dryrun, clean_dryrun) need the test sources
 
 - chat_eval.cpp: `chat_eval <model.gguf> <fixture.txt> <db>` — Ask "What do I need to do?", the follow-up "Draft a
   message asking him for an update", and the to-do pass on one conversation. Fixtures: core/tests/fixtures/proposal_*.txt.
+- verify_eval.cpp: `verify_eval <model.gguf> <fixture.txt> <db> [lang] [--dump]` — a short note as the phone runs it
+  (one section, one-pass notes, action items, memories), then the checking agent (sve_verify_note). Prints what the
+  first check found ("BEFORE") and what is left after the retries ("AFTER") per output; --dump adds every check/retry
+  event and the outputs before and after. SVE_VOCAB="A,B" saves words first (core/tests/fixtures/noisy_meeting.txt
+  says them as speech, as note 18 did).
 - notes_timing.cpp: one-pass notes on a note of a phone DB copy, CPU 4 threads, token counts and seconds.
 - memories_rerun.cpp: reruns the memory pass on notes of a DB copy and prints every dropped candidate and why
   (set DROPS=<file> to save them).

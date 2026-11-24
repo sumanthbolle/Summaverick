@@ -39,6 +39,8 @@ final class ProcessingPipeline {
         case overnight
         /// Memories, after the notes: sections done so far, total to do now.
         case memories(Int, Int)
+        /// The checking agent, after the memories (sve_verify_note): each output checked, failing parts written again.
+        case checking
 
         var label: String {
             switch self {
@@ -63,6 +65,7 @@ final class ProcessingPipeline {
             case .memories(let d, let t):
                 return String(localized: "Finding things to remember… part \(min(d + 1, max(t, 1))) of \(max(t, 1))",
                               comment: "Part number, total parts of a recording whose memories are being written")
+            case .checking: return String(localized: "Checking your notes against the recording…")
             }
         }
         /// True while the model is working (not idle, done or failed).
@@ -84,6 +87,7 @@ final class ProcessingPipeline {
             case .cooling: return .cooling
             case .overnight: return .overnight
             case .memories(let d, let t): return .memories(d, t)
+            case .checking: return .extracting   // after the notes, like the action items
             }
         }
     }
@@ -126,6 +130,7 @@ final class ProcessingPipeline {
         case .cooling: return "cooling"
         case .overnight: return "overnight"
         case .memories: return "memories"
+        case .checking: return "checking"
         }
     }
 
@@ -992,6 +997,8 @@ final class ProcessingPipeline {
                 if let old = now.output(k) { previous.outputs[k] = old }
                 await engine.setOutput(id, k, text)
             }
+            // Written again by the person: the check no longer describes these outputs ("Please check" goes).
+            await engine.setSetting(NoteCheck.key(id), "")
             NotificationCenter.default.post(name: .notesChanged, object: nil)
             setStreak(id, .regenerate, nil)
             if noteTitles[id] == nil { noteTitles[id] = now.title }
@@ -1551,6 +1558,8 @@ final class ProcessingPipeline {
         // Loading reads the model from storage and makes little heat: it is not work the next rest pays for
         // (a hot phone rested as long as the load, note 15, 2026-11-21).
         heatGatePassed = HeatGovernor.now
+        // Outputs are written from here: an earlier check no longer describes them (checkNote marks them again).
+        await engine.setSetting(NoteCheck.key(id), "")
 
         // The notes first; reminders, tasks and profile changes after them (ExtractAfterNotes), so the summary never
         // waits behind them.
@@ -1677,6 +1686,8 @@ final class ProcessingPipeline {
         // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
         _ = await writeMemories(noteID: id, quiet: false, span: after.memories)
+        // The parent's check of every output, after the memories and the action items (NoteCheck).
+        await checkNote(id)
         ContinuedWork.shared.update(afterNotes: after.insight)   // the insight: the note's last part, under the same task
         if !refill { await writeInsight(id) }   // a part written again does not change the insight
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
@@ -1719,6 +1730,46 @@ final class ProcessingPipeline {
             }
             NotificationCenter.default.post(name: .assistantChanged, object: nil)
             ContinuedWork.shared.update(afterNotes: span.upperBound)
+        }
+    }
+
+    /// The checking agent (sve_verify_note): each output of the note checked against its recording, a failing part
+    /// written again (at most twice), what still fails marked "Please check" (NoteCheck). Every check and retry goes
+    /// to the activity log. A stop, a hot phone or a failure never touches the notes; nothing is marked then.
+    private func checkNote(_ id: Int64) async {
+        let engine = CoreEngine.shared
+        let abort = self.abort
+        guard !abort.isSet, !Self.critical, await quietHeatGate({ abort.isSet }) else {
+            ActivityLog.log("check_skipped", note: id, ["why": abort.isSet ? "stopped" : "hot"])
+            return
+        }
+        stage = .checking
+        let started = Date()
+        ActivityLog.log("check_start", note: id)
+        do {
+            let report = try await onBackend {
+                try await engine.verifyNote(noteID: id, shouldStop: { ContinuedWork.beat(); return abort.isSet || Self.critical })
+            }
+            for e in report.events ?? [] {
+                var fields: [String: Any] = ["part": e.part, "check": e.check, "action": e.action, "attempt": e.attempt,
+                                             "failed": e.failed, "total": e.total]
+                if let i = e.id { fields["id"] = i }
+                ActivityLog.log("check", note: id, fields)
+            }
+            if report.isCancelled {
+                ActivityLog.log("check_end", note: id, ["cancelled": true])
+                return
+            }
+            ActivityLog.log("check_end", note: id, ["please_check": report.pleaseCheckParts.joined(separator: ","),
+                                                    "retries": report.retries, "memories_flagged": report.memoriesFlagged ?? 0,
+                                                    "actions_flagged": report.actionsFlagged ?? 0, "judge_calls": report.judgeCalls ?? 0,
+                                                    "s": Int(Date().timeIntervalSince(started))])
+            NSLog("[sve] note %lld: checked in %.0f s; please check: %@", id, Date().timeIntervalSince(started),
+                  report.pleaseCheckParts.joined(separator: ", "))
+            NotificationCenter.default.post(name: .notesChanged, object: nil)
+        } catch {
+            ActivityLog.log("check_failed", note: id, ["error": String(describing: error)])
+            NSLog("[sve] check failed: %@", String(describing: error))
         }
     }
 

@@ -285,6 +285,15 @@ char *sve_assemble_output(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, c
  * no part at all is done (or no sections, or another kind). placeholder NULL = "". */
 char *sve_assemble_output_with_gaps(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang,
                                     const char *placeholder);
+/* The checking agent (sve_verify.h), after a note's outputs, memories and action items are stored: checks each output
+ * (language, decisions and actions said in the transcript, nothing from noise, questions answerable, memory and action
+ * quotes found), writes only the failing part again with what failed as feedback (at most 2 times; a note written
+ * in parts gets only the parts that hold the failing lines), keeps the attempt with the fewest failures, and marks the
+ * rest: settings "verify.<note_id>" = {"parts":{"summary"|"notes"|"questions":{"please_check","retries","chosen",
+ * "checks","items"}},"memories_flagged",...}; memories whose quote is not found go to the review queue, action cards
+ * get "quote" in their check fields. Returns that report plus "events" (each check and retry, for the activity log);
+ * {"cancelled":true,...} when cb cancelled (nothing stored); NULL on error. */
+char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user);
 /* Deletes the stored parts and their try counts of a note: kind 1 notes, 2 questions or -1 all kinds; idx a part or
  * -1 all parts. The sections stay. Returns the rows deleted (parts plus try rows), -1 on error. */
 int   sve_section_outputs_clear(sve_ctx *ctx, int64_t note_id, int kind, int idx);

@@ -106,6 +106,8 @@ public:
     bool set_suggestion_status(int64_t id, const std::string &status);
     json suggestion(int64_t id);
     bool set_suggestion_check(int64_t id, const std::string &check_status, const json &check_fields);
+    // The checking agent found the suggestion's line again (sve_verify_note).
+    bool set_suggestion_quote(int64_t id, const std::string &quote, int64_t start_sec);
 
     int64_t add_reminder(const json &r);
     json reminders(bool active_only);
@@ -152,6 +154,8 @@ public:
     int64_t add_memory_item(const json &row);
     bool add_memory_source(int64_t memory_id, int64_t note_id, int64_t start_sec, const std::string &quote,
                            std::optional<double> conf);
+    // The checking agent found a memory's line again: that source's quote replaced (or the source added).
+    bool set_memory_source_quote(int64_t memory_id, int64_t note_id, int64_t start_sec, const std::string &quote);
     bool link_memory_entity(int64_t memory_id, int64_t topic_id, const std::string &role);
     // filter: note_id, types [], reviews [], queue 0/1, include_wrong (false), include_superseded (false),
     // limit. Newest first. Listing "wrong" in reviews includes wrong rows.

@@ -2,13 +2,14 @@
 
 Branch `feature/personal-assistant`. Everything below is committed except the signing files (see "Open decisions").
 Phone: iPhone 16e, UDID 00008140-001668892E22801C, app id `summaverick.everyday` (new team S5ZM5YV87S).
-Desktop tools for the next session: `core/tests/devtools/README.md`. Core tests: `bash core/tests/run.sh` (469 pass).
+Desktop tools for the next session: `core/tests/devtools/README.md`. Core tests: `bash core/tests/run.sh` (484 pass).
 
 ## What was built (newest first)
 
 | Commit | What |
 |---|---|
-| 0c5c036 | Activity log names the note a run works on (NOT installed yet: phone was disconnected) |
+| (next) | Checking agent (sve_verify.h, sve_verify_note): after memories, every output checked (language, decisions/actions said, owner, noise, questions answerable, memory/action quotes); only the failing part rewritten with feedback, <= 2 retries, best kept, "Please check" banner on the note; each check/retry in activity.log (`check`, `check_end`) |
+| 0c5c036 | Activity log names the note a run works on (installed 2026-11-24) |
 | 8eb77c1 | Processing activity log (Application Support/Summaverick/activity.log), 5-min stall watchdog, Settings > Processing activity |
 | 1c49c1d | Transcript pieces cleaned on save: loops collapsed, repeat of previous piece dropped, saved words written as speech dropped (note 18) |
 | 7b992f2 | Action-item agent: finder, updater (stands/changed/cancelled + condition), coverage check (commitment lines re-asked), parent checks |
@@ -45,8 +46,10 @@ Desktop tools for the next session: `core/tests/devtools/README.md`. Core tests:
 2. Set a loudness cut-off so near-silent pieces never go to Gemma: read `peak` of `piece` events in activity.log
    (`to_gemma` true) on real recordings first.
 3. Fix the Telugu duplicate in the action agent (one_per_line / piece_of in sve_suggest.cpp).
-4. Checking agent for the other outputs (summary, notes, questions, memories): measurable checks, <= 2 retries,
-   "Please check" when unsure (owner: "retry until the parent workflow is confident").
+4. DONE (checking agent). Mac, 5 fixtures x 3 runs (verify_eval): every first-check failure fixed in 1 retry, none
+   left "Please check". Caught: wrong owner in notes (team_meeting en, 3/3), saved words written as speech in summary
+   and notes (noisy_meeting, 3/3). Open: proposal_telugu flags one question per run (judge "no" on an inference
+   question), costs ~4 s. Watch `check` events on the phone; cost there unmeasured yet.
 5. Skills learn from the person's memory/corrections (a capped "what this person taught me" part per skill).
 6. Knowledge graph as the retrieval index for Ask (people/topics/decisions/actions -> recordings and moments).
 7. Long recordings: write each part's notes during recording (sections already summarised live).

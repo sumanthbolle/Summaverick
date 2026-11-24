@@ -3,6 +3,8 @@
 // Pure: no llama, no SQLite. Tested in core/tests/test_assemble.cpp. The model call and the store writes are
 // sve_section_output in sve_core.cpp.
 #include <string>
+#include <utility>
+#include <vector>
 #include "sve_extract.h"  // json
 
 namespace sve {
@@ -67,6 +69,8 @@ std::string assemble_notes(const nlohmann::json &sections, const nlohmann::json 
 // How many whole questions (with an answer) assemble_questions finds in one part's reply. Labels may be "Q1.",
 // "Q 1)", "**Q1.**", "### Q1:", or a bare "1." in a reply without Q labels; answers "A1.", "A.", "Answer:".
 int count_questions(const std::string &reply);
+// The whole questions (with an answer) of a reply, as count_questions counts them: {question, answer} without labels.
+std::vector<std::pair<std::string, std::string>> question_pairs(const std::string &reply);
 // True when a one-pass questions part has at least as many questions as the stepped questions prompt asks for
 // (kRevisionQuestions): sve_generate_all uses the one-pass reply only then.
 bool onepass_questions_enough(const std::string &questions);

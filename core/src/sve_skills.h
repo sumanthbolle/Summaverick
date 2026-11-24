@@ -22,6 +22,7 @@ enum class Skill {
     summary,     // a period's recordings summed up
     general,     // the model's own knowledge
     check_quote, // does a quote say what a memory claims (yes/no)
+    verify,      // the checking agent: is an output line said in the transcript (yes/no), copy the line that says it
     same_person, // are two names the same person (yes/no)
     classify,    // which route a question takes (one letter)
     transcribe,  // speech to text
@@ -35,7 +36,7 @@ inline const char *core() {
 }
 
 inline bool uses_core(Skill s) {
-    return !(s == Skill::check_quote || s == Skill::same_person || s == Skill::classify || s == Skill::transcribe ||
+    return !(s == Skill::check_quote || s == Skill::verify || s == Skill::same_person || s == Skill::classify || s == Skill::transcribe ||
              s == Skill::todos);
 }
 
@@ -85,6 +86,9 @@ inline std::string text(Skill s) {
                "person's recordings. There is no internet on this phone.";
     case Skill::check_quote:
         return "You check whether a quote from a recording says what a memory claims. Answer only yes or no.";
+    case Skill::verify:
+        return "You check notes written from a recording against its transcript. The transcript may be in another "
+               "language than the notes. Answer exactly as asked: yes or no, or the words of the transcript.";
     case Skill::same_person:
         return "You check whether two names from someone's recordings are the same person. Answer only yes or no.";
     case Skill::classify:

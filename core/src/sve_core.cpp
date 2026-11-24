@@ -13,6 +13,8 @@
 #include "sve_threads.h"
 #include "sve_whisper_text.h"
 #include "sve_onepass.h"
+#include "sve_textmatch.h"
+#include "sve_verify.h"
 
 #include <algorithm>
 #include <chrono>
@@ -21,6 +23,7 @@
 #include <fstream>
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -263,8 +266,9 @@ char *sve_generate_all(sve_ctx *ctx, const char *transcript, const char *lang_c,
     }
 }
 
-char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang_c,
-                   sve_progress_cb cb, void *user) {
+// sve_generate with `extra` (the checking agent's feedback) put before the task's prompt.
+static char *generate_impl(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang_c,
+                           const std::string &extra, sve_progress_cb cb, void *user) {
     if (!ctx || !ctx->llm || !transcript) return nullptr;
     sve::Llm &llm = *ctx->llm;
     std::string lang = lang_c ? lang_c : "en";
@@ -289,14 +293,20 @@ char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, c
         case SVE_OUT_REVISION_QUESTIONS: userp = sve::revision_questions_prompt(material, from_bullets); break;
         default: return nullptr;
     }
+    if (!extra.empty()) userp = extra + "\n\n" + userp;
     std::string prompt = llm.apply_template(sys, userp);
     std::string out;
     if (!llm.complete(prompt, max_out, out, cb, user, "final", 0, 1)) return nullptr;
     return dup_str(finish_output(llm, out, prefix, max_out, text));
 }
 
-char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c,
-                                 sve_progress_cb cb, void *user) {
+char *sve_generate(sve_ctx *ctx, const char *transcript, sve_output_kind kind, const char *lang_c,
+                   sve_progress_cb cb, void *user) {
+    return generate_impl(ctx, transcript, kind, lang_c, "", cb, user);
+}
+
+static char *from_sections_impl(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c,
+                                const std::string &extra, sve_progress_cb cb, void *user) {
     try {
         if (!ctx || !ctx->llm) return nullptr;
         sve::json secs = ctx->store->sections(note_id);
@@ -340,6 +350,7 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
             case SVE_OUT_REVISION_QUESTIONS: userp = sve::revision_questions_prompt(material, from_bullets); break;
             default: return nullptr;
         }
+        if (!extra.empty()) userp = extra + "\n\n" + userp;
         std::string out;
         if (!llm.complete(llm.apply_template(sys, userp), max_out, out, cb, user, "final", 0, 1)) return nullptr;
         // Checked against the note's transcript and the sections it was written from.
@@ -352,6 +363,11 @@ char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind 
     } catch (...) {
         return nullptr;
     }
+}
+
+char *sve_generate_from_sections(sve_ctx *ctx, int64_t note_id, sve_output_kind kind, const char *lang_c,
+                                 sve_progress_cb cb, void *user) {
+    return from_sections_impl(ctx, note_id, kind, lang_c, "", cb, user);
 }
 
 static bool section_kind(sve_output_kind kind, sve::SectionOutputKind &out) {
@@ -386,6 +402,7 @@ struct PartInput {
     int64_t first = 0, last = 0;
     std::string text, guide;
     int part = 1, total = 0;
+    std::string feedback;   // the checking agent's (sve_verify_note): put before the part's prompt
 };
 
 static bool part_input(sve_ctx *ctx, int64_t note_id, int idx, PartInput &in) {
@@ -518,7 +535,8 @@ static char *section_output_run(sve_ctx *ctx, const PartInput &in, int idx, sve_
             sink.fail(k, "the part could not be shortened to fit", true);
             return nullptr;
         }
-        const std::string userp = sve::section_output_prompt(sk, material, in.guide, in.part, in.total, from_bullets);
+        std::string userp = sve::section_output_prompt(sk, material, in.guide, in.part, in.total, from_bullets);
+        if (!in.feedback.empty()) userp = in.feedback + "\n\n" + userp;
         const std::string prompt = llm.apply_template(sys, userp);
         const char *phase = sk == sve::SectionOutputKind::Notes ? "section_notes" : "section_questions";
         std::string error = "no reply";
@@ -767,6 +785,216 @@ char *sve_assemble_output_with_gaps(sve_ctx *ctx, int64_t note_id, sve_output_ki
         if (sk == sve::SectionOutputKind::Questions) return dup_str(sve::assemble_questions(texts));
         const std::string ph = placeholder ? placeholder : "";
         return dup_str(sve::assemble_notes(ctx->store->sections(note_id), texts, &ph));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+static const char *column_for(sve_output_kind k);
+
+// ---------------------------------------------------------------- the checking agent (sve_verify.h)
+
+// Whether most words of `line` (a failing line as the checks quote it) are in a part's text: that part holds it.
+static bool part_holds(const std::string &part_text, const std::string &line) {
+    const std::vector<std::string> w = sve::match_tokens(line), p = sve::match_tokens(part_text);
+    if (w.empty()) return false;
+    size_t in = 0;
+    for (const auto &t : w) in += std::find(p.begin(), p.end(), t) != p.end();
+    return in * 10 >= w.size() * 8;
+}
+
+char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
+    try {
+        if (!ctx || !ctx->llm) return nullptr;
+        sve::Store &st = *ctx->store;
+        sve::Llm &llm = *ctx->llm;
+        auto note = st.get(note_id);
+        if (!note) return nullptr;
+        const std::string lang = note->lang.empty() ? "en" : note->lang;
+        using sve::json;
+        using sve::jint;
+        using sve::jstr;
+
+        sve::VerifyInput in;
+        in.pieces = st.pieces(note_id);
+        if (in.pieces.empty() && note->transcript)
+            for (const auto &part : split_text(*note->transcript, 1200)) in.pieces.push_back({{"start_sec", 0}, {"text", part}});
+        in.lang = lang;
+        in.vocab = sve::saved_vocab(st);
+        in.summary = note->short_summary.value_or("");
+        in.notes = note->detailed_notes.value_or("");
+        in.questions = note->revision_questions.value_or("");
+        for (const auto &m : st.memory_items({{"note_id", note_id}})) {
+            if (!m.contains("sources") || !m["sources"].is_array()) continue;
+            for (const auto &src : m["sources"])
+                if (jint(src, "note_id", 0) == note_id) {
+                    in.memories.push_back({{"id", jint(m, "id", 0)}, {"text", jstr(m, "text")}, {"quote", jstr(src, "quote")},
+                                           {"start_sec", jint(src, "start_sec", -1)}});
+                    break;
+                }
+        }
+        for (const auto &sg : st.suggestions("pending")) {
+            if (jint(sg, "note_id", 0) != note_id || jstr(sg, "kind") != "task") continue;
+            const json p = sg.contains("payload") && sg["payload"].is_object() ? sg["payload"] : json::object();
+            in.actions.push_back({{"id", jint(sg, "id", 0)}, {"text", jstr(p, "text")}, {"quote", jstr(sg, "quote")},
+                                  {"start_sec", jint(sg, "start_sec", -1)}});
+        }
+
+        CancelWatch w{cb, user, false};
+        const sve::ModelFn judge = [&](const std::string &phase, const std::string &system, const std::string &prompt,
+                                       int max_out, std::string &reply) {
+            reply.clear();
+            if (w.cancelled) return false;
+            const bool ok = llm.complete(llm.apply_template(system, prompt), max_out, reply, watch_cb, &w, phase.c_str(), 0, 1, true);
+            reply = strip_thinking(reply);
+            return ok;
+        };
+
+        // An output written from its parts (the steps) is written again part by part: only the parts that hold a
+        // failing line (else those in another language, else all), each from its own pieces as the steps write it.
+        const json secs = st.sections(note_id);
+        auto from_parts = [&](sve_output_kind k, const std::string &stored) {
+            const json texts = st.current_section_outputs(note_id, (int)k, lang);
+            if (!texts.is_array() || stored.empty()) return false;
+            const std::string a = k == SVE_OUT_REVISION_QUESTIONS ? sve::assemble_questions(texts) : sve::assemble_notes(secs, texts);
+            return sve::trim_copy(a) == sve::trim_copy(stored);
+        };
+        const bool notes_parts = from_parts(SVE_OUT_DETAILED_NOTES, in.notes);
+        const bool questions_parts = from_parts(SVE_OUT_REVISION_QUESTIONS, in.questions);
+        struct Repl { int idx; int64_t first, last; std::string text; bool cut; };
+        std::map<std::pair<std::string, int>, std::vector<Repl>> repl;   // (part, attempt) -> parts written again
+        // A worker writes from the pieces as kept: loops, repeats and saved words written as speech left out.
+        const std::string material = sve::notes_material(sve::clean_pieces(in.pieces, in.vocab));
+        auto kind_of = [](const std::string &part) {
+            return part == "summary" ? SVE_OUT_SHORT_SUMMARY : part == "notes" ? SVE_OUT_DETAILED_NOTES : SVE_OUT_REVISION_QUESTIONS;
+        };
+        const sve::RewriteFn rewrite = [&](const std::string &part, int attempt, int base, const std::string &feedback,
+                                           const std::vector<std::string> &failing, std::string &out) -> bool {
+            if (w.cancelled) return false;
+            const sve_output_kind k = kind_of(part);
+            if ((part == "notes" && notes_parts) || (part == "questions" && questions_parts)) {
+                json texts = st.current_section_outputs(note_id, (int)k, lang);
+                if (!texts.is_array() || texts.size() != secs.size()) return false;
+                // The attempt kept so far is the base: its parts written again stand, the next builds on them.
+                std::vector<Repl> rs;
+                if (base > 0) {
+                    auto b = repl.find({part, base});
+                    if (b != repl.end())
+                        for (const auto &x : b->second)
+                            for (size_t i = 0; i < secs.size(); ++i)
+                                if (jint(secs[i], "idx", (int64_t)i) == x.idx) texts[i] = x.text;
+                    if (b != repl.end()) rs = b->second;
+                }
+                std::vector<size_t> which;
+                for (size_t i = 0; i < texts.size(); ++i)
+                    for (const auto &f : failing)
+                        if (texts[i].is_string() && part_holds(texts[i].get<std::string>(), f)) { which.push_back(i); break; }
+                if (which.empty())
+                    for (size_t i = 0; i < texts.size(); ++i)
+                        if (texts[i].is_string() && !sve::in_language(texts[i].get<std::string>(), lang)) which.push_back(i);
+                if (which.empty())
+                    for (size_t i = 0; i < texts.size(); ++i) which.push_back(i);
+                int written = 0;
+                for (size_t i : which) {
+                    const int idx = (int)jint(secs[i], "idx", (int64_t)i);
+                    PartInput pin;
+                    if (!part_input(ctx, note_id, idx, pin)) return false;
+                    pin.feedback = feedback;
+                    pin.text = sve::notes_material(sve::clean_pieces(
+                        sve::section_pieces(st.pieces(note_id), pin.first, pin.last), in.vocab));
+                    TextSink sink(idx);
+                    bool cancelled = false;
+                    char *r = section_output_run(ctx, pin, idx, k, lang.c_str(), sink, watch_cb, &w, false, &cancelled);
+                    if (!r) { if (cancelled || w.cancelled) return false; continue; }
+                    texts[i] = std::string(r);
+                    free(r);
+                    rs.erase(std::remove_if(rs.begin(), rs.end(), [&](const Repl &x) { return x.idx == idx; }), rs.end());
+                    rs.push_back({idx, pin.first, pin.last, texts[i].get<std::string>(), sink.cut[TextSink::slot((int)k)]});
+                    ++written;
+                    sve_logf(1, "verify: note %lld %s part %d written again (attempt %d)", (long long)note_id, part.c_str(),
+                             idx + 1, attempt);
+                }
+                if (written == 0) return false;
+                out = k == SVE_OUT_REVISION_QUESTIONS ? sve::assemble_questions(texts) : sve::assemble_notes(secs, texts);
+                repl[{part, attempt}] = rs;
+                return true;
+            }
+            char *r = part == "summary" && notes_parts && !secs.empty()
+                          ? from_sections_impl(ctx, note_id, k, lang.c_str(), feedback, watch_cb, &w)
+                          : generate_impl(ctx, material.c_str(), k, lang.c_str(), feedback, watch_cb, &w);
+            if (!r) return false;
+            out = r;
+            free(r);
+            return !out.empty();
+        };
+
+        json events = json::array();
+        const sve::EventFn on_event = [&](const sve::VerifyEvent &e) {
+            json j = {{"part", e.part}, {"check", e.check}, {"action", e.action}, {"attempt", e.attempt},
+                      {"total", e.total}, {"failed", e.failed}};
+            if (e.id) j["id"] = e.id;
+            events.push_back(j);
+            sve_logf(1, "verify: note %lld %s %s %s attempt %d: %d of %d failed", (long long)note_id, e.part.c_str(),
+                     e.check.c_str(), e.action.c_str(), e.attempt, e.failed, e.total);
+        };
+        const auto started = std::chrono::steady_clock::now();
+        sve::VerifyResult r = sve::verify_outputs(in, judge, rewrite, on_event);
+        if (w.cancelled) {   // a cancel never marks anything: nothing is stored, the check runs again later
+            sve_logf(1, "verify: note %lld cancelled; nothing stored", (long long)note_id);
+            return dup_str(json({{"cancelled", true}, {"events", events}}).dump(-1, ' ', false, json::error_handler_t::replace));
+        }
+
+        // What the parent kept.
+        json parts = json::object();
+        for (const auto &v : r.parts) {
+            const sve_output_kind k = kind_of(v.part);
+            if (v.chosen > 0) {
+                const std::string &text = v.part == "summary" ? r.summary : v.part == "notes" ? r.notes : r.questions;
+                // The parts first: when one is refused (the sections were re-planned, the note deleted), the output stays
+                // as the parts assemble it, never text they no longer match.
+                bool stored = true;
+                auto it = repl.find({v.part, v.chosen});
+                if (it != repl.end())
+                    for (const auto &x : it->second)
+                        stored = st.set_section_output(note_id, x.idx, (int)k, lang, x.first, x.last, x.text, x.cut) && stored;
+                if (stored) st.set_text_column(note_id, column_for(k), text.c_str());
+                else sve_logf(1, "verify: note %lld %s parts not stored; the output is left as it was", (long long)note_id, v.part.c_str());
+            }
+            json checks = json::array(), items = json::array();
+            std::set<std::string> seen;
+            for (const auto &f : v.failures) {
+                if (seen.insert(f.check).second) checks.push_back(f.check);
+                if (items.size() < 6) items.push_back(f.item);
+            }
+            parts[v.part] = {{"please_check", v.please_check}, {"retries", v.retries}, {"chosen", v.chosen},
+                             {"checks", checks}, {"items", items}};
+        }
+        for (const auto &f : r.memory_fixes)
+            if (!st.set_memory_source_quote(jint(f, "id", 0), note_id, jint(f, "start_sec", 0), jstr(f, "quote")))
+                st.update_memory_item(jint(f, "id", 0), {{"queue", 1}});
+        for (const auto &id : r.memories_flagged) st.update_memory_item(id.get<int64_t>(), {{"queue", 1}});
+        for (const auto &f : r.action_fixes) st.set_suggestion_quote(jint(f, "id", 0), jstr(f, "quote"), jint(f, "start_sec", 0));
+        for (const auto &id : r.actions_flagged) {
+            const json sg = st.suggestion(id.get<int64_t>());
+            json fields = sg.is_object() && sg.contains("check_fields") && sg["check_fields"].is_array() ? sg["check_fields"] : json::array();
+            if (std::find(fields.begin(), fields.end(), json("quote")) == fields.end()) fields.push_back("quote");
+            st.set_suggestion_check(id.get<int64_t>(), "check", fields);
+        }
+        const double secs_taken =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+        json report = {{"parts", parts},
+                       {"memories", in.memories.size()}, {"memories_fixed", r.memory_fixes.size()},
+                       {"memories_flagged", r.memories_flagged.size()},
+                       {"actions", in.actions.size()}, {"actions_fixed", r.action_fixes.size()},
+                       {"actions_flagged", r.actions_flagged.size()},
+                       {"judge_calls", r.judge_calls}, {"unjudged", r.unjudged},
+                       {"seconds", (int)secs_taken}, {"at", (int64_t)std::time(nullptr)}};
+        st.setting_set("verify." + std::to_string(note_id), report.dump(-1, ' ', false, json::error_handler_t::replace));
+        report["events"] = events;
+        return dup_str(report.dump(-1, ' ', false, json::error_handler_t::replace));
+    } catch (const std::exception &e) {
+        sve_logf(2, "verify failed: %s", e.what());
+        return nullptr;
     } catch (...) {
         return nullptr;
     }

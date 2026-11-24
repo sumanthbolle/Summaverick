@@ -371,6 +371,19 @@ extension CoreEngine {
         return Int(n)
     }
 
+    /// The checking agent on a note (sve_verify_note): its report, with each check and retry as events.
+    func verifyNote(noteID: Int64, shouldStop: @escaping () -> Bool = { false }) throws -> NoteCheck.Report {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_verify_note(ctx, noteID, CoreEngine.progressTrampoline, user)),
+              let report = NoteCheck.report(json) else {
+            throw AssistantError.failed(String(localized: "check the notes"))
+        }
+        return report
+    }
+
     /// Whether extraction has run on this note (core flag "extracted.<id>", or the note already has
     /// suggestions or topics). An error counts as yes, so the button is never offered on a guess.
     nonisolated func noteExtracted(_ noteID: Int64) async -> Bool { await store { sve_note_extracted($0, noteID) != 0 } }

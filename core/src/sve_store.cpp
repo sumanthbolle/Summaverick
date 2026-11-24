@@ -119,6 +119,9 @@ END;
 CREATE TRIGGER IF NOT EXISTS notes_ad_speed AFTER DELETE ON notes BEGIN
   DELETE FROM settings WHERE key='speed.' || old.id;
 END;
+CREATE TRIGGER IF NOT EXISTS notes_ad_verify AFTER DELETE ON notes BEGIN
+  DELETE FROM settings WHERE key='verify.' || old.id;
+END;
 CREATE TABLE IF NOT EXISTS topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('topic','person')),
     name TEXT NOT NULL, summary TEXT, summary_stale INTEGER NOT NULL DEFAULT 1, UNIQUE(kind, name)
@@ -701,6 +704,10 @@ bool Store::set_suggestion_check(int64_t id, const std::string &check_status, co
            sqlite3_changes(db_) > 0;
 }
 
+bool Store::set_suggestion_quote(int64_t id, const std::string &quote, int64_t start_sec) {
+    return run("UPDATE suggestions SET quote=?, start_sec=? WHERE id=?", {quote, start_sec, id}) && sqlite3_changes(db_) > 0;
+}
+
 json Store::suggestion(int64_t id) {
     json r = query_rows((std::string("SELECT ") + kSuggestionCols + " FROM suggestions WHERE id=?").c_str(), {id});
     return r.empty() ? json(nullptr) : r[0];
@@ -997,6 +1004,12 @@ bool Store::add_memory_source(int64_t memory_id, int64_t note_id, int64_t start_
     return run("INSERT INTO memory_sources(memory_id,note_id,start_sec,quote,conf) VALUES(?,?,?,?,?) "
                "ON CONFLICT(memory_id,note_id,start_sec) DO NOTHING",
                {memory_id, note_id, start_sec, quote, conf ? json(*conf) : json(nullptr)});
+}
+
+bool Store::set_memory_source_quote(int64_t memory_id, int64_t note_id, int64_t start_sec, const std::string &quote) {
+    return run("INSERT INTO memory_sources(memory_id,note_id,start_sec,quote,conf) VALUES(?,?,?,?,NULL) "
+               "ON CONFLICT(memory_id,note_id,start_sec) DO UPDATE SET quote=excluded.quote",
+               {memory_id, note_id, start_sec, quote}) && sqlite3_changes(db_) > 0;
 }
 
 bool Store::link_memory_entity(int64_t memory_id, int64_t topic_id, const std::string &role) {
