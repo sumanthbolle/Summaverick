@@ -183,6 +183,22 @@ describe("Homepage public contract", () => {
     }
   });
 
+  it("announces Summaverick Everyday from the hero and in its own band", () => {
+    const home = text("public/index.html");
+    const hero = home.slice(home.indexOf('id="top"'), home.indexOf('id="rag"'));
+    expect(hero).toContain('class="launch-pill" href="#everyday"');
+
+    const band = home.slice(home.indexOf('id="everyday"'), home.indexOf('id="how-we-work"'));
+    expect(band).toContain("Summaverick Everyday");
+    expect(band).toContain("Coming soon");
+    expect(band).toContain("entirely on your device");
+    expect(band).toContain("Stay tuned.");
+    // Notify me reaches a real inbox, and brand:apply keeps its subject.
+    expect(band).toMatch(/href="mailto:[^"]+\?subject=Notify%20me[^"]*" data-brand="contact">Notify me</);
+    // The waveform is decoration only.
+    expect(band).toContain('class="everyday__wave" aria-hidden="true"');
+  });
+
   it("takes visitors from the introduction directly to the RAG offer", () => {
     const home = text("public/index.html");
     const sections = [...home.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
