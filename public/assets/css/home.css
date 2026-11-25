@@ -1066,3 +1066,136 @@ body[data-home] .dock-cta { display: none; }
   body[data-home] .dock-cta[data-away] { opacity: 0; transform: translate(-50%, 140%); pointer-events: none; }
   body[data-nav-open] .dock-cta { display: none !important; }
 }
+
+/* ---- Summaverick Everyday: launch pill and announcement band ----------------------
+   The pill sits above the hero greeting and links to the band. The band is ink
+   in both appearances, the way a product announcement is set, so it carries
+   the ink ramp itself instead of following the theme. */
+body[data-home] .launch-pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--tap);
+  margin-bottom: var(--space-5);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--c-bg) 82%, transparent);
+  color: var(--c-text-dim);
+  font-size: var(--step--1);
+  line-height: 1.35;
+  text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+body[data-home] .launch-pill:hover { border-color: var(--c-line-strong); color: var(--c-text); }
+body[data-home] .launch-pill__tag {
+  padding: 0.25em 0.75em;
+  border-radius: var(--radius-pill);
+  background: var(--c-accent-fill);
+  color: var(--c-on-accent);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.85em;
+}
+@media (max-width: 640px) {
+  body[data-home] .launch-pill { flex-wrap: nowrap; }
+  body[data-home] .launch-pill > span { white-space: nowrap; }
+  body[data-home] .launch-pill__desc { display: none; }
+}
+body[data-home] .launch-pill__more { color: var(--c-text); font-weight: var(--weight-medium); white-space: nowrap; }
+
+body[data-home] .everyday {
+  --c-bg: var(--c-ink);
+  --c-text: var(--c-on-ink);
+  --c-text-dim: var(--c-on-ink-dim);
+  --c-text-mute: var(--c-on-ink-mute);
+  --c-line: var(--c-ink-line);
+  --c-line-strong: color-mix(in srgb, var(--c-on-ink) 26%, transparent);
+  --c-accent: var(--c-on-ink);
+  --c-accent-fill: var(--c-on-ink);
+  --c-accent-press: var(--c-on-ink-dim);
+  --c-on-accent: var(--c-ink);
+  --focus-ring: 0 0 0 2px var(--c-ink), 0 0 0 4px var(--c-on-ink);
+  padding-block: clamp(5rem, 11vw, 9.5rem);
+  background: var(--c-ink);
+  color: var(--c-on-ink);
+  color-scheme: dark;
+  text-align: center;
+}
+body[data-home] .everyday__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+}
+body[data-home] .everyday__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--c-on-ink-dim);
+  font-size: var(--step--1);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+body[data-home] .everyday__name {
+  margin: 0;
+  color: var(--c-on-ink-mute);
+  font-size: var(--step-2);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-snug);
+}
+body[data-home] .everyday h2 {
+  max-width: 14ch;
+  margin: 0;
+  color: var(--c-on-ink);
+  font-size: clamp(2.6rem, 1.2rem + 6vw, 5.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+body[data-home] .everyday__lead {
+  max-width: 44ch;
+  margin: 0;
+  color: var(--c-on-ink-mute);
+  font-size: var(--step-1);
+  line-height: 1.45;
+}
+body[data-home] .everyday__wave {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  max-width: 100%;
+  overflow: hidden;
+}
+body[data-home] .everyday__wave span {
+  flex: none;
+  width: 5px;
+  height: calc(var(--h) * 1px);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c-on-ink) 30%, transparent);
+}
+body[data-home] .everyday__wave span:nth-child(even) { background: color-mix(in srgb, var(--c-on-ink) 18%, transparent); }
+body[data-home] .everyday__wave span:nth-child(16) { background: var(--c-on-ink); }
+body[data-home] .everyday__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4) var(--space-6);
+}
+body[data-home] .everyday .btn-primary { border-radius: var(--radius-pill); }
+body[data-home] .everyday__tuned { color: var(--c-on-ink); font-size: var(--step-1); font-weight: var(--weight-medium); }
+@media (max-width: 480px) {
+  body[data-home] .everyday__wave span:nth-child(-n+5),
+  body[data-home] .everyday__wave span:nth-last-child(-n+5) { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  body[data-home] .everyday__wave span:nth-child(16) {
+    animation: everyday-pulse 1.6s var(--ease-out) 0.4s 2 alternate;
+  }
+}
+@keyframes everyday-pulse { to { transform: scaleY(0.55); } }
