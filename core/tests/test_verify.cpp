@@ -399,3 +399,13 @@ TEST(verify_provisional_is_open_not_settled) {
     CHECK(!undecided_conflict("Pricing provisional మాత్రమే అని Anil తెలియజేశాడు.", p));
     CHECK(undecided_conflict("The pricing is final", p));
 }
+
+TEST(verify_side_clause_negation_is_not_the_claim) {
+    // Measured 2026-11-26 (team_meeting): "decided for next month on the 15th, not this month" agrees with the
+    // recording; its short side clause "not this month" must not make it read as the opposite.
+    const json p = json::array({
+        {{"start_sec", 80}, {"text", "Ravi: Launch గురించి మనం decide చేశాం: launch ఈ నెల కాదు, next month 15th కి."}},
+    });
+    CHECK(!polarity_conflict("The launch has been decided for next month on the 15th, not this month.", p));
+    CHECK(polarity_conflict("The launch is not next month on the 15th", p));
+}
