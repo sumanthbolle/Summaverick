@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <map>
 #include <regex>
 #include <set>
@@ -311,17 +312,78 @@ std::vector<std::string> decision_action_lines(const std::string &notes) {
     return out;
 }
 
+// Whether a clause is negated: "not", "never", "didn't", "no one"; Telugu "లేదు", "కాదు", "వద్దు".
+bool negated(const std::string &clause) {
+    static const std::set<std::string> words = {"not", "no", "never", "nobody", "nothing", "neither", "nor",
+                                                "cannot", "without", "dont", "didnt", "doesnt", "wont", "cant",
+                                                "isnt", "arent", "wasnt", "werent", "havent", "hasnt", "hadnt",
+                                                "shouldnt", "wouldnt", "couldnt", "mustnt"};
+    std::string low;
+    for (char c : clause) low += (unsigned char)c < 0x80 ? (char)std::tolower((unsigned char)c) : c;
+    if (low.find("n't") != std::string::npos || low.find("n\u2019t") != std::string::npos) return true;
+    for (const char *te : {"లేదు", "కాదు", "వద్దు", "లేరు", "లేవు", "కూడదు"})
+        if (low.find(te) != std::string::npos) return true;
+    std::string word;
+    for (size_t i = 0; i <= low.size(); ++i) {
+        const char c = i < low.size() ? low[i] : ' ';
+        if (std::isalpha((unsigned char)c) || c == '\'') { if (c != '\'') word += c; continue; }
+        if (words.count(word)) return true;
+        word.clear();
+    }
+    return false;
+}
+
+// The clauses of the transcript: each piece split at , . ; : ! ? and "but".
+std::vector<std::string> clauses_of(const json &pieces) {
+    std::vector<std::string> out;
+    if (!pieces.is_array()) return out;
+    for (const auto &p : pieces) {
+        std::string text = jstr(p, "text"), cur;
+        for (size_t i = 0; i <= text.size(); ++i) {
+            const bool end = i == text.size() || std::strchr(",.;:!?", text[i]) ||
+                             (text.compare(i, 5, " but ") == 0);
+            if (!end) { cur += text[i]; continue; }
+            if (!trim(cur).empty()) out.push_back(trim(cur));
+            cur.clear();
+            if (i < text.size() && text[i] == ' ') i += 3;   // past " but"
+        }
+    }
+    return out;
+}
+
+bool polarity_conflict(const std::string &line, const json &pieces) {
+    const std::vector<std::string> w = content_tokens(line);
+    if (w.size() < 2) return false;
+    size_t best = 0;
+    std::vector<bool> best_neg;
+    for (const auto &c : clauses_of(pieces)) {
+        const std::vector<std::string> ct = match_tokens(c);
+        size_t n = 0;
+        for (const auto &t : w)
+            for (const auto &u : ct)
+                if (t == u || same_word(t, u)) { ++n; break; }
+        if (n == 0 || n < best) continue;
+        if (n > best) { best = n; best_neg.clear(); }
+        best_neg.push_back(negated(c));
+    }
+    if (best * 2 < w.size()) return false;   // no clause says it closely enough to compare
+    const bool line_neg = negated(line);
+    for (bool n : best_neg)
+        if (n == line_neg) return false;
+    return true;
+}
+
 int said_check(const std::string &line, const json &pieces) {
     const std::vector<std::string> w = content_tokens(line);
-    if (w.size() < 2) return 1;
     const Said s = said_tokens(pieces);
+    // A number never said is never "said", however short the line ("9000" as a whole answer).
+    for (const auto &t : w)
+        if (is_number(t) && !said_word(t, s)) return -1;
+    if (w.size() < 2) return 1;
     size_t found = 0;
-    for (const auto &t : w) {
-        const bool hit = said_word(t, s);
-        if (!hit && is_number(t)) return -1;   // a number never said is never "said"
-        found += hit;
-    }
-    return found * 4 >= w.size() * 3 ? 1 : 0;
+    for (const auto &t : w) found += said_word(t, s);
+    if (found * 4 < w.size() * 3) return 0;
+    return polarity_conflict(line, pieces) ? -2 : 1;
 }
 
 bool said_in(const std::string &line, const json &pieces) { return said_check(line, pieces) == 1; }
@@ -512,30 +574,44 @@ std::vector<Failure> check_output(const std::string &part, const std::string &te
         if (a < 0) { ++unjudged; return 1; }   // the call failed or the reply is not yes/no: unmeasured, never a failure
         return a;
     };
+    // A line whose closest transcript clause says the opposite ("did not approve" / "approved") has evidence
+    // against it: only a "yes" from the judge clears it; no judge, no budget or no clear reply flags it.
+    auto cleared = [&](const std::string &phase, const std::string &prompt) -> bool {
+        if (!judge || judge_calls >= kMaxJudgeCalls) return false;
+        ++judge_calls;
+        return yes_no(judge, phase, prompt) == 1;
+    };
+    const std::string same_meaning =
+        "\n\nDo the transcript lines say this, in any language, with the same meaning? Answer no if they say the "
+        "opposite (for example \"did not approve\" against \"approved\"), or only propose or ask about what the line "
+        "states as decided or agreed. Answer yes or no.";
     if (part == "notes") {
         for (const auto &l : decision_action_lines(text)) {
             const std::string by = wrong_owner(l, in.pieces);
             if (!by.empty()) { f.push_back({"owner", l + " (said by " + by + ")"}); continue; }
             const int code = said_check(l, in.pieces);
             if (code == 1) continue;
-            if (code < 0) { f.push_back({"grounded", l}); continue; }
-            const int yes = judged("verify_grounded",
-                                   "Transcript lines:\n" + judge_context(l, in.pieces) + "\nA line of the notes: \"" + l +
-                                       "\"\n\nDo the transcript lines say this, in any language? Answer yes or no.");
-            if (yes != 1) f.push_back({"grounded", l});
+            if (code == -1) { f.push_back({"grounded", l}); continue; }
+            const std::string prompt =
+                "Transcript lines:\n" + judge_context(l, in.pieces) + "\nA line of the notes: \"" + l + "\"" + same_meaning;
+            if (code == -2) {
+                if (!cleared("verify_meaning", prompt)) f.push_back({"meaning", l});
+                continue;
+            }
+            if (judged("verify_grounded", prompt) != 1) f.push_back({"grounded", l});
         }
     }
     if (part == "questions") {
         for (const auto &qa : parse_qa(text)) {
             const int code = said_check(qa.a, in.pieces);
             if (code == 1) continue;
-            if (code < 0) { f.push_back({"answerable", qa.q}); continue; }
-            const int yes = judged("verify_answerable",
-                                   "Transcript lines:\n" + judge_context(qa.q + " " + qa.a, in.pieces) +
+            if (code == -1) { f.push_back({"answerable", qa.q}); continue; }
+            const std::string prompt = "Transcript lines:\n" + judge_context(qa.q + " " + qa.a, in.pieces) +
                                        "\nA revision question: \"" + qa.q + "\"\nIts answer: \"" + qa.a +
-                                       "\"\n\nCan the question be answered from the transcript lines, with this answer? "
-                                       "Answer yes or no.");
-            if (yes != 1) f.push_back({"answerable", qa.q});
+                                       "\"\n\nCan the question be answered from the transcript lines, with this answer "
+                                       "and the same meaning (not its opposite)? Answer yes or no.";
+            if (code == -2 ? !cleared("verify_meaning", prompt) : judged("verify_answerable", prompt) != 1)
+                f.push_back({"answerable", qa.q});
         }
     }
     return f;
@@ -543,7 +619,7 @@ std::vector<Failure> check_output(const std::string &part, const std::string &te
 
 std::string feedback_for(const std::string &part, const std::vector<Failure> &failures, const std::string &lang_name,
                          const std::vector<std::string> &not_said) {
-    std::vector<std::string> grounded, noise, answerable, owner;
+    std::vector<std::string> grounded, noise, answerable, owner, meaning;
     bool language = false;
     for (const auto &x : failures) {
         if (x.check == "language") language = true;
@@ -551,12 +627,17 @@ std::string feedback_for(const std::string &part, const std::vector<Failure> &fa
         else if (x.check == "noise") noise.push_back(x.item);
         else if (x.check == "answerable") answerable.push_back(x.item);
         else if (x.check == "owner") owner.push_back(x.item);
+        else if (x.check == "meaning") meaning.push_back(x.item);
     }
     std::string fb = "A check of your earlier " + part + " found problems. Write it again and fix them:\n";
     if (language) fb += "- Write all of it in " + lang_name + " (names and terms from other languages may stay, in brackets).\n";
     if (!grounded.empty())
         fb += "- These decisions or action items are not said in the transcript. Leave them out unless the "
               "transcript says them, and then write them as said:\n" + quoted_list(grounded);
+    if (!meaning.empty())
+        fb += "- These lines say the opposite of the transcript, or write as decided what was only proposed or asked. "
+              "Write each one with the meaning the transcript gives it (\"did not approve\" stays not approved):\n" +
+              quoted_list(meaning);
     if (!owner.empty())
         fb += "- These lines give the action or decision to the wrong person. Each line of the transcript starts with "
               "who said it; write who said or took it on as the transcript shows:\n" + quoted_list(owner);

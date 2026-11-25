@@ -119,5 +119,5 @@ On a Mac the same build works (`brew install cmake`) and runs on Metal.
 - Speech recognition always sets `requiresOnDeviceRecognition`; there is no server fallback path.
 - The only network call is the model download in `ModelManager`.
 - Audio is deleted after the retention window; transcripts and notes stay until deleted by the user.
-- Model files are excluded from iCloud backup; the notes database lives in Application Support (backed up with the phone, encrypted at rest by iOS when the phone is locked).
+- Nothing that was said is backed up: the `Summaverick` folder (notes database, recordings, transcript checkpoints, activity log) and the `Chats` folder in Application Support are excluded from iCloud and computer backups at every launch (`PrivateStorage`), and model files are excluded as they are stored. The files are encrypted at rest by iOS when the phone is locked. A lost or replaced phone means the notes are gone; that is the price of "never leaves your phone".
 - A consent reminder is shown before the first recording and can be re‑enabled in Settings.

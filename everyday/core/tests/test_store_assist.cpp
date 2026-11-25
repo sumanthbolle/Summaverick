@@ -355,3 +355,73 @@ TEST(audio_path_can_be_replaced) {
     CHECK_EQ(*s.get(id)->audio_path, std::string("/r/a.m4a"));
     CHECK(!s.set_text_column(id + 99, "audio_path", "/r/b.m4a"));  // no such note
 }
+
+// Review 2026-11-25: a recording waiting for the AI download, with no transcript, was removed by age at launch with
+// its transcription checkpoint. The retention clock now starts when a usable transcript is saved.
+#include <sqlite3.h>
+#include <cstdio>
+#include <unistd.h>
+
+static void age(const std::string &path, const char *sql) {
+    sqlite3 *db = nullptr;
+    sqlite3_open(path.c_str(), &db);
+    sqlite3_exec(db, sql, nullptr, nullptr, nullptr);
+    sqlite3_close(db);
+}
+
+TEST(retention_waits_for_a_usable_transcript) {
+    const std::string path = "/tmp/sve_retention_" + std::to_string(getpid()) + ".sqlite";
+    std::remove(path.c_str());
+    {
+        Store s(path);
+        const int64_t waiting = s.create("waiting", "en", "/r/waiting.m4a", nullptr, 600);
+        const int64_t done = s.create("done", "en", "/r/done.m4a", nullptr, 600);
+        CHECK(s.set_text_column(done, "transcript", "We will meet on Friday."));
+        // Both recorded 8 days ago.
+        age(path, "UPDATE notes SET created_at=created_at-8*86400");
+        // The transcript was just saved: its clock starts now, not when it was recorded.
+        CHECK(s.audio_older_than(7).empty());
+        age(path, "UPDATE notes SET transcribed_at=transcribed_at-8*86400 WHERE title='done'");
+        auto rows = s.audio_older_than(7);
+        CHECK_EQ(rows.size(), (size_t)1);
+        if (!rows.empty()) CHECK_EQ(rows[0].first, done);
+        // The waiting recording is never chosen, however old.
+        age(path, "UPDATE notes SET created_at=created_at-365*86400 WHERE title='waiting'");
+        for (const auto &r : s.audio_older_than(1)) CHECK(r.first != waiting);
+        // An empty transcript is not usable; clearing the transcript stops the clock again.
+        CHECK(s.set_text_column(waiting, "transcript", "   "));
+        for (const auto &r : s.audio_older_than(0)) CHECK(r.first != waiting);
+        CHECK(s.clear_transcript(done));
+        CHECK(s.audio_older_than(0).empty());
+    }
+    {
+        // Reopening keeps the triggers (created IF NOT EXISTS on every open).
+        Store s(path);
+        const int64_t again = s.create("again", "en", "/r/again.m4a", "Said in full.", 60);
+        age(path, "UPDATE notes SET transcribed_at=transcribed_at-2*86400 WHERE title='again'");
+        auto rows = s.audio_older_than(1);
+        CHECK_EQ(rows.size(), (size_t)1);
+        if (!rows.empty()) CHECK_EQ(rows[0].first, again);
+    }
+    std::remove(path.c_str());
+}
+
+TEST(retention_backfills_notes_from_before_the_column) {
+    const std::string path = "/tmp/sve_retention_old_" + std::to_string(getpid()) + ".sqlite";
+    std::remove(path.c_str());
+    // A database from before transcribed_at: today's schema with the column dropped, one transcribed and one
+    // waiting recording, both recorded long ago.
+    {
+        Store s(path);
+        s.create("old", "en", "/r/old.m4a", "Said.", 60);
+        s.create("wait", "en", "/r/wait.m4a", nullptr, 60);
+    }
+    age(path, "ALTER TABLE notes DROP COLUMN transcribed_at; UPDATE notes SET created_at=1000;");
+    {
+        Store s(path);
+        auto rows = s.audio_older_than(7);
+        CHECK_EQ(rows.size(), (size_t)1);
+        if (!rows.empty()) CHECK_EQ(rows[0].second, std::string("/r/old.m4a"));
+    }
+    std::remove(path.c_str());
+}

@@ -16,6 +16,8 @@ struct SummaverickEverydayApp: App {
         UNUserNotificationCenter.current().delegate = ReminderScheduler.shared
         QuietNotifier.registerCategory()   // Keep recording on Stop when quiet's warning; Finish now on notes notices
         AudioRecorder.sweepAskVoice()
+        // What was said never goes into an iCloud or computer backup (also for installs from before this rule).
+        PrivateStorage.excludeFromBackup()
         // Live Activities left by a closed app go before this launch can start its own.
         RecordingActivities.endStale()
         // Nothing records at launch: a record control left on by a closed app shows off again.
@@ -133,13 +135,15 @@ final class AppSettings {
     }
 }
 
-/// Deletes raw audio older than the retention window. Transcripts and notes stay.
+/// Deletes raw audio transcribed longer ago than the retention window (never a recording still waiting to be
+/// transcribed: Store::audio_older_than). Transcripts and notes stay.
 enum Retention {
     static func applyPolicy(maxAgeDays: Int) async {
         guard maxAgeDays > 0 else { return }
         let engine = CoreEngine.shared
         for row in await engine.audioOlderThan(days: Int32(maxAgeDays)) {
-            if let p = AudioRecorder.existingAudioPath(row.audio_path) { AudioRecorder.removeAudio(atPath: p) }
+            // A file that could not be removed keeps its path, so the next launch tries again.
+            if let p = AudioRecorder.existingAudioPath(row.audio_path), !AudioRecorder.removeAudio(atPath: p) { continue }
             await engine.clearAudio(row.id)
         }
     }

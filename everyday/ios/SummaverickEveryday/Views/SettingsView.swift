@@ -83,7 +83,7 @@ struct SettingsView: View {
                     Picker("Audio retention", selection: $settings.retentionDays) {
                         Text("1 day").tag(1); Text("7 days").tag(7); Text("30 days").tag(30); Text("Forever").tag(0)
                     }
-                    Text("Raw audio is deleted after this period to save space. What was said and your notes are kept until you delete them.")
+                    Text("Raw audio is deleted this long after it is transcribed, to save space. A recording still waiting to be transcribed is kept. What was said and your notes are kept until you delete them.")
                         .font(.footnote).foregroundStyle(Theme.secondary)
                 }
                 .listRowBackground(Theme.formRow)
@@ -223,14 +223,20 @@ struct SettingsView: View {
             pipeline.memoriesHeld = true   // no memory backfill starts while everything is deleted
             defer { pipeline.memoriesHeld = false }
             // Memory work stops for it (K42); a note still being written: busy, as before.
-            guard await pipeline.yieldMemories(), !pipeline.isWorking else { wiping = false; wipeBusy = true; return }
+            // A recording in progress is busy too: the folder sweep below would delete the file being written.
+            guard await pipeline.yieldMemories(), !pipeline.isWorking, !LiveTranscriber.shared.isRecording
+            else { wiping = false; wipeBusy = true; return }
             let engine = CoreEngine.shared
             for n in await engine.notes(limit: 10_000) {
                 pipeline.forget(noteID: n.id)
-                if let full = await engine.note(n.id), let p = AudioRecorder.existingAudioPath(full.audio_path) { AudioRecorder.removeAudio(atPath: p) }
+                // A recording that could not be removed keeps its note, so Retry knows where it is.
+                if let full = await engine.note(n.id), let p = AudioRecorder.existingAudioPath(full.audio_path),
+                   !AudioRecorder.removeAudio(atPath: p) { continue }
                 await engine.deleteNote(n.id)
             }
+            // Success means no note left and no file left in the recordings folder (also files no note pointed to).
             var ok = await engine.notes(limit: 1).isEmpty
+            if !AudioRecorder.removeAllRecordings() { ok = false }
             do { try await engine.wipeAssistant() } catch {
                 NSLog("Settings: assistant wipe failed: %@", "\(error)")
                 ok = false
