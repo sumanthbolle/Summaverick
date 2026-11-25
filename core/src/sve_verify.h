@@ -14,6 +14,13 @@
 //              words, or a saved word that only occurs in pieces clean_piece drops (saved words written as speech)
 //   answerable every revision question's answer is said in the transcript
 //   quote      every memory and every action item has its quote in its recording (a worker copies the line again)
+//   meaning    a summary sentence, a decision or action line, an answer, or a decision/question/promise memory (the
+//              map's relationship) does not say the opposite of the transcript or state as settled what it leaves
+//              open; only a judge "yes" clears it
+//   who        a relationship's person is the one the transcript gives it to
+//   consistency the outputs agree with each other: of two claims about the same thing, one negated or left open and
+//              the other not, the one the transcript contradicts (by code) while it backs the other fails; any other
+//              disagreement is left to each claim's own source check (no judge: measured false flags)
 // Pure: no llama or SQLite; the model and the rewriting are passed in (sve_verify_note in sve_core.cpp).
 #include <functional>
 #include <string>
@@ -23,7 +30,8 @@
 namespace sve {
 
 constexpr int kMaxRetries = 2;
-constexpr int kMaxJudgeCalls = 16;   // yes/no and copy-the-line calls of one run (each is a prefill on the phone)
+constexpr int kMaxJudgeCalls = 16;
+constexpr size_t kMaxEvidence = 60;   // yes/no and copy-the-line calls of one run (each is a prefill on the phone)
 
 // ---- the code checks (exported for the tests) ------------------------------------------------------------
 
@@ -48,6 +56,26 @@ bool said_in(const std::string &line, const json &pieces);
 // opposite polarity ("did not approve" against "approved"). said_check returns -2 for such a line.
 bool negated(const std::string &clause);
 bool polarity_conflict(const std::string &line, const json &pieces);
+// undecided: the clause leaves the matter open (pending, proposed, asked, "?"). undecided_conflict: the line states as
+// settled what a transcript clause sharing one of its words leaves open ("Priya approved the budget" against
+// "Approval is still pending"). said_check returns -2 for it too.
+bool undecided(const std::string &clause);
+bool undecided_conflict(const std::string &line, const json &pieces);
+
+// The summary's sentences that make a claim (2+ content words), headings and bullets left out.
+std::vector<std::string> summary_claims(const std::string &summary);
+// Evidence: the start_sec of the piece that says the most of the claim's content words (half of them, or 2), else -1.
+int64_t evidence_sec(const std::string &claim, const json &pieces);
+
+// One claim of one output, for the check that the outputs agree with each other. part: summary | notes | questions
+// | memory; id: the memory id (0 for the others).
+struct Claim {
+    std::string part, text;
+    int64_t id = 0;
+};
+// Pairs of claims from different outputs (or two memories) about the same thing (2+ shared content words covering
+// 60% of the shorter) where one is negated or left open and the other is not.
+std::vector<std::pair<Claim, Claim>> conflicting_claims(const std::vector<Claim> &claims);
 
 // A decision or action line naming one speaker of the transcript while the line it comes from (the most words in
 // common, the names left out) was said by another, who did not give it to them: that speaker, else "".
@@ -82,7 +110,10 @@ struct VerifyEvent {
     int64_t id = 0;       // memory or suggestion id
 };
 
-struct Failure { std::string check, item; };
+struct Failure {
+    std::string check, item;
+    int64_t start_sec = -1;   // the evidence: where in the recording the claim is said (or should be), -1 unknown
+};
 
 struct PartVerdict {
     std::string part;
@@ -97,7 +128,8 @@ struct VerifyInput {
     std::string lang = "en";
     std::vector<std::string> vocab;
     std::string summary, notes, questions;   // "" = not written, not checked
-    json memories = json::array();   // [{"id","text","quote","start_sec"}]
+    json memories = json::array();   // [{"id","text","quote","start_sec","type"?,"who"?}]: decisions, questions and
+                                     // promises are the map's relationships (who decided, asked or promised what)
     json actions = json::array();    // [{"id","text","quote","start_sec"}]
 };
 
@@ -108,6 +140,12 @@ struct VerifyResult {
     json memories_flagged = json::array();  // [id]
     json action_fixes = json::array();    // [{"id","quote","start_sec"}]
     json actions_flagged = json::array(); // [id]
+    // The map's relationships, checked once on the memory they come from: [{"memory_id","check","start_sec"}] with
+    // check meaning (the opposite of the transcript, or settled where it is open) | who (another person said or
+    // decided it) | consistency (an output says otherwise). Their memories are in memories_flagged too.
+    json relation_flags = json::array();
+    // Every checked claim with its evidence: [{"part","item","start_sec","ok"}] (at most kMaxEvidence).
+    json evidence = json::array();
     std::vector<VerifyEvent> events;
     int judge_calls = 0, unjudged = 0;    // unjudged: items left unmeasured once kMaxJudgeCalls was reached
 };

@@ -21,6 +21,7 @@
 #include "sve_sections.h"  // api mode adds model-like suggestions straight to the store
 #include <sqlite3.h>
 #include <sys/resource.h>  // embed/gate modes: peak resident memory
+#include <unistd.h>        // priya: mkstemp, close
 #include <map>
 #include "third_party/nlohmann/json.hpp"
 #include <cerrno>
@@ -1858,6 +1859,77 @@ static int run_meaning(sve_ctx *ctx, const char *mode, const char *db) {
     return 0;
 }
 
+
+// The orchestrator's acceptance test (review 2026-11-25, "the Priya example"): one sentence, every output right but
+// the map's relationship, which says the budget was approved while the recording says approval is pending. The check
+// is interrupted (the host cancels at its first model call), the app is closed and opened again (a new context on
+// the same file), and the check runs again: only then does the note get its verdict, with the wrong relationship
+// flagged (meaning), its memory queued for review, and the relations review showing why and where.
+static void run_priya(void) {
+    char path[] = "/tmp/sve_priya_XXXXXX";
+    int fd = mkstemp(path);
+    if (fd >= 0) close(fd);
+    remove(path);
+    sve_ctx *ctx = sve_init(path);
+    expect(ctx != nullptr, "priya: context on a file");
+    if (!ctx) return;
+    const json pieces = json::array({{{"start_sec", 0}, {"text", "Ravi: Priya will review the budget on Friday. Approval is still pending."}}});
+    const int64_t note = make_note(ctx, pieces, "Budget");
+    sve_note_set_output(ctx, note, SVE_OUT_SHORT_SUMMARY, "Budget approval is pending. Priya will review it on Friday.");
+    sve_note_set_output(ctx, note, SVE_OUT_DETAILED_NOTES, "## Action items\n- [ ] Review the budget — Priya — Friday\n");
+    sve_note_set_output(ctx, note, SVE_OUT_REVISION_QUESTIONS, "Q1. What will Priya do on Friday?\nA1. Review the budget.");
+    const int64_t wrong = ctx->store->add_memory_item({{"type", "decision"}, {"text", "Priya approved the budget"}, {"who", "Priya"}});
+    const int64_t right = ctx->store->add_memory_item({{"type", "promise"}, {"text", "Priya will review the budget on Friday"}, {"who", "Priya"}});
+    ctx->store->add_memory_source(wrong, note, 0, "Approval is still pending.", std::nullopt);
+    ctx->store->add_memory_source(right, note, 0, "Priya will review the budget on Friday.", std::nullopt);
+    expect(sve_relations_refresh(ctx, note) >= 0, "priya: the map's relationships derived");
+
+    // The judge: "no" to every check (so only code and the evidence decide what passes).
+    g_sve_model_reply = [](const char *phase, const char *) -> const char * { return !strncmp(phase, "verify", 6) ? "no" : "Yes"; };
+    const std::string key = "verify." + std::to_string(note);
+    // 1. Interrupted at its first model call: nothing marked, nothing stored, the check stays owed.
+    int asked = 0;
+    json r1 = take(sve_verify_note(ctx, note, [](const char *, int, int, void *u) { return ++*static_cast<int *>(u) >= 1 ? 1 : 0; }, &asked));
+    expect(r1.is_object() && r1.value("cancelled", false), "priya: the interrupted check reports cancelled");
+    expect(!ctx->store->setting_get(key), "priya: an interrupted check stores no verdict");
+    expect(take(sve_memory_get(ctx, wrong)).value("queue", 0) == 0, "priya: nothing flagged by the interrupted check");
+    sve_free(ctx);
+
+    // 2. The app opens again: the owed check runs on the stored outputs, without writing them again.
+    ctx = sve_init(path);
+    expect(ctx != nullptr, "priya: reopened");
+    if (!ctx) { g_sve_model_reply = nullptr; return; }
+    json r2 = take(sve_verify_note(ctx, note, nullptr, nullptr));
+    expect(r2.is_object() && !r2.value("cancelled", false), "priya: the resumed check finishes");
+    bool flagged = false, right_flagged = false;
+    for (const auto &f : r2.value("relation_flags", json::array())) {
+        if (f.value("memory_id", (int64_t)0) == wrong && f.value("check", std::string()) == "meaning") flagged = true;
+        if (f.value("memory_id", (int64_t)0) == right) right_flagged = true;
+    }
+    expect(flagged, "priya: \"Priya approved the budget\" is flagged: the recording says approval is pending");
+    expect(!right_flagged, "priya: \"Priya will review the budget on Friday\" passes");
+    bool parts_ok = true;
+    for (const auto &kv : r2.value("parts", json::object()).items()) parts_ok = parts_ok && !kv.value().value("please_check", true);
+    expect(parts_ok, "priya: summary, notes and questions pass (reviewing is not approving)");
+    expect(ctx->store->setting_get(key).has_value(), "priya: the verdict is stored only now");
+    expect(take(sve_memory_get(ctx, wrong)).value("queue", 0) == 1, "priya: the wrong relationship's memory waits for review");
+    bool evidence = false;
+    for (const auto &e : r2.value("evidence", json::array()))
+        evidence = evidence || (e.value("part", std::string()) == "relation" && !e.value("ok", true) && e.value("start_sec", (int64_t)-1) == 0);
+    expect(evidence, "priya: the flagged relationship carries where the recording says it");
+    // 3. The relations review shows the line with why and where.
+    bool shown = false;
+    for (const auto &rv : take(sve_relation_reviews_json(ctx)))
+        if (rv.value("note_id", (int64_t)0) == note)
+            for (const auto &d : rv.value("decisions", json::array()))
+                shown = shown || (d.value("text", std::string()) == "Priya approved the budget" &&
+                                  d.value("check", std::string()) == "meaning" && d.value("check_sec", (int64_t)-1) == 0);
+    expect(shown, "priya: the relations review flags the line (meaning, at 0:00)");
+    g_sve_model_reply = nullptr;
+    sve_free(ctx);
+    remove(path);
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "transcribe";
     const char *gguf = getenv("SVE_GEMMA"), *mmproj = getenv("SVE_MMPROJ"), *wav = getenv("SVE_TEST_WAV");
@@ -1874,6 +1946,7 @@ int main(int argc, char **argv) {
     }
     if (!strcmp(mode, "api")) {
         run_api(ctx);
+        run_priya();
         // No context or no model: nothing to load again. (The flag itself needs a failed GPU run: checked on the phone.)
         expect(sve_llm_needs_reload(nullptr) == 0, "needs_reload is off with no context");
         expect(sve_llm_needs_reload(ctx) == 0, "needs_reload is off with no model");

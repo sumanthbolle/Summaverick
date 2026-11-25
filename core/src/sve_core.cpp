@@ -805,9 +805,9 @@ static bool part_holds(const std::string &part_text, const std::string &line) {
 
 char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *user) {
     try {
-        if (!ctx || !ctx->llm) return nullptr;
+        const bool stand_in = g_sve_model_reply != nullptr;   // tests: no model on the host
+        if (!ctx || (!ctx->llm && !stand_in)) return nullptr;
         sve::Store &st = *ctx->store;
-        sve::Llm &llm = *ctx->llm;
         auto note = st.get(note_id);
         if (!note) return nullptr;
         const std::string lang = note->lang.empty() ? "en" : note->lang;
@@ -829,7 +829,8 @@ char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *u
             for (const auto &src : m["sources"])
                 if (jint(src, "note_id", 0) == note_id) {
                     in.memories.push_back({{"id", jint(m, "id", 0)}, {"text", jstr(m, "text")}, {"quote", jstr(src, "quote")},
-                                           {"start_sec", jint(src, "start_sec", -1)}});
+                                           {"start_sec", jint(src, "start_sec", -1)}, {"type", jstr(m, "type")},
+                                           {"who", jstr(m, "who")}});
                     break;
                 }
         }
@@ -845,6 +846,14 @@ char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *u
                                        int max_out, std::string &reply) {
             reply.clear();
             if (w.cancelled) return false;
+            if (stand_in) {   // the host's cancel is asked before each stand-in reply, as the model's callback would
+                if (w.cb && w.cb(phase.c_str(), 0, 1, w.user)) { w.cancelled = true; return false; }
+                const char *r = g_sve_model_reply(phase.c_str(), prompt.c_str());
+                if (!r) return false;
+                reply = r;
+                return true;
+            }
+            sve::Llm &llm = *ctx->llm;
             const bool ok = llm.complete(llm.apply_template(system, prompt), max_out, reply, watch_cb, &w, phase.c_str(), 0, 1, true);
             reply = strip_thinking(reply);
             return ok;
@@ -870,7 +879,7 @@ char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *u
         };
         const sve::RewriteFn rewrite = [&](const std::string &part, int attempt, int base, const std::string &feedback,
                                            const std::vector<std::string> &failing, std::string &out) -> bool {
-            if (w.cancelled) return false;
+            if (w.cancelled || stand_in) return false;   // a stand-in judges only; nothing is written again
             const sve_output_kind k = kind_of(part);
             if ((part == "notes" && notes_parts) || (part == "questions" && questions_parts)) {
                 json texts = st.current_section_outputs(note_id, (int)k, lang);
@@ -960,14 +969,18 @@ char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *u
                 if (stored) st.set_text_column(note_id, column_for(k), text.c_str());
                 else sve_logf(1, "verify: note %lld %s parts not stored; the output is left as it was", (long long)note_id, v.part.c_str());
             }
-            json checks = json::array(), items = json::array();
+            json checks = json::array(), items = json::array(), evidence = json::array();
             std::set<std::string> seen;
             for (const auto &f : v.failures) {
                 if (seen.insert(f.check).second) checks.push_back(f.check);
-                if (items.size() < 6) items.push_back(f.item);
+                if (items.size() < 6) {
+                    items.push_back(f.item);
+                    // Where the recording says it: the person taps the item to hear that passage.
+                    evidence.push_back({{"item", f.item}, {"check", f.check}, {"start_sec", f.start_sec}});
+                }
             }
             parts[v.part] = {{"please_check", v.please_check}, {"retries", v.retries}, {"chosen", v.chosen},
-                             {"checks", checks}, {"items", items}};
+                             {"checks", checks}, {"items", items}, {"evidence", evidence}};
         }
         for (const auto &f : r.memory_fixes)
             if (!st.set_memory_source_quote(jint(f, "id", 0), note_id, jint(f, "start_sec", 0), jstr(f, "quote")))
@@ -987,6 +1000,9 @@ char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *u
                        {"memories_flagged", r.memories_flagged.size()},
                        {"actions", in.actions.size()}, {"actions_fixed", r.action_fixes.size()},
                        {"actions_flagged", r.actions_flagged.size()},
+                       // The map's relationships flagged on their memories (the relations review shows why and where),
+                       // and every checked claim with where the recording says it.
+                       {"relation_flags", r.relation_flags}, {"evidence", r.evidence},
                        {"judge_calls", r.judge_calls}, {"unjudged", r.unjudged},
                        {"seconds", (int)secs_taken}, {"at", (int64_t)std::time(nullptr)}};
         st.setting_set("verify." + std::to_string(note_id), report.dump(-1, ' ', false, json::error_handler_t::replace));
