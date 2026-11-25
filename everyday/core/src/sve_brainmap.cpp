@@ -1,0 +1,254 @@
+#include "sve_brainmap.h"
+#include <algorithm>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+#include "sve_memory.h"  // memory_on_map, memory_waiting
+
+namespace sve {
+namespace {
+
+struct Item {
+    std::string ref, label;
+    double importance = 0;
+    bool is_new = false, low = false, done = false;
+    // Waiting to be checked: a memory in the review queue, or a person/topic whose memories all are.
+    bool waiting = false;
+    int count = 0;
+    bool counted = false;
+    bool question = false;  // an open question shows as open until done
+};
+
+bool has_source(const json &m, int64_t note_id) {
+    if (!m.contains("sources") || !m["sources"].is_array()) return false;
+    for (const auto &s : m["sources"])
+        if (s.is_object() && s.value("note_id", (int64_t)-1) == note_id) return true;
+    return false;
+}
+
+bool shown_on_map(const json &m) { return memory_on_map(m); }
+
+json item_json(const Item &it) {
+    json j = {{"ref", it.ref}, {"label", it.label}, {"importance", it.importance}, {"new", it.is_new},
+              {"low_confidence", it.low}, {"done", it.done}, {"count", it.count}, {"waiting", it.waiting}};
+    if (it.question) j["open"] = !it.done;
+    return j;
+}
+
+std::string name_of(const json &list, int64_t id) {
+    if (list.is_array())
+        for (const auto &e : list)
+            if (e.is_object() && e.value("id", (int64_t)-1) == id) return e.value("name", std::string());
+    return "";
+}
+
+void add_branch(json &out, const std::string &kind, std::vector<Item> items, int per_branch, bool open_first) {
+    if (items.empty()) return;
+    std::stable_sort(items.begin(), items.end(), [&](const Item &a, const Item &b) {
+        if (open_first && a.done != b.done) return !a.done;
+        if (a.importance != b.importance) return a.importance > b.importance;
+        return !a.waiting && b.waiting;  // kept before waiting at equal importance
+    });
+    const int cap = std::max(per_branch, 0);
+    json arr = json::array();
+    for (size_t i = 0; i < items.size() && (int)i < cap; i++) arr.push_back(item_json(items[i]));
+    out.push_back({{"kind", kind}, {"items", arr}, {"more", (int)items.size() - (int)arr.size()}});
+}
+
+}  // namespace
+
+json build_brain_map(const json &memories, const json &people, const json &topics, const json &meaning_pairs,
+                     int64_t note_id, int per_branch, const json &relations, const json &note_links) {
+    std::vector<const json *> mems;
+    if (memories.is_array())
+        for (const auto &m : memories)
+            if (m.is_object() && shown_on_map(m) && (note_id <= 0 || has_source(m, note_id))) mems.push_back(&m);
+
+    std::map<int64_t, Item> person_items, topic_items;
+    std::vector<Item> promises, decisions, questions;
+    std::map<int64_t, std::set<int64_t>> by_person, by_topic;  // entity id -> memory ids
+    std::map<int64_t, Item> shown;                             // memory id -> item (promise/decision/question)
+
+    auto touch = [&](std::map<int64_t, Item> &into, const json &list, const char *prefix, int64_t tid, const json &m,
+                     const Item &mi) {
+        Item &it = into[tid];
+        if (it.ref.empty()) {
+            it.ref = prefix + std::to_string(tid);
+            it.label = name_of(list, tid);
+            it.waiting = true;
+        }
+        it.waiting = it.waiting && mi.waiting;
+        it.count++;
+        it.importance = std::max(it.importance, mi.importance);
+        it.is_new = it.is_new || mi.is_new;
+        it.low = it.low || mi.low;
+        (void)m;
+    };
+
+    for (const json *mp : mems) {
+        const json &m = *mp;
+        const int64_t id = m.value("id", (int64_t)0);
+        Item mi;
+        mi.ref = "m" + std::to_string(id);
+        mi.label = m.value("text", std::string());
+        mi.importance = m.value("importance", 0.0);
+        mi.waiting = memory_waiting(m);
+        mi.is_new = m.value("review", std::string()) == "new" && !mi.waiting;
+        mi.low = m.value("confidence", std::string()) == "low";
+        mi.done = m.value("done", 0) != 0;
+        const std::string type = m.value("type", std::string());
+        if (type == "promise") promises.push_back(mi);
+        else if (type == "decision") decisions.push_back(mi);
+        else if (type == "question") { mi.question = true; questions.push_back(mi); }
+        if (type == "promise" || type == "decision" || type == "question") shown[id] = mi;
+        std::set<int64_t> seen;
+        if (m.contains("people") && m["people"].is_array())
+            for (const auto &p : m["people"]) {
+                const int64_t pid = p.value("id", (int64_t)0);
+                if (pid <= 0 || !seen.insert(pid).second) continue;
+                touch(person_items, people, "t", pid, m, mi);
+                by_person[pid].insert(id);
+            }
+        seen.clear();
+        if (m.contains("topics") && m["topics"].is_array())
+            for (const auto &t : m["topics"]) {
+                const int64_t tid = t.value("id", (int64_t)0);
+                if (tid <= 0 || !seen.insert(tid).second) continue;
+                touch(topic_items, topics, "t", tid, m, mi);
+                by_topic[tid].insert(id);
+            }
+    }
+
+    // The whole map: people and topics of recordings, with or without memories, counted by their recordings.
+    if (note_id <= 0) {
+        auto from_notes = [&](std::map<int64_t, Item> &into, const json &list) {
+            if (!list.is_array()) return;
+            for (const auto &e : list) {
+                if (!e.is_object()) continue;
+                const int64_t tid = e.value("id", (int64_t)0);
+                const int notes = (int)e.value("note_count", (int64_t)0);
+                if (tid <= 0 || notes <= 0) continue;
+                Item &it = into[tid];
+                if (it.ref.empty()) {
+                    it.ref = "t" + std::to_string(tid);
+                    it.label = e.value("name", std::string());
+                }
+                it.waiting = false;  // a recording's topic is not waiting for a check
+                it.count = std::max(it.count, notes);
+                it.importance = std::max(it.importance, std::min(2.0, 0.5 + 0.5 * notes));
+            }
+        };
+        from_notes(person_items, people);
+        from_notes(topic_items, topics);
+    }
+
+    // A promise's open/closed state is not a topic's: topics and people are never "done".
+    std::vector<Item> ppl, tps;
+    for (auto &kv : person_items) ppl.push_back(kv.second);
+    for (auto &kv : topic_items) tps.push_back(kv.second);
+
+    json out = {{"center", {{"kind", note_id > 0 ? "recording" : "you"}, {"note_id", note_id > 0 ? note_id : 0}}},
+                {"branches", json::array()}, {"links", json::array()}};
+    json &br = out["branches"];
+    add_branch(br, "people", ppl, per_branch, false);
+    add_branch(br, "topics", tps, per_branch, false);
+    add_branch(br, "promises", promises, per_branch, true);
+    add_branch(br, "decisions", decisions, per_branch, true);
+    add_branch(br, "questions", questions, per_branch, true);
+
+    int total = 0;
+    std::set<std::string> shown_refs;
+    for (const auto &b : br) {
+        total += b["more"].get<int>();  // items beyond the cap still count toward "few"
+        for (const auto &it : b["items"]) { total++; shown_refs.insert(it["ref"].get<std::string>()); }
+    }
+    out["list"] = total < 8;
+
+    // Links among memories that are drawn: a shared person or topic, then meaning.
+    json &links = out["links"];
+    auto on_map = [&](int64_t id) { return shown_refs.count("m" + std::to_string(id)) > 0; };
+    auto share = [&](const std::map<int64_t, std::set<int64_t>> &groups, const char *kind) {
+        std::set<std::pair<int64_t, int64_t>> done;
+        for (const auto &g : groups) {
+            std::vector<int64_t> ids;
+            for (int64_t id : g.second) if (on_map(id)) ids.push_back(id);
+            for (size_t i = 0; i < ids.size(); i++)
+                for (size_t j = i + 1; j < ids.size(); j++)
+                    if (done.insert({ids[i], ids[j]}).second)
+                        links.push_back({{"a", "m" + std::to_string(ids[i])}, {"b", "m" + std::to_string(ids[j])}, {"kind", kind}});
+        }
+    };
+    share(by_person, "person");
+    share(by_topic, "topic");
+
+    // People and topics on the same recording (whole map only), both drawn.
+    if (note_id <= 0 && note_links.is_array()) {
+        std::map<int64_t, std::vector<std::string>> by_note;
+        for (const auto &l : note_links) {
+            if (!l.is_object()) continue;
+            const int64_t n = l.value("note_id", (int64_t)0), t = l.value("topic_id", (int64_t)0);
+            const std::string ref = "t" + std::to_string(t);
+            if (n > 0 && t > 0 && shown_refs.count(ref)) by_note[n].push_back(ref);
+        }
+        std::set<std::pair<std::string, std::string>> done;
+        for (const auto &kv : by_note) {
+            const auto &refs = kv.second;
+            for (size_t i = 0; i < refs.size(); i++)
+                for (size_t j = i + 1; j < refs.size(); j++) {
+                    auto key = std::minmax(refs[i], refs[j]);
+                    if (refs[i] == refs[j] || !done.insert({key.first, key.second}).second) continue;
+                    links.push_back({{"a", key.first}, {"b", key.second}, {"kind", "together"}});
+                }
+        }
+    }
+
+    // Accepted relations: a person to what they decided or asked, and a person to the person they told or asked.
+    if (relations.is_array()) {
+        std::set<std::string> drawn;
+        for (const auto &r : relations) {
+            if (!r.is_object() || r.value("status", std::string("accepted")) != "accepted") continue;
+            const std::string rel = r.value("relation", std::string()), to_kind = r.value("to_kind", std::string());
+            if (rel != "decided" && rel != "asked" && rel != "told") continue;
+            const json ft = r.contains("from_topic") ? r["from_topic"] : json(nullptr);
+            if (r.value("from_kind", std::string()) != "person" || !ft.is_number_integer()) continue;
+            const std::string a = "t" + std::to_string(ft.get<int64_t>());
+            std::string b;
+            if (to_kind == "decision" || to_kind == "question") {
+                const json mid = r.contains("memory_id") ? r["memory_id"] : json(nullptr);
+                if (mid.is_number_integer()) b = "m" + std::to_string(mid.get<int64_t>());
+            } else if (to_kind == "person") {
+                const json tt = r.contains("to_topic") ? r["to_topic"] : json(nullptr);
+                if (tt.is_number_integer()) b = "t" + std::to_string(tt.get<int64_t>());
+            }
+            if (b.empty() || a == b || !shown_refs.count(a) || !shown_refs.count(b)) continue;
+            if (!drawn.insert(a + ">" + b + ":" + rel).second) continue;
+            links.push_back({{"a", a}, {"b", b}, {"kind", "relation"}, {"label", rel}});
+        }
+    }
+
+    // Meaning: cosine >= 0.8, strongest first, at most 2 per memory, both memories eligible.
+    struct Pair { int64_t a, b; double cos; };
+    std::vector<Pair> pairs;
+    if (meaning_pairs.is_array())
+        for (const auto &p : meaning_pairs) {
+            if (!p.is_object() || !p.contains("a") || !p.contains("b") || !p.contains("cos")) continue;
+            if (!p["a"].is_number_integer() || !p["b"].is_number_integer() || !p["cos"].is_number()) continue;
+            const int64_t a = p["a"].get<int64_t>(), b = p["b"].get<int64_t>();
+            const double c = p["cos"].get<double>();
+            if (a != b && c >= 0.8 && shown.count(a) && shown.count(b)) pairs.push_back({a, b, c});
+        }
+    std::stable_sort(pairs.begin(), pairs.end(), [](const Pair &x, const Pair &y) { return x.cos > y.cos; });
+    std::map<int64_t, int> used;
+    std::set<std::pair<int64_t, int64_t>> seen;
+    for (const auto &p : pairs) {
+        auto key = std::make_pair(std::min(p.a, p.b), std::max(p.a, p.b));
+        if (used[p.a] >= 2 || used[p.b] >= 2 || !on_map(p.a) || !on_map(p.b) || !seen.insert(key).second) continue;
+        used[p.a]++;
+        used[p.b]++;
+        links.push_back({{"a", "m" + std::to_string(p.a)}, {"b", "m" + std::to_string(p.b)}, {"kind", "meaning"}});
+    }
+    return out;
+}
+
+}  // namespace sve

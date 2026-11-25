@@ -1,0 +1,3 @@
+[t=0] Sumanth: I'll send the proposal on Friday.
+[t=12] Anil: The pricing in the proposal is still provisional.
+[t=24] Sumanth: Good point. I'll wait for your pricing confirmation before I send it.

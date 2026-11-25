@@ -1,0 +1,3 @@
+[t=0] Sumanth: నేను Friday proposal పంపిస్తాను.
+[t=12] Anil: Proposal లో pricing ఇంకా final కాలేదు, provisional మాత్రమే.
+[t=24] Sumanth: Correct. నువ్వు pricing confirm చేసిన తర్వాతే నేను పంపిస్తాను.

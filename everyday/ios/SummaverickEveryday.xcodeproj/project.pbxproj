@@ -1,0 +1,2140 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		02483ED28A106C83F67E1A8A = {
+			isa = PBXBuildFile;
+			fileRef = 647DAFDDC9793F2E68970D6F;
+		};
+		0265346915ED5E206E1A6538 = {
+			isa = PBXBuildFile;
+			fileRef = D93A42C45E9E61B243ADE3F8;
+		};
+		02B6E8042D07B8525DD08CA0 = {
+			isa = PBXBuildFile;
+			fileRef = 1E7DCC7C328B39763C50AB6C;
+		};
+		07C4BA787A10CB869B855E1D = {
+			isa = PBXBuildFile;
+			fileRef = 1FB58A118DF0A48276B00C59;
+		};
+		11C62DBEE92DAE5BAA003ED9 = {
+			isa = PBXBuildFile;
+			fileRef = 491BB1ADB53C5E2A1F0AF6C8;
+		};
+		1794160D386E91967AC6CD24 = {
+			isa = PBXBuildFile;
+			fileRef = B9675BF203CCF71683907580;
+		};
+		1970E5A56D56F7BC7ACE9401 = {
+			isa = PBXBuildFile;
+			fileRef = 40CF89C460C8558DF1531E3B;
+		};
+		1D9397B49E2B55EDE5DC3560 = {
+			isa = PBXBuildFile;
+			fileRef = 9E2ACA831A68C5FC7568EFA9;
+		};
+		1D93FAC83E0C239CDE7EBB43 = {
+			isa = PBXBuildFile;
+			fileRef = 6FBD9F3DE594670E26D165EC;
+		};
+		1E01B2EFF4A31A1034B15098 = {
+			isa = PBXBuildFile;
+			fileRef = 13A63ABDA892EF2D8A1A560A;
+		};
+		23A9062ED9C13C47A0044495 = {
+			isa = PBXBuildFile;
+			fileRef = 319F1F8813F1FD9E2E508A64;
+		};
+		5E1A2B3C4D5E6F7081920A1B = {
+			isa = PBXBuildFile;
+			fileRef = 5E1A2B3C4D5E6F7081920A1C;
+		};
+		23C44AF0CB03B5875E813B5F = {
+			isa = PBXBuildFile;
+			fileRef = C9899E0B799571C7B3ED48D8;
+		};
+		24F70CD5F7748FDEB63B8BB1 = {
+			isa = PBXBuildFile;
+			fileRef = 3127CE4AFD13AD5C3FEDC05B;
+		};
+		25A6412A3165EE7261515DB6 = {
+			isa = PBXBuildFile;
+			fileRef = 613ACEA909B6A4FB1BE80F73;
+		};
+		287BB893A1AA69C067C08137 = {
+			isa = PBXBuildFile;
+			fileRef = 33C50C60642D8852C316CF41;
+		};
+		2DE36113806377CB352E5A8E = {
+			isa = PBXBuildFile;
+			fileRef = D84ADCB93009100271D599EA;
+		};
+		2ED95E8479D9CD965A84AD5D = {
+			isa = PBXBuildFile;
+			fileRef = 25C0B7015E31FCB834431FF0;
+		};
+		2FD15473B6B920BB015E30EC = {
+			isa = PBXBuildFile;
+			fileRef = C30CC5397DAA09FBACA85197;
+			settings = {
+				ATTRIBUTES = (
+					CodeSignOnCopy,
+					RemoveHeadersOnCopy,
+				);
+			};
+		};
+		334316FE5AD49DBFE79A28C1 = {
+			isa = PBXBuildFile;
+			fileRef = FC581254F5C135DB22FD9C42;
+		};
+		38CB1246A85B0C24B1334947 = {
+			isa = PBXBuildFile;
+			fileRef = 4EC1FF35F8179A094C3AB745;
+		};
+		3F3EF1BBEFE445AAA7E90A0E = {
+			isa = PBXBuildFile;
+			fileRef = F76CFB3FA4C8F8FBA28F7976;
+		};
+		408386E2C748923A7048D478 = {
+			isa = PBXBuildFile;
+			fileRef = 8A6F757330F3179FB40BD3E2;
+		};
+		4F09E9A49F6F264A6E0572C7 = {
+			isa = PBXBuildFile;
+			fileRef = 678A49AA9B002AAA3E2FC364;
+		};
+		53208D279FD7D4526A01C523 = {
+			isa = PBXBuildFile;
+			fileRef = 69DFE9A274CA05C81C452276;
+		};
+		535ACB83EDFCFBACA1FD4F3C = {
+			isa = PBXBuildFile;
+			fileRef = 32B4ECFC6F6AC631FDE8CCFB;
+		};
+		5809D5B858D8CE07F8518B8C = {
+			isa = PBXBuildFile;
+			fileRef = 2E361774B975154A11567968;
+		};
+		5997944FB95EF3E94D57974F = {
+			isa = PBXBuildFile;
+			fileRef = B05E051B8E13E602C77A96F0;
+		};
+		5E7D376B796A9DEC0100AD23 = {
+			isa = PBXBuildFile;
+			fileRef = 85C6DEF5C197B0C18C2FC34D;
+		};
+		5F2B5F64B097A11CAB54B85B = {
+			isa = PBXBuildFile;
+			fileRef = BB1E4AFCC74F3BEAC626FF50;
+		};
+		66567DD2A6C40F6BC6CB1C24 = {
+			isa = PBXBuildFile;
+			fileRef = 3C94D64FE92A566816D76B43;
+		};
+		6676C0DB08957FBDC042C54F = {
+			isa = PBXBuildFile;
+			fileRef = 6F60E66F2FF8D363A05C6C95;
+		};
+		6A4AAC44A2B9990D006E4C28 = {
+			isa = PBXBuildFile;
+			fileRef = 7BBE0833144762A6B70A1FCF;
+		};
+		7145186EECA51AD6A675CA64 = {
+			isa = PBXBuildFile;
+			fileRef = 91B7437CBCDFB5FF9D4AD20B;
+		};
+		74F26ED096628426F957DD0E = {
+			isa = PBXBuildFile;
+			fileRef = FC685B2FB5E51229E33B1F2C;
+		};
+		78FEF39F0157E95D1536473C = {
+			isa = PBXBuildFile;
+			fileRef = 25C0B7015E31FCB834431FF0;
+			settings = {
+				ATTRIBUTES = (
+					CodeSignOnCopy,
+					RemoveHeadersOnCopy,
+				);
+			};
+		};
+		7930BD02F74FE1E998D43E14 = {
+			isa = PBXBuildFile;
+			fileRef = 2CC5EFA566DA98ADF20EDEAF;
+		};
+		7CD85F6783D894B9047A2C67 = {
+			isa = PBXBuildFile;
+			fileRef = EE7D0A38215CFAEEF0A0E2BE;
+		};
+		7DF93800DB3C9D1EB735C3CD = {
+			isa = PBXBuildFile;
+			fileRef = 618A438B4C8E5391746526C9;
+		};
+		82BAF8328F881FAFD6AEC039 = {
+			isa = PBXBuildFile;
+			fileRef = 92C96DB63D6AC206F247279B;
+		};
+		832433C1965C36667340EE3B = {
+			isa = PBXBuildFile;
+			fileRef = DAD9D4F5BE940D31ED604618;
+		};
+		8C85B5FFFB6330BA125F9177 = {
+			isa = PBXBuildFile;
+			fileRef = AD68489E0874E658C08E370A;
+		};
+		8D4A6C6E4B479FCA91F91BA9 = {
+			isa = PBXBuildFile;
+			fileRef = DCE021A147EA4FBC88B74354;
+		};
+		8E779B106668C15FE8259AA8 = {
+			isa = PBXBuildFile;
+			fileRef = 7935477EC4D13C03471CB46B;
+		};
+		8FB71A3DAC10CCF263B21175 = {
+			isa = PBXBuildFile;
+			fileRef = 393C976A09F0C61C5B20B9DE;
+		};
+		8FE69873EC9B753B9C62DD98 = {
+			isa = PBXBuildFile;
+			fileRef = 4AC8F8DF35A4A27C32F64762;
+		};
+		908F929CC6113FA25B46EE92 = {
+			isa = PBXBuildFile;
+			fileRef = 8108122AC683F0C05267E8CD;
+		};
+		9543CFE6FE3AF9374A448E0F = {
+			isa = PBXBuildFile;
+			fileRef = D58A3AD4F6AD27CF4A2AB3D8;
+		};
+		9693178312F307734DAC8F40 = {
+			isa = PBXBuildFile;
+			fileRef = 41993960BC863990F7951208;
+		};
+		98CC0908F97C13DBC19A09B5 = {
+			isa = PBXBuildFile;
+			fileRef = 7098A4559C0419D83AAB1B2A;
+		};
+		9A5EA1AFF3F67FA08253F534 = {
+			isa = PBXBuildFile;
+			fileRef = 8F55E78D0CAB65A7B800E45B;
+		};
+		A062B0CDA53604F5D8A7D47D = {
+			isa = PBXBuildFile;
+			fileRef = C593582C209D99DB076F4AB2;
+		};
+		A14D701700FCEA89C5B0F439 = {
+			isa = PBXBuildFile;
+			fileRef = C30CC5397DAA09FBACA85197;
+		};
+		A1CD78667A723270125077DD = {
+			isa = PBXBuildFile;
+			fileRef = 65E363A7B54CBC6FC72BFA66;
+		};
+		A5B14A3A01B9BFEF4EB193D3 = {
+			isa = PBXBuildFile;
+			fileRef = 43130EEACCC981C89B012095;
+		};
+		A8D78741F45FACAC32C29FBB = {
+			isa = PBXBuildFile;
+			fileRef = 05DE663E1F9B875F3C1ABC94;
+		};
+		A98A4FF70B48BB38E9507E50 = {
+			isa = PBXBuildFile;
+			fileRef = 5B6316DBD705D039EA15B281;
+		};
+		AD33A465D5C223FBF7C16E07 = {
+			isa = PBXBuildFile;
+			fileRef = C6E38749CC30FE0501F34CE0;
+		};
+		AECF9004BF6C64F9CF4640B9 = {
+			isa = PBXBuildFile;
+			fileRef = 9C35A7555407BE9AE72D84A6;
+		};
+		B3682618E8A7DB35FCEEE996 = {
+			isa = PBXBuildFile;
+			fileRef = 3E8C99285C2BD28FE0ECE99B;
+		};
+		B65B60C3D1ED1A91BF301F39 = {
+			isa = PBXBuildFile;
+			fileRef = 60C1139DF3355429822F7043;
+		};
+		B73BD37B74FFE5DE3C398EE9 = {
+			isa = PBXBuildFile;
+			fileRef = 515BBF6A31C68F3F903DB724;
+		};
+		B939673027A07B580BF6B7A1 = {
+			isa = PBXBuildFile;
+			fileRef = 892E4DF51BC5A1D8EB706A7A;
+		};
+		BA9D2ACC5550BEBF951BB462 = {
+			isa = PBXBuildFile;
+			fileRef = 4AF174E3AE529342FF2A9846;
+		};
+		BBE1E8050D9A57E38FEDD25D = {
+			isa = PBXBuildFile;
+			fileRef = B73E8BA827374C55E1066D30;
+		};
+		C23AA49A9EE82365B4F4B783 = {
+			isa = PBXBuildFile;
+			fileRef = 45B50ED11A0933F793CD181E;
+		};
+		C2AF1244993225350DDBDC94 = {
+			isa = PBXBuildFile;
+			fileRef = 0B08BF124CD0B2571A98FABA;
+		};
+		C5A170B71BA26E9C67BBD6BF = {
+			isa = PBXBuildFile;
+			fileRef = 647DAFDDC9793F2E68970D6F;
+		};
+		C6AAA9F998388DF8734C616C = {
+			isa = PBXBuildFile;
+			fileRef = 2CC5EFA566DA98ADF20EDEAF;
+		};
+		C6FD0A316798F1839A28EADE = {
+			isa = PBXBuildFile;
+			fileRef = F66379AE26FB07E2A8BA2BDA;
+		};
+		CC6072ABC305C2EE3EDCFF78 = {
+			isa = PBXBuildFile;
+			fileRef = ADEEFA19D57BA7D03687B2E4;
+		};
+		CCABCA4B3E738FCE0399D402 = {
+			isa = PBXBuildFile;
+			fileRef = A134B997A05BEC16D4B96325;
+		};
+		CCE03DBE92FEAE25E86430F5 = {
+			isa = PBXBuildFile;
+			fileRef = E6063C3DF54DA54ED6DC32F1;
+		};
+		CE05B940BCBE599A11AE22E8 = {
+			isa = PBXBuildFile;
+			fileRef = 171A4CC9E4CFD6CB1704585A;
+		};
+		CFAE66CBEA2F64C482C52CCD = {
+			isa = PBXBuildFile;
+			fileRef = 9C35A7555407BE9AE72D84A6;
+		};
+		D24548A80F6EDBB04A261E7D = {
+			isa = PBXBuildFile;
+			fileRef = 892E4DF51BC5A1D8EB706A7A;
+		};
+		D4AD48D249A728A25E657B64 = {
+			isa = PBXBuildFile;
+			fileRef = 72401EE38712FDE00FD629BF;
+		};
+		D6FCB3A9A352DEB73CB3880E = {
+			isa = PBXBuildFile;
+			fileRef = EB4D643757F8467F78873D27;
+			settings = {
+				ATTRIBUTES = (
+					RemoveHeadersOnCopy,
+				);
+			};
+		};
+		D9865442550D6A995B0F4FDB = {
+			isa = PBXBuildFile;
+			fileRef = 58C590454FC63BC4EDF7F18D;
+		};
+		DACFC767C169503E4AB3CA4F = {
+			isa = PBXBuildFile;
+			fileRef = 8EDD6E0FBF1E227C55F144C7;
+		};
+		DB8B42E9546B01810DFCAE5A = {
+			isa = PBXBuildFile;
+			fileRef = 8E2A14BEAEE07F5369F65BB8;
+		};
+		DC63BBC908E702BC81A8A6F1 = {
+			isa = PBXBuildFile;
+			fileRef = 85C17E3BCA69B1CF4F17F91A;
+		};
+		DC70A4770243CC1CA714EEB5 = {
+			isa = PBXBuildFile;
+			fileRef = FDA9E084D501D8D1690658ED;
+		};
+		DC72AABB07924C733D349BA4 = {
+			isa = PBXBuildFile;
+			fileRef = 2F4911A292E905F157B99F3B;
+		};
+		DD6F72C30ED5F9B5F7BCA8E3 = {
+			isa = PBXBuildFile;
+			fileRef = C0100A508E690127735ED8DF;
+		};
+		E0F7CCE6E724B4A99DCD35CB = {
+			isa = PBXBuildFile;
+			fileRef = 62C33D8D9F694DDB9C315DDC;
+		};
+		E1A865BA6F70AD42A421A43D = {
+			isa = PBXBuildFile;
+			fileRef = 69021175FE455DA46F1832CA;
+		};
+		E374920B948422FA0FDEBA74 = {
+			isa = PBXBuildFile;
+			fileRef = 63A8A83C123E5491CBE9E84F;
+		};
+		E38796377CD701DE27D4E42D = {
+			isa = PBXBuildFile;
+			fileRef = 520311627B984B6D041E58B4;
+		};
+		E3B6ED99E22E4B0C0EC884D9 = {
+			isa = PBXBuildFile;
+			fileRef = 0A726C07BA65E563FB374790;
+		};
+		E9A17DB1C732407CC6C7359F = {
+			isa = PBXBuildFile;
+			fileRef = 4EC1FF35F8179A094C3AB745;
+		};
+		EAE1FEBFAD37F08A0E5AF91D = {
+			isa = PBXBuildFile;
+			fileRef = 92BE6C4CC02BDF7B9FDAE1B6;
+		};
+		ECB5419178B062460383B28A = {
+			isa = PBXBuildFile;
+			fileRef = EAF88B4A3FB9A8689FADBD2C;
+		};
+		F18AE8B08BB5C071DD06E7B6 = {
+			isa = PBXBuildFile;
+			fileRef = D9FD28DA2706A5CCE79B0A3D;
+		};
+		F4F570D994C6AAFF90AECBAF = {
+			isa = PBXBuildFile;
+			fileRef = 65E363A7B54CBC6FC72BFA66;
+		};
+		F537C5DA2B9ED38A363F872D = {
+			isa = PBXBuildFile;
+			fileRef = 287ECA324ED50C0FEF7A6604;
+		};
+		F5DF4BFB0174304CA2197095 = {
+			isa = PBXBuildFile;
+			fileRef = 4E9F0134C12B9B82D2B2A856;
+		};
+		F7662F48E1C4D62499CCA46C = {
+			isa = PBXBuildFile;
+			fileRef = 495D5704B2E625A6B8DE2E7E;
+		};
+		F7AB124BF9505B6A6F0DB63E = {
+			isa = PBXBuildFile;
+			fileRef = 2536A2BB503827DD0CF5891A;
+			settings = {
+				COMPILER_FLAGS = "-O3 -DNDEBUG -U_LIBCPP_HARDENING_MODE -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_NONE";
+			};
+		};
+		F8E97681421A53898F3C82E0 = {
+			isa = PBXBuildFile;
+			fileRef = FB9B4C78668184CF16F3ABA6;
+		};
+		FA89EFDB7CFDC888DE748CAB = {
+			isa = PBXBuildFile;
+			fileRef = DB74CF4044569BF171D6037F;
+		};
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		736D1CE29F0780E279650A2F = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595;
+			proxyType = 1;
+			remoteGlobalIDString = E157114D15F9748EC61C3AF0;
+			remoteInfo = SummaverickWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		13E535E01ED8244C50D6933B = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D6FCB3A9A352DEB73CB3880E,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BAE1492BDE49D13FF7E211EB = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				2FD15473B6B920BB015E30EC,
+				78FEF39F0157E95D1536473C,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		05DE663E1F9B875F3C1ABC94 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SummaverickWidgets.swift;
+			path = SummaverickWidgets/SummaverickWidgets.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		0A726C07BA65E563FB374790 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_assistant.cpp;
+			path = ../core/src/sve_assistant.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		0B08BF124CD0B2571A98FABA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = TranscriptSidecar.swift;
+			path = SummaverickEveryday/Engine/TranscriptSidecar.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		10A99A9004D029F7A08C362A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_english_words.h;
+			path = ../core/src/sve_english_words.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		13A63ABDA892EF2D8A1A560A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = HeatGovernor.swift;
+			path = SummaverickEveryday/Engine/HeatGovernor.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		171A4CC9E4CFD6CB1704585A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_store.cpp;
+			path = ../core/src/sve_store.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		1E7DCC7C328B39763C50AB6C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_llm.cpp;
+			path = ../core/src/sve_llm.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		1FB58A118DF0A48276B00C59 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_learn.cpp;
+			path = ../core/src/sve_learn.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		2029A639DD8022543C17416B = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = SummaverickEveryday.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		21B1E44867FA3470B2C4DD71 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_assemble.h;
+			path = ../core/src/sve_assemble.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		2536A2BB503827DD0CF5891A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = whisper.cpp;
+			path = ../core/src/whisper.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		25C0B7015E31FCB834431FF0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = wrapper.xcframework;
+			name = SherpaOnnxC.xcframework;
+			path = Frameworks/SherpaOnnxC.xcframework;
+			sourceTree = SOURCE_ROOT;
+		};
+		287ECA324ED50C0FEF7A6604 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder;
+			name = Shruti;
+			path = SummaverickEveryday/Resources/Shruti;
+			sourceTree = SOURCE_ROOT;
+		};
+		29A1CD6197C4EBF318C20726 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = Bridging.h;
+			path = SummaverickEveryday/Bridging.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		2CC5EFA566DA98ADF20EDEAF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingActivity.swift;
+			path = Shared/RecordingActivity.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		2E361774B975154A11567968 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ProcessingPipeline.swift;
+			path = SummaverickEveryday/Engine/ProcessingPipeline.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		2F4911A292E905F157B99F3B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_pieces.cpp;
+			path = ../core/src/sve_pieces.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		3127CE4AFD13AD5C3FEDC05B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ChaptersView.swift;
+			path = SummaverickEveryday/Views/ChaptersView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		319F1F8813F1FD9E2E508A64 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_onepass.cpp;
+			path = ../core/src/sve_onepass.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		5E1A2B3C4D5E6F7081920A1C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_verify.cpp;
+			path = ../core/src/sve_verify.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		5E1A2B3C4D5E6F7081920A1D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_verify.h;
+			path = ../core/src/sve_verify.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		32B4ECFC6F6AC631FDE8CCFB = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = "CoreEngine+Memory.swift";
+			path = "SummaverickEveryday/Engine/CoreEngine+Memory.swift";
+			sourceTree = SOURCE_ROOT;
+		};
+		33C50C60642D8852C316CF41 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingLiveActivity.swift;
+			path = SummaverickWidgets/RecordingLiveActivity.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		393C976A09F0C61C5B20B9DE = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = Brand.swift;
+			path = SummaverickEveryday/Views/Components/Brand.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		3C94D64FE92A566816D76B43 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_core.cpp;
+			path = ../core/src/sve_core.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		3E8C99285C2BD28FE0ECE99B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = CoreEngine.swift;
+			path = SummaverickEveryday/Engine/CoreEngine.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		40CF89C460C8558DF1531E3B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AudioRecorder.swift;
+			path = SummaverickEveryday/Audio/AudioRecorder.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		41993960BC863990F7951208 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_brainmap.cpp;
+			path = ../core/src/sve_brainmap.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		428A09CCDB67F6F77A72F81A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_memory.h;
+			path = ../core/src/sve_memory.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		43130EEACCC981C89B012095 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AudioCompressor.swift;
+			path = SummaverickEveryday/Audio/AudioCompressor.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		45B50ED11A0933F793CD181E = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ContinuedWork.swift;
+			path = SummaverickEveryday/Engine/ContinuedWork.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		491BB1ADB53C5E2A1F0AF6C8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_brain.cpp;
+			path = ../core/src/sve_brain.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		495D5704B2E625A6B8DE2E7E = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = LearnedView.swift;
+			path = SummaverickEveryday/Views/Profile/LearnedView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		4AC8F8DF35A4A27C32F64762 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_consolidate.cpp;
+			path = ../core/src/sve_consolidate.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		4AF174E3AE529342FF2A9846 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = GuidedSetupView.swift;
+			path = SummaverickEveryday/Views/Setup/GuidedSetupView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		4E9F0134C12B9B82D2B2A856 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = NoteDetailView.swift;
+			path = SummaverickEveryday/Views/NoteDetailView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		4EC1FF35F8179A094C3AB745 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = Theme.swift;
+			path = Shared/Theme.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		515BBF6A31C68F3F903DB724 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = LiveActivityLogic.swift;
+			path = SummaverickEveryday/Engine/LiveActivityLogic.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		520311627B984B6D041E58B4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AppLock.swift;
+			path = SummaverickEveryday/Security/AppLock.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		52C1022F6F542158C732AD92 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = Info.plist;
+			path = SummaverickWidgets/Info.plist;
+			sourceTree = SOURCE_ROOT;
+		};
+		58C590454FC63BC4EDF7F18D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = BrainMapLayout.swift;
+			path = SummaverickEveryday/Views/Map/BrainMapLayout.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		5B6316DBD705D039EA15B281 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RootView.swift;
+			path = SummaverickEveryday/Views/RootView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		6013C41549784B5FC55E61C4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_medcheck.h;
+			path = ../core/src/sve_medcheck.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		60C1139DF3355429822F7043 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = DeepDiveView.swift;
+			path = SummaverickEveryday/Views/DeepDive/DeepDiveView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		613ACEA909B6A4FB1BE80F73 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = TopicDetailView.swift;
+			path = SummaverickEveryday/Views/DeepDive/TopicDetailView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		618A438B4C8E5391746526C9 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = "CoreEngine+Assistant.swift";
+			path = "SummaverickEveryday/Engine/CoreEngine+Assistant.swift";
+			sourceTree = SOURCE_ROOT;
+		};
+		62C33D8D9F694DDB9C315DDC = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ProfileParts.swift;
+			path = SummaverickEveryday/Views/Profile/ProfileParts.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		63A8A83C123E5491CBE9E84F = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordView.swift;
+			path = SummaverickEveryday/Views/RecordView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		647DAFDDC9793F2E68970D6F = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ThemePalette.swift;
+			path = Shared/ThemePalette.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		65E363A7B54CBC6FC72BFA66 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingIntents.swift;
+			path = Shared/RecordingIntents.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		678A49AA9B002AAA3E2FC364 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ChatStore.swift;
+			path = SummaverickEveryday/Engine/ChatStore.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		68019339B3FB26EF022BB32A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_budget.h;
+			path = ../core/src/sve_budget.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		69021175FE455DA46F1832CA = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			name = InfoPlist.xcstrings;
+			path = SummaverickEveryday/InfoPlist.xcstrings;
+			sourceTree = SOURCE_ROOT;
+		};
+		69DFE9A274CA05C81C452276 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AssistantModels.swift;
+			path = SummaverickEveryday/Engine/AssistantModels.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		6F60E66F2FF8D363A05C6C95 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_textmatch.cpp;
+			path = ../core/src/sve_textmatch.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		6FBD9F3DE594670E26D165EC = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SetupTour.swift;
+			path = SummaverickEveryday/Views/Setup/SetupTour.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		7098A4559C0419D83AAB1B2A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_memory.cpp;
+			path = ../core/src/sve_memory.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		72401EE38712FDE00FD629BF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = FinishNowView.swift;
+			path = SummaverickEveryday/Views/FinishNowView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		7935477EC4D13C03471CB46B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = MemoryReviewCard.swift;
+			path = SummaverickEveryday/Views/Memory/MemoryReviewCard.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		7BBE0833144762A6B70A1FCF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ScreenAwake.swift;
+			path = SummaverickEveryday/Engine/ScreenAwake.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		7D622FF8905A1014A0F26E0A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_consolidate.h;
+			path = ../core/src/sve_consolidate.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		8108122AC683F0C05267E8CD = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SuggestionCard.swift;
+			path = SummaverickEveryday/Views/Today/SuggestionCard.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		85C17E3BCA69B1CF4F17F91A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = NotesNotifier.swift;
+			path = SummaverickEveryday/Engine/NotesNotifier.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		85C6DEF5C197B0C18C2FC34D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordControl.swift;
+			path = SummaverickWidgets/RecordControl.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		892E4DF51BC5A1D8EB706A7A = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.json.xcstrings;
+			name = Localizable.xcstrings;
+			path = SummaverickEveryday/Localizable.xcstrings;
+			sourceTree = SOURCE_ROOT;
+		};
+		8A6F757330F3179FB40BD3E2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SectionWriter.swift;
+			path = SummaverickEveryday/Engine/SectionWriter.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		8B7A0A18322F15224FEF40CC = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_learn.h;
+			path = ../core/src/sve_learn.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		8C247BC7003BBE5F71E1479C = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.plist.xml;
+			name = Info.plist;
+			path = SummaverickEveryday/Info.plist;
+			sourceTree = SOURCE_ROOT;
+		};
+		8E2A14BEAEE07F5369F65BB8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = App.swift;
+			path = SummaverickEveryday/App.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		8EDD6E0FBF1E227C55F144C7 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_medcheck.cpp;
+			path = ../core/src/sve_medcheck.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		8F55E78D0CAB65A7B800E45B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingController.swift;
+			path = SummaverickEveryday/Audio/RecordingController.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		91B7437CBCDFB5FF9D4AD20B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = TimelineView.swift;
+			path = SummaverickEveryday/Views/DeepDive/TimelineView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		92BE6C4CC02BDF7B9FDAE1B6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ProfileSetupView.swift;
+			path = SummaverickEveryday/Views/Profile/ProfileSetupView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		92C96DB63D6AC206F247279B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AIStatusViews.swift;
+			path = SummaverickEveryday/Views/Components/AIStatusViews.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		9C35A7555407BE9AE72D84A6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingIntentLogic.swift;
+			path = Shared/RecordingIntentLogic.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		9E2ACA831A68C5FC7568EFA9 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_context.cpp;
+			path = ../core/src/sve_context.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		A134B997A05BEC16D4B96325 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_audio.cpp;
+			path = ../core/src/sve_audio.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		A2C4910B70238965992017BD = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_prompts.h;
+			path = ../core/src/sve_prompts.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		A86FAE556CC5799B0918F5A7 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_whisper_text.h;
+			path = ../core/src/sve_whisper_text.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		ACA29E21DABD1A9615823569 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_textmatch.h;
+			path = ../core/src/sve_textmatch.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		AD68489E0874E658C08E370A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_assemble.cpp;
+			path = ../core/src/sve_assemble.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		ADEEFA19D57BA7D03687B2E4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ProfileView.swift;
+			path = SummaverickEveryday/Views/Profile/ProfileView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		B05E051B8E13E602C77A96F0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ModelManager.swift;
+			path = SummaverickEveryday/Engine/ModelManager.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		B3E4E6855986B5C184497144 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_threads.h;
+			path = ../core/src/sve_threads.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		B73E8BA827374C55E1066D30 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_whisper_stubs.cpp;
+			path = ../core/src/sve_whisper_stubs.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		B785295E08BF51AAC35D02B4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_extract.h;
+			path = ../core/src/sve_extract.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		B891D708008B28F0B0C18AF3 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_onepass.h;
+			path = ../core/src/sve_onepass.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		B9675BF203CCF71683907580 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = OvernightWork.swift;
+			path = SummaverickEveryday/Engine/OvernightWork.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		BB1E4AFCC74F3BEAC626FF50 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_embed.cpp;
+			path = ../core/src/sve_embed.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		BB44682AB82F093499931FDE = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_audio.h;
+			path = ../core/src/sve_audio.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		BF13700FB4F0D5393BB27A22 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_brainmap.h;
+			path = ../core/src/sve_brainmap.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		C0100A508E690127735ED8DF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = TodayView.swift;
+			path = SummaverickEveryday/Views/Today/TodayView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		C30CC5397DAA09FBACA85197 = {
+			isa = PBXFileReference;
+			lastKnownFileType = wrapper.xcframework;
+			name = llama.xcframework;
+			path = Frameworks/llama.xcframework;
+			sourceTree = SOURCE_ROOT;
+		};
+		C593582C209D99DB076F4AB2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ModelLogic.swift;
+			path = SummaverickEveryday/Engine/ModelLogic.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		C6DEBE1529DC279F11453BA2 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = "whisper-logging.h";
+			path = "../core/src/whisper-logging.h";
+			sourceTree = SOURCE_ROOT;
+		};
+		C6E38749CC30FE0501F34CE0 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_health.cpp;
+			path = ../core/src/sve_health.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		C9899E0B799571C7B3ED48D8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = MemoryCardView.swift;
+			path = SummaverickEveryday/Views/Memory/MemoryCardView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		CB86695FC323060A64BB0472 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_internal.h;
+			path = ../core/src/sve_internal.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		CCB0BF21AAE2BA7678F1B398 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_sections.h;
+			path = ../core/src/sve_sections.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		D33329CA9BC22DD71B50DCDA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = "ggml-cpp.h";
+			path = "../core/src/ggml-cpp.h";
+			sourceTree = SOURCE_ROOT;
+		};
+		D3DFAF817EC8F3EB79853B54 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_store.h;
+			path = ../core/src/sve_store.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		D58A3AD4F6AD27CF4A2AB3D8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = RecordingPulseView.swift;
+			path = SummaverickEveryday/Views/Components/RecordingPulseView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		D84ADCB93009100271D599EA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_chat.cpp;
+			path = ../core/src/sve_chat.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		D93A42C45E9E61B243ADE3F8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ShrutiRecognizer.swift;
+			path = SummaverickEveryday/Engine/ShrutiRecognizer.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		D9FD28DA2706A5CCE79B0A3D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_whisper_text.cpp;
+			path = ../core/src/sve_whisper_text.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		DAD9D4F5BE940D31ED604618 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = MemoryModels.swift;
+			path = SummaverickEveryday/Engine/MemoryModels.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		DB74CF4044569BF171D6037F = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_sections.cpp;
+			path = ../core/src/sve_sections.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		DCE021A147EA4FBC88B74354 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = SettingsView.swift;
+			path = SummaverickEveryday/Views/SettingsView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		E5E3C7E62C1B0998F7D272BF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_suggest.h;
+			path = ../core/src/sve_suggest.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		E6063C3DF54DA54ED6DC32F1 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = BrainMapView.swift;
+			path = SummaverickEveryday/Views/Map/BrainMapView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		E6FD595D542BBAD86BA1B59B = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_context.h;
+			path = ../core/src/sve_context.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		EAF88B4A3FB9A8689FADBD2C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = AskView.swift;
+			path = SummaverickEveryday/Views/Ask/AskView.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		EB4D643757F8467F78873D27 = {
+			isa = PBXFileReference;
+			explicitFileType = "wrapper.app-extension";
+			includeInIndex = 0;
+			path = SummaverickWidgets.appex;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		ED74DFB438437AA10CDB5F3C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_chat.h;
+			path = ../core/src/sve_chat.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		EE7D0A38215CFAEEF0A0E2BE = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_extract.cpp;
+			path = ../core/src/sve_extract.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		EFA847D5450308230934F05A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_llm.h;
+			path = ../core/src/sve_llm.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		F553EEBE59EAE5FCD3D4B7D8 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_embed.h;
+			path = ../core/src/sve_embed.h;
+			sourceTree = SOURCE_ROOT;
+		};
+		F66379AE26FB07E2A8BA2BDA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = NoteMemoriesSection.swift;
+			path = SummaverickEveryday/Views/Memory/NoteMemoriesSection.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		F76CFB3FA4C8F8FBA28F7976 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = MapModels.swift;
+			path = SummaverickEveryday/Engine/MapModels.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		FB9B4C78668184CF16F3ABA6 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = LiveTranscriber.swift;
+			path = SummaverickEveryday/Engine/LiveTranscriber.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		FC581254F5C135DB22FD9C42 = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			name = Assets.xcassets;
+			path = SummaverickEveryday/Assets.xcassets;
+			sourceTree = SOURCE_ROOT;
+		};
+		FC685B2FB5E51229E33B1F2C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			name = ReminderScheduler.swift;
+			path = SummaverickEveryday/Engine/ReminderScheduler.swift;
+			sourceTree = SOURCE_ROOT;
+		};
+		FD43ABF38FDE3588E4F5E2FB = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = "whisper-arch.h";
+			path = "../core/src/whisper-arch.h";
+			sourceTree = SOURCE_ROOT;
+		};
+		FDA9E084D501D8D1690658ED = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = sve_suggest.cpp;
+			path = ../core/src/sve_suggest.cpp;
+			sourceTree = SOURCE_ROOT;
+		};
+		FF0A638FF345E77C239C08DA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = sve_health.h;
+			path = ../core/src/sve_health.h;
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		424153ED3CD079DB4DB459AF = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A14D701700FCEA89C5B0F439,
+				2ED95E8479D9CD965A84AD5D,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CBF680522761010FEF9A3105 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		14170FB9E149C3DD932A78DD = {
+			isa = PBXGroup;
+			children = (
+				60C1139DF3355429822F7043,
+				91B7437CBCDFB5FF9D4AD20B,
+				613ACEA909B6A4FB1BE80F73,
+			);
+			name = Views/DeepDive;
+			sourceTree = "<group>";
+		};
+		25B8EA0EC84CD169EC13005D = {
+			isa = PBXGroup;
+			children = (
+				520311627B984B6D041E58B4,
+			);
+			name = Security;
+			sourceTree = "<group>";
+		};
+		3A82B61681BFF18BB638B388 = {
+			isa = PBXGroup;
+			children = (
+				92C96DB63D6AC206F247279B,
+				393C976A09F0C61C5B20B9DE,
+				D58A3AD4F6AD27CF4A2AB3D8,
+			);
+			name = Views/Components;
+			sourceTree = "<group>";
+		};
+		3EC16C5E440AEDC2F8EC5F6A = {
+			isa = PBXGroup;
+			children = (
+				C9899E0B799571C7B3ED48D8,
+				7935477EC4D13C03471CB46B,
+				F66379AE26FB07E2A8BA2BDA,
+			);
+			name = Views/Memory;
+			sourceTree = "<group>";
+		};
+		518DA81DB9B99529C0C0AEBE = {
+			isa = PBXGroup;
+			children = (
+				82CF2A43A7100F086D7FCFDD,
+				9CB302E9C7F6377B351DBEAB,
+				EC78298F69778BA6D4D34D39,
+				DA3EB179D6EE613492F299B1,
+				649F037DD903349A9F8F2971,
+				547D009064F7C3F13BEF3460,
+			);
+			sourceTree = "<group>";
+		};
+		547D009064F7C3F13BEF3460 = {
+			isa = PBXGroup;
+			children = (
+				2029A639DD8022543C17416B,
+				EB4D643757F8467F78873D27,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6089C6FE5C91A9ED59F5EAFE = {
+			isa = PBXGroup;
+			children = (
+				58C590454FC63BC4EDF7F18D,
+				E6063C3DF54DA54ED6DC32F1,
+			);
+			name = Views/Map;
+			sourceTree = "<group>";
+		};
+		649F037DD903349A9F8F2971 = {
+			isa = PBXGroup;
+			children = (
+				C30CC5397DAA09FBACA85197,
+				25C0B7015E31FCB834431FF0,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		68491ED0F099EABFEEBED4FC = {
+			isa = PBXGroup;
+			children = (
+				69DFE9A274CA05C81C452276,
+				678A49AA9B002AAA3E2FC364,
+				45B50ED11A0933F793CD181E,
+				618A438B4C8E5391746526C9,
+				32B4ECFC6F6AC631FDE8CCFB,
+				3E8C99285C2BD28FE0ECE99B,
+				13A63ABDA892EF2D8A1A560A,
+				515BBF6A31C68F3F903DB724,
+				FB9B4C78668184CF16F3ABA6,
+				F76CFB3FA4C8F8FBA28F7976,
+				DAD9D4F5BE940D31ED604618,
+				C593582C209D99DB076F4AB2,
+				B05E051B8E13E602C77A96F0,
+				85C17E3BCA69B1CF4F17F91A,
+				B9675BF203CCF71683907580,
+				2E361774B975154A11567968,
+				FC685B2FB5E51229E33B1F2C,
+				7BBE0833144762A6B70A1FCF,
+				8A6F757330F3179FB40BD3E2,
+				D93A42C45E9E61B243ADE3F8,
+				0B08BF124CD0B2571A98FABA,
+			);
+			name = Engine;
+			sourceTree = "<group>";
+		};
+		82CF2A43A7100F086D7FCFDD = {
+			isa = PBXGroup;
+			children = (
+				8E2A14BEAEE07F5369F65BB8,
+				D8254DAFFA2E6457E23C3B03,
+				68491ED0F099EABFEEBED4FC,
+				25B8EA0EC84CD169EC13005D,
+				9808AA3855D4662F673FBFD8,
+				BECA9321D0D66DAD007659AB,
+				3A82B61681BFF18BB638B388,
+				14170FB9E149C3DD932A78DD,
+				6089C6FE5C91A9ED59F5EAFE,
+				3EC16C5E440AEDC2F8EC5F6A,
+				DA0A32E81D9A4713BC65BFBC,
+				BEBE7E84826B6F21349BCBB4,
+				F86C9C201E773F26CECBA845,
+				29A1CD6197C4EBF318C20726,
+				8C247BC7003BBE5F71E1479C,
+				FC581254F5C135DB22FD9C42,
+				287ECA324ED50C0FEF7A6604,
+				69021175FE455DA46F1832CA,
+				892E4DF51BC5A1D8EB706A7A,
+			);
+			name = SummaverickEveryday;
+			sourceTree = "<group>";
+		};
+		9808AA3855D4662F673FBFD8 = {
+			isa = PBXGroup;
+			children = (
+				3127CE4AFD13AD5C3FEDC05B,
+				72401EE38712FDE00FD629BF,
+				4E9F0134C12B9B82D2B2A856,
+				63A8A83C123E5491CBE9E84F,
+				5B6316DBD705D039EA15B281,
+				DCE021A147EA4FBC88B74354,
+			);
+			name = Views;
+			sourceTree = "<group>";
+		};
+		9CB302E9C7F6377B351DBEAB = {
+			isa = PBXGroup;
+			children = (
+				2CC5EFA566DA98ADF20EDEAF,
+				9C35A7555407BE9AE72D84A6,
+				65E363A7B54CBC6FC72BFA66,
+				4EC1FF35F8179A094C3AB745,
+				647DAFDDC9793F2E68970D6F,
+			);
+			name = Shared;
+			sourceTree = "<group>";
+		};
+		BEBE7E84826B6F21349BCBB4 = {
+			isa = PBXGroup;
+			children = (
+				4AF174E3AE529342FF2A9846,
+				6FBD9F3DE594670E26D165EC,
+			);
+			name = Views/Setup;
+			sourceTree = "<group>";
+		};
+		BECA9321D0D66DAD007659AB = {
+			isa = PBXGroup;
+			children = (
+				EAF88B4A3FB9A8689FADBD2C,
+			);
+			name = Views/Ask;
+			sourceTree = "<group>";
+		};
+		D8254DAFFA2E6457E23C3B03 = {
+			isa = PBXGroup;
+			children = (
+				43130EEACCC981C89B012095,
+				40CF89C460C8558DF1531E3B,
+				8F55E78D0CAB65A7B800E45B,
+			);
+			name = Audio;
+			sourceTree = "<group>";
+		};
+		DA0A32E81D9A4713BC65BFBC = {
+			isa = PBXGroup;
+			children = (
+				495D5704B2E625A6B8DE2E7E,
+				62C33D8D9F694DDB9C315DDC,
+				92BE6C4CC02BDF7B9FDAE1B6,
+				ADEEFA19D57BA7D03687B2E4,
+			);
+			name = Views/Profile;
+			sourceTree = "<group>";
+		};
+		DA3EB179D6EE613492F299B1 = {
+			isa = PBXGroup;
+			children = (
+				D33329CA9BC22DD71B50DCDA,
+				AD68489E0874E658C08E370A,
+				21B1E44867FA3470B2C4DD71,
+				0A726C07BA65E563FB374790,
+				A134B997A05BEC16D4B96325,
+				BB44682AB82F093499931FDE,
+				491BB1ADB53C5E2A1F0AF6C8,
+				41993960BC863990F7951208,
+				BF13700FB4F0D5393BB27A22,
+				68019339B3FB26EF022BB32A,
+				D84ADCB93009100271D599EA,
+				ED74DFB438437AA10CDB5F3C,
+				4AC8F8DF35A4A27C32F64762,
+				7D622FF8905A1014A0F26E0A,
+				9E2ACA831A68C5FC7568EFA9,
+				E6FD595D542BBAD86BA1B59B,
+				3C94D64FE92A566816D76B43,
+				BB1E4AFCC74F3BEAC626FF50,
+				F553EEBE59EAE5FCD3D4B7D8,
+				10A99A9004D029F7A08C362A,
+				EE7D0A38215CFAEEF0A0E2BE,
+				B785295E08BF51AAC35D02B4,
+				C6E38749CC30FE0501F34CE0,
+				FF0A638FF345E77C239C08DA,
+				CB86695FC323060A64BB0472,
+				1FB58A118DF0A48276B00C59,
+				8B7A0A18322F15224FEF40CC,
+				1E7DCC7C328B39763C50AB6C,
+				EFA847D5450308230934F05A,
+				8EDD6E0FBF1E227C55F144C7,
+				6013C41549784B5FC55E61C4,
+				7098A4559C0419D83AAB1B2A,
+				428A09CCDB67F6F77A72F81A,
+				319F1F8813F1FD9E2E508A64,
+				B891D708008B28F0B0C18AF3,
+				5E1A2B3C4D5E6F7081920A1C,
+				5E1A2B3C4D5E6F7081920A1D,
+				2F4911A292E905F157B99F3B,
+				A2C4910B70238965992017BD,
+				DB74CF4044569BF171D6037F,
+				CCB0BF21AAE2BA7678F1B398,
+				171A4CC9E4CFD6CB1704585A,
+				D3DFAF817EC8F3EB79853B54,
+				FDA9E084D501D8D1690658ED,
+				E5E3C7E62C1B0998F7D272BF,
+				6F60E66F2FF8D363A05C6C95,
+				ACA29E21DABD1A9615823569,
+				B3E4E6855986B5C184497144,
+				B73E8BA827374C55E1066D30,
+				D9FD28DA2706A5CCE79B0A3D,
+				A86FAE556CC5799B0918F5A7,
+				FD43ABF38FDE3588E4F5E2FB,
+				C6DEBE1529DC279F11453BA2,
+				2536A2BB503827DD0CF5891A,
+			);
+			name = Core;
+			sourceTree = "<group>";
+		};
+		EC78298F69778BA6D4D34D39 = {
+			isa = PBXGroup;
+			children = (
+				85C6DEF5C197B0C18C2FC34D,
+				33C50C60642D8852C316CF41,
+				05DE663E1F9B875F3C1ABC94,
+				52C1022F6F542158C732AD92,
+			);
+			name = SummaverickWidgets;
+			sourceTree = "<group>";
+		};
+		F86C9C201E773F26CECBA845 = {
+			isa = PBXGroup;
+			children = (
+				8108122AC683F0C05267E8CD,
+				C0100A508E690127735ED8DF,
+			);
+			name = Views/Today;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E157114D15F9748EC61C3AF0 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B429FCF8E65333911689421;
+			buildPhases = (
+				220C0D6758212FE888A01291,
+				CBF680522761010FEF9A3105,
+				B2EB01E0E895CE4CFAAEAFC4,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SummaverickWidgets;
+			productName = SummaverickWidgets;
+			productReference = EB4D643757F8467F78873D27;
+			productType = "com.apple.product-type.app-extension";
+		};
+		E3435DDA2687639586BF0B70 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 354589B28580510B6EC24620;
+			buildPhases = (
+				7A70D71C385290AF96BF1031,
+				424153ED3CD079DB4DB459AF,
+				285BB1C1430063331E9F5DD0,
+				BAE1492BDE49D13FF7E211EB,
+				13E535E01ED8244C50D6933B,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BDD53957708D5CF6438C13EB,
+			);
+			name = SummaverickEveryday;
+			productName = SummaverickEveryday;
+			productReference = 2029A639DD8022543C17416B;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46F86FAA6BBF9AC94A7E4595 = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 2720;
+				TargetAttributes = {
+					E157114D15F9748EC61C3AF0 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					E3435DDA2687639586BF0B70 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 1F4E3D13C2320EDA50221924;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				te,
+				Base,
+			);
+			mainGroup = 518DA81DB9B99529C0C0AEBE;
+			productRefGroup = 547D009064F7C3F13BEF3460;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E3435DDA2687639586BF0B70,
+				E157114D15F9748EC61C3AF0,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		285BB1C1430063331E9F5DD0 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				334316FE5AD49DBFE79A28C1,
+				F537C5DA2B9ED38A363F872D,
+				E1A865BA6F70AD42A421A43D,
+				B939673027A07B580BF6B7A1,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B2EB01E0E895CE4CFAAEAFC4 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D24548A80F6EDBB04A261E7D,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		220C0D6758212FE888A01291 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E7D376B796A9DEC0100AD23,
+				287BB893A1AA69C067C08137,
+				A8D78741F45FACAC32C29FBB,
+				C6AAA9F998388DF8734C616C,
+				CFAE66CBEA2F64C482C52CCD,
+				A1CD78667A723270125077DD,
+				E9A17DB1C732407CC6C7359F,
+				C5A170B71BA26E9C67BBD6BF,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A70D71C385290AF96BF1031 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DB8B42E9546B01810DFCAE5A,
+				A5B14A3A01B9BFEF4EB193D3,
+				1970E5A56D56F7BC7ACE9401,
+				9A5EA1AFF3F67FA08253F534,
+				53208D279FD7D4526A01C523,
+				4F09E9A49F6F264A6E0572C7,
+				C23AA49A9EE82365B4F4B783,
+				7DF93800DB3C9D1EB735C3CD,
+				535ACB83EDFCFBACA1FD4F3C,
+				B3682618E8A7DB35FCEEE996,
+				1E01B2EFF4A31A1034B15098,
+				B73BD37B74FFE5DE3C398EE9,
+				F8E97681421A53898F3C82E0,
+				3F3EF1BBEFE445AAA7E90A0E,
+				832433C1965C36667340EE3B,
+				A062B0CDA53604F5D8A7D47D,
+				5997944FB95EF3E94D57974F,
+				DC63BBC908E702BC81A8A6F1,
+				1794160D386E91967AC6CD24,
+				5809D5B858D8CE07F8518B8C,
+				74F26ED096628426F957DD0E,
+				6A4AAC44A2B9990D006E4C28,
+				408386E2C748923A7048D478,
+				0265346915ED5E206E1A6538,
+				C2AF1244993225350DDBDC94,
+				E38796377CD701DE27D4E42D,
+				ECB5419178B062460383B28A,
+				24F70CD5F7748FDEB63B8BB1,
+				82BAF8328F881FAFD6AEC039,
+				8FB71A3DAC10CCF263B21175,
+				9543CFE6FE3AF9374A448E0F,
+				B65B60C3D1ED1A91BF301F39,
+				7145186EECA51AD6A675CA64,
+				25A6412A3165EE7261515DB6,
+				D4AD48D249A728A25E657B64,
+				D9865442550D6A995B0F4FDB,
+				CCE03DBE92FEAE25E86430F5,
+				23C44AF0CB03B5875E813B5F,
+				8E779B106668C15FE8259AA8,
+				C6FD0A316798F1839A28EADE,
+				F5DF4BFB0174304CA2197095,
+				F7662F48E1C4D62499CCA46C,
+				E0F7CCE6E724B4A99DCD35CB,
+				EAE1FEBFAD37F08A0E5AF91D,
+				CC6072ABC305C2EE3EDCFF78,
+				E374920B948422FA0FDEBA74,
+				A98A4FF70B48BB38E9507E50,
+				8D4A6C6E4B479FCA91F91BA9,
+				BA9D2ACC5550BEBF951BB462,
+				1D93FAC83E0C239CDE7EBB43,
+				908F929CC6113FA25B46EE92,
+				DD6F72C30ED5F9B5F7BCA8E3,
+				8C85B5FFFB6330BA125F9177,
+				E3B6ED99E22E4B0C0EC884D9,
+				CCABCA4B3E738FCE0399D402,
+				11C62DBEE92DAE5BAA003ED9,
+				9693178312F307734DAC8F40,
+				2DE36113806377CB352E5A8E,
+				8FE69873EC9B753B9C62DD98,
+				1D9397B49E2B55EDE5DC3560,
+				66567DD2A6C40F6BC6CB1C24,
+				5F2B5F64B097A11CAB54B85B,
+				7CD85F6783D894B9047A2C67,
+				AD33A465D5C223FBF7C16E07,
+				07C4BA787A10CB869B855E1D,
+				02B6E8042D07B8525DD08CA0,
+				DACFC767C169503E4AB3CA4F,
+				98CC0908F97C13DBC19A09B5,
+				23A9062ED9C13C47A0044495,
+				5E1A2B3C4D5E6F7081920A1B,
+				DC72AABB07924C733D349BA4,
+				FA89EFDB7CFDC888DE748CAB,
+				CE05B940BCBE599A11AE22E8,
+				DC70A4770243CC1CA714EEB5,
+				6676C0DB08957FBDC042C54F,
+				BBE1E8050D9A57E38FEDD25D,
+				F18AE8B08BB5C071DD06E7B6,
+				F7AB124BF9505B6A6F0DB63E,
+				7930BD02F74FE1E998D43E14,
+				AECF9004BF6C64F9CF4640B9,
+				F4F570D994C6AAFF90AECBAF,
+				38CB1246A85B0C24B1334947,
+				02483ED28A106C83F67E1A8A,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BDD53957708D5CF6438C13EB = {
+			isa = PBXTargetDependency;
+			target = E157114D15F9748EC61C3AF0;
+			targetProxy = 736D1CE29F0780E279650A2F;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		65835F7B11D67B8CB1AC5A3F = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SummaverickWidgets/SummaverickWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SummaverickWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					SVE_WIDGET_EXTENSION,
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+		6D570E41BB43EE5D285D70ED = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SummaverickEveryday/SummaverickEveryday.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"SVE_WITH_WHISPER=1",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../core/include",
+					"$(SRCROOT)/../core/src",
+					"$(BUILT_PRODUCTS_DIR)/llama.framework/Headers",
+				);
+				INFOPLIST_FILE = SummaverickEveryday/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = SummaverickEveryday/Bridging.h;
+				SWIFT_OBJC_INTEROP_MODE = objc;
+			};
+			name = Release;
+		};
+		910C8E6AE2795D16935CA039 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = NO;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CC317D9E164283CAFD144796 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = SummaverickWidgets/SummaverickWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SummaverickWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					SVE_WIDGET_EXTENSION,
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		D67D94EB8973E00BE54AD468 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SummaverickEveryday/SummaverickEveryday.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"SVE_WITH_WHISPER=1",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../core/include",
+					"$(SRCROOT)/../core/src",
+					"$(BUILT_PRODUCTS_DIR)/llama.framework/Headers",
+				);
+				INFOPLIST_FILE = SummaverickEveryday/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.summaverick.everyday;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = SummaverickEveryday/Bridging.h;
+				SWIFT_OBJC_INTEROP_MODE = objc;
+			};
+			name = Debug;
+		};
+		F4515B5446C52B968D7B9D64 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = NO;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 3JVSNB8RYM;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F4E3D13C2320EDA50221924 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				910C8E6AE2795D16935CA039,
+				F4515B5446C52B968D7B9D64,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		354589B28580510B6EC24620 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D67D94EB8973E00BE54AD468,
+				6D570E41BB43EE5D285D70ED,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B429FCF8E65333911689421 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC317D9E164283CAFD144796,
+				65835F7B11D67B8CB1AC5A3F,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595;
+}
