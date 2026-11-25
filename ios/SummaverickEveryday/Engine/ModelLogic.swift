@@ -1011,6 +1011,18 @@ enum NoteCheck {
     }
 
     static func key(_ noteID: Int64) -> String { "verify.\(noteID)" }
+
+    /// The run's verdict line: checks still owed; checked with nothing to look at; or how many items need a look
+    /// (the parts marked "Please check" with their lines, flagged memories and action items). Nil for notes never
+    /// checked (written before the checking agent, or a check given up after repeated failures).
+    static func status(pending: Bool, report: Report?) -> (text: String, symbol: String)? {
+        if pending { return (String(localized: "Notes available · checks pending"), "clock") }
+        guard let r = report, !r.isCancelled else { return nil }
+        let flaggedParts = (r.parts ?? [:]).values.filter(\.please_check)
+        let items = flaggedParts.reduce(0) { $0 + max(1, $1.items?.count ?? 0) } + (r.memories_flagged ?? 0) + (r.actions_flagged ?? 0)
+        if items == 0 { return (String(localized: "Checked against the recording"), "checkmark.seal") }
+        return (String(localized: "Finished · \(items) items need review"), "exclamationmark.circle")
+    }
     static func report(_ json: String) -> Report? {
         guard let d = json.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(Report.self, from: d)
@@ -1027,6 +1039,7 @@ enum NoteCheck {
             case "language": return String(localized: "Parts may not be in your language.")
             case "grounded": return String(localized: "Some decisions or action items may not be in the recording.")
             case "owner": return String(localized: "Some action items may name the wrong person.")
+            case "meaning": return String(localized: "Some decisions may say the opposite of what was said.")
             case "noise": return String(localized: "Some lines may repeat or come from background noise.")
             case "answerable": return String(localized: "Some questions may not be answered by the recording.")
             default: return nil

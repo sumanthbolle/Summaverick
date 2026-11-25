@@ -18,7 +18,9 @@ Hard rules. Each one is enforced in code, not just policy.
 | No model on the Mac for testing. | Core tests use only `clang++` and SQLite, and the model-free API check. Model runs happen on the phone. |
 | Plain voice for medicine, privacy, consent, "Delete everything". | Voice guide, "Where the voice stays plain" |
 
-Other privacy rules: audio is deleted after a retention window (7 days default), notes stay until the person deletes them, model files are excluded from iCloud backup, and the app is behind Face ID / passcode (`Security/AppLock.swift`).
+Other privacy rules: audio is deleted a retention window (7 days default) after its usable transcript was saved (`notes.transcribed_at`; a recording still waiting to be transcribed is never removed by age), notes stay until the person deletes them, the `Summaverick` and `Chats` folders (notes database, recordings, transcript checkpoints, chats, activity log) and the model files are excluded from iCloud and computer backups (`PrivateStorage` in `Security/AppLock.swift`, at every launch), "Delete everything" succeeds only when no note and no file in the recordings folder is left, and the app is behind Face ID / passcode (`Security/AppLock.swift`).
+
+Checking agent: a note's outputs are owed a check from the moment they are stored (`ProcessingPipeline.checksDue`, kept across launches). A hot phone, a stop, a failure or a closed app leaves the check due; the resume loop runs it later on the stored outputs. The note shows "Notes available · checks pending" until there is a verdict ("Checked against the recording", or "Finished · N items need review"). A check that fails 3 times is given up and the note claims no verdict. The verifier (`core/src/sve_verify.cpp`) checks every number first, also in a one-word answer, and flags a decision whose closest transcript clause has the opposite polarity ("did not approve" against "approved") unless the judge confirms it.
 
 ## 2. Layers
 

@@ -40,9 +40,14 @@ std::vector<std::string> decision_action_lines(const std::string &notes);
 
 // Content words of `line` (match_tokens, 4+ letters, stop words and the notes' own filler left out) found in the
 // transcript: at least 75% of them, and every number. Fewer than two content words: true (nothing to measure).
-// said_check: 1 said, 0 not enough words found (a yes/no check decides), -1 a number never said (fails in code).
+// said_check: 1 said, 0 not enough words found (a yes/no check decides), -1 a number never said (fails in code),
+// -2 said with the opposite meaning (only a judge "yes" clears it).
 int said_check(const std::string &line, const json &pieces);
 bool said_in(const std::string &line, const json &pieces);
+// negated: the clause says "not", "never", "n't", "లేదు"... ; polarity_conflict: the closest transcript clause has the
+// opposite polarity ("did not approve" against "approved"). said_check returns -2 for such a line.
+bool negated(const std::string &clause);
+bool polarity_conflict(const std::string &line, const json &pieces);
 
 // A decision or action line naming one speaker of the transcript while the line it comes from (the most words in
 // common, the names left out) was said by another, who did not give it to them: that speaker, else "".

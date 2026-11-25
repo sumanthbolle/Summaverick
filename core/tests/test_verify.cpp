@@ -243,3 +243,55 @@ TEST(verify_worker_material_and_feedback) {
     const std::string fb = feedback_for("summary", {{"noise", "Meet the vendor about ChargeBee"}}, "English", noise_terms(p, vocab));
     CHECK(fb.find("never said") != std::string::npos && fb.find("ChargeBee") != std::string::npos);
 }
+
+// Review 2026-11-25: a decision that reverses the recording passed on word overlap, and a bare number
+// passed as an answer because short answers skipped the number check.
+TEST(verify_reversed_decision_is_caught) {
+    const json p = json::array({
+        {{"start_sec", 0}, {"text", "Meera: The committee did not approve the budget increase."}},
+        {{"start_sec", 20}, {"text", "Meera: We will ask again in March."}},
+    });
+    CHECK_EQ(said_check("The committee did approve the budget increase", p), -2);
+    CHECK_EQ(said_check("The committee did not approve the budget increase", p), 1);
+    CHECK_EQ(said_check("The committee didn't approve the budget increase", p), 1);
+    // No judge: the reversed decision is flagged, not passed.
+    VerifyInput in;
+    in.lang = "en";
+    in.pieces = p;
+    int calls = 0, unjudged = 0;
+    const std::string notes = "## Decisions\n- The committee did approve the budget increase\n";
+    auto f = check_output("notes", notes, in, nullptr, calls, unjudged);
+    CHECK_EQ(f.size(), (size_t)1);
+    if (!f.empty()) CHECK_EQ(f[0].check, "meaning");
+    // A judge that says no keeps it flagged; one that says yes clears it.
+    const ModelFn no = [](const std::string &, const std::string &, const std::string &, int, std::string &o) { o = "no"; return true; };
+    const ModelFn yes = [](const std::string &, const std::string &, const std::string &, int, std::string &o) { o = "yes"; return true; };
+    calls = 0;
+    CHECK_EQ(check_output("notes", notes, in, no, calls, unjudged).size(), (size_t)1);
+    calls = 0;
+    CHECK(check_output("notes", notes, in, yes, calls, unjudged).empty());
+}
+
+TEST(verify_negation_scope_is_the_clause) {
+    // "not this month, it moves to the 15th": the decision matches the second clause, which is not negated.
+    const json p = meeting();
+    CHECK_EQ(said_check("Launch moves to the 15th of next month", p), 1);
+    CHECK(!negated("The launch moves to the 15th"));
+    CHECK(negated("We did not approve it"));
+    CHECK(negated("ఆమోదం ఇంకా రాలేదు"));
+    CHECK(!negated("Nothingness is a word"));
+}
+
+TEST(verify_bare_number_answer_needs_the_number) {
+    const json p = json::array({
+        {{"start_sec", 0}, {"text", "Asha: The budget increase was discussed but no figure was agreed."}},
+    });
+    CHECK_EQ(said_check("9000", p), -1);
+    VerifyInput in;
+    in.lang = "en";
+    in.pieces = p;
+    int calls = 0, unjudged = 0;
+    const auto f = check_output("questions", "Q1. How much is the increase?\nA1. 9000", in, nullptr, calls, unjudged);
+    CHECK_EQ(f.size(), (size_t)1);
+    if (!f.empty()) CHECK_EQ(f[0].check, "answerable");
+}
