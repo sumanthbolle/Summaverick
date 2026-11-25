@@ -333,21 +333,26 @@ bool negated(const std::string &clause) {
     return false;
 }
 
-// The clauses of the transcript: each piece split at , . ; : ! ? and "but".
+// A text's clauses: split at , . ; : ! ? and "but".
+std::vector<std::string> split_clauses(const std::string &text) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (size_t i = 0; i <= text.size(); ++i) {
+        const bool end = i == text.size() || std::strchr(",.;:!?", text[i]) || (text.compare(i, 5, " but ") == 0);
+        if (!end) { cur += text[i]; continue; }
+        if (!trim(cur).empty()) out.push_back(trim(cur));
+        cur.clear();
+        if (i < text.size() && text[i] == ' ') i += 3;   // past " but"
+    }
+    return out;
+}
+
+// The clauses of the transcript: each piece's.
 std::vector<std::string> clauses_of(const json &pieces) {
     std::vector<std::string> out;
     if (!pieces.is_array()) return out;
-    for (const auto &p : pieces) {
-        std::string text = jstr(p, "text"), cur;
-        for (size_t i = 0; i <= text.size(); ++i) {
-            const bool end = i == text.size() || std::strchr(",.;:!?", text[i]) ||
-                             (text.compare(i, 5, " but ") == 0);
-            if (!end) { cur += text[i]; continue; }
-            if (!trim(cur).empty()) out.push_back(trim(cur));
-            cur.clear();
-            if (i < text.size() && text[i] == ' ') i += 3;   // past " but"
-        }
-    }
+    for (const auto &p : pieces)
+        for (auto &c : split_clauses(jstr(p, "text"))) out.push_back(std::move(c));
     return out;
 }
 
@@ -392,7 +397,17 @@ bool undecided_conflict(const std::string &line, const json &pieces) {
     return false;
 }
 
+bool clause_polarity_conflict(const std::string &line, const json &pieces);
+
+// Clause by clause: "decided for the 15th, not this month" is two claims, and a clause too short to measure
+// ("not this month") never makes the whole line read as negated (measured 2026-11-26, team_meeting).
 bool polarity_conflict(const std::string &line, const json &pieces) {
+    for (const auto &c : split_clauses(line))
+        if (clause_polarity_conflict(c, pieces)) return true;
+    return false;
+}
+
+bool clause_polarity_conflict(const std::string &line, const json &pieces) {
     const std::vector<std::string> w = content_tokens(line);
     if (w.size() < 2) return false;
     size_t best = 0;
