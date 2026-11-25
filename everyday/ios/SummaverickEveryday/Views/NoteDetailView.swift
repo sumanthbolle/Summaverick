@@ -615,6 +615,18 @@ struct NoteDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Please check").font(.headline)
                     ForEach(NoteCheck.reasons(p), id: \.self) { Text($0).font(.body) }
+                    // Each flagged line with where the recording says it: tap to hear that passage.
+                    ForEach((p.evidence ?? []).filter { $0.startSec != nil }, id: \.self) { e in
+                        Button { playMoment(noteID, e.startSec ?? 0) } label: {
+                            Label {
+                                Text(verbatim: "\(AssistantFormat.mmss(e.startSec ?? 0))  \(e.item)").lineLimit(2)
+                            } icon: { Image(systemName: "play.circle") }
+                            .font(.footnote)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(minHeight: 44, alignment: .leading)
+                        .accessibilityLabel(Text("Listen at \(AssistantFormat.mmss(e.startSec ?? 0)): \(e.item)"))
+                    }
                     Text("I checked this against the recording and tried again, but could not be sure.")
                         .font(.footnote).foregroundStyle(Theme.secondary)
                 }
@@ -624,7 +636,7 @@ struct NoteDetailView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.cautionFill, in: RoundedRectangle(cornerRadius: 12))
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: (p.evidence ?? []).contains { $0.startSec != nil } ? .contain : .combine)
         } else if part != nil, let status = NoteCheck.status(pending: checksPending, report: check) {
             // The run's verdict, under every written output: honest about checks not run yet.
             Label(status.text, systemImage: status.symbol)

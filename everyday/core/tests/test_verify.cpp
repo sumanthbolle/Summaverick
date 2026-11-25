@@ -295,3 +295,107 @@ TEST(verify_bare_number_answer_needs_the_number) {
     CHECK_EQ(f.size(), (size_t)1);
     if (!f.empty()) CHECK_EQ(f[0].check, "answerable");
 }
+
+// Orchestrator review 2026-11-25: summary claims, relationships, agreement across outputs, evidence.
+namespace {
+json priya() {
+    return json::array({
+        {{"start_sec", 0}, {"text", "Ravi: Priya will review the budget on Friday. Approval is still pending."}},
+        {{"start_sec", 30}, {"text", "Kiran: I will book the hall for the launch."}},
+    });
+}
+const ModelFn kNo = [](const std::string &, const std::string &, const std::string &, int, std::string &o) { o = "no"; return true; };
+}  // namespace
+
+TEST(verify_undecided_conflict) {
+    const json p = priya();
+    CHECK(undecided("Approval is still pending"));
+    CHECK(undecided("Should we move the launch?"));
+    CHECK(!undecided("Priya will review the budget on Friday"));
+    CHECK(undecided_conflict("Priya approved the budget", p));
+    CHECK(!undecided_conflict("Budget approval is pending", p));     // says it is open: no conflict
+    CHECK(!undecided_conflict("Priya will review the budget on Friday", p) || said_check("Priya will review the budget on Friday", p) == 1);
+    CHECK_EQ(said_check("Priya approved the budget", p), -2);
+}
+
+TEST(verify_summary_claims_checked) {
+    const auto c = summary_claims("## Summary\nBudget approval is pending. Priya will review it on Friday!\n- Ok.");
+    CHECK_EQ(c.size(), (size_t)2);
+    VerifyInput in;
+    in.pieces = priya();
+    int calls = 0, unjudged = 0;
+    auto f = check_output("summary", "The team met. Priya approved the budget.", in, kNo, calls, unjudged);
+    CHECK_EQ(f.size(), (size_t)1);
+    if (!f.empty()) {
+        CHECK_EQ(f[0].check, "meaning");
+        CHECK_EQ(f[0].start_sec, (int64_t)0);   // the evidence: where the recording says it
+    }
+    calls = 0;
+    CHECK(check_output("summary", "Budget approval is pending. Priya will review it on Friday.", in, kNo, calls, unjudged).empty());
+}
+
+TEST(verify_conflicting_claims_across_outputs) {
+    std::vector<Claim> cl = {{"summary", "Budget approval is pending", 0},
+                             {"memory", "Priya approved the budget approval", 7},
+                             {"notes", "Book the hall for the launch Kiran", 0}};
+    auto pairs = conflicting_claims(cl);
+    CHECK_EQ(pairs.size(), (size_t)1);
+    if (!pairs.empty()) CHECK((pairs[0].first.id == 7) != (pairs[0].second.id == 7));
+    // One output's own lines never conflict with each other here.
+    CHECK(conflicting_claims({{"notes", "The budget is approved", 0}, {"notes", "The budget is not approved", 0}}).empty());
+}
+
+TEST(verify_relationships_meaning_who_consistency) {
+    VerifyInput in;
+    in.pieces = priya();
+    in.summary = "Budget approval is pending. Priya will review it on Friday.";
+    in.memories = json::array({
+        {{"id", 1}, {"text", "Priya approved the budget"}, {"quote", "Approval is still pending."}, {"start_sec", 0}, {"type", "decision"}, {"who", "Priya"}},
+        {{"id", 2}, {"text", "Priya will review the budget on Friday"}, {"quote", "Priya will review the budget on Friday."}, {"start_sec", 0}, {"type", "promise"}, {"who", "Priya"}},
+        {{"id", 3}, {"text", "Ravi will book the hall for the launch"}, {"quote", "I will book the hall for the launch."}, {"start_sec", 30}, {"type", "promise"}, {"who", "Ravi"}},
+        {{"id", 4}, {"text", "The hall costs a lot"}, {"quote", "I will book the hall for the launch."}, {"start_sec", 30}, {"type", "fact"}},
+    });
+    VerifyResult r = verify_outputs(in, kNo, nullptr, nullptr);
+    std::map<int64_t, std::string> got;
+    for (const auto &f : r.relation_flags) got[jint(f, "memory_id", 0)] = jstr(f, "check");
+    CHECK_EQ(got[1], "meaning");      // settled where the recording leaves it open
+    CHECK(!got.count(2));             // reviewing is what was said
+    CHECK_EQ(got[3], "who");          // Kiran said he would book the hall, not Ravi
+    CHECK(!got.count(4));             // a fact is not a relationship
+    CHECK(std::find(r.memories_flagged.begin(), r.memories_flagged.end(), json(1)) != r.memories_flagged.end());
+    bool ev = false;
+    for (const auto &e : r.evidence) ev = ev || (jstr(e, "part") == "relation" && jint(e, "id", 0) == 1 && !e.value("ok", true));
+    CHECK(ev);
+}
+
+TEST(verify_output_disagreeing_with_another_is_retried) {
+    // The summary says it is approved; the notes say it is pending. The summary disagrees with the transcript too:
+    // it is the one written again, with the disagreement as feedback.
+    VerifyInput in;
+    in.pieces = priya();
+    in.summary = "The budget approval was given.";
+    in.notes = "## Decisions\n- Budget approval is still pending\n";
+    std::vector<std::string> parts;
+    std::string fb;
+    const RewriteFn rewrite = [&](const std::string &part, int, int, const std::string &f, const std::vector<std::string> &, std::string &out) {
+        parts.push_back(part);
+        fb = f;
+        out = "Budget approval is still pending.";
+        return true;
+    };
+    VerifyResult r = verify_outputs(in, kNo, rewrite, nullptr);
+    CHECK(!parts.empty() && parts[0] == "summary");
+    CHECK(r.summary.find("pending") != std::string::npos);
+    for (const auto &v : r.parts) CHECK(!v.please_check);
+}
+
+TEST(verify_provisional_is_open_not_settled) {
+    // Measured 2026-11-26 (proposal_telugu): "the pricing is only provisional" says the matter is open, like the
+    // transcript's "not final yet"; it is no claim of a settled decision.
+    const json p = json::array({
+        {{"start_sec", 12}, {"text", "Anil: Proposal లో pricing ఇంకా final కాలేదు, provisional మాత్రమే."}},
+    });
+    CHECK(undecided("Pricing provisional మాత్రమే అని Anil తెలియజేశాడు."));
+    CHECK(!undecided_conflict("Pricing provisional మాత్రమే అని Anil తెలియజేశాడు.", p));
+    CHECK(undecided_conflict("The pricing is final", p));
+}

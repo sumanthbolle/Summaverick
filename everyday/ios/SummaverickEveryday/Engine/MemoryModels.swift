@@ -298,21 +298,35 @@ struct RelationLine: Decodable, Equatable, Hashable, Identifiable {
     var whoKind: String
     var quote: String?
     var startSec: Int?
+    /// The checking agent flagged it (sve_verify_note): "meaning" | "who" | "consistency"; nil when it passed.
+    var check: String?
+    /// Where the recording says it, for the flag.
+    var checkSec: Int?
 
     init(id: Int64, memoryID: Int64 = 0, text: String, who: String = "", whoKind: String = "nobody",
-         quote: String? = nil, startSec: Int? = nil) {
+         quote: String? = nil, startSec: Int? = nil, check: String? = nil, checkSec: Int? = nil) {
         self.id = id; self.memoryID = memoryID; self.text = text; self.who = who; self.whoKind = whoKind
-        self.quote = quote; self.startSec = startSec
+        self.quote = quote; self.startSec = startSec; self.check = check; self.checkSec = checkSec
+    }
+    /// Why the line needs a look, in plain words (nil: it passed the check).
+    var checkReason: String? {
+        switch check {
+        case "meaning": return String(localized: "The recording may say this differently, or as still open.")
+        case "who": return String(localized: "The recording may give this to someone else.")
+        case "consistency": return String(localized: "Another part of the note says otherwise.")
+        default: return nil
+        }
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.lenient(.id) ?? 0; memoryID = c.lenient(.memoryID) ?? 0; text = c.lenient(.text) ?? ""
         who = c.lenient(.who) ?? ""; whoKind = c.lenient(.whoKind) ?? "nobody"
         quote = c.lenient(.quote); startSec = c.lenient(.startSec)
+        check = c.lenient(.check); checkSec = c.lenient(.checkSec)
     }
     enum CodingKeys: String, CodingKey {
-        case id, text, who, quote
-        case memoryID = "memory_id", whoKind = "who_kind", startSec = "start_sec"
+        case id, text, who, quote, check
+        case memoryID = "memory_id", whoKind = "who_kind", startSec = "start_sec", checkSec = "check_sec"
     }
 }
 

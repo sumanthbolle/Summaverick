@@ -990,6 +990,14 @@ struct RelationsReviewCard: View {
                         .foregroundStyle(out ? Theme.secondary : Theme.text)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(whoLine(l, question: question)).font(.footnote).foregroundStyle(Theme.secondary)
+                    if !out, let reason = l.checkReason {
+                        // The checking agent's flag: why, and where the recording says it.
+                        Label {
+                            Text(verbatim: l.checkSec.map { "\(reason) (\(AssistantFormat.mmss($0)))" } ?? reason)
+                        } icon: { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.caution) }
+                        .font(.footnote)
+                        .foregroundStyle(Theme.text)
+                    }
                     if !out && needsWho(l) { whoChoices(l, question: question) }
                 }
             }

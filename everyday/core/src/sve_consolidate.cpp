@@ -748,6 +748,14 @@ json relation_reviews(Store &st) {
     for (const auto &n : st.relation_review_notes()) {
         const int64_t note_id = jint(n, "note_id", 0);
         json people = json::array(), decisions = json::array(), questions = json::array(), between = json::array();
+        // The checking agent's flags on the memories these lines come from (sve_verify_note's report): why the line
+        // needs a look (meaning | who | consistency) and where the recording says it.
+        std::map<int64_t, json> flags;
+        if (auto rep = st.setting_get("verify." + std::to_string(note_id))) {
+            const json j = json::parse(*rep, nullptr, false);
+            if (j.is_object() && j.contains("relation_flags") && j["relation_flags"].is_array())
+                for (const auto &f : j["relation_flags"]) flags[jint(f, "memory_id", 0)] = f;
+        }
         for (const auto &r : st.relations({{"note_id", note_id}, {"status", "pending"}})) {
             const std::string rel = jstr(r, "relation"), to_kind = jstr(r, "to_kind");
             if (rel == "involved_in") {
@@ -759,6 +767,11 @@ json relation_reviews(Store &st) {
                              {"who", fk == "me" ? "" : jstr(r, "from_name")},
                              {"who_kind", fk == "me" ? "me" : (jint(r, "from_topic", 0) > 0 ? "person" : "nobody")},
                              {"quote", r["quote"]}, {"start_sec", r["start_sec"]}};
+                auto fl = flags.find(jint(r, "memory_id", 0));
+                if (fl != flags.end()) {
+                    line["check"] = jstr(fl->second, "check");
+                    line["check_sec"] = fl->second.contains("start_sec") ? fl->second["start_sec"] : json(nullptr);
+                }
                 (rel == "decided" ? decisions : questions).push_back(line);
             } else if (rel == "told" || rel == "asked") {
                 between.push_back({{"id", r["id"]}, {"relation", rel},
