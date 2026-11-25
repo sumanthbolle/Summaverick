@@ -21,7 +21,7 @@ final class AudioRecorder {
     private var timer: Timer?
     private var startDate: Date?
 
-    static var recordingsDirectory: URL {
+    nonisolated static var recordingsDirectory: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Summaverick/recordings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -49,10 +49,32 @@ final class AudioRecorder {
         return nil
     }
 
-    /// Deletes a recording and the transcription progress saved next to it (TranscriptSidecar).
-    nonisolated static func removeAudio(atPath path: String) {
-        try? FileManager.default.removeItem(atPath: path)
-        TranscriptSidecar.remove(audioPath: path)
+    /// Deletes a recording and the transcription progress saved next to it (TranscriptSidecar). True when neither is
+    /// on disk afterwards (a file already gone counts as removed); false keeps the caller from forgetting the path, so
+    /// the removal can be tried again.
+    @discardableResult
+    nonisolated static func removeAudio(atPath path: String) -> Bool {
+        let fm = FileManager.default
+        let sidecar = TranscriptSidecar.path(forAudio: path)
+        for p in [path, sidecar] where fm.fileExists(atPath: p) {
+            do { try fm.removeItem(atPath: p) } catch {
+                ActivityLog.log("audio_remove_failed", ["file": (p as NSString).lastPathComponent, "error": "\((error as NSError).code)"])
+            }
+        }
+        return !fm.fileExists(atPath: path) && !fm.fileExists(atPath: sidecar)
+    }
+
+    /// Wipe: removes every file left in the recordings folder (recordings, checkpoints, leftovers of an interrupted
+    /// recording). True when the folder is empty afterwards.
+    nonisolated static func removeAllRecordings() -> Bool {
+        let fm = FileManager.default
+        let dir = recordingsDirectory
+        for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [] {
+            do { try fm.removeItem(at: f) } catch {
+                ActivityLog.log("audio_remove_failed", ["file": f.lastPathComponent, "error": "\((error as NSError).code)"])
+            }
+        }
+        return ((try? fm.contentsOfDirectory(atPath: dir.path)) ?? []).isEmpty
     }
 
     /// Ask's voice questions: short-lived WAVs, deleted after transcription and swept at launch.

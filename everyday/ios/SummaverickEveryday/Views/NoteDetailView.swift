@@ -13,6 +13,8 @@ struct NoteDetailView: View {
     @State private var note: Note?
     @State private var speed: SpeedRecord?
     @State private var check: NoteCheck.Report?
+    /// The outputs are stored and their check has not finished (ProcessingPipeline.checksDue).
+    @State private var checksPending = false
     enum MapMode: Hashable { case flow, graph }
     @State private var mapMode: MapMode = .flow
     @State private var loaded = false
@@ -623,6 +625,12 @@ struct NoteDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.cautionFill, in: RoundedRectangle(cornerRadius: 12))
             .accessibilityElement(children: .combine)
+        } else if part != nil, let status = NoteCheck.status(pending: checksPending, report: check) {
+            // The run's verdict, under every written output: honest about checks not run yet.
+            Label(status.text, systemImage: status.symbol)
+                .font(.footnote)
+                .foregroundStyle(Theme.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -636,6 +644,7 @@ struct NoteDetailView: View {
             speed = try? JSONDecoder().decode(SpeedRecord.self, from: data)
         }
         check = await CoreEngine.shared.setting(NoteCheck.key(noteID)).flatMap(NoteCheck.report)
+        checksPending = pipeline.checksPending(noteID)
         chapters = await CoreEngine.shared.chapters(noteID)
         extracted = await CoreEngine.shared.noteExtracted(noteID)
         let lang = n?.lang ?? "en"

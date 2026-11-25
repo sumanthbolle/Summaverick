@@ -45,6 +45,8 @@ public:
     // Ask: {id,title,created_at,short_summary,revision_questions} of notes created in [from, to) (epoch seconds; to 0 =
     // all notes), newest first unless oldest_first, at most limit. Never reads the transcripts.
     json note_summaries(int64_t from, int64_t to, int limit, bool oldest_first = false);
+    // {id, audio_path} of recordings whose usable transcript was saved more than `days` days ago (notes.transcribed_at).
+    // A recording with no usable transcript yet is never returned: it is still needed to transcribe.
     std::vector<std::pair<int64_t, std::string>> audio_older_than(int days);
 
     // Explicit transaction for multi-row changes (not nested; set_pieces/merge_topics use their own).

@@ -502,6 +502,17 @@ final class ProcessingPipeline {
     /// The saved stepped-aside notes were queued again in this launch (queueWaitingNotes).
     @ObservationIgnored private var steppedAsideRestored = false
     nonisolated private static let insightDueKey = "pipeline.insightDue"
+    nonisolated private static let checksDueKey = "pipeline.checksDue"
+    /// Notes whose outputs are stored but not yet checked (checkNote): a hot phone, a stop, a failure or a closed app
+    /// leaves the note here, and the resume loop checks it later without writing the accepted outputs again. The note
+    /// shows "Checks pending" meanwhile; the run is finished only when its check has a verdict.
+    @ObservationIgnored private var checksDue: Set<Int64> = Set((UserDefaults.standard.array(forKey: ProcessingPipeline.checksDueKey) as? [Int64]) ?? []) {
+        didSet { if checksDue != oldValue { Self.save(checksDue, Self.checksDueKey) } }
+    }
+    /// The note's outputs are stored and their check has not finished yet.
+    func checksPending(_ id: Int64) -> Bool { checksDue.contains(id) }
+    /// Insights and checks still owed to notes whose outputs are stored: the resume loop's last turns.
+    private var afterNotesDue: Set<Int64> { insightDue.union(checksDue) }
     /// Notes whose insight stepped aside for a recording (LiveFirst.insightStaysDue): written after Stop, from the
     /// resume loop. Kept across launches.
     @ObservationIgnored private var insightDue: Set<Int64> = Set((UserDefaults.standard.array(forKey: ProcessingPipeline.insightDueKey) as? [Int64]) ?? []) {
@@ -818,7 +829,7 @@ final class ProcessingPipeline {
     /// With the app not in front, the overnight task is asked for too, so nothing waits until the next open.
     func recordingCancelled() {
         // Nothing waits: the task asked for at Record ends now (a run in flight ends it when it is done).
-        guard !(interrupted.isEmpty && queued.isEmpty && insightDue.isEmpty) else { finishContinuedWork(); return }
+        guard !(interrupted.isEmpty && queued.isEmpty && afterNotesDue.isEmpty) else { finishContinuedWork(); return }
         if !appIsActive { OvernightWork.shared.schedule() }
         guard !isWorking, !resuming else { return }
         Task { await self.resumeInterrupted() }
@@ -1686,7 +1697,9 @@ final class ProcessingPipeline {
         // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
         _ = await writeMemories(noteID: id, quiet: false, span: after.memories)
-        // The parent's check of every output, after the memories and the action items (NoteCheck).
+        // The parent's check of every output, after the memories and the action items (NoteCheck). Owed from here
+        // until it has a verdict: a skip or failure leaves it due for the resume loop (checksDue).
+        checksDue.insert(id)
         await checkNote(id)
         ContinuedWork.shared.update(afterNotes: after.insight)   // the insight: the note's last part, under the same task
         if !refill { await writeInsight(id) }   // a part written again does not change the insight
@@ -1740,7 +1753,7 @@ final class ProcessingPipeline {
         let engine = CoreEngine.shared
         let abort = self.abort
         guard !abort.isSet, !Self.critical, await quietHeatGate({ abort.isSet }) else {
-            ActivityLog.log("check_skipped", note: id, ["why": abort.isSet ? "stopped" : "hot"])
+            ActivityLog.log("check_skipped", note: id, ["why": abort.isSet ? "stopped" : "hot", "pending": true])
             return
         }
         stage = .checking
@@ -1757,9 +1770,11 @@ final class ProcessingPipeline {
                 ActivityLog.log("check", note: id, fields)
             }
             if report.isCancelled {
-                ActivityLog.log("check_end", note: id, ["cancelled": true])
+                ActivityLog.log("check_end", note: id, ["cancelled": true, "pending": true])
                 return
             }
+            checksDue.remove(id)   // a verdict: "Checked", or the parts marked "Please check"
+            UserDefaults.standard.removeObject(forKey: Self.checkFailuresKey(id))
             ActivityLog.log("check_end", note: id, ["please_check": report.pleaseCheckParts.joined(separator: ","),
                                                     "retries": report.retries, "memories_flagged": report.memoriesFlagged ?? 0,
                                                     "actions_flagged": report.actionsFlagged ?? 0, "judge_calls": report.judgeCalls ?? 0,
@@ -1768,9 +1783,48 @@ final class ProcessingPipeline {
                   report.pleaseCheckParts.joined(separator: ", "))
             NotificationCenter.default.post(name: .notesChanged, object: nil)
         } catch {
-            ActivityLog.log("check_failed", note: id, ["error": String(describing: error)])
+            // Tried again by the resume loop, at most maxCheckFailures times; then the note stays unchecked (no
+            // verdict is claimed) and the activity log says so.
+            let failures = UserDefaults.standard.integer(forKey: Self.checkFailuresKey(id)) + 1
+            let givenUp = failures >= Self.maxCheckFailures
+            if givenUp {
+                checksDue.remove(id)
+                UserDefaults.standard.removeObject(forKey: Self.checkFailuresKey(id))
+            } else {
+                UserDefaults.standard.set(failures, forKey: Self.checkFailuresKey(id))
+            }
+            ActivityLog.log("check_failed", note: id, ["error": String(describing: error), "failures": failures,
+                                                       "pending": !givenUp])
             NSLog("[sve] check failed: %@", String(describing: error))
         }
+    }
+
+    nonisolated private static let maxCheckFailures = 3
+    nonisolated private static func checkFailuresKey(_ id: Int64) -> String { "checkFailures.\(id)" }
+
+    /// A due check's turn (from the resume loop): the check alone, on the stored outputs, under the same LiveFirst and
+    /// heat rules as a due insight. Nothing is written again unless the check fails a part (its bounded retries).
+    private func runDueCheck(_ id: Int64) async {
+        guard !isWorking, ModelManager.shared.isReady else { return }
+        starting = true
+        defer { starting = false }
+        guard await CoreEngine.shared.note(id) != nil else { checksDue.remove(id); return }   // deleted
+        beginBackground()
+        defer { endBackground() }
+        activeNoteID = nil
+        notesStored = true   // an expiry only stops it
+        let abort = self.abort
+        func yields() -> Bool { LiveFirst.yields(recording: LiveTranscriber.shared.liveRunning, runIsLive: false) }
+        let heat = HeatGovernor.shared, start = HeatGovernor.now
+        while !HeatLadder.restOver(level: heat.level, started: start, now: HeatGovernor.now), !abort.isSet, !yields() {
+            do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return }
+        }
+        guard !abort.isSet, !yields(), heat.level != .paused,
+              (try? await ModelManager.shared.loadIntoCore(backend: await stepBackend())) != nil else { return }   // stays due
+        ActivityLog.log("check_resumed", note: id)
+        await checkNote(id)
+        stage = .idle
+        NotificationCenter.default.post(name: .notesChanged, object: nil)
     }
 
     /// False only in a debug build launched with SVE_ONEPASS=0 (device check: the steps without the one pass).
@@ -2765,7 +2819,7 @@ final class ProcessingPipeline {
         ScreenAwake.pipeline(wants: false)   // the Finish now mode may still keep the screen on
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
         // A tap or a recording queued behind this run (or a paused note) goes next.
-        if !(interrupted.isEmpty && queued.isEmpty && insightDue.isEmpty) && !resuming { Task { await self.resumeInterrupted() } }
+        if !(interrupted.isEmpty && queued.isEmpty && afterNotesDue.isEmpty) && !resuming { Task { await self.resumeInterrupted() } }
         // After the caller's other defers (its busy claim) have run.
         else if !resuming { Task { self.finishContinuedWork() } }
     }
@@ -2776,8 +2830,9 @@ final class ProcessingPipeline {
     /// Nor while queued taps or notes may start now (waitingToRun): those run first, under this task. tried, triedTaps:
     /// the notes and taps the resume loop has just tried (its own call, which never starts another pass); nil from
     /// anywhere else.
-    private func finishContinuedWork(tried: Set<Int64>? = nil, triedTaps: [QueuedTap] = [], triedInsights: Set<Int64> = []) {
-        let waiting = waitingToRun(tried: tried ?? [], triedTaps: triedTaps, triedInsights: triedInsights)
+    private func finishContinuedWork(tried: Set<Int64>? = nil, triedTaps: [QueuedTap] = [], triedInsights: Set<Int64> = [],
+                                     triedChecks: Set<Int64> = []) {
+        let waiting = waitingToRun(tried: tried ?? [], triedTaps: triedTaps, triedInsights: triedInsights, triedChecks: triedChecks)
         guard TaskLifecycle.finishes(working: isWorking || !handingOver.isEmpty, personRunsPending: personRunsPending,
                                      queued: waiting) else {
             if tried == nil, waiting > 0, !isWorking, !resuming, personRunsPending == 0, handingOver.isEmpty {
@@ -2788,17 +2843,19 @@ final class ProcessingPipeline {
         // Success also when all that is left only waits for the recording (it goes on after Stop, under its own task).
         ContinuedWork.shared.finish(success: LiveFirst.finishSucceeds(
             otherNotesLeft: interrupted.filter { !waitsQuietly($0) }.count, tapsLeft: queued.count,
-            insightsLeft: insightDue.count, recording: LiveTranscriber.shared.isRecording))
+            insightsLeft: afterNotesDue.count, recording: LiveTranscriber.shared.isRecording))
     }
 
     /// Queued taps and notes that may start now, as the resume loop takes them: none while the app could not keep
     /// running them, a recording runs, the AI is not ready, the phone is too hot to start, or the overnight task
     /// has expired.
-    private func waitingToRun(tried: Set<Int64>, triedTaps: [QueuedTap], triedInsights: Set<Int64> = []) -> Int {
+    private func waitingToRun(tried: Set<Int64>, triedTaps: [QueuedTap], triedInsights: Set<Int64> = [],
+                              triedChecks: Set<Int64> = []) -> Int {
         guard appIsActive || ContinuedWork.shared.isHeld || overnightRun != nil, !(overnightRun?.isSet ?? false),
               !LiveTranscriber.shared.isRecording, ModelManager.shared.isReady,
               HeatGovernor.shared.level != .paused else { return 0 }
-        return runnableTaps(tried: triedTaps).count + resumable(tried: tried).count + insightDue.subtracting(triedInsights).count
+        return runnableTaps(tried: triedTaps).count + resumable(tried: tried).count
+            + insightDue.subtracting(triedInsights).count + checksDue.subtracting(triedChecks).count
     }
 
     /// The queued taps the resume loop may take next (each once per pass), oldest first.
@@ -2836,7 +2893,7 @@ final class ProcessingPipeline {
     private func personRunEnded(asked: Bool) {
         if asked { personRunsPending = max(0, personRunsPending - 1) }
         guard !resuming else { return }   // the resume loop releases it when it ends
-        if interrupted.isEmpty && queued.isEmpty && insightDue.isEmpty { Task { self.finishContinuedWork() } } else { Task { await self.resumeInterrupted() } }
+        if interrupted.isEmpty && queued.isEmpty && afterNotesDue.isEmpty { Task { self.finishContinuedWork() } } else { Task { await self.resumeInterrupted() } }
     }
 
     /// Runs the queued taps, then re-runs cut-off and waiting notes, oldest first, one at a time, while the app is
@@ -2850,9 +2907,10 @@ final class ProcessingPipeline {
         var tried: Set<Int64> = []
         var triedTaps: [QueuedTap] = []
         var triedInsights: Set<Int64> = []
+        var triedChecks: Set<Int64> = []
         defer {
             resuming = false
-            finishContinuedWork(tried: tried, triedTaps: triedTaps, triedInsights: triedInsights)
+            finishContinuedWork(tried: tried, triedTaps: triedTaps, triedInsights: triedInsights, triedChecks: triedChecks)
             endWaitingActivities()
         }
         while !isWorking, appIsActive || ContinuedWork.shared.isHeld || overnightRun != nil,
@@ -2860,11 +2918,20 @@ final class ProcessingPipeline {
               ModelManager.shared.isReady, HeatGovernor.shared.level != .paused {
             let tap = TapQueue.next(runnableTaps(tried: triedTaps))
             let id: Int64
-            var insightOnly = false
+            var insightOnly = false, checkOnly = false
             if let tap { id = tap.noteID } else if let n = nextToResume(tried: tried) { id = n }
+            else if let c = checksDue.subtracting(triedChecks).min() { id = c; checkOnly = true }
             else if let i = insightDue.subtracting(triedInsights).min() { id = i; insightOnly = true } else { break }
             let owned = OvernightList.ownsRun(inOvernightTask: overnightRun != nil, appActive: appIsActive,
                                               continuedTaskHeld: ContinuedWork.shared.isHeld)
+            if checkOnly {
+                // Checks still owed to stored notes (heat, a stop, a closed app), each once per pass.
+                triedChecks.insert(id)
+                overnightOwnsRun.set(owned)
+                await runDueCheck(id)
+                overnightOwnsRun.set(false)
+                continue
+            }
             if insightOnly {
                 // Last: insights that stepped aside for a recording, each once per pass.
                 triedInsights.insert(id)
@@ -3210,6 +3277,7 @@ final class ProcessingPipeline {
         queued = TapQueue.forgetting(noteID: id, in: queued)
         ChatStore.shared.forget(noteID: id)   // its quotes, titles and links in Ask's chats
         insightDue.remove(id)
+        checksDue.remove(id)
         heatPaused.remove(id)
         lastFailure[id] = nil
         failedLines[id] = nil
@@ -3320,7 +3388,7 @@ final class ProcessingPipeline {
             let needing = await CoreEngine.shared.notesNeedingMemories(limit: 1 + memoryFailed.count)
             memoriesLeft = !MemoryPass.backfillNotes(needing, skipping: memoryFailed, limit: 1).isEmpty || !sectionsDueNow.isEmpty
         }
-        return !overnight.isEmpty || !interrupted.isEmpty || !queued.isEmpty || !insightDue.isEmpty || memoriesLeft
+        return !overnight.isEmpty || !interrupted.isEmpty || !queued.isEmpty || !afterNotesDue.isEmpty || memoriesLeft
     }
 
     /// The overnight task expired (any thread): cancel the model run in flight if the task started it. The

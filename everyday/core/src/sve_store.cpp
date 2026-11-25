@@ -293,26 +293,34 @@ bool Store::create_schema() {
     return add_missing_columns();
 }
 
-// Columns added to tables after they first shipped in a build: section_outputs.cut, step_attempts.lang and
-// step_attempts.failures. Writes
+// Columns added to tables after they first shipped in a build: section_outputs.cut, step_attempts.lang,
+// step_attempts.failures and notes.transcribed_at. Writes
 // only when one is missing; re-checked inside the IMMEDIATE transaction, as another connection may add it first.
 bool Store::add_missing_columns() {
     static const char *kCols[][3] = {{"section_outputs", "cut", "ALTER TABLE section_outputs ADD COLUMN cut INTEGER NOT NULL DEFAULT 0"},
                                      {"step_attempts", "lang", "ALTER TABLE step_attempts ADD COLUMN lang TEXT"},
                                      {"step_attempts", "failures",
-                                      "ALTER TABLE step_attempts ADD COLUMN failures INTEGER NOT NULL DEFAULT 0"}};
+                                      "ALTER TABLE step_attempts ADD COLUMN failures INTEGER NOT NULL DEFAULT 0"},
+                                     // When the note first had a usable transcript: the audio retention clock. Notes
+                                     // that had one before this column get their recording time (the old clock).
+                                     {"notes", "transcribed_at",
+                                      "ALTER TABLE notes ADD COLUMN transcribed_at INTEGER; "
+                                      "UPDATE notes SET transcribed_at=created_at "
+                                      "WHERE trim(coalesce(transcript,''))<>''"}};
     auto missing = [&](const char *t, const char *c) {
         return query_rows((std::string("SELECT 1 FROM pragma_table_info('") + t + "') WHERE name=?").c_str(), {c}).empty();
     };
     bool any = false;
     for (const auto &c : kCols) any = any || missing(c[0], c[1]);
-    if (!any) return true;
-    if (!begin()) return false;
-    bool ok = true;
-    for (const auto &c : kCols)
-        if (ok && missing(c[0], c[1])) ok = exec(c[2]);
-    if (!ok) { std::string e = err_; rollback(); err_ = e; return false; }
-    return commit();
+    if (any) {
+        if (!begin()) return false;
+        bool ok = true;
+        for (const auto &c : kCols)
+            if (ok && missing(c[0], c[1])) ok = exec(c[2]);
+        if (!ok) { std::string e = err_; rollback(); err_ = e; return false; }
+        return commit();
+    }
+    return true;
 }
 
 static std::string medicine_memory_text(const json &m);
@@ -401,7 +409,9 @@ static std::optional<std::string> col_opt(sqlite3_stmt *st, int i) {
 int64_t Store::create(const std::string &title, const std::string &lang, const char *audio_path,
                       const char *transcript, int64_t duration_seconds) {
     sqlite3_stmt *st = nullptr;
-    const char *sql = "INSERT INTO notes(title,lang,created_at,duration_seconds,audio_path,transcript) VALUES(?,?,?,?,?,?)";
+    // transcribed_at: the audio retention clock, started by the first usable transcript (audio_older_than).
+    const char *sql = "INSERT INTO notes(title,lang,created_at,duration_seconds,audio_path,transcript,transcribed_at) "
+                      "VALUES(?1,?2,?3,?4,?5,?6,CASE WHEN trim(coalesce(?6,''))<>'' THEN ?3 END)";
     if (sqlite3_prepare_v2(db_, sql, -1, &st, nullptr) != SQLITE_OK) { err_ = sqlite3_errmsg(db_); return -1; }
     sqlite3_bind_text(st, 1, title.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, lang.c_str(), -1, SQLITE_TRANSIENT);
@@ -417,7 +427,12 @@ int64_t Store::create(const std::string &title, const std::string &lang, const c
 
 bool Store::set_text_column(int64_t id, const char *column, const char *value) {
     // column names come from our own code only (whitelisted by the C API), never from users.
-    std::string sql = std::string("UPDATE notes SET ") + column + "=? WHERE id=?";
+    std::string sql = std::string("UPDATE notes SET ") + column + "=?1 WHERE id=?2";
+    // The transcript also keeps the audio retention clock: started by the first usable transcript, stopped when it
+    // is cleared (the recording is needed again to transcribe it). audio_older_than reads it.
+    if (std::string(column) == "transcript")
+        sql = "UPDATE notes SET transcript=?1, transcribed_at=CASE WHEN trim(coalesce(?1,''))='' THEN NULL "
+              "ELSE coalesce(transcribed_at, CAST(strftime('%s','now') AS INTEGER)) END WHERE id=?2";
     sqlite3_stmt *st = nullptr;
     if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) { err_ = sqlite3_errmsg(db_); return false; }
     bind_opt(st, 1, value);
@@ -517,7 +532,12 @@ std::vector<NoteListRow> Store::list(const std::string &query, int limit) {
 std::vector<std::pair<int64_t, std::string>> Store::audio_older_than(int days) {
     std::vector<std::pair<int64_t, std::string>> out;
     sqlite3_stmt *st = nullptr;
-    if (sqlite3_prepare_v2(db_, "SELECT id,audio_path FROM notes WHERE audio_path IS NOT NULL AND created_at < ?", -1, &st, nullptr) != SQLITE_OK) return out;
+    // The clock starts when a usable transcript is saved: a recording still waiting to be transcribed (for the AI
+    // download, or a checkpoint mid-way) is never removed by age, however old it is.
+    if (sqlite3_prepare_v2(db_,
+                           "SELECT id,audio_path FROM notes WHERE audio_path IS NOT NULL AND transcribed_at IS NOT NULL "
+                           "AND trim(coalesce(transcript,''))<>'' AND transcribed_at < ?",
+                           -1, &st, nullptr) != SQLITE_OK) return out;
     sqlite3_bind_int64(st, 1, (int64_t)time(nullptr) - (int64_t)days * 86400);
     while (sqlite3_step(st) == SQLITE_ROW)
         out.emplace_back(sqlite3_column_int64(st, 0), reinterpret_cast<const char *>(sqlite3_column_text(st, 1)));
