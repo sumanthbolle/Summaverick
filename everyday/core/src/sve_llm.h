@@ -1,0 +1,93 @@
+// Internal: llama.cpp wrapper shared by the core's .cpp files. Not part of the public API.
+#pragma once
+#include "sve_core.h"
+
+// On iOS llama ships as llama.xcframework (framework-style include); elsewhere as a plain header.
+#if __has_include(<llama/llama.h>)
+#include <llama/llama.h>
+#else
+#include "llama.h"
+#endif
+
+#include <functional>
+#include <string>
+#include <vector>
+
+namespace sve {
+
+// Each generated piece of text as it is sampled (raw: thinking blocks included). Returns false to cancel.
+using PieceFn = std::function<bool(const std::string &piece)>;
+
+struct Llm {
+    llama_model *model = nullptr;
+    llama_context *ctx = nullptr;
+    const llama_vocab *vocab = nullptr;
+    int n_ctx = 4096;
+    int n_threads = 4;
+    int n_threads_batch = 4;   // prefill and the audio encoder (load sets it)
+    int n_gpu_layers = 0;   // 0 = CPU only; the audio projector follows (sve_load_audio)
+    std::string tmpl; // chat template (jinja source) from the GGUF, or empty
+    // A model run failed on the GPU backend (iOS refuses GPU work in the background): the Metal state stays broken and
+    // every later run fails at once, even in front, until the model is loaded again (sve_llm_needs_reload).
+    bool decode_failed = false;
+    bool last_cut = false;
+    // The last complete_pair stopped on a failed decode (decode_failed is also set, for sve_llm_needs_reload, but it
+    // stays set from any earlier run).
+    bool last_pair_decode_failed = false;  // the last generate stopped at max_new_tokens, before an end-of-generation token
+
+    ~Llm();
+    bool embeddings = false;  // loaded as an embedding model (meaning search): embed() only, never complete()
+
+    // embeddings: an embedding model (EmbeddingGemma), CPU only whatever n_gpu_layers says (no GPU device, no op
+    // offload), the model's own pooling, one sequence per batch (n_batch n_ctx, n_ubatch 512); batch threads = decode threads.
+    // n_seq: sequences of a generation context (2 for complete_pair, in one unified KV memory; 1 without).
+    bool load(const char *path, int n_ctx_req, int n_threads_req, int n_gpu_layers, bool embeddings = false, int n_seq = 1);
+    // The pooled vector of text (its first n_ubatch tokens), as the model gives it (not normalised). False on error.
+    bool embed(const std::string &text, std::vector<float> &out);
+    std::vector<llama_token> tokenize(const std::string &text, bool add_special, bool parse_special) const;
+    int count_tokens(const std::string &text) const;
+    // Wrap (system,user) in the model's chat template. Falls back to a ChatML-style layout.
+    std::string apply_template(const std::string &system, const std::string &user) const;
+    // Prompt -> completion. Clears KV memory first, so every call is independent. False on cancel or error.
+    // greedy = deterministic sampling (assistant JSON and answers); notes keep the sampled default.
+    // on_piece (optional): each token's text as it is sampled (Ask streams its answer); false cancels.
+    bool complete(const std::string &prompt, int max_new_tokens, std::string &out,
+                  sve_progress_cb cb, void *user, const char *phase, int done, int total, bool greedy = false,
+                  const PieceFn &on_piece = nullptr);
+    // Samples up to max_new_tokens after a prefill. greedy = deterministic (used for transcription).
+    // mean_prob (optional): mean softmax probability of the chosen non-EOG tokens under the raw logits
+    // (before penalties); NaN when no token was generated. Read after sampling, never changes the choice.
+    // n_out (optional): how many tokens were sampled, the end-of-generation token included.
+    // second_hearing: a transcription piece heard again (N7): the transcription's light penalty, then
+    // top-p 0.9 / min-p 0.05 / temperature 0.3 with a fixed seed, even under g_sve_force_greedy (a greedy repeat
+    // of the same input gives the same text). Overrides greedy.
+    // on_piece: as for complete.
+    bool generate(int max_new_tokens, bool greedy, std::string &out,
+                  sve_progress_cb cb, void *user, const char *phase, int done, int total,
+                  double *mean_prob = nullptr, int *n_out = nullptr, bool second_hearing = false,
+                  const PieceFn &on_piece = nullptr);
+    // One sequence of complete_pair has ended (index 0 or 1): its raw text, and cut when it stopped at its cap.
+    using PairDoneFn = std::function<void(int seq, const std::string &out, bool cut)>;
+    // Two replies to prompts that start alike (the notes and the questions of one part): head is prefilled once into
+    // sequence 0 and copied to sequence 1 (llama_memory_seq_cp), tails[i] is appended to sequence i, then both are
+    // sampled, each with its own chain (complete's sampled default), and decoded in one llama_decode per token round
+    // until each ends or reaches max_new[i]. on_done(i, …) when sequence i ends, in the order they end (the other
+    // goes on). Clears KV memory first and after. Needs a context with n_seq_max >= 2 (load gives 2, kv unified).
+    // False on cancel (cb), error, or a context that cannot hold both: sequences that ended before keep their
+    // on_done; the others get none.
+    bool complete_pair(const std::string &head, const std::string (&tails)[2], const int (&max_new)[2],
+                       const PairDoneFn &on_done, sve_progress_cb cb, void *user, const char *phase);
+};
+
+// Remove thinking blocks and surrounding whitespace.
+std::string strip_thinking(std::string s);
+// Split text into pieces of ~target_chars, cutting at paragraph/sentence boundaries.
+std::vector<std::string> split_text(const std::string &text, size_t target_chars);
+
+// Reduce long material to bullet points that fit final_budget tokens (hierarchical, per-chunk
+// calls with `system` as the system prompt). from_bullets is set when any reduction happened.
+// False on cancel/error.
+bool reduce_to_fit(Llm &llm, const std::string &system, std::string material, int final_budget,
+                   std::string &out, bool &from_bullets, sve_progress_cb cb, void *user);
+
+} // namespace sve

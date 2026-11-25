@@ -1,0 +1,154 @@
+// Records 16 kHz mono 16-bit PCM WAV — the exact format the core's whisper backend reads on the device,
+// so a recording made on the phone can be processed by the device build without conversion.
+import AVFoundation
+import Foundation
+import Observation
+
+@MainActor
+@Observable
+final class AudioRecorder {
+    private(set) var isRecording = false
+    private(set) var elapsed: TimeInterval = 0
+    private(set) var level: Float = 0      // 0…1, for the UI meter
+    private(set) var currentURL: URL?
+    var lastError: String?
+
+    /// Every reading (about 5 a second, also with the phone locked: the audio background mode keeps the app running
+    /// while it records): seconds recorded so far and the level in dBFS. Stop when quiet listens here.
+    @ObservationIgnored var onLevel: (@MainActor (_ recordedSeconds: TimeInterval, _ decibels: Float) -> Void)?
+
+    private var recorder: AVAudioRecorder?
+    private var timer: Timer?
+    private var startDate: Date?
+
+    static var recordingsDirectory: URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Summaverick/recordings", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Where a stored recording actually is now. Notes keep an absolute path, but iOS gives the app a
+    /// new container folder when it is reinstalled or updated, so an old path can point nowhere while
+    /// the file is still in our recordings folder. Returns nil only when the file is really gone.
+    nonisolated static func existingAudioPath(_ stored: String?) -> String? {
+        guard let stored, !stored.isEmpty else { return nil }
+        if FileManager.default.fileExists(atPath: stored) { return stored }
+        let name = (stored as NSString).lastPathComponent
+        guard !name.isEmpty else { return nil }
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Summaverick/recordings", isDirectory: true)
+        let here = dir.appendingPathComponent(name).path
+        if FileManager.default.fileExists(atPath: here) { return here }
+        // A compressed recording: the note may still name the WAV that was swapped for its .m4a.
+        let stem = (name as NSString).deletingPathExtension
+        if (name as NSString).pathExtension.lowercased() == "wav" {
+            let packed = dir.appendingPathComponent(stem + ".m4a").path
+            if FileManager.default.fileExists(atPath: packed) { return packed }
+        }
+        return nil
+    }
+
+    /// Deletes a recording and the transcription progress saved next to it (TranscriptSidecar).
+    nonisolated static func removeAudio(atPath path: String) {
+        try? FileManager.default.removeItem(atPath: path)
+        TranscriptSidecar.remove(audioPath: path)
+    }
+
+    /// Ask's voice questions: short-lived WAVs, deleted after transcription and swept at launch.
+    static var askVoiceDirectory: URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ask-voice", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Removes voice-question files left behind (e.g. the app was closed while transcribing).
+    nonisolated static func sweepAskVoice() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ask-voice", isDirectory: true)
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        for f in files { try? FileManager.default.removeItem(at: f) }
+    }
+
+    /// Seconds recorded so far (0 when not recording).
+    var recordedSeconds: TimeInterval { recorder?.currentTime ?? 0 }
+
+    func requestPermission() async -> Bool {
+        if #available(iOS 17.0, *) {
+            return await AVAudioApplication.requestRecordPermission()
+        } else {
+            return await withCheckedContinuation { c in AVAudioSession.sharedInstance().requestRecordPermission { c.resume(returning: $0) } }
+        }
+    }
+
+    /// directory: where the WAV goes (default: the recordings folder). Ask's voice questions use a temp folder.
+    func start(in directory: URL? = nil) {
+        guard !isRecording else { return }
+        lastError = nil
+        do {
+            let session = AVAudioSession.sharedInstance()
+            // .record + allowBluetoothHFP so a Bluetooth mic/earpiece can be used; background mode "audio" keeps it alive when locked.
+            try session.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
+            try session.setActive(true)
+
+            let url = (directory ?? AudioRecorder.recordingsDirectory)
+                .appendingPathComponent("rec-\(Int64(Date().timeIntervalSince1970 * 1000)).wav")   // ms: never the same name twice
+            let settings: [String: Any] = [
+                AVFormatIDKey: Int(kAudioFormatLinearPCM),
+                AVSampleRateKey: 16_000.0,
+                AVNumberOfChannelsKey: 1,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsFloatKey: false,
+                AVLinearPCMIsBigEndianKey: false,
+            ]
+            let r: AVAudioRecorder
+            do {
+                r = try AVAudioRecorder(url: url, settings: settings)
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                throw error
+            }
+            r.isMeteringEnabled = true
+            guard r.record() else {
+                r.deleteRecording()
+                try? FileManager.default.removeItem(at: url)   // no partial file left behind
+                lastError = String(localized: "I couldn't start recording.")
+                return
+            }
+            recorder = r
+            currentURL = url
+            startDate = Date()
+            isRecording = true
+            elapsed = 0
+            let t = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.tick() }
+            }
+            RunLoop.main.add(t, forMode: .common)   // keeps ticking while a scroll view is being dragged
+            timer = t
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    private func tick() {
+        guard let r = recorder, let s = startDate else { return }
+        elapsed = Date().timeIntervalSince(s)
+        r.updateMeters()
+        let db = r.averagePower(forChannel: 0) // -160…0
+        level = max(0, min(1, (db + 50) / 50))
+        // Recorded time, not wall time: an interruption (a call) pauses the recorder and its quiet timer alike.
+        if r.isRecording { onLevel?(r.currentTime, db) }
+    }
+
+    /// Stops and returns (file, duration in seconds).
+    func stop() -> (URL, Int64)? {
+        guard isRecording, let r = recorder, let url = currentURL else { return nil }
+        timer?.invalidate(); timer = nil
+        let duration = Int64(r.currentTime.rounded())
+        r.stop()
+        recorder = nil
+        isRecording = false
+        level = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        return (url, duration)
+    }
+}

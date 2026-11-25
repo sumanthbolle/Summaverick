@@ -1,0 +1,121 @@
+#pragma once
+// Consolidation of the knowledge graph across recordings: the same person under Telugu and English
+// spellings, and the same, an updated or a contradicting memory. People are never merged silently: a
+// name that only may be someone already known becomes a new person plus a question for the person.
+// The pure rules are tested in core/tests/test_consolidate.cpp; the Store helpers below them write.
+#include <cstdint>
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+#include "sve_store.h"  // Store, json
+
+namespace sve {
+
+// Telugu letters to Latin: vowels, consonants and vowel signs, with the inherent "a" unless a sign or the
+// virama follows; ం -> "m". Other characters pass unchanged. The output is normalised like the Latin side
+// (person_norm), so long vowels come out short.
+std::string transliterate_te(const std::string &s);
+
+// One name word in the shared Latin form: lower case, aa->a, ee->i, oo->u, doubled letters collapsed,
+// w->v, plus the folds both scripts need to meet (see the .cpp).
+std::string person_norm(const std::string &latin_word);
+
+// nfc_clean, then the honorifics (dr, dr., mr, mrs, ms, sir, madam, garu, గారు, అన్న, అక్క) and the last
+// Telugu word's case ending dropped, then transliterate_te and person_norm per word, joined by spaces. Only a clear
+// ending is dropped (see match_person): an ending that may be the name's own stays in the key (రజని, వాసుకి).
+std::string person_key(const std::string &name);
+
+enum class PersonMatch { same, maybe, different };
+// same: the normalised names are equal, or their keys are, with the same honorifics, where removing a case ending
+// counts only for clear endings (కు, తో, లో, గారు ..., and కి after ి ీ ె ే). Removing ని, ను, ది, దే, కే or another
+// కి (రజని is not Raja, జానకి is not Jana), a name
+// of honorifics only, a word subset or one letter apart (keys of 4+ letters): maybe. Else different.
+PersonMatch match_person(const std::string &a, const std::string &b);
+
+// The model's same-person check, answered with parse_yes_no.
+std::string same_person_prompt(const std::string &a_name, const std::string &a_context, const std::string &b_name,
+                               const std::string &b_context);
+extern const std::string kSamePersonSystem;
+
+enum class Pair { unrelated, same, update, contradiction };
+// Rows in the memory_items shape (type, text, checked, said_date, people:[{id}], topics:[{id}]).
+// cosine < 0 when unknown (no embeddings yet).
+Pair classify_pair(const json &newer, const json &older, double cosine);
+
+// {"was","now","said"} from the first checked number or date field whose canonical facts differ, in the
+// words stored; null when none differs.
+json change_line(const json &older, const json &newer);
+
+// `row` plus "change" (change_line against history[0], the row it replaced directly) when it has history.
+json with_change(json row);
+
+// The current row a new memory matches, if any. `current`: rows of the same type, newest first. A row said
+// later than the new one is matched the other way round: the new one is then the older version
+// (newer_is_older), and it is stored already superseded.
+struct Placement {
+    Pair pair = Pair::unrelated;
+    int64_t older = 0;
+    bool newer_is_older = false;
+};
+Placement place_memory(const json &newer, const json &current, double cosine = -1);
+
+// After the new row is stored as new_id: update supersedes the older one (or the new one, newer_is_older);
+// contradiction queues both. A "same" placement adds the source, and the new mention's people and topic
+// links, to the older row instead (merge_same_memory) and stores no new row.
+bool apply_placement(Store &st, const Placement &p, int64_t new_id);
+bool merge_same_memory(Store &st, int64_t older, int64_t note_id, int64_t start_sec, const std::string &quote,
+                       const json &conf /* number or null */, int64_t now,
+                       const std::vector<std::pair<int64_t, std::string>> &links = {} /* (topic id, role) */);
+
+// Model answers for names that may be someone known: (name, existing topic id) -> 1 yes, 0 no, -1 unclear.
+// A pair with no answer (no model) counts as unclear.
+using PersonAnswers = std::map<std::pair<std::string, int64_t>, int>;
+
+// The (name, topic) pairs that need a same-person check: names no known person matches as "same", against
+// every known person they match as "maybe". person_topics: Store::topics("person").
+std::vector<std::pair<std::string, json>> person_checks(const std::vector<std::string> &names, const json &person_topics);
+
+// The person topic for a spoken name, linked to the note: a known person who is the "same", else a new
+// topic, plus a pending person_questions row against every known "maybe" the answers do not rule out.
+// 0 for a name that names nobody (empty, too long, a pronoun, the person themselves), -1 on error.
+// A name the memory only mentions (found by the grounding check, not given as who or to whom): the known person it
+// clearly is, linked to the note; 0 when nobody known is that name. Never makes a new person: an unplaced word
+// ("yoi", "lanex") is not someone.
+int64_t known_person(Store &st, int64_t note_id, const std::string &name);
+int64_t resolve_person(Store &st, int64_t note_id, const std::string &name, const std::string &self_lower,
+                       const std::string &context, const PersonAnswers &answers);
+
+// ---------------------------------------------------------------- relations
+// Who decided, asked or told what in one recording, derived in code from its memories (no model call): person ->
+// decided -> decision, person -> asked -> open question, person -> asked/told -> person (to_whom), person ->
+// involved_in -> the note, decision/question -> about -> topic. "who" comes from the spoken names only; "I", "we"
+// or the person's own name is "me" (from_kind "me"); a decision nobody is named for has an empty person.
+
+// True for words that mean the phone's owner: I, me, myself, we, నేను, మేము, మనం, or their own name.
+bool names_me(const std::string &who, const std::string &self_lower);
+
+// Relation rows (Store::add_relation shape, without id/status) for note_id. memories: Store::memory_items_with_topics
+// of the note; note_people: Store::note_topics(note_id, "person"). Wrong, superseded and medicine memories, and
+// questions marked done, give none.
+json derive_relations(int64_t note_id, const json &memories, const json &note_people, const std::string &self_lower);
+
+// The note's pending review made again from its memories now: pending rows are replaced by the derived ones, leaving
+// out any the person already accepted or rejected. Number of pending rows, -1 on error. No transaction of its own.
+int refresh_relations(Store &st, int64_t note_id);
+
+// One review per note with pending rows, newest note first: [{"note_id","title","created_at",
+// "people":[{"id","topic_id","name"}], "decisions":[{"id","memory_id","text","who","who_kind":"person"|"me"|"nobody",
+// "quote","start_sec"}], "questions":[same], "between":[{"id","relation","from","to"}]}]; ids are relation ids.
+json relation_reviews(Store &st);
+
+// Accepts the note's pending review with the person's corrections: edits [{"id", "removed":bool, "name" (a person
+// line), "text","who" (a decision or question line)}]. A renamed person is resolved like a spoken name
+// (resolve_person) and this note's links move to them; an edited text corrects the memory. A removed person is
+// dropped from the note's relations (a decision of theirs stays, with nobody named); a removed line drops its
+// relations. Everything else becomes accepted. False when the note has no pending review or on error (nothing changed).
+bool accept_relations(Store &st, int64_t note_id, const json &edits);
+// Not now: the note's pending rows are rejected (they are not offered again). False when there were none.
+bool dismiss_relations(Store &st, int64_t note_id);
+
+}  // namespace sve

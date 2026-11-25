@@ -1,0 +1,665 @@
+// Assistant API of the core (sve_core.h, "personal assistant" section), as typed Swift.
+// Model calls run inside the CoreEngine actor on its sve_ctx; store-only calls are nonisolated and run on
+// CoreStore's context (CoreEngine.store), so each sve_ctx is only ever used from one thread at a time.
+import Foundation
+
+/// A chapter of a note: consecutive sections on the same topic (sve_chapters_json).
+struct Chapter: Decodable, Equatable {
+    let title: String
+    let start_sec: Int
+}
+
+extension CoreEngine {
+    enum AssistantError: LocalizedError {
+        case failed(String), badJSON
+        var errorDescription: String? {
+            switch self {
+            case .failed(let what): return String(localized: "I couldn't \(what).", comment: "%@ is an action such as \"save the reminder\"")
+            case .badJSON: return String(localized: "Something went wrong on my side. Please try again.")
+            }
+        }
+    }
+
+    private nonisolated func encodeJSON<T: Encodable>(_ v: T) -> String? {
+        guard let d = try? JSONEncoder().encode(v) else { return nil }
+        return String(data: d, encoding: .utf8)
+    }
+
+    private nonisolated func list<T: Decodable>(_ type: T.Type, _ json: UnsafeMutablePointer<CChar>?) -> [T] {
+        decode([T].self, take(json)) ?? []
+    }
+
+    private func progressBox(_ onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) -> ProgressBox {
+        ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled })
+    }
+
+    // MARK: profile (store context)
+
+    nonisolated func profile() async -> Profile? {
+        let p = await store { self.decode(Profile.self, self.take(sve_profile_get($0))) }
+        if let p { NotifyCopy.rememberFirstName(of: p.name) }
+        return p
+    }
+
+    /// The profile, telling "nothing saved" (.none) from a failed read (.failed, profile nil).
+    nonisolated func profileRead() async -> (kind: ProfileRead.Kind, profile: Profile?) {
+        let raw = await store { self.take(sve_profile_get($0)) }
+        let p = decode(Profile.self, raw)
+        let kind = ProfileRead.kind(raw: raw, decodes: p != nil)
+        if let p { NotifyCopy.rememberFirstName(of: p.name) }
+        return (kind, kind == .found ? p : nil)
+    }
+
+    nonisolated func setProfile(_ p: Profile) async throws {
+        guard let json = encodeJSON(p), await store({ sve_profile_set($0, json) }) == 0 else {
+            throw AssistantError.failed(String(localized: "save the profile"))
+        }
+        NotifyCopy.rememberFirstName(of: p.name)
+    }
+
+    // MARK: medicines (store context)
+
+    nonisolated func medicines() async -> [Medicine] { await store { self.list(Medicine.self, sve_medicines_json($0)) } }
+
+    /// Saves a medicine (id 0 = new) and adds a pending reminder suggestion for it. Returns the medicine id.
+    nonisolated func saveMedicine(_ m: Medicine) async throws -> Int64 {
+        guard let json = encodeJSON(m) else { throw AssistantError.badJSON }
+        let id = await store { sve_medicine_save($0, json) }
+        guard id > 0 else { throw AssistantError.failed(String(localized: "save the medicine")) }
+        return id
+    }
+
+    @discardableResult nonisolated func deleteMedicine(_ id: Int64) async -> Bool { await store { sve_medicine_delete($0, id) == 0 } }
+
+    /// Routine times implied by the words of "when" (the core's one keyword table, against the saved
+    /// routine). [] when there is no keyword or no routine time for it.
+    nonisolated func resolveTimes(_ when: String) async -> [String] {
+        await store { self.decode([String].self, self.take(sve_resolve_times($0, when))) ?? [] }
+    }
+
+    /// Deletes everything the assistant stored (profile, medicines, memory, reminders, tasks, topics,
+    /// suggestions, insights, transcript pieces). Notes are deleted separately; the caller resyncs reminders.
+    /// Runs on the store context, so it does not wait for a model call in flight: the caller stops memory work
+    /// first (yieldMemories) and refuses while a note is being written; a model call still running (Ask, a topic
+    /// summary) only reads, or updates a row that is gone by then.
+    nonisolated func wipeAssistant() async throws {
+        guard await store({ sve_assistant_wipe($0) }) == 0 else { throw AssistantError.failed(String(localized: "delete your saved details")) }
+    }
+
+    // MARK: suggestions (store context)
+
+    /// status: "pending", "accepted", "rejected"; nil = all.
+    nonisolated func suggestions(status: String? = "pending") async -> [Suggestion] {
+        await store { self.list(Suggestion.self, sve_suggestions_json($0, status)) }
+    }
+
+    nonisolated func accept(_ id: Int64, edited: SuggestionPayload? = nil) async throws -> AcceptResult {
+        var json: String?
+        if let edited {   // never fall back to "as proposed" when an edit can't be encoded
+            guard let j = encodeJSON(edited) else { throw AssistantError.badJSON }
+            json = j
+        }
+        let payload = json
+        let r = await store { sve_suggestion_accept($0, id, payload) }
+        switch r {
+        case 1...: return .created(r)
+        case 0: return .applied
+        case -2: return .staleReflagged
+        default: throw AssistantError.failed(String(localized: "accept the suggestion"))
+        }
+    }
+
+    /// false when it is gone or no longer pending.
+    @discardableResult nonisolated func reject(_ id: Int64) async -> Bool { await store { sve_suggestion_reject($0, id) == 0 } }
+
+    // MARK: reminders and tasks (store context)
+
+    /// Like `reminders`, but throws when the engine is unavailable, the call fails, or the JSON does not decode,
+    /// so callers can tell "no reminders" from "could not read".
+    nonisolated func remindersStrict(activeOnly: Bool = false) async throws -> [Reminder] {
+        try await store { c in
+            guard c != nil else { throw AssistantError.failed(String(localized: "read reminders (I'm still starting up)")) }
+            guard let json = self.take(sve_reminders_json(c, activeOnly ? 1 : 0)) else {
+                throw AssistantError.failed(String(localized: "read reminders"))
+            }
+            guard let rows = self.decode([Reminder].self, json) else { throw AssistantError.badJSON }
+            return rows
+        }
+    }
+
+    nonisolated func reminders(activeOnly: Bool = false) async -> [Reminder] {
+        await store { self.list(Reminder.self, sve_reminders_json($0, activeOnly ? 1 : 0)) }
+    }
+    nonisolated func setReminderActive(_ id: Int64, _ active: Bool) async {
+        await store { _ = sve_reminder_set_active($0, id, active ? 1 : 0) }
+    }
+    nonisolated func tasks(openOnly: Bool = false) async -> [TaskItem] {
+        await store { self.list(TaskItem.self, sve_tasks_json($0, openOnly ? 1 : 0)) }
+    }
+    nonisolated func setTaskDone(_ id: Int64, _ done: Bool) async { await store { _ = sve_task_set_done($0, id, done ? 1 : 0) } }
+
+    /// Creates a reminder the person made themselves (their own edit, applied directly). Returns its id.
+    /// Throws if it cannot be encoded or the core refuses it (no text, no valid time, bad date).
+    nonisolated func createReminder(_ r: NewReminder) async throws -> Int64 {
+        let json = encodeJSON(r)
+        return try await store { c in
+            guard c != nil else { throw AssistantError.failed(String(localized: "save the reminder (I'm still starting up)")) }
+            guard let json else { throw AssistantError.badJSON }
+            let id = sve_reminder_create(c, json)
+            guard id > 0 else { throw AssistantError.failed(String(localized: "save the reminder")) }
+            return id
+        }
+    }
+
+    /// Ids of the saved medicines named in a text, by the core's own matcher (the one sve_reminder_create
+    /// checks against). Throws when the core cannot answer.
+    nonisolated func medicinesNamed(_ text: String) async throws -> [Int64] {
+        try await store { c in
+            guard c != nil else { throw AssistantError.failed(String(localized: "read medicines (I'm still starting up)")) }
+            guard let json = self.take(sve_medicines_named(c, text)) else { throw AssistantError.failed(String(localized: "read medicines")) }
+            guard let ids = self.decode([Int64].self, json) else { throw AssistantError.badJSON }
+            return ids
+        }
+    }
+
+    /// Creates a to-do the person made themselves. Returns its id. Throws on encode failure or refusal.
+    nonisolated func createTask(_ t: NewTask) async throws -> Int64 {
+        let json = encodeJSON(t)
+        return try await store { c in
+            guard c != nil else { throw AssistantError.failed(String(localized: "save the to-do (I'm still starting up)")) }
+            guard let json else { throw AssistantError.badJSON }
+            let id = sve_task_create(c, json)
+            guard id > 0 else { throw AssistantError.failed(String(localized: "save the to-do")) }
+            return id
+        }
+    }
+
+    // MARK: topics (store context, except the summary: it runs the model)
+
+    /// kind: "topic", "person", or nil for both.
+    nonisolated func topics(kind: String? = nil) async -> [Topic] { await store { self.list(Topic.self, sve_topics_json($0, kind)) } }
+    nonisolated func topicNotes(_ topicID: Int64) async -> [TopicNote] {
+        await store { self.list(TopicNote.self, sve_topic_notes_json($0, topicID)) }
+    }
+    nonisolated func renameTopic(_ id: Int64, _ name: String) async { await store { _ = sve_topic_rename($0, id, name) } }
+    nonisolated func mergeTopic(_ from: Int64, into: Int64) async { await store { _ = sve_topic_merge($0, from, into) } }
+
+    func topicSummary(_ topicID: Int64, lang: String,
+                      onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> TopicSummary {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        let box = progressBox(onProgress)
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_topic_summary(ctx, topicID, lang, CoreEngine.progressTrampoline, user)) else {
+            throw CoreError.generationFailed
+        }
+        guard let s = decode(TopicSummary.self, json) else { throw AssistantError.badJSON }
+        return s
+    }
+
+    // MARK: memory (store context)
+
+    /// kind: "fact", "preference", "vocab", or nil for all.
+    nonisolated func memory(kind: String? = nil) async -> [MemoryItem] { await store { self.list(MemoryItem.self, sve_memory_json($0, kind)) } }
+    @discardableResult nonisolated func updateMemory(_ id: Int64, _ text: String) async -> Bool {
+        await store { sve_memory_update($0, id, text) == 0 }
+    }
+    @discardableResult nonisolated func deleteMemory(_ id: Int64) async -> Bool { await store { sve_memory_delete($0, id) == 0 } }
+    @discardableResult nonisolated func addVocab(_ term: String) async -> Int64 { await store { sve_vocab_add($0, term) } }
+    /// Each piece's text with the saved words written in where the transcriber misheard them (never a medicine).
+    nonisolated func vocabCorrected(_ pieces: [TranscriptPiece]) async -> [TranscriptPiece] {
+        await store { ctx in
+            // Each piece cleaned first (loops, a repeat of the last piece, saved words written as speech: note 18),
+            // then the saved words written in.
+            var prev = ""
+            return pieces.map { p in
+                var q = p
+                let raw = p.text
+                if let clean = self.take(sve_piece_clean(ctx, raw, prev)) { q.text = clean }
+                if !q.text.isEmpty, let fixed = self.take(sve_vocab_correct(ctx, q.text)) { q.text = fixed }
+                if !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { prev = raw }
+                return q
+            }
+        }
+    }
+
+    // MARK: ask
+
+    func ask(_ question: String, onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> AskAnswer {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        let box = progressBox(onProgress)
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_assistant_ask(ctx, question, CoreEngine.progressTrampoline, user)) else {
+            throw CoreError.generationFailed
+        }
+        guard let a = decode(AskAnswer.self, json) else { throw AssistantError.badJSON }
+        return a
+    }
+
+    /// The kind the core's code rule gives a question; "recordings" when it cannot say.
+    nonisolated func routeKind(_ question: String) async -> String {
+        await store { self.take(sve_route_kind($0, question)) } ?? "recordings"
+    }
+
+    /// A question that needs no model ("due", "quiz") on the store context: never behind a model call on this actor,
+    /// so it answers at once during a notes run.
+    nonisolated func chatOnStore(messages: [ChatMessage], langHint: String? = nil) async throws -> AskAnswer {
+        guard let json = encodeJSON(messages) else { throw AssistantError.badJSON }
+        return try await store { c in
+            guard let out = self.take(sve_assistant_chat(c, json, langHint, nil, nil, nil, nil)) else { throw CoreError.generationFailed }
+            guard let a = self.decode(AskAnswer.self, out) else { throw AssistantError.badJSON }
+            return a
+        }
+    }
+
+    /// Stop: what had been released when the answer was stopped.
+    struct ChatStopped: Error {
+        let partial: String
+    }
+
+    /// Streamed text passed through the C callback as an opaque pointer (sve_assistant_chat's on_text).
+    final class TextBox: @unchecked Sendable {   // its state is behind the lock
+        private let lock = NSLock()
+        private var text = ""
+        private var lastDraw: TimeInterval?
+        private var drawScheduled = false
+        private let onText: @MainActor (String) -> Void
+        let isCancelled: () -> Bool
+        init(onText: @escaping @MainActor (String) -> Void, isCancelled: @escaping () -> Bool) {
+            self.onText = onText; self.isCancelled = isCancelled
+        }
+
+        /// Everything released so far.
+        var soFar: String {
+            lock.lock()
+            defer { lock.unlock() }
+            return text
+        }
+
+        /// A piece from the core's thread: added to the text. The bubble redraws on the main thread at most once per
+        /// StreamThrottle.interval; a piece that comes too soon is drawn at the end of the interval, not left waiting.
+        func add(_ piece: String) {
+            let now = ProcessInfo.processInfo.systemUptime
+            lock.lock()
+            text += piece
+            let wait = StreamThrottle.delay(last: lastDraw, now: now)
+            if wait == nil { lastDraw = now }
+            let schedule = wait != nil && !drawScheduled
+            if schedule { drawScheduled = true }
+            let snapshot = text
+            lock.unlock()
+            if let wait {
+                if schedule { scheduleDraw(after: wait) }
+            } else {
+                redraw(snapshot)
+            }
+        }
+
+        /// The last text, whatever the throttle said.
+        func flush() {
+            let snapshot = soFar
+            if !snapshot.isEmpty { redraw(snapshot) }
+        }
+
+        private func scheduleDraw(after wait: TimeInterval) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [self] in
+                lock.lock()
+                drawScheduled = false
+                lastDraw = ProcessInfo.processInfo.systemUptime
+                let snapshot = text
+                lock.unlock()
+                MainActor.assumeIsolated { onText(snapshot) }
+            }
+        }
+
+        private func redraw(_ snapshot: String) {
+            let onText = self.onText
+            DispatchQueue.main.async { MainActor.assumeIsolated { onText(snapshot) } }
+        }
+    }
+
+    static let textTrampoline: sve_text_cb = { piece, user in
+        guard let user else { return 0 }
+        let box = Unmanaged<TextBox>.fromOpaque(user).takeUnretainedValue()
+        if let piece { box.add(String(cString: piece)) }
+        return box.isCancelled() ? 1 : 0
+    }
+
+    /// Ask as a chat (sve_assistant_chat): `messages` end with the question (ChatWindow.messages). onText gets the
+    /// visible answer so far, on the main thread, as it is written (never for medicine, due or quiz answers, which
+    /// come whole in the result). onKind gets the answer's kind before its first piece. Cancelling the calling task
+    /// stops it: throws ChatStopped with what was released.
+    func chat(messages: [ChatMessage], langHint: String? = nil,
+              onKind: @escaping @MainActor (String) -> Void = { _ in },
+              onText: @escaping @MainActor (String) -> Void = { _ in }) async throws -> AskAnswer {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        guard let json = encodeJSON(messages) else { throw AssistantError.badJSON }
+        let text = TextBox(onText: onText, isCancelled: { Task.isCancelled })
+        let box = progressBox { phase, _, _ in
+            guard phase.hasPrefix("kind:") else { return }
+            let kind = String(phase.dropFirst(5))
+            DispatchQueue.main.async { MainActor.assumeIsolated { onKind(kind) } }
+        }
+        let tuser = Unmanaged.passUnretained(text).toOpaque()
+        let puser = Unmanaged.passUnretained(box).toOpaque()
+        let out = take(sve_assistant_chat(ctx, json, langHint, CoreEngine.textTrampoline, tuser,
+                                          CoreEngine.progressTrampoline, puser))
+        withExtendedLifetime(box) {}
+        guard let out else {
+            if Task.isCancelled { throw ChatStopped(partial: text.soFar) }
+            text.flush()
+            throw CoreError.generationFailed
+        }
+        text.flush()
+        guard let a = decode(AskAnswer.self, out) else { throw AssistantError.badJSON }
+        return a
+    }
+
+    // MARK: extraction and insight
+
+    /// Runs extraction on a note's pieces. Returns the number of pending suggestions added.
+    func extract(noteID: Int64, shouldStop: @escaping () -> Bool = { false },
+                 onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> Int {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        let n = sve_extract(ctx, noteID, CoreEngine.progressTrampoline, user)
+        guard n >= 0 else { throw AssistantError.failed(String(localized: "find reminders and tasks")) }
+        return Int(n)
+    }
+
+    /// The checking agent on a note (sve_verify_note): its report, with each check and retry as events.
+    func verifyNote(noteID: Int64, shouldStop: @escaping () -> Bool = { false }) throws -> NoteCheck.Report {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_verify_note(ctx, noteID, CoreEngine.progressTrampoline, user)),
+              let report = NoteCheck.report(json) else {
+            throw AssistantError.failed(String(localized: "check the notes"))
+        }
+        return report
+    }
+
+    /// Whether extraction has run on this note (core flag "extracted.<id>", or the note already has
+    /// suggestions or topics). An error counts as yes, so the button is never offered on a guess.
+    nonisolated func noteExtracted(_ noteID: Int64) async -> Bool { await store { sve_note_extracted($0, noteID) != 0 } }
+
+    nonisolated func latestInsight() async -> Insight? { await store { self.decode(Insight.self, self.take(sve_insight_latest($0))) } }
+    /// At most one per calendar day; nil when there is nothing new, or when shouldStop cancelled it (nothing stored).
+    /// Runs the model (this actor's context).
+    func generateInsight(noteID: Int64, shouldStop: @escaping () -> Bool = { false }) -> Insight? {
+        try? ensureGemmaLoaded()
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        return decode(Insight.self, take(sve_insight_generate(ctx, noteID, CoreEngine.progressTrampoline, user)))
+    }
+    nonisolated func dismissInsight(_ id: Int64) async { await store { _ = sve_insight_dismiss($0, id) } }
+
+    // MARK: transcript pieces (store context)
+
+    @discardableResult
+    nonisolated func setPieces(_ noteID: Int64, _ pieces: [TranscriptPiece]) async -> Bool {
+        guard let json = encodeJSON(pieces) else { return false }
+        return await store { sve_note_set_pieces($0, noteID, json) == 0 }
+    }
+
+    nonisolated func pieces(_ noteID: Int64) async -> [TranscriptPiece] {
+        await store { self.list(TranscriptPiece.self, sve_note_pieces($0, noteID)) }
+    }
+
+    // MARK: sections (summaries, notes and titles run the model; the stored rows are on the store context)
+
+    /// Summary of one section's pieces, on `backend` when given (switched here, in the same actor turn as the
+    /// run). nil when `shouldStart` said no once the engine was free (nothing ran). Throws when the run was
+    /// cancelled (`shouldStop`) or there was nothing it could summarise.
+    func sectionSummarize(pieces: [TranscriptPiece], lang: String, backend: ModelBackend? = nil,
+                          shouldStart: () -> Bool = { true },
+                          shouldStop: @escaping () -> Bool = { false }) throws -> SectionSummary? {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        guard shouldStart() else { return nil }
+        if let backend { try ensureBackend(backend) }
+        guard let json = encodeJSON(pieces) else { throw AssistantError.badJSON }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let out = take(sve_section_summarize(ctx, json, lang, CoreEngine.progressTrampoline, user)) else {
+            throw CoreError.generationFailed
+        }
+        guard let summary = decode(SectionSummary.self, out) else { throw AssistantError.badJSON }
+        return summary
+    }
+
+    /// What a live part run wrote (writeLiveParts): each kind written, and whether the run was stopped.
+    struct LiveWritten {
+        var parts: [(kind: Int, text: String, cut: Bool)] = []
+        var cancelled = false
+    }
+
+    /// A section's notes and questions (`kinds`: LivePart.notes, LivePart.questions) written while recording, from its
+    /// pieces and summary, stored nowhere (the sidecar keeps them; the note gets them at Stop). Both kinds: together
+    /// (sve_section_outputs_pair_text, one reading of the part), else one kind (sve_section_output_text). On `backend`,
+    /// switched here in the same actor turn. nil when `shouldStart` said no once the engine was free (nothing ran).
+    /// A kind finished before a stop is kept.
+    func writeLiveParts(pieces: [TranscriptPiece], summary: SectionSummary, idx: Int, kinds: [Int], lang: String,
+                        backend: ModelBackend, shouldStart: () -> Bool,
+                        shouldStop: @escaping () -> Bool) throws -> LiveWritten? {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        guard shouldStart() else { return nil }
+        try ensureBackend(backend)
+        guard let pj = encodeJSON(pieces), let sj = encodeJSON(summary) else { throw AssistantError.badJSON }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        var out = LiveWritten()
+        if kinds.contains(LivePart.notes) && kinds.contains(LivePart.questions) {
+            struct Reply: Decodable { let text: String; let cut: Bool }
+            struct Pair: Decodable { let notes: Reply?; let questions: Reply?; let cancelled: Bool }
+            guard let json = take(sve_section_outputs_pair_text(ctx, pj, sj, Int32(idx), lang, CoreEngine.progressTrampoline, user)),
+                  let r = decode(Pair.self, json) else { throw CoreError.generationFailed }
+            if let n = r.notes { out.parts.append((LivePart.notes, n.text, n.cut)) }
+            if let q = r.questions { out.parts.append((LivePart.questions, q.text, q.cut)) }
+            out.cancelled = r.cancelled
+            return out
+        }
+        for k in kinds {
+            var cut: Int32 = 0
+            guard let text = take(sve_section_output_text(ctx, pj, sj, Int32(idx), sve_output_kind(UInt32(k)), lang, &cut,
+                                                         CoreEngine.progressTrampoline, user)) else {
+                if box.isCancelled() { out.cancelled = true; return out }
+                continue   // both tries failed: left for the normal steps after Stop
+            }
+            out.parts.append((k, text, cut != 0))
+        }
+        return out
+    }
+
+    /// A part written while recording into the note (sve_section_output_put): 1 stored, 0 when the note's section
+    /// idx no longer has that range (the normal steps write it again), -1 on error.
+    nonisolated func putSectionOutput(noteID: Int64, _ p: LivePart) async -> Int {
+        await store { Int(sve_section_output_put($0, noteID, Int32(p.idx), sve_output_kind(UInt32(p.kind)), p.lang,
+                                                 Int32(p.first), Int32(p.last), p.text, p.cut ? 1 : 0)) }
+    }
+
+    /// The text the notes are written from (sve_notes_material): the pieces joined as the transcript is, a piece heard
+    /// with conf < 0.80 marked "[unclear] " so the notes prompts do not state it as fact. nil on bad input.
+    nonisolated func notesMaterial(_ pieces: [TranscriptPiece]) -> String? {
+        guard let json = encodeJSON(pieces) else { return nil }
+        return take(sve_notes_material(json))
+    }
+
+    /// Replaces the note's sections. False when it could not be stored, for example the note is gone.
+    @discardableResult
+    nonisolated func setSections(_ noteID: Int64, _ sections: [NoteSection]) async -> Bool {
+        guard let json = encodeJSON(sections) else { return false }
+        return await store { sve_note_set_sections($0, noteID, json) == 0 }
+    }
+
+    nonisolated func sections(_ noteID: Int64) async -> [NoteSection] {
+        await store { self.list(NoteSection.self, sve_note_sections($0, noteID)) }
+    }
+
+    /// An output written from the note's sections. nil when the note has no sections, or on cancel or failure:
+    /// callers check their own cancel flag before falling back to `generate`.
+    func generateFromSections(noteID: Int64, kind: OutputKind, lang: String, shouldStop: @escaping () -> Bool = { false },
+                              onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) -> String? {
+        guard let ctx else { return nil }
+        try? ensureGemmaLoaded()
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        return take(sve_generate_from_sections(ctx, noteID, kind.cKind, lang, CoreEngine.progressTrampoline, user))
+    }
+
+    /// One part of a note's detailed notes or questions (one section), written and stored by the core. Throws when
+    /// nothing was stored: a cancel (shouldStop), no model, the note or its sections gone or changed, or a failed
+    /// try (the core counts it; sectionOutputsState says how many and why).
+    func sectionOutput(noteID: Int64, idx: Int, kind: NoteSteps.Kind, lang: String, shouldStop: @escaping () -> Bool = { false },
+                       onProgress: @escaping (String, Int, Int) -> Void = { _, _, _ in }) throws -> String {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        let box = ProgressBox(onProgress: onProgress, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let out = take(sve_section_output(ctx, noteID, Int32(idx), kind.outputKind.cKind, lang,
+                                                CoreEngine.progressTrampoline, user)) else {
+            throw CoreError.generationFailed
+        }
+        return out
+    }
+
+    /// Every part of the note (each section's notes and questions): done, tries and the last reason, in lang.
+    /// nil on error; empty when the note has no sections.
+    nonisolated func sectionOutputsState(noteID: Int64, lang: String) async -> [NoteSteps.StepState]? {
+        await store { self.decode([NoteSteps.StepState].self, self.take(sve_section_outputs_state($0, noteID, lang))) }
+    }
+
+    /// The note's detailed notes or questions put together from its stored parts (no model). Every part written:
+    /// the whole text. Parts missing: with `placeholder` under a missing part's heading, when given; nil without it.
+    /// nil too when no part is written.
+    nonisolated func assembleOutput(noteID: Int64, kind: NoteSteps.Kind, lang: String, placeholder: String? = nil) async -> String? {
+        await store {
+            if let whole = self.take(sve_assemble_output($0, noteID, kind.outputKind.cKind, lang)) { return whole }
+            guard let placeholder else { return nil }
+            return self.take(sve_assemble_output_with_gaps($0, noteID, kind.outputKind.cKind, lang, placeholder))
+        }
+    }
+
+    /// Deletes stored parts and their try counts: kind nil both kinds, idx nil every part. The sections stay.
+    @discardableResult
+    nonisolated func clearSectionOutputs(noteID: Int64, kind: NoteSteps.Kind?, idx: Int? = nil) async -> Bool {
+        await store { sve_section_outputs_clear($0, noteID, Int32(kind?.rawValue ?? -1), Int32(idx ?? -1)) >= 0 }
+    }
+
+    /// A title from the section titles; nil when there are no sections or no model.
+    func titleFromSections(noteID: Int64, lang: String) -> String? {
+        guard let ctx else { return nil }
+        try? ensureGemmaLoaded()
+        let t = take(sve_title_from_sections(ctx, noteID, lang))?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (t?.isEmpty ?? true) ? nil : t
+    }
+
+    nonisolated func chapters(_ noteID: Int64) async -> [Chapter] { await store { self.list(Chapter.self, sve_chapters_json($0, noteID)) } }
+
+    /// Same as transcribeAudio, but keeps the start second of each ~28 s piece.
+    /// `shouldStop` is asked at every progress step; true cancels the run (it then throws).
+    func transcribeAudioPieces(path: String, shouldStop: @escaping () -> Bool = { false },
+                               onProgress: @escaping (Int, Int) -> Void = { _, _ in }) throws -> [TranscriptPiece] {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
+        let box = ProgressBox(onProgress: { _, d, t in onProgress(d, t) }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_transcribe_audio_pieces(ctx, path, CoreEngine.progressTrampoline, user)),
+              let pieces = decode([TranscriptPiece].self, json) else {
+            throw CoreError.transcriptionFailed
+        }
+        return pieces
+    }
+
+    /// Result of one step of incremental transcription (sve_transcribe_next_piece).
+    enum NextPiece: Equatable {
+        /// Transcribed [start, endSample); text may be empty (silence).
+        case piece(startSec: Int, endSample: Int64, text: String, conf: Double?)
+        /// Still recording and under 31 s after the cursor: ask again later.
+        case wait
+        /// Nothing left to transcribe (final only).
+        case end
+        /// `shouldStart` said no once the engine was free: nothing was run.
+        case skipped
+    }
+
+    private struct NextPieceJSON: Decodable {
+        let status: String
+        let start_sec: Int?
+        let end_sample: Int64?
+        let text: String?
+        let conf: Double?
+    }
+
+    /// Plans and transcribes the next ~28 s piece of a WAV that may still be being recorded, from
+    /// `startSample`, on `backend` (switched here, in the same actor turn as the run). isFinal: the
+    /// recording has stopped. shouldStart is asked once the engine is free (a Stop while this call waited
+    /// skips it). Throws on failure; cancels (throws) when `shouldStop` turns true during the run.
+    func transcribeNextPiece(path: String, startSample: Int64, isFinal: Bool, previousText: String?,
+                             backend: ModelBackend = .cpu,
+                             shouldStart: () -> Bool = { true },
+                             shouldStop: @escaping () -> Bool = { false }) throws -> NextPiece {
+        guard let ctx else { throw CoreError.initFailed }
+        try ensureGemmaLoaded()
+        guard shouldStart() else { return .skipped }
+        try ensureBackend(backend)
+        guard sve_audio_loaded(ctx) != 0 else { throw CoreError.audioModelNotLoaded }
+        let box = ProgressBox(onProgress: { _, _, _ in }, isCancelled: { Task.isCancelled || shouldStop() })
+        let user = Unmanaged.passUnretained(box).toOpaque()
+        guard let json = take(sve_transcribe_next_piece(ctx, path, startSample, isFinal ? 1 : 0, previousText,
+                                                        CoreEngine.progressTrampoline, user)),
+              let r = decode(NextPieceJSON.self, json) else {
+            throw CoreError.transcriptionFailed
+        }
+        switch r.status {
+        case "wait": return .wait
+        case "end": return .end
+        case "piece":
+            guard let end = r.end_sample, end > startSample else { throw CoreError.transcriptionFailed }
+            return .piece(startSec: r.start_sec ?? Int(startSample / 16_000), endSample: end, text: r.text ?? "", conf: r.conf)
+        default: throw CoreError.transcriptionFailed
+        }
+    }
+}
+
+// MARK: relations review (store context)
+
+extension CoreEngine {
+    /// Recordings whose people, decisions and open questions wait for the person to check, newest first.
+    nonisolated func relationReviews() async -> [RelationReview] {
+        await store { self.decode([RelationReview].self, self.take(sve_relation_reviews_json($0))) ?? [] }
+    }
+
+    /// Accepts a recording's review with the person's corrections; only then does it reach the map.
+    @discardableResult nonisolated func acceptRelations(noteID: Int64, edits: [RelationEdit]) async -> Bool {
+        let json = (try? JSONEncoder().encode(edits)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        return await store { sve_relations_accept($0, noteID, json) == 0 }
+    }
+
+    /// Not now: the review is put away and not offered again.
+    @discardableResult nonisolated func dismissRelations(noteID: Int64) async -> Bool {
+        await store { sve_relations_dismiss($0, noteID) == 0 }
+    }
+
+    /// Once per install: recordings whose memories were made before relations existed get their review too. Only the
+    /// store (no model); safe to repeat, since accepted or put-away relations are never offered again.
+    nonisolated func backfillRelationReviewsOnce() async {
+        let key = "relations.backfilled.v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let ids = await notes().map(\.id)
+        var made = 0
+        for id in ids {
+            let n = await store { sve_relations_refresh($0, id) }
+            if n > 0 { made += 1 }
+        }
+        UserDefaults.standard.set(true, forKey: key)
+        NSLog("[sve] relations: older recordings checked: %ld, %ld with a review", ids.count, made)
+    }
+}
