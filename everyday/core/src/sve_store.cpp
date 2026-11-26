@@ -1,4 +1,5 @@
 #include "sve_store.h"
+#include <functional>
 #include "sve_memory.h"  // memory_importance
 #include "sve_embed.h"   // vector_blob
 #include <sqlite3.h>
@@ -543,6 +544,97 @@ std::vector<std::pair<int64_t, std::string>> Store::audio_older_than(int days) {
         out.emplace_back(sqlite3_column_int64(st, 0), reinterpret_cast<const char *>(sqlite3_column_text(st, 1)));
     sqlite3_finalize(st);
     return out;
+}
+
+// `from` replaced by `to` in text: ASCII words whole and case-insensitive, other scripts wherever they occur.
+static std::string replace_word_in(const std::string &text, const std::string &from, const std::string &to, int &n) {
+    if (from.empty() || text.empty()) return text;
+    const bool ascii = std::all_of(from.begin(), from.end(), [](char c) { return (unsigned char)c < 0x80; });
+    auto low = [](std::string x) {
+        for (auto &c : x) c = (char)std::tolower((unsigned char)c);
+        return x;
+    };
+    const std::string hay = ascii ? low(text) : text, needle = ascii ? low(from) : from;
+    auto word_char = [](unsigned char c) { return std::isalnum(c) || c == '_' || c >= 0x80; };
+    std::string out;
+    size_t i = 0;
+    while (i < text.size()) {
+        const size_t at = hay.find(needle, i);
+        if (at == std::string::npos) break;
+        const size_t end = at + needle.size();
+        const bool whole = !ascii || ((at == 0 || !word_char((unsigned char)text[at - 1])) &&
+                                      (end >= text.size() || !word_char((unsigned char)text[end])));
+        out += text.substr(i, at - i);
+        if (whole) { out += to; ++n; } else out += text.substr(at, needle.size());
+        i = end;
+    }
+    out += text.substr(i);
+    return out;
+}
+
+int Store::replace_word(int64_t note_id, const std::string &from, const std::string &to) {
+    if (from.empty() || from == to || !get(note_id)) return -1;
+    if (!begin()) return -1;
+    int changed = 0;
+    bool ok = true;
+    // Every (table, key columns, text column) row of the note: read, replace, write back what changed.
+    auto pass = [&](const std::string &select, const std::vector<json> &binds, const std::string &update,
+                    const std::vector<std::string> &keys, const std::string &col, bool is_json) {
+        if (!ok) return;
+        for (const auto &row : query_rows(select.c_str(), binds)) {
+            if (!row.contains(col)) continue;
+            const bool parsed = row[col].is_object() || row[col].is_array();   // query_rows parses JSON columns
+            if (!row[col].is_string() && !(is_json && parsed)) continue;
+            const std::string before = parsed ? std::string() : row[col].get<std::string>();
+            int n = 0;
+            std::string after;
+            if (is_json) {   // a JSON payload: its string values only, never its keys
+                json j = parsed ? row[col] : json::parse(before, nullptr, false);
+                if (j.is_discarded()) continue;
+                std::function<void(json &)> walk = [&](json &v) {
+                    if (v.is_string()) v = replace_word_in(v.get<std::string>(), from, to, n);
+                    else if (v.is_array() || v.is_object()) for (auto &x : v) walk(x);
+                };
+                walk(j);
+                after = j.dump(-1, ' ', false, json::error_handler_t::replace);
+            } else {
+                after = replace_word_in(before, from, to, n);
+            }
+            if (n == 0) continue;
+            std::vector<json> b = {after};
+            for (const auto &k : keys) b.push_back(row[k]);
+            ok = ok && run(update.c_str(), b);
+            ++changed;
+        }
+    };
+    const json id = note_id;
+    pass("SELECT note_id, idx, text FROM transcript_pieces WHERE note_id=?", {id},
+         "UPDATE transcript_pieces SET text=? WHERE note_id=? AND idx=?", {"note_id", "idx"}, "text", false);
+    for (const char *col : {"title", "transcript", "short_summary", "detailed_notes", "revision_questions"})
+        pass(std::string("SELECT id, ") + col + " FROM notes WHERE id=?", {id},
+             std::string("UPDATE notes SET ") + col + "=? WHERE id=?", {"id"}, col, false);
+    pass("SELECT note_id, idx, kind, text FROM section_outputs WHERE note_id=?", {id},
+         "UPDATE section_outputs SET text=? WHERE note_id=? AND idx=? AND kind=?", {"note_id", "idx", "kind"}, "text", false);
+    pass("SELECT note_id, idx, summary_json FROM sections WHERE note_id=?", {id},
+         "UPDATE sections SET summary_json=? WHERE note_id=? AND idx=?", {"note_id", "idx"}, "summary_json", true);
+    const std::string mems = "SELECT m.id AS id, m.text AS text, m.who AS who, m.to_whom AS to_whom FROM memories m "
+                             "WHERE m.id IN (SELECT memory_id FROM memory_sources WHERE note_id=?)";
+    for (const char *col : {"text", "who", "to_whom"})
+        pass(mems, {id}, std::string("UPDATE memories SET ") + col + "=? WHERE id=?", {"id"}, col, false);
+    pass("SELECT memory_id, note_id, start_sec, quote FROM memory_sources WHERE note_id=?", {id},
+         "UPDATE memory_sources SET quote=? WHERE memory_id=? AND note_id=? AND start_sec=?",
+         {"memory_id", "note_id", "start_sec"}, "quote", false);
+    pass("SELECT id, payload FROM suggestions WHERE note_id=?", {id}, "UPDATE suggestions SET payload=? WHERE id=?", {"id"}, "payload", true);
+    pass("SELECT id, quote FROM suggestions WHERE note_id=?", {id}, "UPDATE suggestions SET quote=? WHERE id=?", {"id"}, "quote", false);
+    for (const char *col : {"text", "who"})
+        pass(std::string("SELECT id, ") + col + " FROM tasks WHERE note_id=?", {id},
+             std::string("UPDATE tasks SET ") + col + "=? WHERE id=?", {"id"}, col, false);
+    pass("SELECT id, text FROM reminders WHERE note_id=?", {id}, "UPDATE reminders SET text=? WHERE id=?", {"id"}, "text", false);
+    for (const char *col : {"from_name", "to_text", "quote"})
+        pass(std::string("SELECT id, ") + col + " FROM relations WHERE note_id=?", {id},
+             std::string("UPDATE relations SET ") + col + "=? WHERE id=?", {"id"}, col, false);
+    if (!ok) { std::string e = err_; rollback(); err_ = e; return -1; }
+    return commit() ? changed : -1;
 }
 
 bool Store::setting_set(const std::string &k, const std::string &v) {

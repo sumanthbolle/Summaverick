@@ -48,6 +48,13 @@ public:
     // {id, audio_path} of recordings whose usable transcript was saved more than `days` days ago (notes.transcribed_at).
     // A recording with no usable transcript yet is never returned: it is still needed to transcribe.
     std::vector<std::pair<int64_t, std::string>> audio_older_than(int days);
+    // "Fix a word": `from` (a word heard wrong) becomes `to` in everything this note produced: its transcript
+    // pieces and transcript, title, summary, notes, questions and section outputs, the memories it is a source of
+    // (text, who, to whom, its quotes), its reminder/task cards (payload and quote), its tasks and reminders, and its
+    // map relationships. Whole words only for ASCII (case-insensitive; "Ravi" never changes "Ravindra"); a word in
+    // another script is replaced where it occurs (Telugu adds case endings to the word). One transaction. Returns
+    // how many fields changed, -1 on error (nothing changed).
+    int replace_word(int64_t note_id, const std::string &from, const std::string &to);
 
     // Explicit transaction for multi-row changes (not nested; set_pieces/merge_topics use their own).
     // IMMEDIATE: the write lock is taken at BEGIN, where the busy timeout applies. A deferred transaction that

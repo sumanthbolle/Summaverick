@@ -409,3 +409,87 @@ TEST(verify_side_clause_negation_is_not_the_claim) {
     CHECK(!polarity_conflict("The launch has been decided for next month on the 15th, not this month.", p));
     CHECK(polarity_conflict("The launch is not next month on the 15th", p));
 }
+
+// Review of 9b6c400 (2026-11-26): four reproductions that were accepted, and the unchecked state.
+namespace {
+json planning() {
+    return json::array({
+        {{"start_sec", 0}, {"text", "Ravi: We could approve the budget increase next quarter."}},
+        {{"start_sec", 30}, {"text", "Priya: I will fix the login bug by Friday."}},
+        {{"start_sec", 60}, {"text", "Ravi: Good. Let me check the calendar for the review."}},
+        {{"start_sec", 90}, {"text", "Kiran: Testing needs another device."}},
+        {{"start_sec", 120}, {"text", "Ravi: I will order the test phones by Monday."}},
+    });
+}
+const ModelFn kFailing = [](const std::string &, const std::string &, const std::string &, int, std::string &) { return false; };
+const ModelFn kYes = [](const std::string &, const std::string &, const std::string &, int, std::string &o) { o = "yes"; return true; };
+std::string status_of(const VerifyResult &r, const std::string &part, const std::string &prefix) {
+    for (const auto &e : r.evidence)
+        if (jstr(e, "part") == part && jstr(e, "item").rfind(prefix, 0) == 0) return jstr(e, "status");
+    return "";
+}
+}  // namespace
+
+TEST(verify_could_is_not_decided) {
+    const json p = planning();
+    CHECK(undecided("We could approve the budget increase next quarter"));
+    CHECK_EQ(said_check("We decided to approve the budget increase", p), -2);
+    VerifyInput in;
+    in.pieces = p;
+    int calls = 0, unjudged = 0;
+    auto f = check_output("notes", "## Decisions\n- We decided to approve the budget increase\n", in, kNo, calls, unjudged);
+    CHECK_EQ(f.size(), (size_t)1);
+    if (!f.empty()) CHECK_EQ(f[0].check, "meaning");
+    CHECK(calls >= 1);   // the judge was asked
+}
+
+TEST(verify_date_moved_to_another_task_is_caught) {
+    const json p = planning();
+    CHECK_EQ(binding_conflict("Fix the login bug Priya Monday", p), "wd1");
+    CHECK_EQ(binding_conflict("Fix the login bug Priya Friday", p), "");
+    CHECK_EQ(binding_conflict("Order the test phones Ravi Monday", p), "");
+    CHECK_EQ(binding_conflict("Order the test phones Kiran Monday", p), "");   // named in the window (Kiran asked)
+    VerifyInput in;
+    in.pieces = p;
+    int calls = 0, unjudged = 0;
+    auto f = check_output("notes", "## Action items\n- [ ] Fix the login bug — Priya — Monday\n", in, kNo, calls, unjudged);
+    CHECK_EQ(f.size(), (size_t)1);
+    if (!f.empty()) CHECK_EQ(f[0].check, "binding");
+    calls = 0;
+    CHECK(check_output("notes", "## Action items\n- [ ] Fix the login bug — Priya — Friday\n", in, kNo, calls, unjudged).empty());
+}
+
+TEST(verify_invented_relationship_with_real_quote_is_not_passed) {
+    VerifyInput in;
+    in.pieces = planning();
+    in.memories = json::array({{{"id", 9}, {"text", "The team decided to buy an office in London"}, {"type", "decision"},
+                                {"who", "Ravi"}, {"quote", "I will order the test phones by Monday."}, {"start_sec", 120}}});
+    CHECK(!quote_supports("The team decided to buy an office in London", "I will order the test phones by Monday."));
+    // A judge that says no: flagged.
+    VerifyResult r = verify_outputs(in, kNo, nullptr, nullptr);
+    CHECK_EQ(r.relation_flags.size(), (size_t)1);
+    if (!r.relation_flags.empty()) CHECK_EQ(jstr(r.relation_flags[0], "check"), "grounded");
+    CHECK_EQ(status_of(r, "relation", "The team decided"), "failed");
+    // A judge that fails: unchecked, never passed.
+    VerifyResult u = verify_outputs(in, kFailing, nullptr, nullptr);
+    CHECK(u.relation_flags.empty());
+    CHECK_EQ(status_of(u, "relation", "The team decided"), "unchecked");
+    CHECK_EQ(u.unchecked.size(), (size_t)1);
+    // A judge that says yes: passed.
+    VerifyResult y = verify_outputs(in, kYes, nullptr, nullptr);
+    CHECK_EQ(status_of(y, "relation", "The team decided"), "passed");
+}
+
+TEST(verify_judge_failure_leaves_claims_unchecked) {
+    VerifyInput in;
+    in.pieces = planning();
+    in.summary = "The quarterly offsite moves to Goa.";   // nothing of it said: only the judge can decide
+    VerifyResult r = verify_outputs(in, kFailing, nullptr, nullptr);
+    CHECK(!r.parts.empty() && !r.parts[0].please_check);   // no "Please check" on a guess
+    CHECK_EQ(r.parts[0].unchecked.size(), (size_t)1);
+    CHECK_EQ(status_of(r, "summary", "The quarterly offsite"), "unchecked");
+    CHECK(r.unjudged >= 1);
+    // No judge at all is the same: unchecked, not passed.
+    VerifyResult n = verify_outputs(in, nullptr, nullptr, nullptr);
+    CHECK_EQ(status_of(n, "summary", "The quarterly offsite"), "unchecked");
+}

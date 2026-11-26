@@ -511,6 +511,14 @@ final class ProcessingPipeline {
     }
     /// The note's outputs are stored and their check has not finished yet.
     func checksPending(_ id: Int64) -> Bool { checksDue.contains(id) }
+    /// The note's stored outputs changed outside a run ("Fix a word"): they are owed a check again, which the resume
+    /// loop runs when the phone may (the same rules as any due check).
+    func recheck(_ id: Int64) {
+        checksDue.insert(id)
+        UserDefaults.standard.removeObject(forKey: Self.checkFailuresKey(id))
+        ActivityLog.log("check_due", note: id, ["why": "fixed_word"])
+        if !isWorking && !resuming { Task { await self.resumeInterrupted() } }
+    }
     /// Insights and checks still owed to notes whose outputs are stored: the resume loop's last turns.
     private var afterNotesDue: Set<Int64> { insightDue.union(checksDue) }
     /// Notes whose insight stepped aside for a recording (LiveFirst.insightStaysDue): written after Stop, from the
@@ -1676,6 +1684,9 @@ final class ProcessingPipeline {
         }
         // The detailed notes and the questions are stored: "ready" now (when the app is not in front), not after the
         // memories.
+        // The outputs are stored: their check is owed from this moment, before "ready" is announced, so an app killed
+        // anywhere after this point still has the note in checksDue (kept across launches) and checks it later.
+        checksDue.insert(id)
         let step = partStored(.notes)
         notifyStage(id, NotifyRule.notes) { NotesNotifier.notesReady(noteID: id, title: $0, step: step, hold: $1) }
         RecordingActivities.shared.update(noteID: id, .ready, line: noteTitles[id] ?? "", percent: 100)
@@ -1697,9 +1708,9 @@ final class ProcessingPipeline {
         // Memories now, never before them; a stop or failure here never fails the notes
         // (sections left are done later, idle in front or overnight).
         _ = await writeMemories(noteID: id, quiet: false, span: after.memories)
-        // The parent's check of every output, after the memories and the action items (NoteCheck). Owed from here
-        // until it has a verdict: a skip or failure leaves it due for the resume loop (checksDue).
-        checksDue.insert(id)
+        // The parent's check of every output, after the memories and the action items (NoteCheck). Owed since the
+        // outputs were stored (checksDue): a skip or failure leaves it due for the resume loop.
+        checksDue.insert(id)   // already in; kept for a refill that stored nothing new
         await checkNote(id)
         ContinuedWork.shared.update(afterNotes: after.insight)   // the insight: the note's last part, under the same task
         if !refill { await writeInsight(id) }   // a part written again does not change the insight

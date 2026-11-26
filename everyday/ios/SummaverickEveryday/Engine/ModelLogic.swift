@@ -1007,6 +1007,10 @@ enum NoteCheck {
         let memories_flagged: Int?
         let actions_flagged: Int?
         let judge_calls: Int?
+        /// Claims no check could decide (no judge, no budget, no clear reply). Reports written before the count
+        /// existed have only `unjudged`, which counts the same thing.
+        let unchecked_count: Int?
+        let unjudged: Int?
         let cancelled: Bool?
         let events: [Event]?
 
@@ -1028,8 +1032,16 @@ enum NoteCheck {
         guard let r = report, !r.isCancelled else { return nil }
         let flaggedParts = (r.parts ?? [:]).values.filter(\.please_check)
         let items = flaggedParts.reduce(0) { $0 + max(1, $1.items?.count ?? 0) } + (r.memories_flagged ?? 0) + (r.actions_flagged ?? 0)
-        if items == 0 { return (String(localized: "Checked against the recording"), "checkmark.seal") }
-        return (String(localized: "Finished · \(items) items need review"), "exclamationmark.circle")
+        // Passed, failed and unchecked stay apart: "Checked" only when every claim passed.
+        let unchecked = r.unchecked_count ?? r.unjudged ?? 0
+        if items > 0 {
+            if unchecked > 0 {
+                return (String(localized: "Finished · \(items) items need review · \(unchecked) not checked"), "exclamationmark.circle")
+            }
+            return (String(localized: "Finished · \(items) items need review"), "exclamationmark.circle")
+        }
+        if unchecked > 0 { return (String(localized: "Partly checked · \(unchecked) items could not be checked"), "questionmark.circle") }
+        return (String(localized: "Checked against the recording"), "checkmark.seal")
     }
     static func report(_ json: String) -> Report? {
         guard let d = json.data(using: .utf8) else { return nil }
