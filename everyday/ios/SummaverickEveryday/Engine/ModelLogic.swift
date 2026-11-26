@@ -988,11 +988,19 @@ enum NoteCheck {
         let attempt: Int, total: Int, failed: Int
         let id: Int64?
     }
+    /// A flagged line and where the recording says it (start_sec -1: not found), so the person can listen.
+    struct Evidence: Decodable, Equatable, Hashable {
+        let item: String
+        let check: String?
+        let start_sec: Int?
+        var startSec: Int? { (start_sec ?? -1) >= 0 ? start_sec : nil }
+    }
     struct Part: Decodable, Equatable {
         let please_check: Bool
         let retries: Int
         let checks: [String]
         let items: [String]?
+        let evidence: [Evidence]?
     }
     struct Report: Decodable {
         let parts: [String: Part]?
@@ -1037,9 +1045,10 @@ enum NoteCheck {
         p.checks.compactMap { c in
             switch c {
             case "language": return String(localized: "Parts may not be in your language.")
-            case "grounded": return String(localized: "Some decisions or action items may not be in the recording.")
+            case "grounded": return String(localized: "Some lines may not be in the recording.")
             case "owner": return String(localized: "Some action items may name the wrong person.")
-            case "meaning": return String(localized: "Some decisions may say the opposite of what was said.")
+            case "meaning": return String(localized: "Some lines may say the opposite of what was said, or call settled what is still open.")
+            case "consistency": return String(localized: "Some lines disagree with another part of this note.")
             case "noise": return String(localized: "Some lines may repeat or come from background noise.")
             case "answerable": return String(localized: "Some questions may not be answered by the recording.")
             default: return nil

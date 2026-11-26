@@ -315,7 +315,7 @@ std::vector<std::string> decision_action_lines(const std::string &notes) {
 // Whether a clause is negated: "not", "never", "didn't", "no one"; Telugu "లేదు", "కాదు", "వద్దు".
 bool negated(const std::string &clause) {
     static const std::set<std::string> words = {"not", "no", "never", "nobody", "nothing", "neither", "nor",
-                                                "cannot", "without", "dont", "didnt", "doesnt", "wont", "cant",
+                                                "cannot", "dont", "didnt", "doesnt", "wont", "cant",
                                                 "isnt", "arent", "wasnt", "werent", "havent", "hasnt", "hadnt",
                                                 "shouldnt", "wouldnt", "couldnt", "mustnt"};
     std::string low;
@@ -333,25 +333,81 @@ bool negated(const std::string &clause) {
     return false;
 }
 
-// The clauses of the transcript: each piece split at , . ; : ! ? and "but".
-std::vector<std::string> clauses_of(const json &pieces) {
+// A text's clauses: split at , . ; : ! ? and "but".
+std::vector<std::string> split_clauses(const std::string &text) {
     std::vector<std::string> out;
-    if (!pieces.is_array()) return out;
-    for (const auto &p : pieces) {
-        std::string text = jstr(p, "text"), cur;
-        for (size_t i = 0; i <= text.size(); ++i) {
-            const bool end = i == text.size() || std::strchr(",.;:!?", text[i]) ||
-                             (text.compare(i, 5, " but ") == 0);
-            if (!end) { cur += text[i]; continue; }
-            if (!trim(cur).empty()) out.push_back(trim(cur));
-            cur.clear();
-            if (i < text.size() && text[i] == ' ') i += 3;   // past " but"
-        }
+    std::string cur;
+    for (size_t i = 0; i <= text.size(); ++i) {
+        const bool end = i == text.size() || std::strchr(",.;:!?", text[i]) || (text.compare(i, 5, " but ") == 0);
+        if (!end) { cur += text[i]; continue; }
+        if (!trim(cur).empty()) out.push_back(trim(cur));
+        cur.clear();
+        if (i < text.size() && text[i] == ' ') i += 3;   // past " but"
     }
     return out;
 }
 
+// The clauses of the transcript: each piece's.
+std::vector<std::string> clauses_of(const json &pieces) {
+    std::vector<std::string> out;
+    if (!pieces.is_array()) return out;
+    for (const auto &p : pieces)
+        for (auto &c : split_clauses(jstr(p, "text"))) out.push_back(std::move(c));
+    return out;
+}
+
+// Words that leave a matter open: pending, proposed, asked, not decided yet ("Approval is still pending").
+bool undecided(const std::string &clause) {
+    std::string low;
+    for (char c : clause) low += (unsigned char)c < 0x80 ? (char)std::tolower((unsigned char)c) : c;
+    if (low.find('?') != std::string::npos) return true;
+    static const char *marks[] = {"pending", "not yet", "still open", "propos", "suggest", "maybe", "might ",
+                                  "consider", "should we", "what if", "not decided", "undecided", "to be decided",
+                                  "tbd", "awaiting", "waiting for", "not clear", "unclear", "will decide",
+                                  "provisional", "tentative", "not final", "on hold", "interim", "subject to",
+                                  "conditional", "తాత్కాలిక",
+                                  "ఇంకా", "పెండింగ్", "ప్రతిపాద", "ఆలోచిద్దాం", "నిర్ణయించలేదు"};
+    for (const char *m : marks)
+        if (low.find(m) != std::string::npos) return true;
+    return false;
+}
+
+// A line that states as settled what a transcript clause about it leaves open: the line has no "open" words and is
+// not negated, and a clause sharing one of its content words (names left aside: they match too widely) says it is
+// pending, proposed or asked. "Priya approved the budget" against "Approval is still pending".
+bool undecided_conflict(const std::string &line, const json &pieces) {
+    if (undecided(line) || negated(line)) return false;
+    std::vector<std::string> w;
+    for (const auto &t : content_tokens(line)) {
+        bool name = false;
+        if (pieces.is_array())
+            for (const auto &p : pieces) {
+                const std::string sp = speaker_of(jstr(p, "text"));
+                if (!sp.empty() && match_tokens(sp) == std::vector<std::string>{t}) { name = true; break; }
+            }
+        if (!name && !is_number(t)) w.push_back(t);
+    }
+    if (w.empty()) return false;
+    for (const auto &c : clauses_of(pieces)) {
+        if (!undecided(c)) continue;
+        for (const auto &u : match_tokens(c))
+            for (const auto &t : w)
+                if (t == u || same_word(t, u)) return true;
+    }
+    return false;
+}
+
+bool clause_polarity_conflict(const std::string &line, const json &pieces);
+
+// Clause by clause: "decided for the 15th, not this month" is two claims, and a clause too short to measure
+// ("not this month") never makes the whole line read as negated (measured 2026-11-26, team_meeting).
 bool polarity_conflict(const std::string &line, const json &pieces) {
+    for (const auto &c : split_clauses(line))
+        if (clause_polarity_conflict(c, pieces)) return true;
+    return false;
+}
+
+bool clause_polarity_conflict(const std::string &line, const json &pieces) {
     const std::vector<std::string> w = content_tokens(line);
     if (w.size() < 2) return false;
     size_t best = 0;
@@ -383,7 +439,65 @@ int said_check(const std::string &line, const json &pieces) {
     size_t found = 0;
     for (const auto &t : w) found += said_word(t, s);
     if (found * 4 < w.size() * 3) return 0;
-    return polarity_conflict(line, pieces) ? -2 : 1;
+    return polarity_conflict(line, pieces) || undecided_conflict(line, pieces) ? -2 : 1;
+}
+
+std::vector<std::string> summary_claims(const std::string &summary) {
+    std::vector<std::string> out;
+    for (const auto &raw : lines_of(summary)) {
+        const std::string l = trim(raw);
+        if (l.empty() || l[0] == '#') continue;
+        std::string body = bullet_text(l), cur;
+        for (size_t i = 0; i <= body.size(); ++i) {
+            const bool end = i == body.size() || ((body[i] == '.' || body[i] == '!' || body[i] == '?') &&
+                                                  (i + 1 == body.size() || body[i + 1] == ' '));
+            if (!end) { cur += body[i]; continue; }
+            if (i < body.size()) cur += body[i];
+            const std::string c = trim(cur);
+            cur.clear();
+            if (content_tokens(c).size() >= 2) out.push_back(c);
+        }
+    }
+    return out;
+}
+
+int64_t evidence_sec(const std::string &claim, const json &pieces) {
+    if (!pieces.is_array()) return -1;
+    const std::vector<std::string> w = content_tokens(claim);
+    if (w.empty()) return -1;
+    size_t best = 0;
+    int64_t sec = -1;
+    for (const auto &p : pieces) {
+        const std::vector<std::string> pt = match_tokens(jstr(p, "text"));
+        size_t n = 0;
+        for (const auto &t : w)
+            for (const auto &u : pt)
+                if (t == u || same_word(t, u)) { ++n; break; }
+        if (n > best) { best = n; sec = jint(p, "start_sec", -1); }
+    }
+    return best * 2 >= w.size() || best >= 2 ? sec : -1;
+}
+
+std::vector<std::pair<Claim, Claim>> conflicting_claims(const std::vector<Claim> &claims) {
+    std::vector<std::pair<Claim, Claim>> out;
+    std::vector<std::vector<std::string>> toks;
+    for (const auto &c : claims) toks.push_back(content_tokens(c.text));
+    for (size_t i = 0; i < claims.size(); ++i)
+        for (size_t j = i + 1; j < claims.size(); ++j) {
+            if (claims[i].part == claims[j].part && claims[i].id == claims[j].id) continue;
+            if (claims[i].part == claims[j].part && claims[i].part != "memory") continue;   // one output: its own business
+            const auto &a = toks[i], &b = toks[j];
+            const size_t shorter = std::min(a.size(), b.size());
+            if (shorter < 2) continue;
+            size_t shared = 0;
+            for (const auto &t : a)
+                for (const auto &u : b)
+                    if (t == u || same_word(t, u)) { ++shared; break; }
+            if (shared < 2 || shared * 10 < shorter * 6) continue;
+            const bool open_a = undecided(claims[i].text), open_b = undecided(claims[j].text);
+            if (negated(claims[i].text) != negated(claims[j].text) || open_a != open_b) out.push_back({claims[i], claims[j]});
+        }
+    return out;
 }
 
 bool said_in(const std::string &line, const json &pieces) { return said_check(line, pieces) == 1; }
@@ -583,35 +697,43 @@ std::vector<Failure> check_output(const std::string &part, const std::string &te
     };
     const std::string same_meaning =
         "\n\nDo the transcript lines say this, in any language, with the same meaning? Answer no if they say the "
-        "opposite (for example \"did not approve\" against \"approved\"), or only propose or ask about what the line "
-        "states as decided or agreed. Answer yes or no.";
+        "opposite (for example \"did not approve\" against \"approved\"), or only propose, ask about or leave pending "
+        "what the line states as decided, done or agreed. Answer yes or no.";
+    // A claim against the transcript: every number said, the words said (else the judge), the same meaning.
+    auto check_claim = [&](const std::string &l, const char *what) {
+        const int code = said_check(l, in.pieces);
+        if (code == 1) return;
+        const int64_t sec = evidence_sec(l, in.pieces);
+        if (code == -1) { f.push_back({"grounded", l, sec}); return; }
+        const std::string prompt = "Transcript lines:\n" + judge_context(l, in.pieces) + "\nA line of the " + what +
+                                   ": \"" + l + "\"" + same_meaning;
+        if (code == -2) {
+            if (!cleared("verify_meaning", prompt)) f.push_back({"meaning", l, sec});
+            return;
+        }
+        if (judged("verify_grounded", prompt) != 1) f.push_back({"grounded", l, sec});
+    };
+    if (part == "summary")
+        for (const auto &l : summary_claims(text)) check_claim(l, "summary");
     if (part == "notes") {
         for (const auto &l : decision_action_lines(text)) {
             const std::string by = wrong_owner(l, in.pieces);
-            if (!by.empty()) { f.push_back({"owner", l + " (said by " + by + ")"}); continue; }
-            const int code = said_check(l, in.pieces);
-            if (code == 1) continue;
-            if (code == -1) { f.push_back({"grounded", l}); continue; }
-            const std::string prompt =
-                "Transcript lines:\n" + judge_context(l, in.pieces) + "\nA line of the notes: \"" + l + "\"" + same_meaning;
-            if (code == -2) {
-                if (!cleared("verify_meaning", prompt)) f.push_back({"meaning", l});
-                continue;
-            }
-            if (judged("verify_grounded", prompt) != 1) f.push_back({"grounded", l});
+            if (!by.empty()) { f.push_back({"owner", l + " (said by " + by + ")", evidence_sec(l, in.pieces)}); continue; }
+            check_claim(l, "notes");
         }
     }
     if (part == "questions") {
         for (const auto &qa : parse_qa(text)) {
             const int code = said_check(qa.a, in.pieces);
             if (code == 1) continue;
-            if (code == -1) { f.push_back({"answerable", qa.q}); continue; }
+            const int64_t sec = evidence_sec(qa.q + " " + qa.a, in.pieces);
+            if (code == -1) { f.push_back({"answerable", qa.q, sec}); continue; }
             const std::string prompt = "Transcript lines:\n" + judge_context(qa.q + " " + qa.a, in.pieces) +
                                        "\nA revision question: \"" + qa.q + "\"\nIts answer: \"" + qa.a +
                                        "\"\n\nCan the question be answered from the transcript lines, with this answer "
                                        "and the same meaning (not its opposite)? Answer yes or no.";
             if (code == -2 ? !cleared("verify_meaning", prompt) : judged("verify_answerable", prompt) != 1)
-                f.push_back({"answerable", qa.q});
+                f.push_back({"answerable", qa.q, sec});
         }
     }
     return f;
@@ -619,7 +741,7 @@ std::vector<Failure> check_output(const std::string &part, const std::string &te
 
 std::string feedback_for(const std::string &part, const std::vector<Failure> &failures, const std::string &lang_name,
                          const std::vector<std::string> &not_said) {
-    std::vector<std::string> grounded, noise, answerable, owner, meaning;
+    std::vector<std::string> grounded, noise, answerable, owner, meaning, consistency;
     bool language = false;
     for (const auto &x : failures) {
         if (x.check == "language") language = true;
@@ -628,6 +750,7 @@ std::string feedback_for(const std::string &part, const std::vector<Failure> &fa
         else if (x.check == "answerable") answerable.push_back(x.item);
         else if (x.check == "owner") owner.push_back(x.item);
         else if (x.check == "meaning") meaning.push_back(x.item);
+        else if (x.check == "consistency") consistency.push_back(x.item);
     }
     std::string fb = "A check of your earlier " + part + " found problems. Write it again and fix them:\n";
     if (language) fb += "- Write all of it in " + lang_name + " (names and terms from other languages may stay, in brackets).\n";
@@ -638,6 +761,9 @@ std::string feedback_for(const std::string &part, const std::vector<Failure> &fa
         fb += "- These lines say the opposite of the transcript, or write as decided what was only proposed or asked. "
               "Write each one with the meaning the transcript gives it (\"did not approve\" stays not approved):\n" +
               quoted_list(meaning);
+    if (!consistency.empty())
+        fb += "- These lines disagree with another part of the notes about the same thing, and the transcript does not "
+              "say them this way. Write each one as the transcript says it:\n" + quoted_list(consistency);
     if (!owner.empty())
         fb += "- These lines give the action or decision to the wrong person. Each line of the transcript starts with "
               "who said it; write who said or took it on as the transcript shows:\n" + quoted_list(owner);
@@ -667,6 +793,46 @@ std::string check_names(const std::vector<Failure> &f) {
 
 }  // namespace
 
+namespace {
+
+const char *kSameMeaning =
+    "\n\nDo the transcript lines say this, in any language, with the same meaning? Answer no if they say the opposite "
+    "(for example \"did not approve\" against \"approved\"), or only propose, ask about or leave pending what the line "
+    "states as decided, done or agreed. Answer yes or no.";
+
+// Only a judge "yes" clears a claim with evidence against it (no judge, no budget or no clear reply: not cleared).
+bool cleared_by(const ModelFn &judge, int &judge_calls, const std::string &phase, const std::string &prompt) {
+    if (!judge || judge_calls >= kMaxJudgeCalls) return false;
+    ++judge_calls;
+    return yes_no(judge, phase, prompt) == 1;
+}
+
+std::vector<std::string> claims_of(const std::string &part, const std::string &text) {
+    if (part == "summary") return summary_claims(text);
+    if (part == "notes") return decision_action_lines(text);
+    std::vector<std::string> out;
+    if (part == "questions")
+        for (const auto &qa : parse_qa(text)) {
+            // The question asks; its answer is the claim. Without the "?", a question reads as an open matter.
+            std::string q = qa.q;
+            q.erase(std::remove(q.begin(), q.end(), '?'), q.end());
+            out.push_back(q + " " + qa.a);
+        }
+    return out;
+}
+
+bool relationship_memory(const json &m) {
+    const std::string t = jstr(m, "type");
+    return t == "decision" || t == "question" || t == "promise";
+}
+
+// The claim does not match the transcript by code: the opposite meaning, or settled where it is open.
+bool off_source(const std::string &claim, const json &pieces) {
+    return polarity_conflict(claim, pieces) || undecided_conflict(claim, pieces);
+}
+
+}  // namespace
+
 VerifyResult verify_outputs(const VerifyInput &in, const ModelFn &judge, const RewriteFn &rewrite, const EventFn &on_event) {
     VerifyResult r;
     r.summary = in.summary;
@@ -678,6 +844,51 @@ VerifyResult verify_outputs(const VerifyInput &in, const ModelFn &judge, const R
     };
     const std::string lname = language_name(in.lang);
 
+    // The claims of every output but `part` (as kept so far) and the map's relationships.
+    auto other_claims = [&](const std::string &part) {
+        std::vector<Claim> out;
+        for (const std::string p : {"summary", "notes", "questions"}) {
+            if (p == part) continue;
+            for (const auto &c : claims_of(p, p == "summary" ? r.summary : p == "notes" ? r.notes : r.questions))
+                out.push_back({p, c, 0});
+        }
+        if (in.memories.is_array())
+            for (const auto &m : in.memories)
+                if (relationship_memory(m)) out.push_back({"memory", jstr(m, "text"), jint(m, "id", 0)});
+        return out;
+    };
+    // Claims of `text` (output `part`) that another output contradicts and the transcript does not back.
+    auto consistency = [&](const std::string &part, const std::string &text, const std::vector<Failure> &already) {
+        std::vector<Failure> f;
+        std::vector<Claim> all;
+        for (const auto &c : claims_of(part, text)) all.push_back({part, c, 0});
+        if (all.empty()) return f;
+        const size_t own = all.size();
+        for (const auto &c : other_claims(part)) all.push_back(c);
+        std::set<std::string> done;
+        for (const auto &x : already) done.insert(x.item);
+        for (const auto &pr : conflicting_claims(all)) {
+            const Claim *mine = pr.first.part == part ? &pr.first : pr.second.part == part ? &pr.second : nullptr;
+            if (!mine || (&pr.first == mine ? &pr.second : &pr.first)->part == part) continue;
+            if (done.count(mine->text)) continue;
+            const Claim &theirs = &pr.first == mine ? pr.second : pr.first;
+            // Failed only on evidence: the transcript backs the other output and not this one (by code). Otherwise the
+            // disagreement is left to each claim's own source check: a hypothetical question ("if he had sent it
+            // without...") or a paraphrase reads as a contradiction to word matching, and a judge asked about it
+            // in isolation says no to anything not stated as such (measured 2026-11-26: false flags on 2 of 5).
+            const bool mine_off = off_source(mine->text, in.pieces), theirs_off = off_source(theirs.text, in.pieces);
+            if (!mine_off || theirs_off) continue;
+            f.push_back({"consistency", mine->text, evidence_sec(mine->text, in.pieces)});
+            done.insert(mine->text);
+        }
+        (void)own;
+        return f;
+    };
+    auto with_consistency = [&](const std::string &part, const std::string &text, std::vector<Failure> f) {
+        for (auto &x : consistency(part, text, f)) f.push_back(std::move(x));
+        return f;
+    };
+
     for (const std::string part : {"summary", "notes", "questions"}) {
         std::string &text = part == "summary" ? r.summary : part == "notes" ? r.notes : r.questions;
         if (trim(text).empty()) continue;
@@ -688,7 +899,7 @@ VerifyResult verify_outputs(const VerifyInput &in, const ModelFn &judge, const R
             return part == "notes" ? 1 + (int)decision_action_lines(t).size()
                  : part == "questions" ? 1 + (int)parse_qa(t).size() : 1;
         };
-        std::vector<Failure> best = check_output(part, text, in, judge, r.judge_calls, r.unjudged);
+        std::vector<Failure> best = with_consistency(part, text, check_output(part, text, in, judge, r.judge_calls, r.unjudged));
         emit({part, check_names(best), "check", 0, measured(text), (int)best.size(), 0});
         // Too little said: writing it again cannot help.
         const bool hopeless = std::any_of(best.begin(), best.end(), [](const Failure &x) {
@@ -702,7 +913,7 @@ VerifyResult verify_outputs(const VerifyInput &in, const ModelFn &judge, const R
             v.retries = attempt;
             std::string out;
             if (!rewrite(part, attempt, v.chosen, feedback_for(part, best, lname, noise_terms(in.pieces, in.vocab)), failing, out) || trim(out).empty()) continue;
-            std::vector<Failure> got = check_output(part, out, in, judge, r.judge_calls, r.unjudged);
+            std::vector<Failure> got = with_consistency(part, out, check_output(part, out, in, judge, r.judge_calls, r.unjudged));
             emit({part, check_names(got), "check", attempt, measured(out), (int)got.size(), 0});
             // Kept only when better: a language failure counts more than any other single line.
             auto weight = [](const std::vector<Failure> &f) {
@@ -758,6 +969,85 @@ VerifyResult verify_outputs(const VerifyInput &in, const ModelFn &judge, const R
         }
         if (total > 0) emit({kind, "quote", "check", -1, total, failed, 0});   // the tally (attempt -1)
     }
+
+    // The map's relationships, checked once on the memory each comes from (who decided, asked or promised what):
+    // the same meaning as the transcript, the right person, and no output saying otherwise. A flagged one waits for
+    // the person in the relations review with its reason and where it is said.
+    if (in.memories.is_array()) {
+        std::vector<Claim> outputs;
+        for (const std::string p : {"summary", "notes", "questions"})
+            for (const auto &c : claims_of(p, p == "summary" ? r.summary : p == "notes" ? r.notes : r.questions))
+                outputs.push_back({p, c, 0});
+        int total = 0, failed = 0;
+        for (const auto &m : in.memories) {
+            if (!relationship_memory(m)) continue;
+            ++total;
+            const int64_t id = jint(m, "id", 0);
+            const std::string text = jstr(m, "text"), who = trim(jstr(m, "who")), type = jstr(m, "type");
+            const int64_t sec = evidence_sec(text, in.pieces);
+            std::string check;
+            const int code = said_check(text, in.pieces);
+            if (code == -1) check = "meaning";
+            else if (code == -2 && !cleared_by(judge, r.judge_calls, "verify_relation",
+                                                "Transcript lines:\n" + judge_context(text, in.pieces) + "\nA " + type +
+                                                    " from this recording: \"" + text + "\"" + kSameMeaning))
+                check = "meaning";
+            if (check.empty() && !who.empty()) {
+                const std::string lw = who;
+                std::string low;
+                for (char c : lw) low += (char)std::tolower((unsigned char)c);
+                if (low != "me" && low != "i" && low != "unknown" && low != "someone") {
+                    const std::string by = wrong_owner(who + " " + text, in.pieces);
+                    const std::string verb = type == "decision" ? "decided" : type == "question" ? "asked" : "promised";
+                    if (!by.empty() &&
+                        !cleared_by(judge, r.judge_calls, "verify_relation",
+                                    "Transcript lines:\n" + judge_context(text, in.pieces) + "\nDoes the transcript say that " +
+                                        who + " " + verb + " this: \"" + text + "\"? Answer no if someone else did. Answer yes or no."))
+                        check = "who";
+                }
+            }
+            if (check.empty()) {
+                std::vector<Claim> all = outputs;
+                all.push_back({"memory", text, id});
+                for (const auto &pr : conflicting_claims(all)) {
+                    if (pr.first.part != "memory" && pr.second.part != "memory") continue;
+                    const Claim &other = pr.first.part == "memory" ? pr.second : pr.first;
+                    // On evidence only, as for the outputs: the transcript backs the output and not the relationship.
+                    if (!off_source(text, in.pieces) || off_source(other.text, in.pieces)) continue;
+                    check = "consistency";
+                    break;
+                }
+            }
+            if (check.empty()) continue;
+            ++failed;
+            r.relation_flags.push_back({{"memory_id", id}, {"check", check}, {"start_sec", sec}});
+            if (std::find(r.memories_flagged.begin(), r.memories_flagged.end(), json(id)) == r.memories_flagged.end())
+                r.memories_flagged.push_back(id);
+            emit({"relation", check, "please_check", 0, 1, 1, id});
+        }
+        if (total > 0) emit({"relation", "all", "check", -1, total, failed, 0});
+    }
+
+    // The evidence of every checked claim: where the recording says it, and whether it passed.
+    for (const auto &v : r.parts) {
+        const std::string &text = v.part == "summary" ? r.summary : v.part == "notes" ? r.notes : r.questions;
+        for (const auto &c : claims_of(v.part, text)) {
+            if (r.evidence.size() >= kMaxEvidence) break;
+            bool ok = true;
+            for (const auto &f : v.failures)
+                if (f.item == c || c.rfind(f.item, 0) == 0 || f.item.rfind(c, 0) == 0) ok = false;
+            r.evidence.push_back({{"part", v.part}, {"item", c}, {"start_sec", evidence_sec(c, in.pieces)}, {"ok", ok}});
+        }
+    }
+    if (in.memories.is_array())
+        for (const auto &m : in.memories) {
+            if (!relationship_memory(m) || r.evidence.size() >= kMaxEvidence) continue;
+            const int64_t id = jint(m, "id", 0);
+            bool ok = true;
+            for (const auto &x : r.relation_flags) ok = ok && jint(x, "memory_id", 0) != id;
+            r.evidence.push_back({{"part", "relation"}, {"item", jstr(m, "text")}, {"id", id},
+                                  {"start_sec", evidence_sec(jstr(m, "text"), in.pieces)}, {"ok", ok}});
+        }
     return r;
 }
 

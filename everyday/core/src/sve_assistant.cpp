@@ -1375,7 +1375,9 @@ char *sve_insight_generate(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, vo
         const std::string userp = material + "\nToday is " + today + ".\n"
             "Write ONE short, helpful insight for the person, at most 2 sentences, in " + sve::language_name(lang) +
             ": a topic that keeps coming up, a deadline that is close, or a suggestion to revise a topic with its quiz. "
-            "Use only the material above. Do not mention medicines, doses or health advice. "
+            "Use only the material above. An observation says what the material says (\"Approval is still open\"); a "
+            "suggestion is written as yours (\"You could ...\"), never as something anyone agreed, decided or promised. "
+            "Do not mention medicines, doses or health advice. "
             "If nothing useful stands out, reply with exactly NONE.";
         std::string out;
         if (stand_in) {
