@@ -25,8 +25,15 @@ enum RecordControlState {
 
     static var isRecording: Bool { defaults?.bool(forKey: key) ?? false }
 
+    /// Whether this build is signed with the App Group. Without it `UserDefaults(suiteName:)` still answers, but
+    /// from a store private to each process, so the record control would never see a recording start.
+    static var isShared: Bool {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) != nil
+    }
+
     /// From the app, whenever a recording starts or ends (and at launch, when nothing records yet).
     static func recordingChanged(_ on: Bool) {
+        if !isShared { NSLog("[sve] record control: App Group %@ missing from this build's signing; the control cannot show the recording state", appGroup) }
         guard defaults?.object(forKey: key) as? Bool != on else { return }
         defaults?.set(on, forKey: key)
         if #available(iOS 18.0, *) { ControlCenter.shared.reloadControls(ofKind: kind) }
