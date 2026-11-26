@@ -979,8 +979,11 @@ char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *u
                     evidence.push_back({{"item", f.item}, {"check", f.check}, {"start_sec", f.start_sec}});
                 }
             }
+            json unchecked = json::array();
+            for (const auto &u : v.unchecked)
+                if (unchecked.size() < 6) unchecked.push_back({{"item", u.item}, {"start_sec", u.start_sec}});
             parts[v.part] = {{"please_check", v.please_check}, {"retries", v.retries}, {"chosen", v.chosen},
-                             {"checks", checks}, {"items", items}, {"evidence", evidence}};
+                             {"checks", checks}, {"items", items}, {"evidence", evidence}, {"unchecked", unchecked}};
         }
         for (const auto &f : r.memory_fixes)
             if (!st.set_memory_source_quote(jint(f, "id", 0), note_id, jint(f, "start_sec", 0), jstr(f, "quote")))
@@ -1003,6 +1006,8 @@ char *sve_verify_note(sve_ctx *ctx, int64_t note_id, sve_progress_cb cb, void *u
                        // The map's relationships flagged on their memories (the relations review shows why and where),
                        // and every checked claim with where the recording says it.
                        {"relation_flags", r.relation_flags}, {"evidence", r.evidence},
+                       // What no check could decide (no judge, no budget, no clear reply): never shown as checked.
+                       {"unchecked", r.unchecked}, {"unchecked_count", r.unchecked.size()},
                        {"judge_calls", r.judge_calls}, {"unjudged", r.unjudged},
                        {"seconds", (int)secs_taken}, {"at", (int64_t)std::time(nullptr)}};
         st.setting_set("verify." + std::to_string(note_id), report.dump(-1, ' ', false, json::error_handler_t::replace));
@@ -1595,6 +1600,19 @@ char *sve_notes_audio_older_than_json(sve_ctx *ctx, int max_age_days) {
     }
     o += "]";
     return dup_str(o);
+}
+
+int sve_note_replace_word(sve_ctx *ctx, int64_t note_id, const char *from, const char *to) {
+    try {
+        if (!ctx || !from || !to) return -1;
+        const std::string f = sve::trim_copy(from), t = sve::trim_copy(to);
+        if (f.empty() || t.empty()) return -1;
+        const int n = ctx->store->replace_word(note_id, f, t);
+        if (n > 0) sve_logf(1, "fix a word: note %lld, %d fields changed", (long long)note_id, n);
+        return n;
+    } catch (...) {
+        return -1;
+    }
 }
 
 int sve_setting_set(sve_ctx *ctx, const char *key, const char *value) {
