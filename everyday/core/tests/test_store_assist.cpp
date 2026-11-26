@@ -425,3 +425,33 @@ TEST(retention_backfills_notes_from_before_the_column) {
     }
     std::remove(path.c_str());
 }
+
+// Review of 9b6c400: "Fix a word" saved only the vocabulary; the correction now reaches what the note produced.
+TEST(fix_a_word_reaches_everything_the_note_produced) {
+    Store s(":memory:");
+    const int64_t id = s.create("Call with Ravee", "en", nullptr, "Ravee: I will send the deck to Ravindra.", 60);
+    const int64_t other = s.create("Other", "en", nullptr, "Ravee said hi.", 10);
+    CHECK(s.set_pieces(id, json::parse(R"([{"start_sec":0,"text":"Ravee: I will send the deck to Ravindra."}])")));
+    CHECK(s.set_text_column(id, "short_summary", "Ravee will send the deck."));
+    CHECK(s.set_text_column(id, "detailed_notes", "## Action items\n- [ ] Send the deck — Ravee — Friday"));
+    const int64_t mid = s.add_memory_item({{"type", "promise"}, {"text", "Ravee will send the deck"}, {"who", "Ravee"}});
+    CHECK(s.add_memory_source(mid, id, 0, "Ravee: I will send the deck", std::nullopt));
+    const int64_t sid = s.add_suggestion(json::parse(R"J({"kind":"task","payload":{"text":"Send the deck (Ravee)"},"quote":"Ravee: I will send the deck","note_id":)J" + std::to_string(id) + "}"));
+    const int64_t tid = s.add_task(json::parse(R"({"text":"Follow up with Ravee","note_id":)" + std::to_string(id) + "}"));
+    const int n = s.replace_word(id, "Ravee", "Ravi");
+    CHECK(n >= 8);
+    CHECK_EQ(s.pieces(id)[0]["text"].get<std::string>(), std::string("Ravi: I will send the deck to Ravindra."));   // whole words
+    auto note = s.get(id);
+    CHECK(note && note->title == "Call with Ravi" && *note->short_summary == "Ravi will send the deck.");
+    CHECK(note && note->detailed_notes->find("Ravee") == std::string::npos);
+    const json m = s.memory_items({{"note_id", id}});
+    CHECK(!m.empty() && m[0]["text"] == "Ravi will send the deck" && m[0]["who"] == "Ravi");
+    CHECK(s.suggestion(sid)["payload"]["text"] == "Send the deck (Ravi)");
+    bool task = false;
+    for (const auto &t : s.tasks(true)) task = task || (t["id"] == tid && t["text"] == "Follow up with Ravi");
+    CHECK(task);
+    // Another note is not touched; a word that is not there changes nothing.
+    CHECK(s.get(other)->transcript == std::string("Ravee said hi."));
+    CHECK_EQ(s.replace_word(id, "Nobody", "Somebody"), 0);
+    CHECK_EQ(s.replace_word(id, "", "x"), -1);
+}

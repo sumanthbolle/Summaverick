@@ -18,6 +18,7 @@
 //              map's relationship) does not say the opposite of the transcript or state as settled what it leaves
 //              open; only a judge "yes" clears it
 //   who        a relationship's person is the one the transcript gives it to
+//   binding    a line's person, action and date are said together (binding_conflict); only a judge "yes" clears it
 //   consistency the outputs agree with each other: of two claims about the same thing, one negated or left open and
 //              the other not, the one the transcript contradicts (by code) while it backs the other fails; any other
 //              disagreement is left to each claim's own source check (no judge: measured false flags)
@@ -61,6 +62,16 @@ bool polarity_conflict(const std::string &line, const json &pieces);
 // "Approval is still pending"). said_check returns -2 for it too.
 bool undecided(const std::string &clause);
 bool undecided_conflict(const std::string &line, const json &pieces);
+
+// Person, action and date together: the passage that says the line's action (its content words, names and dates
+// left aside: the best piece and the pieces either side) must also say each of the line's dates and days and name
+// or be said by the speaker the line names. "" when it does, else what is missing ("Monday", "Priya"). A line with
+// no date and no speaker named, or no action words, is not measured here. "Fix the login bug — Priya — Monday"
+// fails when Monday belongs to another speaker's task.
+std::string binding_conflict(const std::string &line, const json &pieces);
+// A memory's or action item's quote says something of its text (a content word in common). An invented line with a
+// real but unrelated quote does not.
+bool quote_supports(const std::string &text, const std::string &quote);
 
 // The summary's sentences that make a claim (2+ content words), headings and bullets left out.
 std::vector<std::string> summary_claims(const std::string &summary);
@@ -121,6 +132,8 @@ struct PartVerdict {
     int chosen = 0;               // the attempt kept (0: as written)
     bool please_check = false;
     std::vector<Failure> failures;  // of the attempt kept
+    std::vector<Failure> unchecked; // of the attempt kept: claims no check could decide (no judge, no budget, no
+                                    // clear reply). Never "passed": the note says it was only partly checked.
 };
 
 struct VerifyInput {
@@ -144,8 +157,11 @@ struct VerifyResult {
     // check meaning (the opposite of the transcript, or settled where it is open) | who (another person said or
     // decided it) | consistency (an output says otherwise). Their memories are in memories_flagged too.
     json relation_flags = json::array();
-    // Every checked claim with its evidence: [{"part","item","start_sec","ok"}] (at most kMaxEvidence).
+    // Every checked claim with its evidence: [{"part","item","start_sec","status","ok"}] (at most kMaxEvidence);
+    // status passed | failed | unchecked, ok = status == passed.
     json evidence = json::array();
+    // Claims, memories, action items and relationships no check could decide: [{"part","item","start_sec","id"?}].
+    json unchecked = json::array();
     std::vector<VerifyEvent> events;
     int judge_calls = 0, unjudged = 0;    // unjudged: items left unmeasured once kMaxJudgeCalls was reached
 };
@@ -158,8 +174,10 @@ using RewriteFn = std::function<bool(const std::string &part, int attempt, int b
 using EventFn = std::function<void(const VerifyEvent &)>;
 
 // The failures of one output as the parent measures them (judge may be empty: code checks only).
+// unchecked (optional): the claims a judge was needed for and could not decide (no judge, no budget, no clear reply).
 std::vector<Failure> check_output(const std::string &part, const std::string &text, const VerifyInput &in,
-                                  const ModelFn &judge, int &judge_calls, int &unjudged);
+                                  const ModelFn &judge, int &judge_calls, int &unjudged,
+                                  std::vector<Failure> *unchecked = nullptr);
 // The feedback a worker gets for these failures, in plain words (the lines quoted).
 std::string feedback_for(const std::string &part, const std::vector<Failure> &failures, const std::string &lang_name,
                          const std::vector<std::string> &not_said = {});

@@ -282,7 +282,7 @@ struct NoteDetailView: View {
         .sheet(item: $shareItem) { ActivityView(items: $0.items) }
         .navigationDestination(item: $openMoment) { NoteDetailView(noteID: $0.noteID, startAt: $0.startSec) }
         .sheet(item: $fixing) { target in
-            FixWordSheet(pieceText: target.text) { word in Task { await saveWord(word) } }
+            FixWordSheet(pieceText: target.text) { wrong, word in Task { await saveWord(word, replacing: wrong) } }
         }
         .alert("I couldn't save this. Please try again.", isPresented: errorShown) {
             Button("OK", role: .cancel) {}
@@ -502,14 +502,36 @@ struct NoteDetailView: View {
         .accessibilityAction(named: Text("Fix a word")) { fixing = FixTarget(text: p.text) }
     }
 
-    private func saveWord(_ word: String) async {
+    /// Saves the word for the next recordings and, when the person tapped the word that was wrong, corrects it in
+    /// everything this note produced (transcript, summary, notes, questions, memories, cards, tasks, map), then has
+    /// the note checked again.
+    private func saveWord(_ word: String, replacing wrong: String?) async {
         let w = word.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !w.isEmpty else { return }
         fixing = nil
         let id = await CoreEngine.shared.addVocab(w)
         guard id > 0 else { errorMessage = String(localized: "I couldn't save this. Please try again."); return }
+        var fixed = 0
+        // Not while this note's notes are being written: the run would write over the correction.
+        if isThisNoteBusy, wrong != nil {
+            NotificationCenter.default.post(name: .assistantChanged, object: nil)
+            showToast(String(localized: "Saved “\(w)”. Fix it in this note again once its notes are written."))
+            return
+        }
+        if let wrong = wrong?.trimmingCharacters(in: .whitespacesAndNewlines), !wrong.isEmpty, wrong != w {
+            fixed = await CoreEngine.shared.replaceWord(noteID: noteID, from: wrong, to: w)
+            if fixed < 0 { errorMessage = String(localized: "I saved the word but couldn't correct this note. Please try again.") }
+            if fixed > 0 {
+                pipeline.recheck(noteID)
+                NotificationCenter.default.post(name: .notesChanged, object: nil)
+            }
+        }
         NotificationCenter.default.post(name: .assistantChanged, object: nil)
-        showToast(String(localized: "Saved “\(w)”. I'll remember this word."))
+        if fixed > 0 {
+            showToast(String(localized: "Changed “\(wrong ?? "")” to “\(w)” in this note. I'll check it again."))
+        } else {
+            showToast(String(localized: "Saved “\(w)”. I'll remember this word."))
+        }
     }
 
     private func showToast(_ message: String) {
@@ -802,9 +824,12 @@ private struct ActivityView: UIViewControllerRepresentable {
 /// The word is the person's own edit, so it is added to Summaverick's vocabulary directly.
 private struct FixWordSheet: View {
     let pieceText: String
-    let onSave: (String) -> Void
+    /// (the word tapped as wrong, if one was; the correct word)
+    let onSave: (String?, String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var word = ""
+    /// The word the person tapped as wrong: replaced by the correct one in this note.
+    @State private var wrong: String?
 
     private var words: [String] {
         var seen = Set<String>()
@@ -825,7 +850,7 @@ private struct FixWordSheet: View {
                     Section {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], alignment: .leading, spacing: 8) {
                             ForEach(words, id: \.self) { w in
-                                Button { word = w } label: {
+                                Button { word = w; wrong = w } label: {
                                     Text(verbatim: w).font(.body).lineLimit(1).minimumScaleFactor(0.7)
                                         .frame(maxWidth: .infinity, minHeight: 44)
                                 }
@@ -844,7 +869,8 @@ private struct FixWordSheet: View {
                         .textInputAutocapitalization(.never)
                         .frame(minHeight: 44)
                 } header: { Text("Write it correctly") } footer: {
-                    Text("I'll remember this word for your next recordings.")
+                    Text(wrong == nil ? LocalizedStringKey("I'll remember this word for your next recordings.")
+                                      : LocalizedStringKey("I'll correct it in this note and remember it for your next recordings."))
                 }
                 .listRowBackground(Theme.formRow)
             }
@@ -854,7 +880,7 @@ private struct FixWordSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { onSave(word) }
+                    Button("Save") { onSave(wrong, word) }
                         .font(.headline)
                         .disabled(word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }

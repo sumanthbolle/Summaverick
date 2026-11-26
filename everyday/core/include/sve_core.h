@@ -188,6 +188,11 @@ char *sve_notes_list_json(sve_ctx *ctx, const char *query, int limit);
 /* Retention: returns a JSON array of {"id":…, "audio_path":"…"} for notes whose audio is older
  * than max_age_days. The host deletes the files, then calls sve_note_clear_audio for each. */
 char *sve_notes_audio_older_than_json(sve_ctx *ctx, int max_age_days);
+// "Fix a word": `from` (heard wrong) becomes `to` in everything the note produced (Store::replace_word): transcript,
+// title, summary, notes, questions, section outputs, its memories, cards, tasks, reminders and map relationships.
+// Returns how many fields changed (0: the word was not found), -1 on error (nothing changed). The host checks the
+// note again afterwards.
+int sve_note_replace_word(sve_ctx *ctx, int64_t note_id, const char *from, const char *to);
 int   sve_note_clear_audio(sve_ctx *ctx, int64_t id);
 /* Points the note at another audio file (the recording after it was compressed). 0 ok, -1 no such note. */
 int   sve_note_set_audio_path(sve_ctx *ctx, int64_t id, const char *audio_path);
