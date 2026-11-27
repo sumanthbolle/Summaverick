@@ -199,6 +199,16 @@ describe("Homepage public contract", () => {
     expect(band).toContain('class="everyday__wave" aria-hidden="true"');
   });
 
+  it("publishes the Everyday privacy policy the app links to", () => {
+    // The iPhone app's Settings → Privacy opens https://summaverick.com/everyday/privacy (App Store requirement).
+    const page = text("public/everyday/privacy.html");
+    expect(page).toContain('<link rel="canonical" href="https://summaverick.com/everyday/privacy" />');
+    for (const topic of ["Microphone", "language pack", "excluded from iCloud", "Delete everything", "7 days", "SUMMAVERICK LLP"]) {
+      expect(page, topic).toContain(topic);
+    }
+    expect(text("public/sitemap.xml")).toContain("https://summaverick.com/everyday/privacy");
+  });
+
   it("takes visitors from the introduction directly to the RAG offer", () => {
     const home = text("public/index.html");
     const sections = [...home.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
