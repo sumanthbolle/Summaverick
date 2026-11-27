@@ -86,7 +86,8 @@
 
   <main id="main">
     <!-- ---- Hero: the offer, readable before any motion runs ------------- -->
-    <section class="hero" id="top" aria-labelledby="hero-title">
+    <section class="hero scope-night" id="top" aria-labelledby="hero-title" data-night>
+      <canvas class="hero__dither" data-dither="night" aria-hidden="true"></canvas>
       <div class="container hero__grid">
         <div class="hero__copy">
           <!-- Launch notice for Summaverick Everyday; it links to the full
@@ -109,6 +110,8 @@
               <span class="hero-headline__face hero-headline__face--brand" data-face-brand><span class="glassmark" data-glassmark><span class="glassmark__base">Summaverick</span><span class="glassmark__layer glassmark__shade" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__rim" aria-hidden="true">Summaverick</span><span class="glassmark__layer glassmark__reflect" aria-hidden="true">Summaverick</span><span class="glassmark__flash" aria-hidden="true"></span><span class="glassmark__frag" data-frag="0" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="1" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="2" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="3" aria-hidden="true">Summaverick</span><span class="glassmark__frag" data-frag="4" aria-hidden="true">Summaverick</span><span class="glassmark__glint glassmark__glint--s" aria-hidden="true"></span><span class="glassmark__glint glassmark__glint--a" aria-hidden="true"></span></span><span class="hero-headline__dot" aria-hidden="true">.</span></span>
             </span>
           </h1>
+        </div>
+        <div class="hero__aside">
           <p class="studio-lead">
             A software studio for AI agents. We design and build them end to
             end—a personal assistant on someone's phone, a mobile experience,
@@ -120,8 +123,38 @@
             <a class="btn btn-quiet btn-lg" href="#rag">Explore RAG assistants</a>
           </div>
         </div>
-
       </div>
+
+      <!-- The brand moment: the folded S from the mark as a ribbon of light,
+           in a product frame with a real way into the assistant. The form
+           posts to /ask-summaverick?q=, which fills and sends the question. -->
+      <div class="container">
+        <div class="hero__frame" data-particle-host>
+          <div class="hero__frame-bar">
+            <span class="hero__frame-dot" aria-hidden="true"></span>
+            <span>Meet Summaverick</span>
+            <span class="hero__frame-meta">Cited answers · three depths</span>
+          </div>
+          <canvas class="hero__s" data-particle-s aria-hidden="true"></canvas>
+          <form class="hero__ask" action="/ask-summaverick" method="get" role="search">
+            <label class="visually-hidden" for="hero-ask">Ask Summaverick a question</label>
+            <input id="hero-ask" name="q" type="text" maxlength="500" autocomplete="off" enterkeyhint="send" placeholder="Ask Summaverick anything" />
+            <button type="submit" aria-label="Ask Summaverick">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            </button>
+          </form>
+        </div>
+
+        <div class="hero__works">
+          <p>Built into the systems your team already uses</p>
+          <ul>
+            <li>ServiceNow</li><li>Postgres</li><li>Snowflake</li><li>SharePoint</li>
+            <li>MongoDB</li><li>WhatsApp</li><li>Slack</li><li>Microsoft Teams</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="dawn" aria-hidden="true" data-night-end><canvas data-dither="dawn"></canvas></div>
     </section>
 
     <!-- ---- Next-generation RAG assistants ------------------------------
@@ -145,7 +178,7 @@
         </div>
 
         <div class="rag__grid">
-          <article class="rag__pillar" data-reveal>
+          <article class="rag__pillar" data-spot data-reveal>
             <p class="rag__figure">Modules</p>
             <h3>Lightweight by design</h3>
             <p>
@@ -154,7 +187,7 @@
               with nothing to rip out later.
             </p>
           </article>
-          <article class="rag__pillar" data-reveal style="--d:30ms">
+          <article class="rag__pillar" data-spot data-reveal style="--d:30ms">
             <p class="rag__figure">1 week</p>
             <h3>Proof of concept to production</h3>
             <p>
@@ -163,7 +196,7 @@
               hardens it, hands it over, and goes live.
             </p>
           </article>
-          <article class="rag__pillar" data-reveal style="--d:60ms">
+          <article class="rag__pillar" data-spot data-reveal style="--d:60ms">
             <p class="rag__figure">Any DB</p>
             <h3>Wherever your data lives</h3>
             <p>
@@ -174,7 +207,7 @@
           </article>
         </div>
 
-        <div class="rag__board band-ink" data-reveal aria-hidden="true">
+        <div class="rag__board band-ink" data-spot data-reveal aria-hidden="true">
           <div class="rag__flow">
             <div class="rag__col">
               <p class="rag__col-title">Your data, where it is</p>
@@ -240,7 +273,7 @@
           </p>
         </div>
         <div class="offers__grid" data-reveal-group>
-          <article class="offer" data-reveal>
+          <article class="offer" data-spot data-reveal>
             <div class="offer__art mini mini--chat" aria-hidden="true">
               <p class="mini__tag">Sample data</p>
               <div class="mini__screen">
@@ -265,7 +298,7 @@
             </p>
             <a class="offer__link" href="/ask-summaverick">Try Meet Summaverick <span aria-hidden="true">›</span></a>
           </article>
-          <article class="offer" data-reveal style="--d:30ms">
+          <article class="offer" data-spot data-reveal style="--d:30ms">
             <div class="offer__art mini mini--phone" aria-hidden="true">
               <p class="mini__tag">Sample data</p>
               <div class="mini__phone">
@@ -292,7 +325,7 @@
             </p>
             <a class="offer__link" href="#examples" data-demo-open="1">See it work<span class="visually-hidden">: an assistant answering customers on WhatsApp</span> <span aria-hidden="true">›</span></a>
           </article>
-          <article class="offer" data-reveal style="--d:60ms">
+          <article class="offer" data-spot data-reveal style="--d:60ms">
             <div class="offer__art mini mini--desk" aria-hidden="true">
               <p class="mini__tag">Sample data</p>
               <div class="mini__screen">
@@ -595,11 +628,11 @@
           </p>
         </div>
         <div class="platforms__grid">
-          <article class="platform" data-reveal>
+          <article class="platform" data-spot data-reveal>
             <h3>ServiceNow</h3>
             <p>Agent experiences, applications, and integrations designed around ServiceNow workflows.</p>
           </article>
-          <article class="platform" data-reveal style="--d:30ms">
+          <article class="platform" data-spot data-reveal style="--d:30ms">
             <h3>Beyond ServiceNow</h3>
             <p>Custom products and agent services that connect with the tools a person or team uses.</p>
           </article>
@@ -620,7 +653,7 @@
     </section>
 
     <!-- ---- About: the dark brand band -------------------------------------- -->
-    <section class="about band-ink" id="about" aria-labelledby="about-title">
+    <section class="about band-ink scope-night" id="about" aria-labelledby="about-title" data-night>
       <span class="anchor-alias" id="company" aria-hidden="true"></span>
       <div class="container about__grid">
         <figure class="about__brand" data-reveal>

@@ -73,33 +73,314 @@ body[data-home] .btn-primary {
 }
 body[data-home] .btn-quiet { border-color: transparent; }
 
+/* ---- Night scope -------------------------------------------------------------
+   Points the page ramp at the night tokens, so everything inside the hero,
+   the headline, the glass wordmark, the buttons, reads as it does in the dark
+   appearance whichever appearance the visitor chose. */
+body[data-home] .scope-night {
+  --c-bg: var(--night-bg);
+  --c-bg-elev: var(--night-surface);
+  --c-surface: var(--night-surface);
+  --c-surface-2: var(--night-surface-2);
+  --c-line: var(--night-line);
+  --c-line-strong: var(--night-line-strong);
+  --c-text: var(--night-text);
+  --c-text-dim: var(--night-text-dim);
+  --c-text-mute: var(--night-text-mute);
+  --c-accent: var(--night-text);
+  --c-accent-press: var(--c-white);
+  --c-accent-soft: color-mix(in srgb, var(--night-text) 12%, transparent);
+  --c-accent-fill: var(--night-text);
+  --c-on-accent: var(--night-bg);
+  --focus-ring: 0 0 0 2px var(--night-bg), 0 0 0 4px var(--night-text);
+  --shadow-2: 0 6px 24px color-mix(in srgb, black 55%, transparent);
+  --grad-head: var(--grad-head-night);
+  --grad-hero: var(--grad-hero-night);
+  --grad-spectrum: var(--grad-spectrum-bright);
+  --glass-spectrum: var(--glass-spectrum-night);
+  color-scheme: dark;
+}
+
 /* ---- Hero ------------------------------------------------------------------
-   A light, dotted ground for the introduction, followed directly by RAG.
-   The same reading order applies on desktop and narrow screens. */
+   Night ground with a dithered light falling from the top, the headline
+   beside the offer, and under them a frame holding the folded S as points of
+   light with a way into the assistant. Followed directly by RAG. */
 body[data-home] .hero {
-  padding-top: clamp(7.5rem, 12vw, 9.5rem);
-  padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
-  background:
-    radial-gradient(
-      circle,
-      color-mix(in srgb, var(--c-text) 13%, transparent) 0 1px,
-      transparent 1.5px
-    ) 0 0 / 10px 10px,
-    var(--cine-ground);
+  padding-top: clamp(8rem, 13vw, 10.5rem);
+  padding-bottom: 0;
+  background: var(--night-bg);
+  color: var(--c-text-dim);
 }
-/* The bloom used to breathe forever; it now simply sits there. */
-body[data-home] .hero::before { animation: none; opacity: 0.9; }
-/* Where the vignette was, the dots fade into the ground the next band sits on. */
-body[data-home] .hero::after {
-  background: linear-gradient(to bottom, transparent 38%, var(--c-bg) 94%);
+body[data-home] .hero::before,
+body[data-home] .hero::after { content: none; }
+body[data-home] .hero__dither {
+  --dither: var(--night-steel);
+  --dither-alpha: 0.32;
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: -1;
+  width: 100%;
+  height: min(100%, 64rem);
+  image-rendering: pixelated;
+  opacity: 0;
+  transition: opacity 1.4s var(--ease-out);
 }
+body[data-home] .hero__dither.is-painted { opacity: 1; }
 body[data-home] .hero__grid {
-  grid-template-columns: minmax(0, 1fr);
-  gap: clamp(2rem, 4.5vw, 3.5rem);
-  align-items: start;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: end;
 }
-body[data-home] .hero__copy { max-width: 48rem; }
-body[data-home] .hero .studio-lead { max-width: 52ch; }
+@media (min-width: 861px) {
+  body[data-home] .hero .studio-actions { flex-wrap: nowrap; }
+}
+body[data-home] .hero .studio-lead {
+  max-width: 48ch;
+  margin: 0;
+  font-size: var(--step-0);
+  line-height: 1.6;
+}
+body[data-home] .hero .studio-actions { margin-top: var(--space-5); }
+body[data-home] .hero .btn-quiet { color: var(--c-text); }
+body[data-home] .hero .btn-quiet:hover { background: var(--c-accent-soft); }
+
+/* The frame: a dark product surface, the S drawn across it on a canvas, a
+   status bar along the top and the composer at the bottom. */
+body[data-home] .hero__frame {
+  position: relative;
+  height: clamp(26rem, 44vw, 38rem);
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+  overflow: hidden;
+  border: 1px solid var(--night-line-strong);
+  border-radius: 20px;
+  background:
+    radial-gradient(52% 58% at 50% 46%, color-mix(in srgb, var(--night-steel) 7%, transparent), transparent 72%),
+    var(--night-surface);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--night-text) 7%, transparent),
+    0 60px 120px -60px color-mix(in srgb, black 90%, transparent);
+}
+body[data-home] .hero__frame-bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--night-line);
+  color: var(--c-text);
+  font-size: var(--step--1);
+  font-weight: var(--weight-medium);
+}
+body[data-home] .hero__frame-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-ok) 22%, transparent);
+}
+body[data-home] .hero__frame-meta {
+  margin-left: auto;
+  color: var(--c-text-mute);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: var(--weight-regular);
+}
+body[data-home] .hero__s {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+body[data-home] .hero__ask {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(36rem, calc(100% - 32px));
+  padding: 6px 6px 6px 20px;
+  border: 1px solid var(--night-line-strong);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--night-surface-2) 80%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+body[data-home] .hero__ask:focus-within {
+  border-color: color-mix(in srgb, var(--night-text) 42%, transparent);
+}
+body[data-home] .hero__ask input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--step-0);
+  outline: none;
+}
+body[data-home] .hero__ask input::placeholder { color: var(--c-text-mute); }
+body[data-home] .hero__ask button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--night-text);
+  color: var(--night-bg);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+body[data-home] .hero__ask button:hover { background: var(--c-white); }
+body[data-home] .hero__ask button:active { transform: scale(0.96); }
+body[data-home] .hero__ask button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+body[data-home] .hero__ask svg { width: 18px; height: 18px; }
+
+/* Where a reference site shows client logos, this shows the systems the page
+   already names, set as quiet wordmarks. */
+body[data-home] .hero__works {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+  margin-top: clamp(3rem, 6vw, 4.5rem);
+  text-align: center;
+}
+body[data-home] .hero__works p {
+  margin: 0;
+  color: var(--c-text-mute);
+  font-size: var(--step--1);
+}
+body[data-home] .hero__works ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3) clamp(1.5rem, 3.2vw, 2.75rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+body[data-home] .hero__works li {
+  color: var(--c-text-dim);
+  font-size: clamp(1.05rem, 0.95rem + 0.4vw, 1.3rem);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  transition: color var(--dur-base) var(--ease-out);
+}
+body[data-home] .hero__works li:hover { color: var(--c-text); }
+
+@media (max-width: 860px) {
+  body[data-home] .hero__grid { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  body[data-home] .hero__frame { height: 24rem; }
+  body[data-home] .hero__frame-meta { display: none; }
+}
+
+/* ---- Dawn --------------------------------------------------------------------
+   The foot of the hero, where night gives way to the page: the ground runs
+   from night to the page colour while a ridge of dithered light crosses it.
+   It sits inside the night scope, so it reads the page colour from
+   --page-bg, captured on <body>. */
+body[data-home] .dawn {
+  position: relative;
+  height: clamp(8rem, 14vw, 12rem);
+  margin-top: clamp(2rem, 4vw, 3rem);
+  background: linear-gradient(to bottom, var(--night-bg), var(--page-bg));
+}
+body[data-home] .dawn canvas {
+  --dither: var(--c-white);
+  --dither-alpha: 0.42;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body[data-home] .dawn canvas { --dither: var(--night-steel); --dither-alpha: 0.2; }
+}
+:root[data-theme="dark"] body[data-home] .dawn canvas { --dither: var(--night-steel); --dither-alpha: 0.2; }
+
+/* ---- Halftone pools -----------------------------------------------------------
+   A field of fine dots fading out from under the RAG board and the demo, the
+   printed counterpart of the hero's light. */
+body[data-home] :is(.rag, .examples) { position: relative; isolation: isolate; }
+body[data-home] :is(.rag, .examples)::before {
+  content: "";
+  position: absolute;
+  inset: 34% 0 6% 0;
+  z-index: -1;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c-text) 16%, transparent) 0 1.1px, transparent 1.6px) 0 0 / 12px 12px;
+  -webkit-mask-image: radial-gradient(48% 50% at 50% 50%, black, transparent 78%);
+  mask-image: radial-gradient(48% 50% at 50% 50%, black, transparent 78%);
+  pointer-events: none;
+}
+body[data-home] .examples::before { inset: 22% 0 8% 0; }
+
+/* ---- Edge light -----------------------------------------------------------------
+   Cards marked [data-spot] catch a soft light on their hairline where the
+   pointer is. fx.js writes --mx/--my; without it the light never shows. */
+body[data-home] [data-spot] { position: relative; }
+body[data-home] [data-spot]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 1px;
+  border-radius: inherit;
+  background: radial-gradient(320px circle at var(--mx, 50%) var(--my, -60%), color-mix(in srgb, var(--c-text) 70%, transparent), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+  pointer-events: none;
+}
+body[data-home] [data-spot]:hover::after { opacity: 1; }
+body[data-home] [data-spot]:hover {
+  background-image: radial-gradient(440px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--c-text) 5%, transparent), transparent 65%);
+}
+
+/* ---- Floating nav ------------------------------------------------------------------
+   On the homepage the bar becomes a pill that floats over the page, lined up
+   with the container. Over the night hero it takes the night glass (fx.js
+   sets data-over="night"); everywhere else it keeps the light glass. */
+:root:has(body[data-home]) { scroll-padding-top: 88px; }
+body[data-home] .nav {
+  inset: 12px max(12px, calc((100vw - var(--container)) / 2 + 8px)) auto;
+  min-height: 52px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--c-bar-line);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 12px 32px -16px color-mix(in srgb, black 30%, transparent);
+  transition:
+    background-color var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out);
+}
+body[data-home] .nav[data-over="night"] {
+  --c-bar: var(--night-glass);
+  --c-bar-line: var(--night-line-strong);
+  --c-bar-fill: color-mix(in srgb, var(--night-text) 10%, transparent);
+  --c-bar-text: var(--night-text);
+  --c-bar-text-dim: var(--night-text-dim);
+  --c-on-accent: var(--night-bg);
+  --grad-head-bar: var(--grad-head-night);
+  box-shadow: 0 12px 32px -16px color-mix(in srgb, black 70%, transparent);
+}
+body[data-home] .nav-panel {
+  inset: 72px 12px auto;
+  max-height: calc(100dvh - 84px);
+  border: 1px solid var(--c-bar-line);
+  border-radius: 20px;
+}
 
 /* ---- Section headers --------------------------------------------------------
    The sections that open a block of cards or a panel centre their header over
@@ -803,8 +1084,25 @@ body[data-home] .control h2 {
 }
 body[data-home] .control p { font-size: var(--step-1); line-height: 1.55; }
 
-/* ---- About: an ink band -------------------------------------------------------------- */
+/* ---- About: the second night ------------------------------------------------------------
+   Night in both appearances, like the hero. The logo render is black, so its
+   square is masked into the night ground and the S sits in the same dark as
+   the one drawn in points at the top of the page. */
 body[data-home] .about { padding-block: clamp(4rem, 9vw, 8rem); }
+body[data-home] .about.scope-night {
+  --band: var(--night-bg);
+  --band-text: var(--night-text);
+  --band-text-dim: var(--night-text-dim);
+  --band-text-mute: var(--night-text-mute);
+  --band-line: var(--night-line);
+  --band-raise: color-mix(in srgb, var(--night-text) 6%, transparent);
+  --band-scheme: dark;
+}
+body[data-home] .about__brand img {
+  box-shadow: none;
+  -webkit-mask-image: radial-gradient(closest-side, black 62%, transparent 100%);
+  mask-image: radial-gradient(closest-side, black 62%, transparent 100%);
+}
 body[data-home] .about__actions { margin-top: var(--space-6); }
 
 /* ---- Resources: tall cards ----------------------------------------------------------- */
