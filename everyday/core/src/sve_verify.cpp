@@ -1001,10 +1001,11 @@ VerifyResult verify_outputs(const VerifyInput &in, const ModelFn &judge, const R
         if (trim(text).empty()) continue;
         PartVerdict v;
         v.part = part;
-        // How many things the check measured (for the log): the output, its claims or its questions.
+        // How many things the check measured (for the log): the summary's claims, the notes' lines or the questions.
         auto measured = [&](const std::string &t) {
             return part == "notes" ? 1 + (int)decision_action_lines(t).size()
-                 : part == "questions" ? 1 + (int)parse_qa(t).size() : 1;
+                 : part == "questions" ? 1 + (int)parse_qa(t).size()
+                 : std::max<int>(1, (int)summary_claims(t).size());
         };
         std::vector<Failure> best_unchecked;
         std::vector<Failure> best = with_consistency(part, text, check_output(part, text, in, judge, r.judge_calls, r.unjudged, &best_unchecked));

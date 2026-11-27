@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5E1A2B3C4D5E6F7081920B03 = {
+			isa = PBXBuildFile;
+			fileRef = 5E1A2B3C4D5E6F7081920B04;
+		};
+		5E1A2B3C4D5E6F7081920B01 = {
+			isa = PBXBuildFile;
+			fileRef = 5E1A2B3C4D5E6F7081920B02;
+		};
 		02483ED28A106C83F67E1A8A = {
 			isa = PBXBuildFile;
 			fileRef = 647DAFDDC9793F2E68970D6F;
@@ -470,6 +478,20 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5E1A2B3C4D5E6F7081920B04 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xml;
+			name = PrivacyInfo.xcprivacy;
+			path = SummaverickWidgets/PrivacyInfo.xcprivacy;
+			sourceTree = SOURCE_ROOT;
+		};
+		5E1A2B3C4D5E6F7081920B02 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xml;
+			name = PrivacyInfo.xcprivacy;
+			path = SummaverickEveryday/PrivacyInfo.xcprivacy;
+			sourceTree = SOURCE_ROOT;
+		};
 		05DE663E1F9B875F3C1ABC94 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
@@ -1490,6 +1512,7 @@
 				F86C9C201E773F26CECBA845,
 				29A1CD6197C4EBF318C20726,
 				8C247BC7003BBE5F71E1479C,
+				5E1A2B3C4D5E6F7081920B02,
 				FC581254F5C135DB22FD9C42,
 				287ECA324ED50C0FEF7A6604,
 				69021175FE455DA46F1832CA,
@@ -1629,6 +1652,7 @@
 				33C50C60642D8852C316CF41,
 				05DE663E1F9B875F3C1ABC94,
 				52C1022F6F542158C732AD92,
+				5E1A2B3C4D5E6F7081920B04,
 			);
 			name = SummaverickWidgets;
 			sourceTree = "<group>";
@@ -1725,6 +1749,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5E1A2B3C4D5E6F7081920B01,
 				334316FE5AD49DBFE79A28C1,
 				F537C5DA2B9ED38A363F872D,
 				E1A865BA6F70AD42A421A43D,
@@ -1736,6 +1761,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5E1A2B3C4D5E6F7081920B03,
 				D24548A80F6EDBB04A261E7D,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1863,7 +1889,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = SummaverickWidgets/SummaverickWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = SummaverickWidgets/SummaverickWidgets-Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3JVSNB8RYM;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1890,7 +1916,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = SummaverickEveryday/SummaverickEveryday.entitlements;
+				CODE_SIGN_ENTITLEMENTS = SummaverickEveryday/SummaverickEveryday-Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3JVSNB8RYM;
 				ENABLE_PREVIEWS = YES;

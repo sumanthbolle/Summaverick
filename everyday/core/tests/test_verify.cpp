@@ -493,3 +493,19 @@ TEST(verify_judge_failure_leaves_claims_unchecked) {
     VerifyResult n = verify_outputs(in, nullptr, nullptr, nullptr);
     CHECK_EQ(status_of(n, "summary", "The quarterly offsite"), "unchecked");
 }
+
+TEST(verify_log_counts_each_summary_claim) {
+    VerifyInput in;
+    in.pieces = planning();
+    in.summary = "The quarterly offsite moves to Goa. The office in London was sold.";
+    std::vector<VerifyEvent> events;
+    verify_outputs(in, kNo, nullptr, [&](const VerifyEvent &e) { events.push_back(e); });
+    bool seen = false;
+    for (const auto &e : events)
+        if (e.part == "summary" && e.action == "check" && e.attempt == 0) {
+            seen = true;
+            CHECK_EQ(e.total, 2);             // two claims checked, not "the summary"
+            CHECK(e.failed <= e.total);       // never "2 failed of 1"
+        }
+    CHECK(seen);
+}

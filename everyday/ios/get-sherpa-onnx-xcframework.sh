@@ -23,4 +23,33 @@ unzip -q "$TMP/sherpa.zip" -d "$TMP/x"
 mkdir -p Frameworks
 rm -rf Frameworks/SherpaOnnxC.xcframework
 mv "$TMP/x/SherpaOnnxC.xcframework" Frameworks/SherpaOnnxC.xcframework
+# sherpa-onnx ships no privacy manifest, and its library calls stat/fstat (Apple's "file timestamp" required-reason
+# API) on the speech model files in the app. App Store submission needs the reason declared in the framework itself.
+for fw in Frameworks/SherpaOnnxC.xcframework/*/SherpaOnnxC.framework; do
+  cat > "$fw/PrivacyInfo.xcprivacy" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
+PLIST
+done
 echo "OK: Frameworks/SherpaOnnxC.xcframework (sherpa-onnx 2.0.1). Now: python3 make_xcodeproj.py"
