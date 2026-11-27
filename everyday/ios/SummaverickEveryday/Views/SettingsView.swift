@@ -118,6 +118,10 @@ struct SettingsView: View {
                         .disabled(!AppLock.isAvailable)
                     Toggle("Show recording reminder", isOn: Binding(get: { !settings.consentAcknowledged }, set: { settings.consentAcknowledged = !$0 }))
                         .tint(Theme.toggleOn)
+                    Link(destination: PrivacyPolicy.url) {
+                        Label("Privacy Policy", systemImage: "hand.raised")
+                    }
+                    .frame(minHeight: 44)
                     Text("Summaverick has no account, no analytics and no server. The only network use is downloading Summaverick's language pack.")
                         .font(.footnote).foregroundStyle(Theme.secondary)
                 }
@@ -315,4 +319,10 @@ struct ProcessingActivityView: View {
             titles = Dictionary(await CoreEngine.shared.notes().map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
         }
     }
+}
+
+/// The public privacy policy (also entered in App Store Connect). Opens in Safari: the app itself makes no other
+/// network request.
+enum PrivacyPolicy {
+    static let url = URL(string: "https://summaverick.com/everyday/privacy")!
 }

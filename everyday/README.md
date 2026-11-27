@@ -62,6 +62,15 @@ SVE_TEST_WAV=clip.wav bash core/tests/smoke_gemma.sh transcribe   # 16 kHz mono 
 
 The app needs one entitlement, Increased Memory Limit (`com.apple.developer.kernel.increased-memory-limit`), so that the 5 GB Gemma model fits in memory. It is the only extra entitlement a personal Apple team supports, so the app is built to need nothing else. Adding other capabilities in Xcode will break signing with a personal team.
 
+Release builds (TestFlight, App Store) also sign the app and the widget extension with the App Group `group.com.summaverick.everyday`, through `SummaverickEveryday-Release.entitlements` and `SummaverickWidgets-Release.entitlements`. The record control in Control Center and on the Lock Screen reads the recording state from it. A personal team cannot use App Groups, so Debug builds leave it out; the control then shows no state, and the app logs `App Group ... missing`. To archive for the App Store, enable the App Group for both bundle ids in the paid team, and put it in both distribution profiles.
+
+### App Store submission
+
+- **Privacy manifests:** `SummaverickEveryday/PrivacyInfo.xcprivacy` and `SummaverickWidgets/PrivacyInfo.xcprivacy`. Nothing is collected or tracked. They declare these required-reason APIs: UserDefaults, file timestamps, disk space and system boot time. `get-sherpa-onnx-xcframework.sh` writes a manifest into SherpaOnnxC.framework, which calls `stat`/`fstat`. Check that all three are inside the Release archive.
+- **Privacy policy:** https://summaverick.com/everyday/privacy, published from the website repo as `public/everyday/privacy.html`. It is linked from Settings → Privacy. Enter the same URL in App Store Connect. Update the page whenever storage, retention, the download or deletion changes.
+- **Archive check:** run `ios/tools/check-release-archive.sh <the .xcarchive or .ipa>`. It fails if any of the three manifests is missing, which happens with a SherpaOnnxC framework fetched before the script added its manifest. It also fails if the app or the widget is signed without the App Group, or is development-signed.
+- **Review notes:** say that the first launch downloads a 5.5 GB language pack from Hugging Face, and that after the download everything works offline.
+
 ## Build the iOS app (on your Mac)
 
 Requirements: Xcode 16+, an iPhone/iPad on iOS 17+, [Homebrew](https://brew.sh).

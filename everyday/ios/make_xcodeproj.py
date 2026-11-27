@@ -118,10 +118,14 @@ assets_ref = file_ref(assets, "folder.assetcatalog", name="Assets.xcassets")
 assets_build = build_file(assets_ref, "resources")
 xcstrings_refs = [file_ref(p, "text.json.xcstrings", name=os.path.basename(p)) for p in xcstrings_files]
 xcstrings_builds = [build_file(r, "resources") for r in xcstrings_refs]
+# Apple's privacy manifests (required-reason APIs; nothing collected), one per bundle.
+privacy_ref = file_ref(f"{SWIFT_DIR}/PrivacyInfo.xcprivacy", "text.xml", name="PrivacyInfo.xcprivacy")
+privacy_build = build_file(privacy_ref, "resources")
 shared_refs = [file_ref(p, "sourcecode.swift", name=os.path.basename(p)) for p in shared_files]
 widget_refs = [file_ref(p, "sourcecode.swift", name=os.path.basename(p)) for p in widget_files]
 widget_plist = f"{WIDGETS_DIR}/Info.plist"
 widget_plist_ref = file_ref(widget_plist, "text.plist.xml", name="Info.plist")
+widget_privacy_ref = file_ref(f"{WIDGETS_DIR}/PrivacyInfo.xcprivacy", "text.xml", name="PrivacyInfo.xcprivacy")
 xcf_ref = file_ref(XCFRAMEWORK, "wrapper.xcframework", name="llama.xcframework")
 sherpa_ref = file_ref(SHERPA_XCFRAMEWORK, "wrapper.xcframework", name="SherpaOnnxC.xcframework")
 shruti_ref = file_ref(SHRUTI_DIR, "folder", name="Shruti")
@@ -147,6 +151,7 @@ widget_source_builds = [build_file(r, "widget-sources") for r in widget_refs + s
 # The extension shows the app's strings: the same catalog, as its own resource.
 widget_resource_builds = [build_file(r, "widget-resources") for r, p in zip(xcstrings_refs, xcstrings_files)
                           if os.path.basename(p) == "Localizable.xcstrings"]
+widget_resource_builds.append(build_file(widget_privacy_ref, "widget-resources"))
 embed_widget_build = build_file(widget_product_ref, "embed-extensions", settings={"ATTRIBUTES": ["RemoveHeadersOnCopy"]})
 link_build = build_file(xcf_ref, "frameworks")
 embed_build = build_file(xcf_ref, "embed", settings={"ATTRIBUTES": ["CodeSignOnCopy", "RemoveHeadersOnCopy"]})
@@ -175,11 +180,11 @@ for d in sorted(by_dir):
         swift_children.extend(by_dir[d])
     else:
         swift_children.append(group("swift/" + d, d, by_dir[d]))
-swift_children += [bridging_ref, plist_ref, assets_ref, shruti_ref] + xcstrings_refs
+swift_children += [bridging_ref, plist_ref, privacy_ref, assets_ref, shruti_ref] + xcstrings_refs
 
 app_group = group("app", APP, swift_children)
 shared_group = group("shared", SHARED_DIR, shared_refs)
-widgets_group = group("widgets", WIDGETS, widget_refs + [widget_plist_ref])
+widgets_group = group("widgets", WIDGETS, widget_refs + [widget_plist_ref, widget_privacy_ref])
 core_group = group("core", "Core", core_refs)
 fw_group = group("frameworks", "Frameworks", [xcf_ref, sherpa_ref])
 products_group = group("products", "Products", [product_ref, widget_product_ref])
@@ -196,7 +201,7 @@ objects[frameworks_phase] = ("PBXFrameworksBuildPhase", {
     "runOnlyForDeploymentPostprocessing": "0"})
 resources_phase = uid("phase:resources")
 objects[resources_phase] = ("PBXResourcesBuildPhase", {
-    "isa": "PBXResourcesBuildPhase", "buildActionMask": "2147483647", "files": [assets_build, shruti_build] + xcstrings_builds,
+    "isa": "PBXResourcesBuildPhase", "buildActionMask": "2147483647", "files": [assets_build, shruti_build, privacy_build] + xcstrings_builds,
     "runOnlyForDeploymentPostprocessing": "0"})
 embed_phase = uid("phase:embed")
 objects[embed_phase] = ("PBXCopyFilesBuildPhase", {
@@ -307,8 +312,8 @@ target_settings = {
 
 # WidgetKit + ActivityKit + SwiftUI (linked automatically). 18.0: the Live Activity is iOS 18+ (the app only starts
 # it there), and the record ControlWidget needs 18. Same team and signing as the app. SVE_WIDGET_EXTENSION: the
-# extension's copy of the recording intents never records (they are performed in the app). Both targets share the
-# App Group group.com.summaverick.everyday (the record control's state).
+# extension's copy of the recording intents never records (they are performed in the app). In Release both targets
+# share the App Group group.com.summaverick.everyday (the record control's state).
 widget_settings = {
     "APPLICATION_EXTENSION_API_ONLY": "YES",
     "CODE_SIGN_ENTITLEMENTS": f"{WIDGETS_DIR}/SummaverickWidgets.entitlements",
@@ -342,11 +347,15 @@ def config_list(key, configs):
 
 proj_cl = config_list("project", [config("project/Debug", "Debug", project_debug),
                                   config("project/Release", "Release", project_release)])
+# Release (TestFlight, App Store) signs both targets with the App Group the record control reads; Debug leaves it
+# out, so a personal-team profile (no App Groups) can still install on a phone. The control then shows no state.
 target_cl = config_list("target", [config("target/Debug", "Debug", target_settings),
-                                   config("target/Release", "Release", target_settings)])
+                                   config("target/Release", "Release", {**target_settings,
+                                          "CODE_SIGN_ENTITLEMENTS": f"{SWIFT_DIR}/SummaverickEveryday-Release.entitlements"})])
 
 widget_cl = config_list("widget", [config("widget/Debug", "Debug", widget_settings),
-                                   config("widget/Release", "Release", widget_settings)])
+                                   config("widget/Release", "Release", {**widget_settings,
+                                          "CODE_SIGN_ENTITLEMENTS": f"{WIDGETS_DIR}/SummaverickWidgets-Release.entitlements"})])
 widget_target = uid("target:" + WIDGETS)
 objects[widget_target] = ("PBXNativeTarget", {
     "isa": "PBXNativeTarget", "buildConfigurationList": widget_cl,
