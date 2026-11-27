@@ -68,6 +68,7 @@ Release builds (TestFlight, App Store) also sign the app and the widget extensio
 
 - **Privacy manifests:** `SummaverickEveryday/PrivacyInfo.xcprivacy` and `SummaverickWidgets/PrivacyInfo.xcprivacy`. Nothing is collected or tracked. They declare these required-reason APIs: UserDefaults, file timestamps, disk space and system boot time. `get-sherpa-onnx-xcframework.sh` writes a manifest into SherpaOnnxC.framework, which calls `stat`/`fstat`. Check that all three are inside the Release archive.
 - **Privacy policy:** https://summaverick.com/everyday/privacy, published from the website repo as `public/everyday/privacy.html`. It is linked from Settings → Privacy. Enter the same URL in App Store Connect. Update the page whenever storage, retention, the download or deletion changes.
+- **Archive check:** run `ios/tools/check-release-archive.sh <the .xcarchive or .ipa>`. It fails if any of the three manifests is missing, which happens with a SherpaOnnxC framework fetched before the script added its manifest. It also fails if the app or the widget is signed without the App Group, or is development-signed.
 - **Review notes:** say that the first launch downloads a 5.5 GB language pack from Hugging Face, and that after the download everything works offline.
 
 ## Build the iOS app (on your Mac)
